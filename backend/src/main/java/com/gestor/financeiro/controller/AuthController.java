@@ -3,21 +3,28 @@ package com.gestor.financeiro.controller;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
-// Indica que esta classe é um controller REST (API)
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    // Injeta o repositório para acessar o banco
     @Autowired
     private UsuarioRepository usuarioRepository;
 
-    // Endpoint para registrar um novo usuário
+    @Autowired
+    private PasswordEncoder passwordEncoder;  // Injeta o BCrypt
+
+    @Transactional
     @PostMapping("/register")
     public Usuario register(@RequestBody Usuario usuario) {
-        // Salva o usuário no banco
+        // Criptografa a senha ANTES de salvar
+        String senhaCriptografada = passwordEncoder.encode(usuario.getSenha());
+        usuario.setSenha(senhaCriptografada);
+        
+        // Salva no banco com senha criptografada
         return usuarioRepository.save(usuario);
     }
 }
