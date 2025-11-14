@@ -47,3 +47,16 @@ Cadastra novo usuário.
   "senha": "suasenha"
 }
 ```
+
+✅ Setup inicial e Git                    ← CONCLUÍDO!
+✅ Criar backend Spring Boot              ← CONCLUÍDO!
+✅ Configurar PostgreSQL                  ← CONCLUÍDO!
+✅ Criar entidade Usuario                 ← CONCLUÍDO!
+✅ Criar endpoint /register               ← CONCLUÍDO!
+✅ Criptografar senha (BCrypt)            ← CONCLUÍDO!
+✅ Criar endpoint /login                  ← CONCLUÍDO!
+✅ Tratamento de erros HTTP               ← CONCLUÍDO!
+⬜ Implementar JWT (token)                ← PRÓXIMO!
+⬜ Proteger rotas privadas
+⬜ Criar outras entidades (Transação, Categoria, Conta)
+⬜ Frontend React
