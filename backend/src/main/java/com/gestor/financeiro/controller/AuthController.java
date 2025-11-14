@@ -47,17 +47,10 @@ public class AuthController {
         
         Usuario usuario = usuarioOpt.get();
         
-        if (passwordEncoder.matches(request.getSenha(), usuario.getSenha())) {
-            // DEBUG: Verificar se jwtUtil foi injetado
-            System.out.println("JwtUtil: " + jwtUtil);
-            System.out.println("Email do usuario: " + usuario.getEmail());
-            
+        if (passwordEncoder.matches(request.getSenha(), usuario.getSenha())) {         
             // Gera o token JWT
             String token = jwtUtil.generateToken(usuario.getEmail());
-            
-            // DEBUG: Ver o token gerado
-            System.out.println("Token gerado: " + token);
-            
+                     
             return ResponseEntity
                 .ok(new LoginResponse("Login realizado com sucesso!", true, token));
         } else {
