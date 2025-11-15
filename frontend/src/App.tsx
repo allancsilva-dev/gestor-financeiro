@@ -4,7 +4,8 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Register from './pages/Register';
-import Categorias from './pages/Categorias'; 
+import Categorias from './pages/Categorias';
+import Contas from './pages/contas';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -33,6 +34,14 @@ function AppRoutes() {
         }
       />
       <Route path="/" element={<Navigate to="/login" />} />
+      <Route
+        path="/contas"
+        element={
+          <PrivateRoute>
+            <Contas />
+          </PrivateRoute>
+  }
+/>
     </Routes>
   );
 }
