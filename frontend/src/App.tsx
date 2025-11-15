@@ -7,6 +7,7 @@ import Register from './pages/Register';
 import Categorias from './pages/Categorias';
 import Contas from './pages/contas';
 import Transacoes from './pages/Transacoes';
+import Metas from './pages/Metas';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -48,6 +49,14 @@ function AppRoutes() {
         element={
           <PrivateRoute>
             <Transacoes />
+          </PrivateRoute>
+        }
+      />
+      <Route
+        path="/metas"
+        element={
+          <PrivateRoute>
+            <Metas />
           </PrivateRoute>
         }
       />
