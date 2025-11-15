@@ -16,6 +16,7 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/auth")
+@CrossOrigin(origins = "*")
 public class AuthController {
 
     @Autowired
@@ -24,17 +25,32 @@ public class AuthController {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
-    @Autowired  // ← ADICIONE ESTAS 2 LINHAS!!!
+    @Autowired
     private JwtUtil jwtUtil;
 
+    // POST /api/auth/register - Cadastra novo usuário
     @Transactional
     @PostMapping("/register")
-    public Usuario register(@RequestBody Usuario usuario) {
+    public ResponseEntity<?> register(@RequestBody Usuario usuario) {
+        // Verifica se email já existe
+        Optional<Usuario> usuarioExistente = usuarioRepository.findByEmail(usuario.getEmail());
+        if (usuarioExistente.isPresent()) {
+            return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body("Email já cadastrado!");
+        }
+        
+        // Criptografa a senha
         String senhaCriptografada = passwordEncoder.encode(usuario.getSenha());
         usuario.setSenha(senhaCriptografada);
-        return usuarioRepository.save(usuario);
+        
+        // Salva no banco
+        Usuario usuarioSalvo = usuarioRepository.save(usuario);
+        
+        return ResponseEntity.ok(usuarioSalvo);
     }
 
+    // POST /api/auth/login - Faz login
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request) {
         Optional<Usuario> usuarioOpt = usuarioRepository.findByEmail(request.getEmail());
