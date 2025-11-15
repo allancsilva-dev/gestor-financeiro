@@ -1,5 +1,6 @@
 package com.gestor.financeiro.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.gestor.financeiro.model.enums.StatusPagamento;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import jakarta.persistence.*;
@@ -57,6 +58,7 @@ public class Transacao {
     private BigDecimal valorParcela;
     
     @OneToMany(mappedBy = "transacao", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnoreProperties("transacao") // ✅ LINHA ADICIONADA
     private List<Parcela> parcelas = new ArrayList<>();
     
     @Column

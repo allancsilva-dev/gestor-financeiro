@@ -1,8 +1,12 @@
 package com.gestor.financeiro.service;
 
+import com.gestor.financeiro.model.Categoria;
+import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.Parcela;
 import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.model.enums.StatusPagamento;
+import com.gestor.financeiro.repository.CategoriaRepository;
+import com.gestor.financeiro.repository.ContaRepository;
 import com.gestor.financeiro.repository.ParcelaRepository;
 import com.gestor.financeiro.repository.TransacaoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,7 +28,10 @@ public class TransacaoService {
     private ParcelaRepository parcelaRepository;
     
     @Autowired
-    private CategoriaService categoriaService;
+    private CategoriaRepository categoriaRepository;
+    
+    @Autowired
+    private ContaRepository contaRepository;
     
     @Autowired
     private ContaService contaService;
@@ -40,29 +47,39 @@ public class TransacaoService {
     }
     
     // Cria transação (com ou sem parcelamento)
-    @Transactional // Garante que tudo seja salvo ou nada (segurança)
+    @Transactional
     public Transacao criar(Transacao transacao) {
+        
+        // ✅ BUSCA A CATEGORIA DO BANCO (com dados completos)
+        if (transacao.getCategoria() != null && transacao.getCategoria().getId() != null) {
+            Categoria categoria = categoriaRepository.findById(transacao.getCategoria().getId())
+                .orElseThrow(() -> new RuntimeException("Categoria não encontrada"));
+            
+            // Atualiza o valorGasto da categoria
+            categoria.setValorGasto(
+                categoria.getValorGasto().add(transacao.getValorTotal())
+            );
+            categoriaRepository.save(categoria);
+            
+            // Associa a categoria completa à transação
+            transacao.setCategoria(categoria);
+        }
+        
+        // ✅ BUSCA A CONTA DO BANCO (com dados completos)
+        if (transacao.getConta() != null && transacao.getConta().getId() != null) {
+            Conta conta = contaRepository.findById(transacao.getConta().getId())
+                .orElseThrow(() -> new RuntimeException("Conta não encontrada"));
+            
+            // Adiciona gasto na conta
+            contaService.adicionarGasto(conta.getId(), transacao.getValorTotal());
+            
+            // Associa a conta completa à transação
+            transacao.setConta(conta);
+        }
         
         // Se for parcelado, cria as parcelas automaticamente
         if (transacao.getParcelado() && transacao.getTotalParcelas() > 1) {
             criarParcelas(transacao);
-        }
-        
-        // Atualiza o gasto da categoria
-        if (transacao.getCategoria() != null) {
-            var categoria = transacao.getCategoria();
-            categoria.setValorGasto(
-                categoria.getValorGasto().add(transacao.getValorTotal())
-            );
-            categoriaService.atualizar(categoria.getId(), categoria);
-        }
-        
-        // Atualiza o gasto da conta
-        if (transacao.getConta() != null) {
-            contaService.adicionarGasto(
-                transacao.getConta().getId(), 
-                transacao.getValorTotal()
-            );
         }
         
         return transacaoRepository.save(transacao);
@@ -126,11 +143,13 @@ public class TransacaoService {
         
         // Remove gasto da categoria
         if (transacao.getCategoria() != null) {
-            var categoria = transacao.getCategoria();
+            Categoria categoria = categoriaRepository.findById(transacao.getCategoria().getId())
+                .orElseThrow(() -> new RuntimeException("Categoria não encontrada"));
+            
             categoria.setValorGasto(
                 categoria.getValorGasto().subtract(transacao.getValorTotal())
             );
-            categoriaService.atualizar(categoria.getId(), categoria);
+            categoriaRepository.save(categoria);
         }
         
         transacaoRepository.delete(transacao);
