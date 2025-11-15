@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Register from './pages/Register';
 import Categorias from './pages/Categorias';
 import Contas from './pages/contas';
+import Transacoes from './pages/Transacoes';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -42,6 +43,14 @@ function AppRoutes() {
           </PrivateRoute>
   }
 />
+      <Route
+        path="/transacoes"
+        element={
+          <PrivateRoute>
+            <Transacoes />
+          </PrivateRoute>
+        }
+      />
     </Routes>
   );
 }
