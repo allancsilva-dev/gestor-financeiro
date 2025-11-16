@@ -49,13 +49,12 @@ public class ContaFixaService {
         LocalDate proximoVencimento = LocalDate.of(
             hoje.getYear(), 
             hoje.getMonthValue(), 
-            Math.min(diaVencimento, hoje.lengthOfMonth()) // Ajusta para meses com menos dias
+            Math.min(diaVencimento, hoje.lengthOfMonth())
         );
         
         // Se já passou, joga pro próximo mês
         if (proximoVencimento.isBefore(hoje)) {
             proximoVencimento = proximoVencimento.plusMonths(1);
-            // Ajusta novamente para o dia correto no próximo mês
             proximoVencimento = proximoVencimento.withDayOfMonth(
                 Math.min(diaVencimento, proximoVencimento.lengthOfMonth())
             );
@@ -64,11 +63,16 @@ public class ContaFixaService {
         contaFixa.setDataProximoVencimento(proximoVencimento);
     }
     
-    // ✅ NOVO: Marca conta como paga E cria transação automática
+    // ✅ CORRIGIDO: Mantém como PAGO e só avança o vencimento
     @Transactional
     public ContaFixa marcarComoPaga(Long id, BigDecimal valorPago) {
         ContaFixa conta = contaFixaRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Conta fixa não encontrada"));
+        
+        // ✅ VERIFICA SE JÁ ESTÁ PAGA ESTE MÊS
+        if (conta.getStatus() == StatusPagamento.PAGO) {
+            throw new RuntimeException("Esta conta já foi paga este mês!");
+        }
         
         // 1. Cria a transação de saída
         Transacao transacao = new Transacao();
@@ -84,20 +88,18 @@ public class ContaFixaService {
         // Salva a transação
         transacaoRepository.save(transacao);
         
-        // 2. Atualiza o status da conta fixa
+        // 2. Marca como PAGA
         conta.setStatus(StatusPagamento.PAGO);
         conta.setValorReal(valorPago);
         
-        // 3. Se é recorrente, gera próximo vencimento e reseta status
+        // 3. ✅ Se é recorrente, apenas AVANÇA o vencimento (mantém como PAGO)
         if (conta.getRecorrente()) {
             LocalDate proximoVencimento = conta.getDataProximoVencimento().plusMonths(1);
-            // Ajusta para o dia correto no próximo mês
             proximoVencimento = proximoVencimento.withDayOfMonth(
                 Math.min(conta.getDiaVencimento(), proximoVencimento.lengthOfMonth())
             );
             conta.setDataProximoVencimento(proximoVencimento);
-            conta.setStatus(StatusPagamento.PENDENTE); // Reseta para próximo mês
-            conta.setValorReal(null); // Limpa valor real
+            // ✅ NÃO reseta o status aqui!
         }
         
         return contaFixaRepository.save(conta);
@@ -135,13 +137,21 @@ public class ContaFixaService {
             .orElseThrow(() -> new RuntimeException("Conta fixa não encontrada"));
     }
     
-    // Verifica contas atrasadas
+    // ✅ NOVO: Reseta contas pagas quando passa o vencimento
     public void atualizarContasAtrasadas() {
         List<ContaFixa> todasContas = contaFixaRepository.findAll();
         LocalDate hoje = LocalDate.now();
         
         for (ContaFixa conta : todasContas) {
-            if (conta.getDataProximoVencimento().isBefore(hoje) 
+            // Se a conta está PAGA e o vencimento já passou, volta para PENDENTE
+            if (conta.getStatus() == StatusPagamento.PAGO 
+                && conta.getDataProximoVencimento().isBefore(hoje)) {
+                conta.setStatus(StatusPagamento.PENDENTE);
+                conta.setValorReal(null);
+                contaFixaRepository.save(conta);
+            }
+            // Se está PENDENTE e atrasou
+            else if (conta.getDataProximoVencimento().isBefore(hoje) 
                 && conta.getStatus() == StatusPagamento.PENDENTE) {
                 conta.setStatus(StatusPagamento.ATRASADO);
                 contaFixaRepository.save(conta);
