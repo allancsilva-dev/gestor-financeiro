@@ -100,10 +100,12 @@ export default function Dashboard() {
   };
 
   const formatarMoeda = (valor: number) => {
-    return valor.toLocaleString('pt-BR', {
+    const valorAbsoluto = Math.abs(valor);
+    const formatado = valorAbsoluto.toLocaleString('pt-BR', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
+    return valor < 0 ? `-${formatado}` : formatado;
   };
 
   if (loading) {
@@ -139,7 +141,11 @@ export default function Dashboard() {
           {/* KPI Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Saldo Total - Card Destacado */}
-            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-6 shadow-2xl transform hover:scale-105 transition-transform">
+            <div className={`rounded-2xl p-6 shadow-2xl transform hover:scale-105 transition-transform ${
+              (resumo?.saldo || 0) >= 0 
+                ? 'bg-gradient-to-br from-orange-500 to-orange-600' 
+                : 'bg-gradient-to-br from-red-500 to-red-600'
+            }`}>
               <div className="flex justify-between items-start mb-4">
                 <span className="text-white/80 text-sm font-medium">Saldo Total</span>
                 <span className="text-2xl">📊</span>
@@ -149,7 +155,7 @@ export default function Dashboard() {
               </div>
               <div className={`text-sm flex items-center gap-1 ${(resumo?.saldo || 0) >= 0 ? 'text-green-200' : 'text-red-200'}`}>
                 {(resumo?.saldo || 0) >= 0 ? '↑' : '↓'} 
-                <span>Fluxo do mês</span>
+                <span>{(resumo?.saldo || 0) >= 0 ? 'Saldo positivo' : 'Déficit do mês'}</span>
               </div>
             </div>
 
