@@ -142,7 +142,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Saldo Total - Card Destacado */}
             <div className={`rounded-2xl p-6 shadow-2xl transform hover:scale-105 transition-transform ${
-              ((resumo?.saldoCarteiras || 0) + (resumo?.saldo || 0)) >= 0 
+              (resumo?.saldoCarteiras || 0) >= 0 
                 ? 'bg-gradient-to-br from-orange-500 to-orange-600' 
                 : 'bg-gradient-to-br from-red-500 to-red-600'
             }`}>
@@ -151,7 +151,7 @@ export default function Dashboard() {
                 <span className="text-2xl">💰</span>
               </div>
               <div className="text-4xl font-bold text-white mb-2">
-                R$ {formatarMoeda((resumo?.saldoCarteiras || 0) + (resumo?.saldo || 0))}
+                R$ {formatarMoeda(resumo?.saldoCarteiras || 0)}
               </div>
               <div className={`text-sm flex items-center gap-1 text-white/90`}>
                 {(resumo?.saldo || 0) >= 0 ? '↑' : '↓'} 
