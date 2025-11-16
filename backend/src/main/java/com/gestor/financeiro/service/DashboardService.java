@@ -30,7 +30,9 @@ public class DashboardService {
     @Autowired
     private CarteiraRepository carteiraRepository;
     
-    // Retorna resumo completo do dashboard
+    @Autowired
+    private ParcelaRepository parcelaRepository;
+    
     public Map<String, Object> obterResumo(Long usuarioId) {
         Map<String, Object> resumo = new HashMap<>();
         
@@ -40,17 +42,17 @@ public class DashboardService {
             LocalDate.now().lengthOfMonth()
         );
         
-        // Total de entradas do mês (TODAS as transações, com ou sem conta)
+        // Total de entradas do mês (todas as transações de ENTRADA)
         BigDecimal totalEntradas = calcularTotalPorTipo(
             usuarioId, TipoTransacao.ENTRADA, inicioMes, fimMes
         );
         
-        // Total de saídas do mês (TODAS as transações, com ou sem conta)
-        BigDecimal totalSaidas = calcularTotalPorTipo(
-            usuarioId, TipoTransacao.SAIDA, inicioMes, fimMes
+        // Total de saídas do mês (CORRIGIDO: considera valor da parcela)
+        BigDecimal totalSaidas = calcularTotalSaidasComParcelas(
+            usuarioId, inicioMes, fimMes
         );
         
-        // Saldo do mês
+        // Saldo do mês (fluxo de caixa)
         BigDecimal saldo = totalEntradas.subtract(totalSaidas);
         
         // Saldo total das carteiras
@@ -77,6 +79,25 @@ public class DashboardService {
             .stream()
             .filter(t -> t.getTipo() == tipo)
             .map(t -> t.getValorTotal())
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+    
+    // NOVO MÉTODO: Calcula total de saídas considerando valor da parcela
+    private BigDecimal calcularTotalSaidasComParcelas(Long usuarioId, 
+                                                       LocalDate inicio, 
+                                                       LocalDate fim) {
+        return transacaoRepository
+            .findByUsuarioIdAndDataBetween(usuarioId, inicio, fim)
+            .stream()
+            .filter(t -> t.getTipo() == TipoTransacao.SAIDA)
+            .map(t -> {
+                // Se é parcelado, considera apenas o valor da parcela
+                if (t.getParcelado() != null && t.getParcelado() && t.getValorParcela() != null) {
+                    return t.getValorParcela();
+                }
+                // Se não é parcelado, considera o valor total
+                return t.getValorTotal();
+            })
             .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
     

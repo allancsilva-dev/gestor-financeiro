@@ -29,24 +29,34 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     HttpServletResponse response, 
                                     FilterChain filterChain) throws ServletException, IOException {
         
+        String requestPath = request.getRequestURI();
+        
+        System.out.println("========================================");
+        System.out.println("🔍 JWT FILTER - URL: " + requestPath);
+        
+        // ✅ PULA O FILTRO PARA ROTAS PÚBLICAS
+        if (requestPath.startsWith("/api/auth/")) {
+            System.out.println("✅ ROTA PÚBLICA - Pulando autenticação JWT");
+            System.out.println("========================================");
+            filterChain.doFilter(request, response);
+            return;  // ← IMPORTANTE: Para aqui!
+        }
+        
         String authHeader = request.getHeader("Authorization");
         String token = null;
         String email = null;
         
-        System.out.println("========================================");
-        System.out.println("🔍 JWT FILTER - URL: " + request.getRequestURI());
         System.out.println("🔍 Authorization Header: " + authHeader);
         
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             token = authHeader.substring(7);
-            System.out.println("✅ Token encontrado: " + token.substring(0, 20) + "...");
+            System.out.println("✅ Token encontrado: " + token.substring(0, Math.min(20, token.length())) + "...");
             
             try {
                 email = jwtUtil.extractEmail(token);
                 System.out.println("✅ Email extraído: " + email);
             } catch (Exception e) {
                 System.out.println("❌ ERRO ao extrair email: " + e.getMessage());
-                e.printStackTrace();
             }
         } else {
             System.out.println("❌ Header Authorization inválido ou não encontrado");
@@ -78,7 +88,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
             } catch (Exception e) {
                 System.out.println("❌ ERRO ao buscar usuário: " + e.getMessage());
-                e.printStackTrace();
             }
         } else {
             if (email == null) {
