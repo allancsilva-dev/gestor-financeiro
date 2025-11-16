@@ -142,20 +142,20 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Saldo Total - Card Destacado */}
             <div className={`rounded-2xl p-6 shadow-2xl transform hover:scale-105 transition-transform ${
-              (resumo?.saldo || 0) >= 0 
+              (resumo?.saldoCarteiras || 0) >= 0 
                 ? 'bg-gradient-to-br from-orange-500 to-orange-600' 
                 : 'bg-gradient-to-br from-red-500 to-red-600'
             }`}>
               <div className="flex justify-between items-start mb-4">
                 <span className="text-white/80 text-sm font-medium">Saldo Total</span>
-                <span className="text-2xl">📊</span>
+                <span className="text-2xl">💰</span>
               </div>
               <div className="text-4xl font-bold text-white mb-2">
-                R$ {formatarMoeda(resumo?.saldo || 0)}
+                R$ {formatarMoeda(resumo?.saldoCarteiras || 0)}
               </div>
-              <div className={`text-sm flex items-center gap-1 ${(resumo?.saldo || 0) >= 0 ? 'text-green-200' : 'text-red-200'}`}>
+              <div className={`text-sm flex items-center gap-1 text-white/90`}>
                 {(resumo?.saldo || 0) >= 0 ? '↑' : '↓'} 
-                <span>{(resumo?.saldo || 0) >= 0 ? 'Saldo positivo' : 'Déficit do mês'}</span>
+                <span>Fluxo do mês: R$ {formatarMoeda(resumo?.saldo || 0)}</span>
               </div>
             </div>
 
@@ -169,7 +169,7 @@ export default function Dashboard() {
                 R$ {formatarMoeda(resumo?.totalEntradas || 0)}
               </div>
               <div className="text-sm text-green-400 flex items-center gap-1">
-                ↑ <span>Receitas do mês</span>
+                <span>Receitas do mês</span>
               </div>
             </div>
 
@@ -183,13 +183,13 @@ export default function Dashboard() {
                 R$ {formatarMoeda(resumo?.totalSaidas || 0)}
               </div>
               <div className="text-sm text-red-400 flex items-center gap-1">
-                ↑ <span>Gastos do mês</span>
+                <span>Gastos do mês</span>
               </div>
             </div>
           </div>
 
           {/* Cards Secundários */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-slate-800 rounded-2xl p-5 shadow-xl border border-slate-700">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center text-2xl">
@@ -210,18 +210,6 @@ export default function Dashboard() {
                 <div>
                   <div className="text-gray-400 text-sm">Metas Ativas</div>
                   <div className="text-2xl font-bold text-white">{resumo?.totalMetas || 0}</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-slate-800 rounded-2xl p-5 shadow-xl border border-slate-700">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-teal-500/20 flex items-center justify-center text-2xl">
-                  👛
-                </div>
-                <div>
-                  <div className="text-gray-400 text-sm">Carteiras</div>
-                  <div className="text-2xl font-bold text-white">R$ {formatarMoeda(resumo?.saldoCarteiras || 0)}</div>
                 </div>
               </div>
             </div>
