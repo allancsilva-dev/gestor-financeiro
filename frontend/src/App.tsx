@@ -9,6 +9,7 @@ import Contas from './pages/contas';
 import Transacoes from './pages/Transacoes';
 import Metas from './pages/Metas';
 import CarteiraPage from './pages/Carteira';
+import ContasFixas from './pages/ContasFixas';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -72,6 +73,15 @@ function AppRoutes() {
         element={
           <PrivateRoute>
             <CarteiraPage />
+          </PrivateRoute>
+        }
+      />
+      
+      <Route
+        path="/contas-fixas"
+        element={
+          <PrivateRoute>
+            <ContasFixas />
           </PrivateRoute>
         }
       />

@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Wallet, LayoutDashboard, CreditCard, ArrowLeftRight, Target, LogOut } from 'lucide-react';
+import { Wallet, LayoutDashboard, CreditCard, ArrowLeftRight, Target, LogOut, FileText } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -22,6 +22,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/contas', label: 'Cartões', icon: <CreditCard className="w-5 h-5" />, color: 'text-blue-500' },
     { path: '/transacoes', label: 'Transações', icon: <ArrowLeftRight className="w-5 h-5" />, color: 'text-purple-500' },
     { path: '/metas', label: 'Metas', icon: <Target className="w-5 h-5" />, color: 'text-pink-500' },
+    { path: '/contas-fixas', label: 'Contas Fixas', icon: <FileText className="w-5 h-5" />, color: 'text-amber-500' },
   ];
 
   return (

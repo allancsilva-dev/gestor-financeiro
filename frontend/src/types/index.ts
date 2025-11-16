@@ -5,9 +5,10 @@ export interface Usuario {
   senha?: string;
 }
 
+// ✅ CORRIGIDO: Mudado de "senha" para "password"
 export interface LoginRequest {
   email: string;
-  senha: string;
+  password: string;  // ← MUDOU AQUI!
 }
 
 export interface LoginResponse {

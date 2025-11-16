@@ -8,37 +8,37 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [usuario, setUsuario] = useState<Usuario | null>(null);
-  // 1. ADICIONADO ESTADO DE CARREGAMENTO
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // 2. LÓGICA DE VERIFICAÇÃO ATUALIZADA
     async function checkAuthStatus() {
       const storedToken = localStorage.getItem('token');
       if (storedToken) {
         setToken(storedToken);
         try {
-          // Precisamos validar o token e carregar o usuário
           const user = await authService.getMe();
           setUsuario(user);
         } catch (error) {
-          // Token falhou (expirado/inválido)
           console.error('Falha ao validar token:', error);
           setToken(null);
           setUsuario(null);
           localStorage.removeItem('token');
         }
       }
-      // 3. TERMINOU DE CARREGAR (COM OU SEM TOKEN)
       setIsLoading(false);
     }
     
     checkAuthStatus();
   }, []);
 
-    const login = async (email: string, senha: string) => {
+  // ✅ CORRIGIDO: Mudado de "senha" para "password"
+  const login = async (email: string, senha: string) => {
     try {
-      const response = await authService.login({ email, senha });
+      // ✅ ENVIA "password" para o backend
+      const response = await authService.login({ 
+        email, 
+        password: senha  // ← MUDOU AQUI!
+      });
       
       if (response.success && response.token) {
         setToken(response.token);
@@ -74,9 +74,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
       }}
     >
-      {/* 5. SÓ RENDERIZA O APP QUANDO NÃO ESTIVER CARREGANDO INICIALMENTE
-          Isso previne o "flash" da tela de login
-      */}
       {!isLoading && children}
     </AuthContext.Provider>
   );
