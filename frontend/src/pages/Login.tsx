@@ -103,11 +103,11 @@ export default function Login() {
             </button>
           </Link>
 
-          {/* Link "Esqueci minha senha" (opcional) */}
+          {/* Link "Esqueci minha senha" */}
           <div className="mt-4 text-center">
-            <a href="#" className="text-sm text-gray-400 hover:text-orange-400 transition">
+            <Link to="/forgot-password" className="text-sm text-gray-400 hover:text-orange-400 transition">
               Esqueceu sua senha?
-            </a>
+            </Link>
           </div>
         </div>
 
