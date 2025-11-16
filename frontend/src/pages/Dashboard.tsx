@@ -79,7 +79,7 @@ export default function Dashboard() {
           <h1 className="text-3xl font-bold text-gray-800 mb-8">Dashboard</h1>
 
           {/* Cards de Resumo */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
             <div className="bg-white rounded-lg shadow-md p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -118,6 +118,20 @@ export default function Dashboard() {
                 </div>
                 <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
                   <span className="text-2xl">📊</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-md p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Saldo em Carteiras</p>
+                  <p className="text-2xl font-bold text-teal-600">
+                    R$ {(resumo?.saldoCarteiras || 0).toFixed(2)}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-teal-100 rounded-full flex items-center justify-center">
+                  <span className="text-2xl">👛</span>
                 </div>
               </div>
             </div>
