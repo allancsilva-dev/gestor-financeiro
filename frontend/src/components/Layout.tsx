@@ -16,12 +16,11 @@ export default function Layout({ children }: LayoutProps) {
   };
 
   const menuItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: '📊' },
-    { path: '/categorias', label: 'Categorias', icon: '🏷️' },
-    { path: '/contas', label: 'Contas', icon: '💳' },
-    { path: '/transacoes', label: 'Transações', icon: '💰' },
-    { path: '/metas', label: 'Metas', icon: '🎯' },
-  ];
+  { path: '/dashboard', label: 'Dashboard', icon: '📊' },
+  { path: '/contas', label: 'Cartões', icon: '💳' },
+  { path: '/transacoes', label: 'Transações', icon: '💰' },
+  { path: '/metas', label: 'Metas', icon: '🎯' },
+];
 
   return (
     <div className="flex min-h-screen bg-gray-50">

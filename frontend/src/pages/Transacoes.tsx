@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import { transacaoService, Transacao } from '../services/transacaoService';
-import { categoriaService, Categoria } from '../services/categoriaService';
+import { categoriaService } from '../services/categoriaService';
 import { contaService, Conta } from '../services/contaService';
 import toast from 'react-hot-toast';
 import Layout from '../components/Layout';
+import CategoriaDropdown from '../components/CategoriaDropdown';
 
 export default function Transacoes() {
   const [transacoes, setTransacoes] = useState<any[]>([]);
-  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [contas, setContas] = useState<Conta[]>([]);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -17,7 +17,9 @@ export default function Transacoes() {
     valorTotal: '',
     tipo: 'SAIDA' as 'ENTRADA' | 'SAIDA',
     data: new Date().toISOString().split('T')[0],
-    categoriaId: '',
+    categoriaNome: '',
+    categoriaCor: '',
+    categoriaIcone: '',
     contaId: '',
     parcelado: false,
     totalParcelas: ''
@@ -30,14 +32,14 @@ export default function Transacoes() {
   const carregarDados = async () => {
     try {
       setLoading(true);
-      const [transacoesData, categoriasData, contasData] = await Promise.all([
+      const [transacoesData, contasData] = await Promise.all([
         transacaoService.listarPorUsuario(1),
-        categoriaService.listarMinhas(),
         contaService.listarPorUsuario(1)
       ]);
       setTransacoes(transacoesData);
-      setCategorias(categoriasData);
-      setContas(contasData);
+      // Filtrar apenas cartões de crédito
+      const cartoes = contasData.filter((c: Conta) => c.tipo === 'CREDITO');
+      setContas(cartoes);
     } catch (error: any) {
       toast.error('Erro ao carregar dados');
       console.error(error);
@@ -46,16 +48,57 @@ export default function Transacoes() {
     }
   };
 
+  const handleCategoriaChange = (categoria: { nome: string; cor: string; icone: string }) => {
+    setFormData({
+      ...formData,
+      categoriaNome: categoria.nome,
+      categoriaCor: categoria.cor,
+      categoriaIcone: categoria.icone
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!formData.categoriaNome) {
+      toast.error('Selecione uma categoria');
+      return;
+    }
+
     try {
       setLoading(true);
+      
+      // Primeiro, buscar ou criar a categoria
+      let categoriaId;
+      try {
+        const categoriasExistentes = await categoriaService.listarMinhas();
+        const categoriaExistente = categoriasExistentes.find(
+          (c: any) => c.nome.toLowerCase() === formData.categoriaNome.toLowerCase()
+        );
+        
+        if (categoriaExistente) {
+          categoriaId = categoriaExistente.id;
+        } else {
+          // Criar nova categoria
+          const novaCategoria = await categoriaService.criar({
+            nome: formData.categoriaNome,
+            cor: formData.categoriaCor,
+            icone: formData.categoriaIcone,
+            valorEsperado: 0
+          });
+          categoriaId = novaCategoria.id;
+          toast.success('Nova categoria criada!');
+        }
+      } catch (error) {
+        console.error('Erro ao buscar/criar categoria:', error);
+        toast.error('Erro ao processar categoria');
+        return;
+      }
       
       const transacaoParaEnviar: any = {
         usuario: { id: 1 },
         conta: { id: parseInt(formData.contaId) },
-        categoria: { id: parseInt(formData.categoriaId) },
+        categoria: { id: categoriaId },
         descricao: formData.descricao,
         valorTotal: parseFloat(formData.valorTotal),
         tipo: formData.tipo,
@@ -72,7 +115,9 @@ export default function Transacoes() {
         valorTotal: '', 
         tipo: 'SAIDA',
         data: new Date().toISOString().split('T')[0],
-        categoriaId: '',
+        categoriaNome: '',
+        categoriaCor: '',
+        categoriaIcone: '',
         contaId: '',
         parcelado: false,
         totalParcelas: ''
@@ -98,6 +143,13 @@ export default function Transacoes() {
       toast.error('Erro ao deletar transação');
       console.error(error);
     }
+  };
+
+  const formatarMoeda = (valor: number) => {
+    return valor.toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
   };
 
   return (
@@ -138,6 +190,7 @@ export default function Transacoes() {
                     <input
                       type="number"
                       step="0.01"
+                      min="0"
                       value={formData.valorTotal}
                       onChange={(e) => setFormData({ ...formData, valorTotal: e.target.value })}
                       className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
@@ -162,21 +215,14 @@ export default function Transacoes() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">Categoria</label>
-                    <select
-                      value={formData.categoriaId}
-                      onChange={(e) => setFormData({ ...formData, categoriaId: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
-                      required
-                    >
-                      <option value="">Selecione...</option>
-                      {categorias.map((cat) => (
-                        <option key={cat.id} value={cat.id}>{cat.nome}</option>
-                      ))}
-                    </select>
+                    <CategoriaDropdown
+                      value={formData.categoriaNome}
+                      onChange={handleCategoriaChange}
+                    />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium mb-1 text-gray-700">Conta</label>
+                    <label className="block text-sm font-medium mb-1 text-gray-700">Cartão</label>
                     <select
                       value={formData.contaId}
                       onChange={(e) => setFormData({ ...formData, contaId: e.target.value })}
@@ -230,7 +276,7 @@ export default function Transacoes() {
                     />
                     {formData.totalParcelas && formData.valorTotal && (
                       <p className="text-sm text-gray-600 mt-1">
-                        {formData.totalParcelas}x de R$ {(parseFloat(formData.valorTotal) / parseInt(formData.totalParcelas)).toFixed(2)}
+                        {formData.totalParcelas}x de R$ {formatarMoeda(parseFloat(formData.valorTotal) / parseInt(formData.totalParcelas))}
                       </p>
                     )}
                   </div>
@@ -265,7 +311,7 @@ export default function Transacoes() {
                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Data</th>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Descrição</th>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Categoria</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Conta</th>
+                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Cartão</th>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Valor</th>
                     <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Ações</th>
                   </tr>
@@ -281,7 +327,7 @@ export default function Transacoes() {
                           <p className="font-medium text-gray-800">{t.descricao}</p>
                           {t.parcelado && (
                             <p className="text-xs text-gray-500">
-                              {t.totalParcelas}x de R$ {(t.valorParcela || 0).toFixed(2)}
+                              {t.totalParcelas}x de R$ {formatarMoeda(t.valorParcela || 0)}
                             </p>
                           )}
                         </div>
@@ -300,7 +346,7 @@ export default function Transacoes() {
                       </td>
                       <td className="px-6 py-4">
                         <span className={`font-semibold ${t.tipo === 'ENTRADA' ? 'text-green-600' : 'text-red-600'}`}>
-                          {t.tipo === 'ENTRADA' ? '+' : '-'} R$ {(t.valorTotal || 0).toFixed(2)}
+                          {t.tipo === 'ENTRADA' ? '+' : '-'} R$ {formatarMoeda(t.valorTotal || 0)}
                         </span>
                       </td>
                       <td className="px-6 py-4">
