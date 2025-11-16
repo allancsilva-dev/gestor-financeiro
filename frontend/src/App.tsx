@@ -8,6 +8,7 @@ import Categorias from './pages/Categorias';
 import Contas from './pages/contas';
 import Transacoes from './pages/Transacoes';
 import Metas from './pages/Metas';
+import CarteiraPage from './pages/Carteira';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -19,6 +20,8 @@ function AppRoutes() {
     <Routes>
       <Route path="/register" element={<Register />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/" element={<Navigate to="/login" />} />
+      
       <Route
         path="/dashboard"
         element={
@@ -27,6 +30,7 @@ function AppRoutes() {
           </PrivateRoute>
         }
       />
+      
       <Route
         path="/categorias"
         element={
@@ -35,15 +39,16 @@ function AppRoutes() {
           </PrivateRoute>
         }
       />
-      <Route path="/" element={<Navigate to="/login" />} />
+      
       <Route
         path="/contas"
         element={
           <PrivateRoute>
             <Contas />
           </PrivateRoute>
-  }
-/>
+        }
+      />
+      
       <Route
         path="/transacoes"
         element={
@@ -52,11 +57,21 @@ function AppRoutes() {
           </PrivateRoute>
         }
       />
+      
       <Route
         path="/metas"
         element={
           <PrivateRoute>
             <Metas />
+          </PrivateRoute>
+        }
+      />
+      
+      <Route
+        path="/carteira"
+        element={
+          <PrivateRoute>
+            <CarteiraPage />
           </PrivateRoute>
         }
       />

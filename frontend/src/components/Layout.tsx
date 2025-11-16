@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { Wallet } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -16,6 +17,7 @@ export default function Layout({ children }: LayoutProps) {
   };
 
   const menuItems = [
+  { path: '/carteira', label: 'Carteira', icon: <Wallet className="w-6 h-6" /> },
   { path: '/dashboard', label: 'Dashboard', icon: '📊' },
   { path: '/contas', label: 'Cartões', icon: '💳' },
   { path: '/transacoes', label: 'Transações', icon: '💰' },

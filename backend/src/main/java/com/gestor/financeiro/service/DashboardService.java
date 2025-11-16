@@ -27,30 +27,29 @@ public class DashboardService {
     @Autowired
     private ContaFixaRepository contaFixaRepository;
     
-    // Retorna resumo completo do dashboard
+    @Autowired
+    private CarteiraRepository carteiraRepository; // ✅ LINHA 1: ADICIONAR
+    
     public Map<String, Object> obterResumo(Long usuarioId) {
         Map<String, Object> resumo = new HashMap<>();
         
-        // Período: mês atual
         LocalDate inicioMes = LocalDate.now().withDayOfMonth(1);
         LocalDate fimMes = LocalDate.now().withDayOfMonth(
             LocalDate.now().lengthOfMonth()
         );
         
-        // Total de entradas do mês
         BigDecimal totalEntradas = calcularTotalPorTipo(
             usuarioId, TipoTransacao.ENTRADA, inicioMes, fimMes
         );
         
-        // Total de saídas do mês
         BigDecimal totalSaidas = calcularTotalPorTipo(
             usuarioId, TipoTransacao.SAIDA, inicioMes, fimMes
         );
         
-        // Saldo do mês
         BigDecimal saldo = totalEntradas.subtract(totalSaidas);
         
-        // Monta o resumo
+        BigDecimal saldoCarteiras = calcularSaldoCarteiras(usuarioId); // ✅ LINHA 2: ADICIONAR
+        
         resumo.put("totalEntradas", totalEntradas);
         resumo.put("totalSaidas", totalSaidas);
         resumo.put("saldo", saldo);
@@ -58,11 +57,11 @@ public class DashboardService {
         resumo.put("totalContas", contaRepository.findByUsuarioId(usuarioId).size());
         resumo.put("totalMetas", metaRepository.findByUsuarioIdAndAtivaTrue(usuarioId).size());
         resumo.put("totalContasFixas", contaFixaRepository.findByUsuarioIdAndAtivoTrue(usuarioId).size());
+        resumo.put("saldoCarteiras", saldoCarteiras); // ✅ LINHA 3: ADICIONAR
         
         return resumo;
     }
     
-    // Calcula total por tipo de transação
     private BigDecimal calcularTotalPorTipo(Long usuarioId, TipoTransacao tipo, 
                                            LocalDate inicio, LocalDate fim) {
         return transacaoRepository
@@ -70,6 +69,14 @@ public class DashboardService {
             .stream()
             .filter(t -> t.getTipo() == tipo)
             .map(t -> t.getValorTotal())
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+    
+    // ✅ MÉTODO NOVO: ADICIONAR
+    private BigDecimal calcularSaldoCarteiras(Long usuarioId) {
+        return carteiraRepository.findByUsuarioId(usuarioId)
+            .stream()
+            .map(c -> c.getSaldo())
             .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }
