@@ -51,13 +51,13 @@ const contaFixaService = {
     await api.delete(`/contas-fixas/${id}`);
   },
 
-  // Marcar como paga
+  // ✅ CORRIGIDO: Envia valorPago no BODY ao invés de query param
   marcarComoPaga: async (id: number, valorPago: number): Promise<ContaFixa> => {
-    const response = await api.put(`/contas-fixas/${id}/pagar`, null, {
-      params: { valorPago }
+    const response = await api.put(`/contas-fixas/${id}/pagar`, {
+      valorPago: valorPago
     });
     return response.data;
   }
 };
 
-export default contaFixaService;  
+export default contaFixaService;
