@@ -3,7 +3,7 @@ import { dashboardService } from '../services/dashboardService';
 import { transacaoService } from '../services/transacaoService';
 import { metaService } from '../services/metaService';
 import Layout from '../components/Layout';
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
+import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import toast from 'react-hot-toast';
 
 export default function Dashboard() {
@@ -25,8 +25,8 @@ export default function Dashboard() {
         metaService.listarPorUsuario(1)
       ]);
       setResumo(resumoData);
-      setTransacoes(transacoesData.slice(0, 5)); // Últimas 5
-      setMetas(metasData.slice(0, 3)); // Top 3
+      setTransacoes(transacoesData);
+      setMetas(metasData);
     } catch (error: any) {
       toast.error('Erro ao carregar dashboard');
       console.error(error);
@@ -35,7 +35,26 @@ export default function Dashboard() {
     }
   };
 
-  const prepararDadosGrafico = () => {
+  const prepararDadosEntradasPorCategoria = () => {
+    const categorias: any = {};
+    
+    transacoes
+      .filter(t => t.tipo === 'ENTRADA')
+      .forEach(t => {
+        const nome = t.categoria?.nome || 'Sem categoria';
+        if (!categorias[nome]) {
+          categorias[nome] = 0;
+        }
+        categorias[nome] += t.valorTotal || 0;
+      });
+
+    return Object.entries(categorias)
+      .map(([nome, valor]) => ({ nome, valor }))
+      .sort((a: any, b: any) => b.valor - a.valor)
+      .slice(0, 5);
+  };
+
+  const prepararDadosDespesasPorCategoria = () => {
     const categorias: any = {};
     
     transacoes
@@ -49,11 +68,42 @@ export default function Dashboard() {
         categorias[nome].valor += t.valorTotal || 0;
       });
 
-    return Object.values(categorias);
+    return Object.values(categorias)
+      .sort((a: any, b: any) => b.valor - a.valor)
+      .slice(0, 5);
+  };
+
+  const prepararDadosEvolucaoMensal = () => {
+    // Agrupa transações por mês
+    const meses: any = {};
+    
+    transacoes.forEach(t => {
+      const data = new Date(t.data);
+      const mes = data.toLocaleString('pt-BR', { month: 'short' });
+      
+      if (!meses[mes]) {
+        meses[mes] = { mes, entradas: 0, saidas: 0 };
+      }
+      
+      if (t.tipo === 'ENTRADA') {
+        meses[mes].entradas += t.valorTotal || 0;
+      } else {
+        meses[mes].saidas += t.valorTotal || 0;
+      }
+    });
+
+    return Object.values(meses);
   };
 
   const calcularProgresso = (meta: any) => {
     return ((meta.valorReservado || 0) / meta.valorTotal) * 100;
+  };
+
+  const formatarMoeda = (valor: number) => {
+    return valor.toLocaleString('pt-BR', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
   };
 
   if (loading) {
@@ -61,220 +111,251 @@ export default function Dashboard() {
       <Layout>
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-            <p className="mt-4 text-gray-600">Carregando dashboard...</p>
+            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+            <p className="mt-4 text-gray-400">Carregando dashboard...</p>
           </div>
         </div>
       </Layout>
     );
   }
 
-  const dadosGrafico = prepararDadosGrafico();
+  const dadosEntradas = prepararDadosEntradasPorCategoria();
+  const dadosDespesas = prepararDadosDespesasPorCategoria();
+  const dadosEvolucao = prepararDadosEvolucaoMensal();
+
+  const COLORS = ['#ef4444', '#f97316', '#f59e0b', '#06b6d4', '#a855f7', '#ec4899', '#8b5cf6'];
 
   return (
     <Layout>
-      <div className="p-8">
-        <div className="max-w-7xl mx-auto">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8">
+        <div className="max-w-7xl mx-auto space-y-6">
           
-          <h1 className="text-3xl font-bold text-gray-800 mb-8">Dashboard</h1>
+          {/* Header */}
+          <div className="mb-8">
+            <h1 className="text-4xl font-bold text-white mb-2">Dashboard Financeiro</h1>
+            <p className="text-gray-400">Visão geral das suas finanças</p>
+          </div>
 
-          {/* Cards de Resumo */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total Entradas</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    R$ {(resumo?.totalEntradas || 0).toFixed(2)}
-                  </p>
+          {/* KPI Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Saldo Total - Card Destacado */}
+            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-6 shadow-2xl transform hover:scale-105 transition-transform">
+              <div className="flex justify-between items-start mb-4">
+                <span className="text-white/80 text-sm font-medium">Saldo Total</span>
+                <span className="text-2xl">📊</span>
+              </div>
+              <div className="text-4xl font-bold text-white mb-2">
+                R$ {formatarMoeda(resumo?.saldo || 0)}
+              </div>
+              <div className={`text-sm flex items-center gap-1 ${(resumo?.saldo || 0) >= 0 ? 'text-green-200' : 'text-red-200'}`}>
+                {(resumo?.saldo || 0) >= 0 ? '↑' : '↓'} 
+                <span>Fluxo do mês</span>
+              </div>
+            </div>
+
+            {/* Total Entradas */}
+            <div className="bg-slate-800 rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-shadow border border-slate-700">
+              <div className="flex justify-between items-start mb-4">
+                <span className="text-gray-400 text-sm font-medium">Total Entradas</span>
+                <span className="text-2xl">📈</span>
+              </div>
+              <div className="text-4xl font-bold text-blue-400 mb-2">
+                R$ {formatarMoeda(resumo?.totalEntradas || 0)}
+              </div>
+              <div className="text-sm text-green-400 flex items-center gap-1">
+                ↑ <span>Receitas do mês</span>
+              </div>
+            </div>
+
+            {/* Total Despesas */}
+            <div className="bg-slate-800 rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-shadow border border-slate-700">
+              <div className="flex justify-between items-start mb-4">
+                <span className="text-gray-400 text-sm font-medium">Total Despesas</span>
+                <span className="text-2xl">📉</span>
+              </div>
+              <div className="text-4xl font-bold text-red-400 mb-2">
+                R$ {formatarMoeda(resumo?.totalSaidas || 0)}
+              </div>
+              <div className="text-sm text-red-400 flex items-center gap-1">
+                ↑ <span>Gastos do mês</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Cards Secundários */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="bg-slate-800 rounded-2xl p-5 shadow-xl border border-slate-700">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center text-2xl">
+                  💳
                 </div>
-                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                  <span className="text-2xl">💰</span>
+                <div>
+                  <div className="text-gray-400 text-sm">Cartões</div>
+                  <div className="text-2xl font-bold text-white">{resumo?.totalContas || 0}</div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total Saídas</p>
-                  <p className="text-2xl font-bold text-red-600">
-                    R$ {(resumo?.totalSaidas || 0).toFixed(2)}
-                  </p>
+            <div className="bg-slate-800 rounded-2xl p-5 shadow-xl border border-slate-700">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center text-2xl">
+                  🎯
                 </div>
-                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                  <span className="text-2xl">💸</span>
+                <div>
+                  <div className="text-gray-400 text-sm">Metas Ativas</div>
+                  <div className="text-2xl font-bold text-white">{resumo?.totalMetas || 0}</div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Saldo</p>
-                  <p className={`text-2xl font-bold ${(resumo?.saldo || 0) >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-                    R$ {(resumo?.saldo || 0).toFixed(2)}
-                  </p>
+            <div className="bg-slate-800 rounded-2xl p-5 shadow-xl border border-slate-700">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-teal-500/20 flex items-center justify-center text-2xl">
+                  👛
                 </div>
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                  <span className="text-2xl">📊</span>
+                <div>
+                  <div className="text-gray-400 text-sm">Carteiras</div>
+                  <div className="text-2xl font-bold text-white">R$ {formatarMoeda(resumo?.saldoCarteiras || 0)}</div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <div className="flex items-center justify-between">
+            <div className="bg-slate-800 rounded-2xl p-5 shadow-xl border border-slate-700">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-orange-500/20 flex items-center justify-center text-2xl">
+                  📋
+                </div>
                 <div>
-                  <p className="text-sm text-gray-600">Saldo em Carteiras</p>
-                  <p className="text-2xl font-bold text-teal-600">
-                    R$ {(resumo?.saldoCarteiras || 0).toFixed(2)}
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-teal-100 rounded-full flex items-center justify-center">
-                  <span className="text-2xl">👛</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Metas Ativas</p>
-                  <p className="text-2xl font-bold text-purple-600">
-                    {resumo?.totalMetas || 0}
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                  <span className="text-2xl">🎯</span>
+                  <div className="text-gray-400 text-sm">Contas Fixas</div>
+                  <div className="text-2xl font-bold text-white">{resumo?.totalContasFixas || 0}</div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            
-            {/* Gráfico de Pizza */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">Gastos por Categoria</h2>
-              
-              {dadosGrafico.length === 0 ? (
+          {/* Gráficos */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Gráfico de Entradas */}
+            <div className="bg-slate-800 rounded-2xl p-6 shadow-xl border border-slate-700">
+              <h3 className="text-xl font-bold text-white mb-6">Top 5 Entradas por Categoria</h3>
+              {dadosEntradas.length === 0 ? (
                 <div className="text-center py-12 text-gray-500">
-                  Nenhuma transação de saída cadastrada
+                  Nenhuma entrada cadastrada
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={dadosEntradas}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                    <XAxis dataKey="nome" stroke="#94a3b8" />
+                    <YAxis stroke="#94a3b8" />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                      labelStyle={{ color: '#e2e8f0' }}
+                      formatter={(value: any) => `R$ ${formatarMoeda(value)}`}
+                    />
+                    <Bar dataKey="valor" fill="#3b82f6" radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+
+            {/* Gráfico de Despesas */}
+            <div className="bg-slate-800 rounded-2xl p-6 shadow-xl border border-slate-700">
+              <h3 className="text-xl font-bold text-white mb-6">Top 5 Despesas por Categoria</h3>
+              {dadosDespesas.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  Nenhuma despesa cadastrada
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
-                      data={dadosGrafico}
+                      data={dadosDespesas}
                       cx="50%"
                       cy="50%"
                       labelLine={false}
                       label={({ nome, percent }: any) => `${nome}: ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
+                      outerRadius={100}
                       fill="#8884d8"
                       dataKey="valor"
                     >
-                      {dadosGrafico.map((entry: any, index: number) => (
-                        <Cell key={`cell-${index}`} fill={entry.cor} />
+                      {dadosDespesas.map((entry: any, index: number) => (
+                        <Cell key={`cell-${index}`} fill={entry.cor || COLORS[index % COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value: any) => `R$ ${value.toFixed(2)}`} />
-                    <Legend />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                      formatter={(value: any) => `R$ ${formatarMoeda(value)}`}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               )}
             </div>
-
-            {/* Metas em Progresso */}
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">Metas em Progresso</h2>
-              
-              {metas.length === 0 ? (
-                <div className="text-center py-12 text-gray-500">
-                  Nenhuma meta cadastrada
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {metas.map((meta) => (
-                    <div key={meta.id}>
-                      <div className="flex justify-between text-sm mb-1">
-                        <span className="font-medium text-gray-700">{meta.nome}</span>
-                        <span className="text-gray-600">{calcularProgresso(meta).toFixed(0)}%</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className="h-2 rounded-full transition-all"
-                          style={{ 
-                            width: `${Math.min(calcularProgresso(meta), 100)}%`,
-                            backgroundColor: meta.cor || '#3498DB'
-                          }}
-                        ></div>
-                      </div>
-                      <div className="flex justify-between text-xs text-gray-500 mt-1">
-                        <span>R$ {(meta.valorReservado || 0).toFixed(2)}</span>
-                        <span>R$ {meta.valorTotal.toFixed(2)}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
           </div>
 
-          {/* Últimas Transações */}
-          <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            <div className="px-6 py-4 border-b">
-              <h2 className="text-xl font-bold text-gray-800">Últimas Transações</h2>
-            </div>
-            
-            {transacoes.length === 0 ? (
+          {/* Gráfico de Evolução Mensal */}
+          <div className="bg-slate-800 rounded-2xl p-6 shadow-xl border border-slate-700">
+            <h3 className="text-xl font-bold text-white mb-6">Evolução Mensal - Despesas vs Entradas</h3>
+            {dadosEvolucao.length === 0 ? (
               <div className="text-center py-12 text-gray-500">
                 Nenhuma transação cadastrada
               </div>
             ) : (
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Data</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Descrição</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Categoria</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Valor</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {transacoes.map((t) => (
-                    <tr key={t.id} className="border-t border-gray-200 hover:bg-gray-50">
-                      <td className="px-6 py-4 text-sm text-gray-700">
-                        {new Date(t.data).toLocaleDateString('pt-BR')}
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="font-medium text-gray-800">{t.descricao}</p>
-                        {t.parcelado && (
-                          <p className="text-xs text-gray-500">
-                            {t.totalParcelas}x de R$ {(t.valorParcela || 0).toFixed(2)}
-                          </p>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="inline-flex items-center gap-2">
-                          <span
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: t.categoria?.cor || '#666' }}
-                          ></span>
-                          <span className="text-sm text-gray-700">{t.categoria?.nome || 'N/A'}</span>
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`font-semibold ${t.tipo === 'ENTRADA' ? 'text-green-600' : 'text-red-600'}`}>
-                          {t.tipo === 'ENTRADA' ? '+' : '-'} R$ {(t.valorTotal || 0).toFixed(2)}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={dadosEvolucao}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                  <XAxis dataKey="mes" stroke="#94a3b8" />
+                  <YAxis stroke="#94a3b8" />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                    labelStyle={{ color: '#e2e8f0' }}
+                    formatter={(value: any) => `R$ ${formatarMoeda(value)}`}
+                  />
+                  <Legend />
+                  <Bar dataKey="entradas" name="Entradas" fill="#3b82f6" radius={[8, 8, 0, 0]} />
+                  <Bar dataKey="saidas" name="Despesas" fill="#ef4444" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
             )}
           </div>
+
+          {/* Metas em Progresso */}
+          {metas.length > 0 && (
+            <div className="bg-slate-800 rounded-2xl p-6 shadow-xl border border-slate-700">
+              <h3 className="text-xl font-bold text-white mb-6">🎯 Metas em Progresso</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {metas.slice(0, 3).map((meta) => (
+                  <div key={meta.id} className="bg-slate-900/50 rounded-xl p-5 border border-slate-700">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div 
+                        className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg"
+                        style={{ backgroundColor: meta.cor || '#3498DB' }}
+                      >
+                        {meta.icone?.charAt(0).toUpperCase() || '🎯'}
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-bold text-white">{meta.nome}</h4>
+                        <p className="text-sm text-gray-400">{calcularProgresso(meta).toFixed(0)}%</p>
+                      </div>
+                    </div>
+                    <div className="w-full bg-slate-700 rounded-full h-3 mb-2">
+                      <div
+                        className="h-3 rounded-full transition-all"
+                        style={{ 
+                          width: `${Math.min(calcularProgresso(meta), 100)}%`,
+                          backgroundColor: meta.cor || '#3498DB'
+                        }}
+                      ></div>
+                    </div>
+                    <div className="flex justify-between text-sm text-gray-400">
+                      <span>R$ {formatarMoeda(meta.valorReservado || 0)}</span>
+                      <span>R$ {formatarMoeda(meta.valorTotal)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </Layout>

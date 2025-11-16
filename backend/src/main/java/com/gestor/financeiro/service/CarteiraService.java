@@ -2,12 +2,19 @@ package com.gestor.financeiro.service;
 
 import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Usuario;
+import com.gestor.financeiro.model.Transacao;
+import com.gestor.financeiro.model.Categoria;
+import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
+import com.gestor.financeiro.repository.TransacaoRepository;
+import com.gestor.financeiro.repository.CategoriaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 @Service
@@ -18,6 +25,12 @@ public class CarteiraService {
     
     @Autowired
     private UsuarioRepository usuarioRepository;
+    
+    @Autowired
+    private TransacaoRepository transacaoRepository;
+    
+    @Autowired
+    private CategoriaRepository categoriaRepository;
     
     // Lista carteiras do usuário
     public List<Carteira> listarPorUsuario(Long usuarioId) {
@@ -58,14 +71,28 @@ public class CarteiraService {
         return carteiraRepository.save(carteira);
     }
     
-    // Adiciona dinheiro
+    // Adiciona dinheiro E cria transação de ENTRADA
+    @Transactional
     public Carteira adicionarDinheiro(Long id, BigDecimal valor) {
         Carteira carteira = buscarPorId(id);
+        
+        // Atualiza o saldo da carteira
         carteira.setSaldo(carteira.getSaldo().add(valor));
-        return carteiraRepository.save(carteira);
+        carteiraRepository.save(carteira);
+        
+        // Cria transação de ENTRADA automaticamente
+        criarTransacaoAutomatica(
+            carteira,
+            valor,
+            TipoTransacao.ENTRADA,
+            "Depósito na carteira: " + carteira.getNome()
+        );
+        
+        return carteira;
     }
     
-    // Remove dinheiro
+    // Remove dinheiro E cria transação de SAÍDA
+    @Transactional
     public Carteira removerDinheiro(Long id, BigDecimal valor) {
         Carteira carteira = buscarPorId(id);
         
@@ -73,8 +100,62 @@ public class CarteiraService {
             throw new RuntimeException("Saldo insuficiente");
         }
         
+        // Atualiza o saldo da carteira
         carteira.setSaldo(carteira.getSaldo().subtract(valor));
-        return carteiraRepository.save(carteira);
+        carteiraRepository.save(carteira);
+        
+        // Cria transação de SAÍDA automaticamente
+        criarTransacaoAutomatica(
+            carteira,
+            valor,
+            TipoTransacao.SAIDA,
+            "Retirada da carteira: " + carteira.getNome()
+        );
+        
+        return carteira;
+    }
+    
+    // Método auxiliar para criar transação automática
+    private void criarTransacaoAutomatica(Carteira carteira, BigDecimal valor, 
+                                         TipoTransacao tipo, String descricao) {
+        // Busca ou cria categoria "Transferência"
+        Categoria categoria = buscarOuCriarCategoriaTransferencia(carteira.getUsuario());
+        
+        // Cria a transação
+        Transacao transacao = new Transacao();
+        transacao.setUsuario(carteira.getUsuario());
+        transacao.setConta(null); // Carteira não tem "conta" (cartão)
+        transacao.setCategoria(categoria);
+        transacao.setDescricao(descricao);
+        transacao.setValorTotal(valor);
+        transacao.setTipo(tipo);
+        transacao.setData(LocalDate.now());
+        transacao.setParcelado(false);
+        
+        transacaoRepository.save(transacao);
+    }
+    
+    // Busca ou cria a categoria "Transferência"
+    private Categoria buscarOuCriarCategoriaTransferencia(Usuario usuario) {
+        List<Categoria> categorias = categoriaRepository.findByUsuarioId(usuario.getId());
+        
+        // Procura categoria existente
+        for (Categoria cat : categorias) {
+            if ("Transferência".equalsIgnoreCase(cat.getNome()) || 
+                "Depósito".equalsIgnoreCase(cat.getNome())) {
+                return cat;
+            }
+        }
+        
+        // Se não existir, cria uma nova
+        Categoria novaCategoria = new Categoria();
+        novaCategoria.setUsuario(usuario);
+        novaCategoria.setNome("Transferência");
+        novaCategoria.setCor("#00BCD4"); // Azul ciano
+        novaCategoria.setIcone("💱");
+        novaCategoria.setValorEsperado(BigDecimal.ZERO);
+        
+        return categoriaRepository.save(novaCategoria);
     }
     
     // Calcula saldo total de todas as carteiras do usuário

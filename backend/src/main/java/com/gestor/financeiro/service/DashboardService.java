@@ -28,28 +28,35 @@ public class DashboardService {
     private ContaFixaRepository contaFixaRepository;
     
     @Autowired
-    private CarteiraRepository carteiraRepository; // ✅ LINHA 1: ADICIONAR
+    private CarteiraRepository carteiraRepository;
     
+    // Retorna resumo completo do dashboard
     public Map<String, Object> obterResumo(Long usuarioId) {
         Map<String, Object> resumo = new HashMap<>();
         
+        // Período: mês atual
         LocalDate inicioMes = LocalDate.now().withDayOfMonth(1);
         LocalDate fimMes = LocalDate.now().withDayOfMonth(
             LocalDate.now().lengthOfMonth()
         );
         
+        // Total de entradas do mês (TODAS as transações, com ou sem conta)
         BigDecimal totalEntradas = calcularTotalPorTipo(
             usuarioId, TipoTransacao.ENTRADA, inicioMes, fimMes
         );
         
+        // Total de saídas do mês (TODAS as transações, com ou sem conta)
         BigDecimal totalSaidas = calcularTotalPorTipo(
             usuarioId, TipoTransacao.SAIDA, inicioMes, fimMes
         );
         
+        // Saldo do mês
         BigDecimal saldo = totalEntradas.subtract(totalSaidas);
         
-        BigDecimal saldoCarteiras = calcularSaldoCarteiras(usuarioId); // ✅ LINHA 2: ADICIONAR
+        // Saldo total das carteiras
+        BigDecimal saldoCarteiras = calcularSaldoCarteiras(usuarioId);
         
+        // Monta o resumo
         resumo.put("totalEntradas", totalEntradas);
         resumo.put("totalSaidas", totalSaidas);
         resumo.put("saldo", saldo);
@@ -57,11 +64,12 @@ public class DashboardService {
         resumo.put("totalContas", contaRepository.findByUsuarioId(usuarioId).size());
         resumo.put("totalMetas", metaRepository.findByUsuarioIdAndAtivaTrue(usuarioId).size());
         resumo.put("totalContasFixas", contaFixaRepository.findByUsuarioIdAndAtivoTrue(usuarioId).size());
-        resumo.put("saldoCarteiras", saldoCarteiras); // ✅ LINHA 3: ADICIONAR
+        resumo.put("saldoCarteiras", saldoCarteiras);
         
         return resumo;
     }
     
+    // Calcula total por tipo de transação (TODAS, com ou sem conta)
     private BigDecimal calcularTotalPorTipo(Long usuarioId, TipoTransacao tipo, 
                                            LocalDate inicio, LocalDate fim) {
         return transacaoRepository
@@ -72,7 +80,7 @@ public class DashboardService {
             .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
     
-    // ✅ MÉTODO NOVO: ADICIONAR
+    // Calcula saldo total das carteiras
     private BigDecimal calcularSaldoCarteiras(Long usuarioId) {
         return carteiraRepository.findByUsuarioId(usuarioId)
             .stream()
