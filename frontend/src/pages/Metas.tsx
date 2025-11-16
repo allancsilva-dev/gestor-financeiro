@@ -8,6 +8,7 @@ export default function Metas() {
   const [mostrarForm, setMostrarForm] = useState(false);
   const [mostrarAdicionar, setMostrarAdicionar] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
+  const [editando, setEditando] = useState<Meta | null>(null);
   
   const [formData, setFormData] = useState({
     nome: '',
@@ -37,6 +38,37 @@ export default function Metas() {
     }
   };
 
+  const abrirFormulario = (meta?: Meta) => {
+    if (meta) {
+      // Modo edição
+      setEditando(meta);
+      setFormData({
+        nome: meta.nome,
+        valorTotal: meta.valorTotal?.toString() || '',
+        valorMensal: meta.valorMensal?.toString() || '',
+        cor: meta.cor || '#3498DB',
+        icone: meta.icone || 'target',
+        descricao: meta.descricao || ''
+      });
+    } else {
+      // Modo criação
+      resetarFormulario();
+    }
+    setMostrarForm(true);
+  };
+
+  const resetarFormulario = () => {
+    setEditando(null);
+    setFormData({
+      nome: '',
+      valorTotal: '',
+      valorMensal: '',
+      cor: '#3498DB',
+      icone: 'target',
+      descricao: ''
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -53,21 +85,21 @@ export default function Metas() {
         descricao: formData.descricao
       };
       
-      await metaService.criar(metaParaEnviar);
-      toast.success('Meta criada com sucesso!');
+      if (editando) {
+        // Atualizar
+        await metaService.atualizar(editando.id!, metaParaEnviar);
+        toast.success('Meta atualizada com sucesso!');
+      } else {
+        // Criar
+        await metaService.criar(metaParaEnviar);
+        toast.success('Meta criada com sucesso!');
+      }
       
-      setFormData({ 
-        nome: '', 
-        valorTotal: '', 
-        valorMensal: '', 
-        cor: '#3498DB', 
-        icone: 'target', 
-        descricao: '' 
-      });
+      resetarFormulario();
       setMostrarForm(false);
       carregarMetas();
     } catch (error: any) {
-      toast.error('Erro ao criar meta');
+      toast.error(editando ? 'Erro ao atualizar meta' : 'Erro ao criar meta');
       console.error(error);
     } finally {
       setLoading(false);
@@ -119,7 +151,10 @@ export default function Metas() {
           <div className="flex justify-between items-center mb-8">
             <h1 className="text-3xl font-bold text-gray-800">Metas</h1>
             <button
-              onClick={() => setMostrarForm(!mostrarForm)}
+              onClick={() => {
+                resetarFormulario();
+                setMostrarForm(!mostrarForm);
+              }}
               className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
             >
               {mostrarForm ? 'Cancelar' : '+ Nova Meta'}
@@ -128,7 +163,9 @@ export default function Metas() {
 
           {mostrarForm && (
             <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-              <h2 className="text-xl font-bold mb-4">Nova Meta</h2>
+              <h2 className="text-xl font-bold mb-4">
+                {editando ? 'Editar Meta' : 'Nova Meta'}
+              </h2>
               
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
@@ -211,13 +248,25 @@ export default function Metas() {
                   />
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50"
-                >
-                  {loading ? 'Salvando...' : 'Salvar Meta'}
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMostrarForm(false);
+                      resetarFormulario();
+                    }}
+                    className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400 transition"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+                  >
+                    {loading ? 'Salvando...' : (editando ? 'Atualizar' : 'Salvar')}
+                  </button>
+                </div>
               </form>
             </div>
           )}
@@ -255,12 +304,20 @@ export default function Metas() {
                         )}
                       </div>
                     </div>
-                    <button
-                      onClick={() => handleDeletar(meta.id!)}
-                      className="text-red-600 hover:text-red-800 text-sm"
-                    >
-                      Deletar
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => abrirFormulario(meta)}
+                        className="text-blue-600 hover:text-blue-800 text-sm"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => handleDeletar(meta.id!)}
+                        className="text-red-600 hover:text-red-800 text-sm"
+                      >
+                        Deletar
+                      </button>
+                    </div>
                   </div>
 
                   <div className="mb-4">

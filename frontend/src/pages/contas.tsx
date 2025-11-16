@@ -7,6 +7,7 @@ export default function Contas() {
   const [contas, setContas] = useState<Conta[]>([]);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [editando, setEditando] = useState<Conta | null>(null);
   
   const [formData, setFormData] = useState({
     nome: '',
@@ -36,6 +37,37 @@ export default function Contas() {
     }
   };
 
+  const abrirFormulario = (conta?: Conta) => {
+    if (conta) {
+      // Modo edição
+      setEditando(conta);
+      setFormData({
+        nome: conta.nome,
+        tipo: 'CREDITO',
+        limiteTotal: conta.limiteTotal?.toString() || '',
+        diaFechamento: conta.diaFechamento?.toString() || '',
+        diaVencimento: conta.diaVencimento?.toString() || '',
+        cor: conta.cor || '#8B10AE'
+      });
+    } else {
+      // Modo criação
+      resetarFormulario();
+    }
+    setMostrarForm(true);
+  };
+
+  const resetarFormulario = () => {
+    setEditando(null);
+    setFormData({
+      nome: '',
+      tipo: 'CREDITO',
+      limiteTotal: '',
+      diaFechamento: '',
+      diaVencimento: '',
+      cor: '#8B10AE'
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -52,21 +84,21 @@ export default function Contas() {
         diaVencimento: parseInt(formData.diaVencimento) || 1
       };
       
-      await contaService.criar(contaParaEnviar);
-      toast.success('Cartão criado com sucesso!');
+      if (editando) {
+        // Atualizar
+        await contaService.atualizar(editando.id!, contaParaEnviar);
+        toast.success('Cartão atualizado com sucesso!');
+      } else {
+        // Criar
+        await contaService.criar(contaParaEnviar);
+        toast.success('Cartão criado com sucesso!');
+      }
       
-      setFormData({ 
-        nome: '', 
-        tipo: 'CREDITO', 
-        limiteTotal: '',
-        diaFechamento: '', 
-        diaVencimento: '', 
-        cor: '#8B10AE' 
-      });
+      resetarFormulario();
       setMostrarForm(false);
       carregarContas();
     } catch (error: any) {
-      toast.error('Erro ao criar cartão');
+      toast.error(editando ? 'Erro ao atualizar cartão' : 'Erro ao criar cartão');
       console.error(error);
     } finally {
       setLoading(false);
@@ -101,7 +133,10 @@ export default function Contas() {
           <div className="flex justify-between items-center mb-8">
             <h1 className="text-3xl font-bold text-gray-800">💳 Cartões de Crédito</h1>
             <button
-              onClick={() => setMostrarForm(!mostrarForm)}
+              onClick={() => {
+                resetarFormulario();
+                setMostrarForm(!mostrarForm);
+              }}
               className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
             >
               {mostrarForm ? 'Cancelar' : '+ Novo Cartão'}
@@ -110,7 +145,9 @@ export default function Contas() {
 
           {mostrarForm && (
             <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-              <h2 className="text-xl font-bold mb-4">Novo Cartão de Crédito</h2>
+              <h2 className="text-xl font-bold mb-4">
+                {editando ? 'Editar Cartão de Crédito' : 'Novo Cartão de Crédito'}
+              </h2>
               
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
@@ -180,13 +217,25 @@ export default function Contas() {
                   </div>
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50"
-                >
-                  {loading ? 'Salvando...' : 'Salvar Cartão'}
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMostrarForm(false);
+                      resetarFormulario();
+                    }}
+                    className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400 transition"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+                  >
+                    {loading ? 'Salvando...' : (editando ? 'Atualizar' : 'Salvar')}
+                  </button>
+                </div>
               </form>
             </div>
           )}
@@ -215,12 +264,20 @@ export default function Contas() {
                       <h3 className="text-xl font-bold text-gray-800">{conta.nome}</h3>
                       <p className="text-sm text-gray-500">💳 Cartão de Crédito</p>
                     </div>
-                    <button
-                      onClick={() => handleDeletar(conta.id!)}
-                      className="text-red-600 hover:text-red-800 text-sm font-medium"
-                    >
-                      Deletar
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => abrirFormulario(conta)}
+                        className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => handleDeletar(conta.id!)}
+                        className="text-red-600 hover:text-red-800 text-sm font-medium"
+                      >
+                        Deletar
+                      </button>
+                    </div>
                   </div>
 
                   <div className="space-y-3">

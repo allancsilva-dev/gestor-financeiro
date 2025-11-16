@@ -11,6 +11,7 @@ export default function Transacoes() {
   const [contas, setContas] = useState<Conta[]>([]);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [editando, setEditando] = useState<any | null>(null);
   
   const [formData, setFormData] = useState({
     descricao: '',
@@ -46,6 +47,45 @@ export default function Transacoes() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const abrirFormulario = (transacao?: any) => {
+    if (transacao) {
+      // Modo edição
+      setEditando(transacao);
+      setFormData({
+        descricao: transacao.descricao,
+        valorTotal: transacao.valorTotal?.toString() || '',
+        tipo: transacao.tipo,
+        data: transacao.data,
+        categoriaNome: transacao.categoria?.nome || '',
+        categoriaCor: transacao.categoria?.cor || '',
+        categoriaIcone: transacao.categoria?.icone || '',
+        contaId: transacao.conta?.id?.toString() || '',
+        parcelado: transacao.parcelado || false,
+        totalParcelas: transacao.totalParcelas?.toString() || ''
+      });
+    } else {
+      // Modo criação
+      resetarFormulario();
+    }
+    setMostrarForm(true);
+  };
+
+  const resetarFormulario = () => {
+    setEditando(null);
+    setFormData({
+      descricao: '',
+      valorTotal: '',
+      tipo: 'SAIDA',
+      data: new Date().toISOString().split('T')[0],
+      categoriaNome: '',
+      categoriaCor: '',
+      categoriaIcone: '',
+      contaId: '',
+      parcelado: false,
+      totalParcelas: ''
+    });
   };
 
   const handleCategoriaChange = (categoria: { nome: string; cor: string; icone: string }) => {
@@ -107,25 +147,21 @@ export default function Transacoes() {
         totalParcelas: formData.parcelado ? parseInt(formData.totalParcelas) : null
       };
       
-      await transacaoService.criar(transacaoParaEnviar);
-      toast.success('Transação criada com sucesso!');
+      if (editando) {
+        // Atualizar
+        await transacaoService.atualizar(editando.id, transacaoParaEnviar);
+        toast.success('Transação atualizada com sucesso!');
+      } else {
+        // Criar
+        await transacaoService.criar(transacaoParaEnviar);
+        toast.success('Transação criada com sucesso!');
+      }
       
-      setFormData({ 
-        descricao: '', 
-        valorTotal: '', 
-        tipo: 'SAIDA',
-        data: new Date().toISOString().split('T')[0],
-        categoriaNome: '',
-        categoriaCor: '',
-        categoriaIcone: '',
-        contaId: '',
-        parcelado: false,
-        totalParcelas: ''
-      });
+      resetarFormulario();
       setMostrarForm(false);
       carregarDados();
     } catch (error: any) {
-      toast.error('Erro ao criar transação');
+      toast.error(editando ? 'Erro ao atualizar transação' : 'Erro ao criar transação');
       console.error(error);
     } finally {
       setLoading(false);
@@ -160,7 +196,10 @@ export default function Transacoes() {
           <div className="flex justify-between items-center mb-8">
             <h1 className="text-3xl font-bold text-gray-800">Transações</h1>
             <button
-              onClick={() => setMostrarForm(!mostrarForm)}
+              onClick={() => {
+                resetarFormulario();
+                setMostrarForm(!mostrarForm);
+              }}
               className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
             >
               {mostrarForm ? 'Cancelar' : '+ Nova Transação'}
@@ -169,7 +208,9 @@ export default function Transacoes() {
 
           {mostrarForm && (
             <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-              <h2 className="text-xl font-bold mb-4">Nova Transação</h2>
+              <h2 className="text-xl font-bold mb-4">
+                {editando ? 'Editar Transação' : 'Nova Transação'}
+              </h2>
               
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
@@ -248,47 +289,71 @@ export default function Transacoes() {
                   />
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="parcelado"
-                    checked={formData.parcelado}
-                    onChange={(e) => setFormData({ ...formData, parcelado: e.target.checked })}
-                    className="w-4 h-4"
-                  />
-                  <label htmlFor="parcelado" className="text-sm font-medium text-gray-700">
-                    Parcelar compra?
-                  </label>
-                </div>
+                {!editando && (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="parcelado"
+                        checked={formData.parcelado}
+                        onChange={(e) => setFormData({ ...formData, parcelado: e.target.checked })}
+                        className="w-4 h-4"
+                      />
+                      <label htmlFor="parcelado" className="text-sm font-medium text-gray-700">
+                        Parcelar compra?
+                      </label>
+                    </div>
 
-                {formData.parcelado && (
-                  <div>
-                    <label className="block text-sm font-medium mb-1 text-gray-700">Número de Parcelas</label>
-                    <input
-                      type="number"
-                      min="2"
-                      max="48"
-                      value={formData.totalParcelas}
-                      onChange={(e) => setFormData({ ...formData, totalParcelas: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
-                      placeholder="12"
-                      required={formData.parcelado}
-                    />
-                    {formData.totalParcelas && formData.valorTotal && (
-                      <p className="text-sm text-gray-600 mt-1">
-                        {formData.totalParcelas}x de R$ {formatarMoeda(parseFloat(formData.valorTotal) / parseInt(formData.totalParcelas))}
-                      </p>
+                    {formData.parcelado && (
+                      <div>
+                        <label className="block text-sm font-medium mb-1 text-gray-700">Número de Parcelas</label>
+                        <input
+                          type="number"
+                          min="2"
+                          max="48"
+                          value={formData.totalParcelas}
+                          onChange={(e) => setFormData({ ...formData, totalParcelas: e.target.value })}
+                          className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                          placeholder="12"
+                          required={formData.parcelado}
+                        />
+                        {formData.totalParcelas && formData.valorTotal && (
+                          <p className="text-sm text-gray-600 mt-1">
+                            {formData.totalParcelas}x de R$ {formatarMoeda(parseFloat(formData.valorTotal) / parseInt(formData.totalParcelas))}
+                          </p>
+                        )}
+                      </div>
                     )}
+                  </>
+                )}
+
+                {editando && editando.parcelado && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                    <p className="text-sm text-yellow-800">
+                      ⚠️ Esta é uma transação parcelada ({editando.totalParcelas}x). Alterar o valor afetará apenas esta transação, não as parcelas.
+                    </p>
                   </div>
                 )}
 
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50"
-                >
-                  {loading ? 'Salvando...' : 'Salvar Transação'}
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMostrarForm(false);
+                      resetarFormulario();
+                    }}
+                    className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400 transition"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+                  >
+                    {loading ? 'Salvando...' : (editando ? 'Atualizar' : 'Salvar')}
+                  </button>
+                </div>
               </form>
             </div>
           )}
@@ -350,12 +415,20 @@ export default function Transacoes() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <button
-                          onClick={() => handleDeletar(t.id!)}
-                          className="text-red-600 hover:text-red-800 font-medium transition"
-                        >
-                          Deletar
-                        </button>
+                        <div className="flex gap-3">
+                          <button
+                            onClick={() => abrirFormulario(t)}
+                            className="text-blue-600 hover:text-blue-800 font-medium transition"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => handleDeletar(t.id!)}
+                            className="text-red-600 hover:text-red-800 font-medium transition"
+                          >
+                            Deletar
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
