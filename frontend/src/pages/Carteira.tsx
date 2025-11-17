@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import carteiraService, { Carteira } from '../services/carteiraService.ts';
+import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-hot-toast';
 import { Wallet, Banknote, PiggyBank, Plus, Trash2, Edit2, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
 
 const CarteiraPage = () => {
+  const { usuario } = useAuth();
   const [carteiras, setCarteiras] = useState<Carteira[]>([]);
   const [loading, setLoading] = useState(true);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
@@ -22,18 +24,20 @@ const CarteiraPage = () => {
   const [valorMovimentacao, setValorMovimentacao] = useState('');
   const [tipoMovimentacao, setTipoMovimentacao] = useState<'adicionar' | 'remover'>('adicionar');
 
-  const usuarioId = 1; // Hardcoded por enquanto
-
   useEffect(() => {
-    carregarCarteiras();
-  }, []);
+    if (usuario?.id) {
+      carregarCarteiras();
+    }
+  }, [usuario]);
 
   const carregarCarteiras = async () => {
+    if (!usuario?.id) return;
+
     try {
       setLoading(true);
       const [carteirasData, saldoData] = await Promise.all([
-        carteiraService.listarCarteiras(usuarioId),
-        carteiraService.calcularSaldoTotal(usuarioId)
+        carteiraService.listarCarteiras(usuario.id),
+        carteiraService.calcularSaldoTotal(usuario.id)
       ]);
       setCarteiras(carteirasData);
       setSaldoTotal(saldoData);
@@ -69,13 +73,18 @@ const CarteiraPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!usuario?.id) {
+      toast.error('Usuário não autenticado');
+      return;
+    }
+
     try {
       const carteiraData = {
         nome,
         tipo,
         saldo: parseFloat(saldo) || 0,
         banco: tipo === 'CONTA_BANCARIA' ? banco : undefined,
-        usuario: { id: usuarioId }
+        usuario: { id: usuario.id }
       };
 
       if (editando) {

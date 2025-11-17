@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { transacaoService, Transacao } from '../services/transacaoService';
 import { categoriaService } from '../services/categoriaService';
 import { contaService, Conta } from '../services/contaService';
+import { useAuth } from '../context/AuthContext'; // ← ADICIONADO
 import toast from 'react-hot-toast';
 import Layout from '../components/Layout';
 import CategoriaDropdown from '../components/CategoriaDropdown';
 
 export default function Transacoes() {
+  const { usuario } = useAuth(); // ← ADICIONADO
   const [transacoes, setTransacoes] = useState<any[]>([]);
   const [contas, setContas] = useState<Conta[]>([]);
   const [mostrarForm, setMostrarForm] = useState(false);
@@ -27,15 +29,19 @@ export default function Transacoes() {
   });
 
   useEffect(() => {
-    carregarDados();
-  }, []);
+    if (usuario?.id) { // ← ADICIONADO: só carrega se tiver usuário
+      carregarDados();
+    }
+  }, [usuario]);
 
   const carregarDados = async () => {
+    if (!usuario?.id) return; // ← ADICIONADO: proteção
+
     try {
       setLoading(true);
       const [transacoesData, contasData] = await Promise.all([
-        transacaoService.listarPorUsuario(1),
-        contaService.listarPorUsuario(1)
+        transacaoService.listarPorUsuario(usuario.id), // ← CORRIGIDO!
+        contaService.listarPorUsuario(usuario.id)      // ← CORRIGIDO!
       ]);
       setTransacoes(transacoesData);
       // Filtrar apenas cartões de crédito
@@ -100,6 +106,11 @@ export default function Transacoes() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!usuario?.id) { // ← ADICIONADO: proteção
+      toast.error('Usuário não autenticado');
+      return;
+    }
+
     if (!formData.categoriaNome) {
       toast.error('Selecione uma categoria');
       return;
@@ -136,7 +147,7 @@ export default function Transacoes() {
       }
       
       const transacaoParaEnviar: any = {
-        usuario: { id: 1 },
+        usuario: { id: usuario.id }, // ← CORRIGIDO!
         conta: { id: parseInt(formData.contaId) },
         categoria: { id: categoriaId },
         descricao: formData.descricao,

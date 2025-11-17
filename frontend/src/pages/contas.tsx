@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { contaService, Conta } from '../services/contaService';
+import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import Layout from '../components/Layout';
 
 export default function Contas() {
+  const { usuario } = useAuth();
   const [contas, setContas] = useState<Conta[]>([]);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -19,13 +21,17 @@ export default function Contas() {
   });
 
   useEffect(() => {
-    carregarContas();
-  }, []);
+    if (usuario?.id) {
+      carregarContas();
+    }
+  }, [usuario]);
 
   const carregarContas = async () => {
+    if (!usuario?.id) return;
+
     try {
       setLoading(true);
-      const data = await contaService.listarPorUsuario(1);
+      const data = await contaService.listarPorUsuario(usuario.id);
       // Filtrar apenas cartões de crédito
       const cartoes = data.filter((c: Conta) => c.tipo === 'CREDITO');
       setContas(cartoes);
@@ -71,11 +77,16 @@ export default function Contas() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!usuario?.id) {
+      toast.error('Usuário não autenticado');
+      return;
+    }
+
     try {
       setLoading(true);
       
       const contaParaEnviar: any = {
-        usuario: { id: 1 },
+        usuario: { id: usuario.id },
         nome: formData.nome,
         tipo: 'CREDITO',
         cor: formData.cor,

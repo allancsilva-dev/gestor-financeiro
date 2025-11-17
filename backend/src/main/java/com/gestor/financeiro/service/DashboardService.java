@@ -1,111 +1,201 @@
-    package com.gestor.financeiro.service;
+package com.gestor.financeiro.service;
 
-    import com.gestor.financeiro.model.enums.TipoTransacao;
-    import com.gestor.financeiro.repository.*;
-    import org.springframework.beans.factory.annotation.Autowired;
-    import org.springframework.stereotype.Service;
-    import java.math.BigDecimal;
-    import java.time.LocalDate;
-    import java.util.HashMap;
-    import java.util.Map;
+import com.gestor.financeiro.model.enums.TipoTransacao;
+import com.gestor.financeiro.repository.*;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.format.TextStyle;
+import java.util.*;
+import java.util.stream.Collectors;
 
-    @Service
-    public class DashboardService {
+@Service
+public class DashboardService {
+    
+    @Autowired
+    private TransacaoRepository transacaoRepository;
+    
+    @Autowired
+    private CategoriaRepository categoriaRepository;
+    
+    @Autowired
+    private ContaRepository contaRepository;
+    
+    @Autowired
+    private MetaRepository metaRepository;
+    
+    @Autowired
+    private ContaFixaRepository contaFixaRepository;
+    
+    @Autowired
+    private CarteiraRepository carteiraRepository;
+    
+    public Map<String, Object> obterResumo(Long usuarioId) {
+        Map<String, Object> resumo = new HashMap<>();
         
-        @Autowired
-        private TransacaoRepository transacaoRepository;
+        LocalDate inicioMes = LocalDate.now().withDayOfMonth(1);
+        LocalDate fimMes = LocalDate.now().withDayOfMonth(LocalDate.now().lengthOfMonth());
         
-        @Autowired
-        private CategoriaRepository categoriaRepository;
+        BigDecimal totalEntradas = calcularTotalPorTipo(usuarioId, TipoTransacao.ENTRADA, inicioMes, fimMes);
+        BigDecimal totalSaidas = calcularTotalSaidasComParcelas(usuarioId, inicioMes, fimMes);
+        BigDecimal saldo = totalEntradas.subtract(totalSaidas);
+        BigDecimal saldoCarteiras = calcularSaldoCarteiras(usuarioId);
         
-        @Autowired
-        private ContaRepository contaRepository;
+        resumo.put("totalEntradas", totalEntradas);
+        resumo.put("totalSaidas", totalSaidas);
+        resumo.put("saldo", saldo);
+        resumo.put("totalCategorias", categoriaRepository.findByUsuarioId(usuarioId).size());
+        resumo.put("totalContas", contaRepository.findByUsuarioId(usuarioId).size());
+        resumo.put("totalMetas", metaRepository.findByUsuarioIdAndAtivaTrue(usuarioId).size());
+        resumo.put("totalContasFixas", contaFixaRepository.findByUsuarioIdAndAtivoTrue(usuarioId).size());
+        resumo.put("saldoCarteiras", saldoCarteiras);
         
-        @Autowired
-        private MetaRepository metaRepository;
-        
-        @Autowired
-        private ContaFixaRepository contaFixaRepository;
-        
-        @Autowired
-        private CarteiraRepository carteiraRepository;
-        
-        @Autowired
-        private ParcelaRepository parcelaRepository;
-        
-        public Map<String, Object> obterResumo(Long usuarioId) {
-            Map<String, Object> resumo = new HashMap<>();
-            
-            // Período: mês atual
-            LocalDate inicioMes = LocalDate.now().withDayOfMonth(1);
-            LocalDate fimMes = LocalDate.now().withDayOfMonth(
-                LocalDate.now().lengthOfMonth()
-            );
-            
-            // Total de entradas do mês (todas as transações de ENTRADA)
-            BigDecimal totalEntradas = calcularTotalPorTipo(
-                usuarioId, TipoTransacao.ENTRADA, inicioMes, fimMes
-            );
-            
-            // Total de saídas do mês (CORRIGIDO: considera valor da parcela)
-            BigDecimal totalSaidas = calcularTotalSaidasComParcelas(
-                usuarioId, inicioMes, fimMes
-            );
-            
-            // Saldo do mês (fluxo de caixa)
-            BigDecimal saldo = totalEntradas.subtract(totalSaidas);
-            
-            // Saldo total das carteiras
-            BigDecimal saldoCarteiras = calcularSaldoCarteiras(usuarioId);
-            
-            // Monta o resumo
-            resumo.put("totalEntradas", totalEntradas);
-            resumo.put("totalSaidas", totalSaidas);
-            resumo.put("saldo", saldo);
-            resumo.put("totalCategorias", categoriaRepository.findByUsuarioId(usuarioId).size());
-            resumo.put("totalContas", contaRepository.findByUsuarioId(usuarioId).size());
-            resumo.put("totalMetas", metaRepository.findByUsuarioIdAndAtivaTrue(usuarioId).size());
-            resumo.put("totalContasFixas", contaFixaRepository.findByUsuarioIdAndAtivoTrue(usuarioId).size());
-            resumo.put("saldoCarteiras", saldoCarteiras);
-            
-            return resumo;
-        }
-        
-        // Calcula total por tipo de transação (TODAS, com ou sem conta)
-        private BigDecimal calcularTotalPorTipo(Long usuarioId, TipoTransacao tipo, 
-                                            LocalDate inicio, LocalDate fim) {
-            return transacaoRepository
-                .findByUsuarioIdAndDataBetween(usuarioId, inicio, fim)
-                .stream()
-                .filter(t -> t.getTipo() == tipo)
-                .map(t -> t.getValorTotal())
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        }
-        
-        // NOVO MÉTODO: Calcula total de saídas considerando valor da parcela
-        private BigDecimal calcularTotalSaidasComParcelas(Long usuarioId, 
-                                                        LocalDate inicio, 
-                                                        LocalDate fim) {
-            return transacaoRepository
-                .findByUsuarioIdAndDataBetween(usuarioId, inicio, fim)
-                .stream()
-                .filter(t -> t.getTipo() == TipoTransacao.SAIDA)
-                .map(t -> {
-                    // Se é parcelado, considera apenas o valor da parcela
-                    if (t.getParcelado() != null && t.getParcelado() && t.getValorParcela() != null) {
-                        return t.getValorParcela();
-                    }
-                    // Se não é parcelado, considera o valor total
-                    return t.getValorTotal();
-                })
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        }
-        
-        // Calcula saldo total das carteiras
-        private BigDecimal calcularSaldoCarteiras(Long usuarioId) {
-            return carteiraRepository.findByUsuarioId(usuarioId)
-                .stream()
-                .map(c -> c.getSaldo())
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        }
+        return resumo;
     }
+    
+    // NOVO: Gastos por categoria (para gráfico de pizza)
+    public List<Map<String, Object>> obterGastosPorCategoria(Long usuarioId) {
+        LocalDate inicioMes = LocalDate.now().withDayOfMonth(1);
+        LocalDate fimMes = LocalDate.now().withDayOfMonth(LocalDate.now().lengthOfMonth());
+        
+        var transacoes = transacaoRepository.findByUsuarioIdAndDataBetween(usuarioId, inicioMes, fimMes)
+            .stream()
+            .filter(t -> t.getTipo() == TipoTransacao.SAIDA)
+            .collect(Collectors.toList());
+        
+        // Agrupa por categoria
+        Map<String, BigDecimal> gastosPorCategoria = new HashMap<>();
+        Map<String, String> coresCategorias = new HashMap<>();
+        
+        for (var transacao : transacoes) {
+            if (transacao.getCategoria() != null) {
+                String nomeCategoria = transacao.getCategoria().getNome();
+                BigDecimal valor = transacao.getParcelado() != null && transacao.getParcelado() 
+                    ? transacao.getValorParcela() 
+                    : transacao.getValorTotal();
+                
+                gastosPorCategoria.merge(nomeCategoria, valor, BigDecimal::add);
+                coresCategorias.put(nomeCategoria, transacao.getCategoria().getCor());
+            }
+        }
+        
+        // Calcula total para percentuais
+        BigDecimal totalGastos = gastosPorCategoria.values().stream()
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        // Monta lista de resultados
+        List<Map<String, Object>> resultado = new ArrayList<>();
+        for (Map.Entry<String, BigDecimal> entry : gastosPorCategoria.entrySet()) {
+            Map<String, Object> item = new HashMap<>();
+            item.put("categoria", entry.getKey());
+            item.put("valor", entry.getValue());
+            item.put("cor", coresCategorias.get(entry.getKey()));
+            
+            // Calcula percentual
+            if (totalGastos.compareTo(BigDecimal.ZERO) > 0) {
+                BigDecimal percentual = entry.getValue()
+                    .divide(totalGastos, 4, RoundingMode.HALF_UP)
+                    .multiply(new BigDecimal("100"))
+                    .setScale(1, RoundingMode.HALF_UP);
+                item.put("percentual", percentual);
+            } else {
+                item.put("percentual", 0);
+            }
+            
+            resultado.add(item);
+        }
+        
+        // Ordena por valor (maior primeiro)
+        resultado.sort((a, b) -> 
+            ((BigDecimal) b.get("valor")).compareTo((BigDecimal) a.get("valor"))
+        );
+        
+        return resultado;
+    }
+    
+    // NOVO: Evolução dos últimos 6 meses (para gráfico de linhas)
+    public List<Map<String, Object>> obterEvolucaoMensal(Long usuarioId) {
+        List<Map<String, Object>> resultado = new ArrayList<>();
+        
+        for (int i = 5; i >= 0; i--) {
+            LocalDate data = LocalDate.now().minusMonths(i);
+            LocalDate inicioMes = data.withDayOfMonth(1);
+            LocalDate fimMes = data.withDayOfMonth(data.lengthOfMonth());
+            
+            BigDecimal entradas = calcularTotalPorTipo(usuarioId, TipoTransacao.ENTRADA, inicioMes, fimMes);
+            BigDecimal saidas = calcularTotalSaidasComParcelas(usuarioId, inicioMes, fimMes);
+            BigDecimal saldo = entradas.subtract(saidas);
+            
+            Map<String, Object> mes = new HashMap<>();
+            mes.put("mes", data.getMonth().getDisplayName(TextStyle.SHORT, new Locale("pt", "BR")));
+            mes.put("entradas", entradas);
+            mes.put("saidas", saidas);
+            mes.put("saldo", saldo);
+            
+            resultado.add(mes);
+        }
+        
+        return resultado;
+    }
+    
+    // NOVO: Comparação mês atual vs anterior (para gráfico de barras)
+    public List<Map<String, Object>> obterComparacaoMensal(Long usuarioId) {
+        List<Map<String, Object>> resultado = new ArrayList<>();
+        
+        // Mês anterior
+        LocalDate mesAnterior = LocalDate.now().minusMonths(1);
+        LocalDate inicioMesAnterior = mesAnterior.withDayOfMonth(1);
+        LocalDate fimMesAnterior = mesAnterior.withDayOfMonth(mesAnterior.lengthOfMonth());
+        
+        Map<String, Object> anterior = new HashMap<>();
+        anterior.put("periodo", "Mês Anterior");
+        anterior.put("entradas", calcularTotalPorTipo(usuarioId, TipoTransacao.ENTRADA, inicioMesAnterior, fimMesAnterior));
+        anterior.put("saidas", calcularTotalSaidasComParcelas(usuarioId, inicioMesAnterior, fimMesAnterior));
+        resultado.add(anterior);
+        
+        // Mês atual
+        LocalDate inicioMesAtual = LocalDate.now().withDayOfMonth(1);
+        LocalDate fimMesAtual = LocalDate.now().withDayOfMonth(LocalDate.now().lengthOfMonth());
+        
+        Map<String, Object> atual = new HashMap<>();
+        atual.put("periodo", "Mês Atual");
+        atual.put("entradas", calcularTotalPorTipo(usuarioId, TipoTransacao.ENTRADA, inicioMesAtual, fimMesAtual));
+        atual.put("saidas", calcularTotalSaidasComParcelas(usuarioId, inicioMesAtual, fimMesAtual));
+        resultado.add(atual);
+        
+        return resultado;
+    }
+    
+    // Métodos auxiliares
+    private BigDecimal calcularTotalPorTipo(Long usuarioId, TipoTransacao tipo, LocalDate inicio, LocalDate fim) {
+        return transacaoRepository
+            .findByUsuarioIdAndDataBetween(usuarioId, inicio, fim)
+            .stream()
+            .filter(t -> t.getTipo() == tipo)
+            .map(t -> t.getValorTotal())
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+    
+    private BigDecimal calcularTotalSaidasComParcelas(Long usuarioId, LocalDate inicio, LocalDate fim) {
+        return transacaoRepository
+            .findByUsuarioIdAndDataBetween(usuarioId, inicio, fim)
+            .stream()
+            .filter(t -> t.getTipo() == TipoTransacao.SAIDA)
+            .map(t -> {
+                if (t.getParcelado() != null && t.getParcelado() && t.getValorParcela() != null) {
+                    return t.getValorParcela();
+                }
+                return t.getValorTotal();
+            })
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+    
+    private BigDecimal calcularSaldoCarteiras(Long usuarioId) {
+        return carteiraRepository.findByUsuarioId(usuarioId)
+            .stream()
+            .map(c -> c.getSaldo())
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+}

@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { metaService, Meta } from '../services/metaService';
+import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import Layout from '../components/Layout';
 
 export default function Metas() {
+  const { usuario } = useAuth();
   const [metas, setMetas] = useState<Meta[]>([]);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [mostrarAdicionar, setMostrarAdicionar] = useState<number | null>(null);
@@ -22,13 +24,17 @@ export default function Metas() {
   const [valorAdicionar, setValorAdicionar] = useState('');
 
   useEffect(() => {
-    carregarMetas();
-  }, []);
+    if (usuario?.id) {
+      carregarMetas();
+    }
+  }, [usuario]);
 
   const carregarMetas = async () => {
+    if (!usuario?.id) return;
+
     try {
       setLoading(true);
-      const data = await metaService.listarPorUsuario(1);
+      const data = await metaService.listarPorUsuario(usuario.id);
       setMetas(data);
     } catch (error: any) {
       toast.error('Erro ao carregar metas');
@@ -72,11 +78,16 @@ export default function Metas() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!usuario?.id) {
+      toast.error('Usuário não autenticado');
+      return;
+    }
+
     try {
       setLoading(true);
       
       const metaParaEnviar = {
-        usuario: { id: 1 },
+        usuario: { id: usuario.id },
         nome: formData.nome,
         valorTotal: parseFloat(formData.valorTotal),
         valorMensal: parseFloat(formData.valorMensal),

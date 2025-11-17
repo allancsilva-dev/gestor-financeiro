@@ -9,7 +9,7 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, usuario } = useAuth(); // ← ADICIONADO usuario
 
   const handleLogout = () => {
     logout();
@@ -24,6 +24,12 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/metas', label: 'Metas', icon: <Target className="w-5 h-5" />, color: 'text-pink-500' },
     { path: '/contas-fixas', label: 'Contas Fixas', icon: <FileText className="w-5 h-5" />, color: 'text-amber-500' },
   ];
+
+  // ✅ Pega a primeira letra do nome para o avatar
+  const getInitials = (name?: string) => {
+    if (!name) return '?';
+    return name.charAt(0).toUpperCase();
+  };
 
   return (
     <div className="flex min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
@@ -70,15 +76,19 @@ export default function Layout({ children }: LayoutProps) {
 
         {/* User Info & Logout */}
         <div className="absolute bottom-0 w-64 p-4 border-t border-slate-700 bg-slate-800">
-          {/* User Profile */}
+          {/* User Profile - DINÂMICO */}
           <div className="mb-4 p-3 bg-slate-700/50 rounded-xl">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold">
-                A
+                {getInitials(usuario?.nome)}
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium text-white">Allan Carvalho</p>
-                <p className="text-xs text-gray-400">allan@teste.com</p>
+                <p className="text-sm font-medium text-white">
+                  {usuario?.nome || 'Usuário'}
+                </p>
+                <p className="text-xs text-gray-400">
+                  {usuario?.email || 'email@exemplo.com'}
+                </p>
               </div>
             </div>
           </div>
