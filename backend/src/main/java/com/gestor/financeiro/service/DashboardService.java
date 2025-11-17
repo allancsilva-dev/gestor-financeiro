@@ -55,22 +55,28 @@ public class DashboardService {
         return resumo;
     }
     
-    // NOVO: Gastos por categoria (para gráfico de pizza)
     public List<Map<String, Object>> obterGastosPorCategoria(Long usuarioId) {
         LocalDate inicioMes = LocalDate.now().withDayOfMonth(1);
         LocalDate fimMes = LocalDate.now().withDayOfMonth(LocalDate.now().lengthOfMonth());
         
-        var transacoes = transacaoRepository.findByUsuarioIdAndDataBetween(usuarioId, inicioMes, fimMes)
+        // --- CORREÇÃO APLICADA ---
+        var transacoes = transacaoRepository.findByUsuarioIdAndDataBetweenWithCategoria(usuarioId, inicioMes, fimMes) 
             .stream()
             .filter(t -> t.getTipo() == TipoTransacao.SAIDA)
             .collect(Collectors.toList());
         
-        // Agrupa por categoria
+        // --- LINHA DE DEBUG 1 ---
+        System.out.println(">>> DEBUG: Total de transações de SAÍDA encontradas: " + transacoes.size());
+
         Map<String, BigDecimal> gastosPorCategoria = new HashMap<>();
         Map<String, String> coresCategorias = new HashMap<>();
         
         for (var transacao : transacoes) {
-            if (transacao.getCategoria() != null) {
+            if (transacao.getCategoria() != null) { 
+                
+                // --- LINHA DE DEBUG 2 ---
+                System.out.println(">>> DEBUG: Processando Categoria: " + transacao.getCategoria().getNome());
+                
                 String nomeCategoria = transacao.getCategoria().getNome();
                 BigDecimal valor = transacao.getParcelado() != null && transacao.getParcelado() 
                     ? transacao.getValorParcela() 
@@ -78,14 +84,17 @@ public class DashboardService {
                 
                 gastosPorCategoria.merge(nomeCategoria, valor, BigDecimal::add);
                 coresCategorias.put(nomeCategoria, transacao.getCategoria().getCor());
+            } else {
+                
+                // --- LINHA DE DEBUG 3 ---
+                System.out.println(">>> DEBUG: ERRO! Categoria NULA na transação: " + transacao.getDescricao());
             }
         }
         
-        // Calcula total para percentuais
+        // ... (resto do método) ...
         BigDecimal totalGastos = gastosPorCategoria.values().stream()
             .reduce(BigDecimal.ZERO, BigDecimal::add);
         
-        // Monta lista de resultados
         List<Map<String, Object>> resultado = new ArrayList<>();
         for (Map.Entry<String, BigDecimal> entry : gastosPorCategoria.entrySet()) {
             Map<String, Object> item = new HashMap<>();
@@ -93,7 +102,6 @@ public class DashboardService {
             item.put("valor", entry.getValue());
             item.put("cor", coresCategorias.get(entry.getKey()));
             
-            // Calcula percentual
             if (totalGastos.compareTo(BigDecimal.ZERO) > 0) {
                 BigDecimal percentual = entry.getValue()
                     .divide(totalGastos, 4, RoundingMode.HALF_UP)
@@ -107,7 +115,6 @@ public class DashboardService {
             resultado.add(item);
         }
         
-        // Ordena por valor (maior primeiro)
         resultado.sort((a, b) -> 
             ((BigDecimal) b.get("valor")).compareTo((BigDecimal) a.get("valor"))
         );
@@ -115,7 +122,8 @@ public class DashboardService {
         return resultado;
     }
     
-    // NOVO: Evolução dos últimos 6 meses (para gráfico de linhas)
+    // ... (outros métodos) ...
+
     public List<Map<String, Object>> obterEvolucaoMensal(Long usuarioId) {
         List<Map<String, Object>> resultado = new ArrayList<>();
         
@@ -140,11 +148,9 @@ public class DashboardService {
         return resultado;
     }
     
-    // NOVO: Comparação mês atual vs anterior (para gráfico de barras)
     public List<Map<String, Object>> obterComparacaoMensal(Long usuarioId) {
         List<Map<String, Object>> resultado = new ArrayList<>();
         
-        // Mês anterior
         LocalDate mesAnterior = LocalDate.now().minusMonths(1);
         LocalDate inicioMesAnterior = mesAnterior.withDayOfMonth(1);
         LocalDate fimMesAnterior = mesAnterior.withDayOfMonth(mesAnterior.lengthOfMonth());
@@ -155,7 +161,6 @@ public class DashboardService {
         anterior.put("saidas", calcularTotalSaidasComParcelas(usuarioId, inicioMesAnterior, fimMesAnterior));
         resultado.add(anterior);
         
-        // Mês atual
         LocalDate inicioMesAtual = LocalDate.now().withDayOfMonth(1);
         LocalDate fimMesAtual = LocalDate.now().withDayOfMonth(LocalDate.now().lengthOfMonth());
         
@@ -168,10 +173,9 @@ public class DashboardService {
         return resultado;
     }
     
-    // Métodos auxiliares
     private BigDecimal calcularTotalPorTipo(Long usuarioId, TipoTransacao tipo, LocalDate inicio, LocalDate fim) {
         return transacaoRepository
-            .findByUsuarioIdAndDataBetween(usuarioId, inicio, fim)
+            .findByUsuarioIdAndDataBetween(usuarioId, inicio, fim) 
             .stream()
             .filter(t -> t.getTipo() == tipo)
             .map(t -> t.getValorTotal())
@@ -180,7 +184,7 @@ public class DashboardService {
     
     private BigDecimal calcularTotalSaidasComParcelas(Long usuarioId, LocalDate inicio, LocalDate fim) {
         return transacaoRepository
-            .findByUsuarioIdAndDataBetween(usuarioId, inicio, fim)
+            .findByUsuarioIdAndDataBetween(usuarioId, inicio, fim) 
             .stream()
             .filter(t -> t.getTipo() == TipoTransacao.SAIDA)
             .map(t -> {

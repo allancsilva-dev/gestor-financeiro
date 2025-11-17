@@ -8,11 +8,18 @@ interface EvolucaoMes {
 }
 
 interface Props {
-  dados: EvolucaoMes[];
+  // --- CORREÇÃO (V8) ---
+  chartData: EvolucaoMes[];
 }
 
-export default function GraficoEvolucaoMensal({ dados }: Props) {
-  if (!dados || dados.length === 0) {
+// --- CORREÇÃO (V8) ---
+export default function GraficoEvolucaoMensal({ chartData }: Props) {
+  
+  // --- CORREÇÃO (V8) ---
+  console.log("--- DENTRO DO GRÁFICO LINHA (Componente):", chartData);
+
+  // --- CORREÇÃO (V8) ---
+  if (!chartData || chartData.length === 0) {
     return (
       <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700">
         <h3 className="text-lg font-bold text-white mb-4">📈 Evolução Mensal</h3>
@@ -51,7 +58,8 @@ export default function GraficoEvolucaoMensal({ dados }: Props) {
       <h3 className="text-lg font-bold text-white mb-4">📈 Evolução dos Últimos 6 Meses</h3>
       
       <ResponsiveContainer width="100%" height={300}>
-        <LineChart data={dados}>
+        {/* --- CORREÇÃO (V8) --- */}
+        <LineChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
           <XAxis 
             dataKey="mes" 

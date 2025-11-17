@@ -1,32 +1,59 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import toast from 'react-hot-toast';
-import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
+// --- 1. IMPORTAMOS O TIPO DO SERVICE ---
+import dashboardService, { EvolucaoMensal } from '../services/dashboardService';
+import api from '../services/api'; 
+
+import GraficoGastosPorCategoria from '../components/GraficoGastosPorCategoria';
+import GraficoEvolucaoMensal from '../components/GraficoEvolucaoMensal';
 
 export default function Dashboard() {
   const [resumo, setResumo] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const { usuario } = useAuth();
 
+  // --- 2. CORRIGIMOS A TIPAGEM DOS ESTADOS ---
+  const [gastosPorCategoria, setGastosPorCategoria] = useState<any[]>([]);
+  const [evolucaoMensal, setEvolucaoMensal] = useState<EvolucaoMensal[]>([]);
+
   useEffect(() => {
-    carregarDados();
-  }, []);
+    if (usuario?.id) {
+      carregarDados();
+    }
+  }, [usuario]);
 
   const carregarDados = async () => {
+    if (!usuario?.id) return;
+
     try {
       setLoading(true);
-      const response = await api.get('/dashboard/resumo');
-      setResumo(response.data);
+
+      const [resumoResponse, gastosData, evolucaoData] = await Promise.all([
+        api.get(`/dashboard/resumo`), 
+        dashboardService.gastosPorCategoria(),
+        dashboardService.evolucaoMensal()
+      ]);
+
+      // (Removi os console.log para limpar o console)
+
+      setResumo(resumoResponse.data); 
+      setGastosPorCategoria(gastosData);
+      setEvolucaoMensal(evolucaoData); // <-- O erro estava aqui
+
     } catch (error: any) {
+      console.error("ERRO AO CARREGAR DADOS:", error);
       toast.error('Erro ao carregar dashboard');
-      console.error(error);
     } finally {
       setLoading(false);
     }
   };
 
   const formatarMoeda = (valor: number) => {
+    if (typeof valor !== 'number') {
+      valor = 0;
+    }
     const valorAbsoluto = Math.abs(valor);
     const formatado = valorAbsoluto.toLocaleString('pt-BR', {
       minimumFractionDigits: 2,
@@ -41,7 +68,21 @@ export default function Dashboard() {
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
             <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
-            <p className="mt-4 text-gray-400">Carregando dashboard...</p>
+            <p className="mt-4 text-gray-400">Carregar dashboard...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!resumo) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center p-8 bg-slate-800 rounded-lg">
+            <h3 className="text-xl text-white font-bold mb-2">Ops!</h3>
+            <p className="text-red-400">Não foi possível carregar os dados do dashboard.</p>
+            <p className="text-gray-400 mt-2">Verifique o console para mais detalhes.</p>
           </div>
         </div>
       </Layout>
@@ -52,31 +93,31 @@ export default function Dashboard() {
     <Layout>
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8">
         <div className="max-w-7xl mx-auto space-y-6">
-          
+
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-4xl font-bold text-white mb-2">Dashboard Financeiro</h1>
             <p className="text-gray-400">Visão geral das suas finanças</p>
           </div>
 
-          {/* KPI Cards */}
+          {/* KPI Cards (3 colunas em 'md') */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Saldo Total - Card Destacado */}
-            <div className={`rounded-2xl p-6 shadow-2xl transform hover:scale-105 transition-transform ${
-              (resumo?.saldoCarteiras || 0) >= 0 
-                ? 'bg-gradient-to-br from-orange-500 to-orange-600' 
+             {/* Saldo Total */}
+             <div className={`rounded-2xl p-6 shadow-2xl transform hover:scale-105 transition-transform ${
+              (resumo.saldoCarteiras || 0) >= 0
+                ? 'bg-gradient-to-br from-orange-500 to-orange-600'
                 : 'bg-gradient-to-br from-red-500 to-red-600'
-            }`}>
+              }`}>
               <div className="flex justify-between items-start mb-4">
                 <span className="text-white/80 text-sm font-medium">Saldo Total</span>
                 <span className="text-2xl">💰</span>
               </div>
               <div className="text-4xl font-bold text-white mb-2">
-                R$ {formatarMoeda(resumo?.saldoCarteiras || 0)}
+                R$ {formatarMoeda(resumo.saldoCarteiras)}
               </div>
               <div className={`text-sm flex items-center gap-1 text-white/90`}>
-                {(resumo?.saldo || 0) >= 0 ? '↑' : '↓'} 
-                <span>Fluxo do mês: R$ {formatarMoeda(resumo?.saldo || 0)}</span>
+                {(resumo.saldo || 0) >= 0 ? '↑' : '↓'}
+                <span>Fluxo do mês: R$ {formatarMoeda(resumo.saldo)}</span>
               </div>
             </div>
 
@@ -87,7 +128,7 @@ export default function Dashboard() {
                 <span className="text-2xl">📈</span>
               </div>
               <div className="text-4xl font-bold text-blue-400 mb-2">
-                R$ {formatarMoeda(resumo?.totalEntradas || 0)}
+                R$ {formatarMoeda(resumo.totalEntradas)}
               </div>
               <div className="text-sm text-green-400 flex items-center gap-1">
                 <span>Receitas do mês</span>
@@ -101,7 +142,7 @@ export default function Dashboard() {
                 <span className="text-2xl">📉</span>
               </div>
               <div className="text-4xl font-bold text-red-400 mb-2">
-                R$ {formatarMoeda(resumo?.totalSaidas || 0)}
+                R$ {formatarMoeda(resumo.totalSaidas)}
               </div>
               <div className="text-sm text-red-400 flex items-center gap-1">
                 <span>Gastos do mês</span>
@@ -109,8 +150,9 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Cards Secundários */}
+          {/* Cards Secundários (3 colunas em 'md') */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Cartões */}
             <div className="bg-slate-800 rounded-2xl p-5 shadow-xl border border-slate-700">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center text-2xl">
@@ -118,11 +160,11 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <div className="text-gray-400 text-sm">Cartões</div>
-                  <div className="text-2xl font-bold text-white">{resumo?.totalContas || 0}</div>
+                  <div className="text-2xl font-bold text-white">{resumo.totalContas}</div>
                 </div>
               </div>
             </div>
-
+            {/* Metas */}
             <div className="bg-slate-800 rounded-2xl p-5 shadow-xl border border-slate-700">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center text-2xl">
@@ -130,11 +172,11 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <div className="text-gray-400 text-sm">Metas Ativas</div>
-                  <div className="text-2xl font-bold text-white">{resumo?.totalMetas || 0}</div>
+                  <div className="text-2xl font-bold text-white">{resumo.totalMetas}</div>
                 </div>
               </div>
             </div>
-
+            {/* Contas Fixas */}
             <div className="bg-slate-800 rounded-2xl p-5 shadow-xl border border-slate-700">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-xl bg-orange-500/20 flex items-center justify-center text-2xl">
@@ -142,11 +184,24 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <div className="text-gray-400 text-sm">Contas Fixas</div>
-                  <div className="text-2xl font-bold text-white">{resumo?.totalContasFixas || 0}</div>
+                  <div className="text-2xl font-bold text-white">{resumo.totalContasFixas}</div>
                 </div>
               </div>
             </div>
           </div>
+
+          {/* Seção de Gráficos (V8) */}
+          <div className="flex flex-col md:flex-row gap-6 mt-6">
+            
+            <div className="md:w-1/3">
+              <GraficoGastosPorCategoria chartData={gastosPorCategoria} />
+            </div>
+
+            <div className="md:w-2/3">
+              <GraficoEvolucaoMensal chartData={evolucaoMensal} />
+            </div>
+          </div>
+
         </div>
       </div>
     </Layout>

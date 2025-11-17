@@ -3,6 +3,8 @@ package com.gestor.financeiro.repository;
 import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query; // Importar
+import org.springframework.data.repository.query.Param; // Importar
 import org.springframework.stereotype.Repository;
 import java.time.LocalDate;
 import java.util.List;
@@ -21,4 +23,15 @@ public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
     
     // Busca transações em um período (entre duas datas)
     List<Transacao> findByUsuarioIdAndDataBetween(Long usuarioId, LocalDate inicio, LocalDate fim);
+
+    // --- ADIÇÃO NECESSÁRIA ---
+    // Este novo método força o JPA a carregar a Categoria junto com a Transação
+    @Query("SELECT t FROM Transacao t JOIN FETCH t.categoria " +
+           "WHERE t.usuario.id = :usuarioId " +
+           "AND t.data BETWEEN :inicio AND :fim")
+    List<Transacao> findByUsuarioIdAndDataBetweenWithCategoria(
+            @Param("usuarioId") Long usuarioId, 
+            @Param("inicio") LocalDate inicio, 
+            @Param("fim") LocalDate fim);
+    // --- FIM DA ADIÇÃO ---
 }

@@ -1,19 +1,18 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 
-interface GastoCategoria {
-  categoria: string;
-  valor: number;
-  cor: string;
-  percentual: number;
-  [key: string]: any; // ✅ Adiciona compatibilidade com Recharts
-}
-
 interface Props {
-  dados: GastoCategoria[];
+  // --- CORREÇÃO (V8) ---
+  chartData: any[]; 
 }
 
-export default function GraficoGastosPorCategoria({ dados }: Props) {
-  if (!dados || dados.length === 0) {
+// --- CORREÇÃO (V8) ---
+export default function GraficoGastosPorCategoria({ chartData }: Props) {
+  
+  // --- CORREÇÃO (V8) ---
+  console.log("--- DENTRO DO GRÁFICO PIZZA (Componente):", chartData);
+
+  // --- CORREÇÃO (V8) ---
+  if (!chartData || chartData.length === 0) {
     return (
       <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700">
         <h3 className="text-lg font-bold text-white mb-4">📊 Gastos por Categoria</h3>
@@ -51,22 +50,24 @@ export default function GraficoGastosPorCategoria({ dados }: Props) {
       <ResponsiveContainer width="100%" height={300}>
         <PieChart>
           <Pie
-            data={dados}
+            // --- CORREÇÃO (V8) ---
+            data={chartData}
             dataKey="valor"
             nameKey="categoria"
             cx="50%"
             cy="50%"
             outerRadius={100}
-            label={(entry) => `${entry.payload.percentual}%`}
+            label={(entry: any) => `${entry.payload.percentual}%`}
             labelLine={false}
           >
-            {dados.map((entry, index) => (
+            {/* --- CORREÇÃO (V8) --- */}
+            {chartData.map((entry: any, index: number) => (
               <Cell key={`cell-${index}`} fill={entry.cor} />
             ))}
           </Pie>
           <Tooltip content={<CustomTooltip />} />
           <Legend 
-            formatter={(value, entry: any) => (
+            formatter={(value: string, entry: any) => (
               <span className="text-gray-300 text-sm">
                 {value}: {formatarMoeda(entry.payload.valor)}
               </span>
