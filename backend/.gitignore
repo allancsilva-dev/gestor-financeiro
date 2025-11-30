@@ -31,3 +31,19 @@ build/
 
 ### VS Code ###
 .vscode/
+
+# ==========================================
+# ✅ ADICIONADO: SECRETS E CONFIGURAÇÕES
+# ==========================================
+.env
+.env.local
+.env.production
+.env.*.local
+*.env
+
+# Não commitar application-prod.properties com secrets
+# application-prod.properties
+
+# Logs
+*.log
+logs/
