@@ -59,24 +59,17 @@ public class DashboardService {
         LocalDate inicioMes = LocalDate.now().withDayOfMonth(1);
         LocalDate fimMes = LocalDate.now().withDayOfMonth(LocalDate.now().lengthOfMonth());
         
-        // --- CORREÇÃO APLICADA ---
+        // Usa a query otimizada com JOIN FETCH para garantir que a categoria venha preenchida
         var transacoes = transacaoRepository.findByUsuarioIdAndDataBetweenWithCategoria(usuarioId, inicioMes, fimMes) 
             .stream()
             .filter(t -> t.getTipo() == TipoTransacao.SAIDA)
             .collect(Collectors.toList());
         
-        // --- LINHA DE DEBUG 1 ---
-        System.out.println(">>> DEBUG: Total de transações de SAÍDA encontradas: " + transacoes.size());
-
         Map<String, BigDecimal> gastosPorCategoria = new HashMap<>();
         Map<String, String> coresCategorias = new HashMap<>();
         
         for (var transacao : transacoes) {
             if (transacao.getCategoria() != null) { 
-                
-                // --- LINHA DE DEBUG 2 ---
-                System.out.println(">>> DEBUG: Processando Categoria: " + transacao.getCategoria().getNome());
-                
                 String nomeCategoria = transacao.getCategoria().getNome();
                 BigDecimal valor = transacao.getParcelado() != null && transacao.getParcelado() 
                     ? transacao.getValorParcela() 
@@ -84,14 +77,9 @@ public class DashboardService {
                 
                 gastosPorCategoria.merge(nomeCategoria, valor, BigDecimal::add);
                 coresCategorias.put(nomeCategoria, transacao.getCategoria().getCor());
-            } else {
-                
-                // --- LINHA DE DEBUG 3 ---
-                System.out.println(">>> DEBUG: ERRO! Categoria NULA na transação: " + transacao.getDescricao());
             }
         }
         
-        // ... (resto do método) ...
         BigDecimal totalGastos = gastosPorCategoria.values().stream()
             .reduce(BigDecimal.ZERO, BigDecimal::add);
         
@@ -122,8 +110,6 @@ public class DashboardService {
         return resultado;
     }
     
-    // ... (outros métodos) ...
-
     public List<Map<String, Object>> obterEvolucaoMensal(Long usuarioId) {
         List<Map<String, Object>> resultado = new ArrayList<>();
         
