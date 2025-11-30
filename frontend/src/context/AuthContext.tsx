@@ -10,34 +10,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    async function checkAuthStatus() {
-      const storedToken = localStorage.getItem('token');
-      if (storedToken) {
-        setToken(storedToken);
-        try {
-          const user = await authService.getMe();
-          setUsuario(user);
-        } catch (error) {
-          console.error('Falha ao validar token:', error);
-          setToken(null);
-          setUsuario(null);
-          localStorage.removeItem('token');
-        }
-      }
-      setIsLoading(false);
-    }
+useEffect(() => {
+  async function checkAuthStatus() {
+    const storedToken = localStorage.getItem('token');
+    const storedRefreshToken = localStorage.getItem('refreshToken');
     
-    checkAuthStatus();
-  }, []);
+    if (storedToken && storedRefreshToken) {
+      setToken(storedToken);
+      try {
+        const user = await authService.getMe();
+        setUsuario(user);
+      } catch (error: any) {
+        console.error('Falha ao validar token:', error);
+        
+        // Se for 401 ou 403, tentar renovar o token
+        if (error.response?.status === 401 || error.response?.status === 403) {
+          console.log('🔄 Tentando renovar token no checkAuthStatus...');
+          
+          try {
+            const novoToken = await authService.refreshToken();
+            
+            if (novoToken) {
+              setToken(novoToken);
+              
+              // Tentar buscar usuário novamente com novo token
+              const user = await authService.getMe();
+              setUsuario(user);
+              
+              console.log('✅ Token renovado e usuário carregado');
+              setIsLoading(false);
+              return;
+            }
+          } catch (refreshError) {
+            console.error('❌ Erro ao renovar token:', refreshError);
+          }
+        }
+        
+        // Se falhou tudo, limpar localStorage
+        setToken(null);
+        setUsuario(null);
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+      }
+    }
+    setIsLoading(false);
+  }
+  
+  checkAuthStatus();
+}, []);
 
-  // ✅ CORRIGIDO: Mudado de "senha" para "password"
   const login = async (email: string, senha: string) => {
     try {
-      // ✅ ENVIA "password" para o backend
       const response = await authService.login({ 
         email, 
-        password: senha  // ← MUDOU AQUI!
+        password: senha
       });
       
       if (response.success && response.token) {
@@ -56,11 +82,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = () => {
-    setToken(null);
-    setUsuario(null);
-    localStorage.removeItem('token');
-    toast.success('Logout realizado!');
+  // ✅ ATUALIZADO: Logout com revogação de refresh token
+  const logout = async () => {
+    try {
+      await authService.logout(); // ✅ Chama o novo método que revoga o refresh token
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+    } finally {
+      setToken(null);
+      setUsuario(null);
+      toast.success('Logout realizado!');
+    }
   };
 
   return (

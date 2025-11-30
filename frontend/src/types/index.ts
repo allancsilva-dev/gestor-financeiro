@@ -15,6 +15,8 @@ export interface LoginResponse {
   message: string;
   success: boolean;
   token: string;
+  refreshToken?: string; // ✅ NOVO: Adicionado refreshToken opcional
+  accessToken?: string; // Para compatibilidade com backend que usa esse nome
 }
 
 export interface AuthContextType {
