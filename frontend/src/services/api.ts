@@ -1,7 +1,11 @@
 import axios from 'axios';
 
+// ✅ MUDANÇA 1: Definir a URL base dinamicamente
+// Se estiver na Vercel, usa a variável. Se estiver no PC, usa localhost.
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081/api';
+
 const api = axios.create({
-  baseURL: 'http://localhost:8081/api',
+  baseURL: BASE_URL, // ✅ Usa a constante aqui
   headers: {
     'Content-Type': 'application/json',
   },
@@ -22,7 +26,7 @@ const processQueue = (error: any, token: string | null = null) => {
   failedQueue = [];
 };
 
-// ✅ INTERCEPTOR DE REQUEST (seu código original)
+// Interceptor de Request
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
@@ -31,7 +35,7 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// ✅ NOVO: INTERCEPTOR DE RESPONSE (renovação automática)
+// Interceptor de Response (Renovação Automática)
 api.interceptors.response.use(
   (response) => {
     return response;
@@ -72,8 +76,10 @@ api.interceptors.response.use(
         console.log('🔄 Token expirado, renovando automaticamente...');
 
         // Chamar renovação SEM interceptor (evitar loop)
+        // ✅ MUDANÇA 2: Usar a BASE_URL aqui também!
+        // Antes estava 'http://localhost:8081/api/auth/refresh-token'
         const response = await axios.post(
-          'http://localhost:8081/api/auth/refresh-token',
+          `${BASE_URL}/auth/refresh-token`, 
           { refreshToken },
           {
             headers: {
@@ -86,6 +92,7 @@ api.interceptors.response.use(
         const novoToken = accessToken || token;
 
         localStorage.setItem('token', novoToken);
+        api.defaults.headers.common['Authorization'] = `Bearer ${novoToken}`; // Boa prática adicionar essa linha
         originalRequest.headers.Authorization = `Bearer ${novoToken}`;
 
         processQueue(null, novoToken);
