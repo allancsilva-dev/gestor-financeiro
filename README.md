@@ -61,13 +61,15 @@ Aplicação fullstack para controle financeiro pessoal com:
 
 ```bash
 # Clone
-git clone https://github.com/seu-usuario/gestor-financeiro.git
+git clone https://github.com/ZeroHardCore/gestor-financeiro.git
 cd gestor-financeiro
 
 # Backend
 cd backend
 cp .env.example .env
-# Edite .env com suas configurações
+# Edite .env com suas configurações:
+# DATABASE_URL, DB_USERNAME, DB_PASSWORD
+# JWT_SECRET (gere em https://randomkeygen.com/)
 ./mvnw.cmd spring-boot:run
 
 # Frontend
@@ -118,8 +120,8 @@ Principais endpoints:
 
 Ver guia completo: [DEPLOY.md](./docs/DEPLOY.md)
 
-**Stack gratuita:**
-- Backend: Railway
+**Stack recomendada (gratuita):**
+- Backend: Railway ou Render
 - Frontend: Vercel
 - Banco: Neon PostgreSQL
 

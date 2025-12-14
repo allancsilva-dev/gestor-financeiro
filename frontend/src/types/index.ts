@@ -5,18 +5,24 @@ export interface Usuario {
   senha?: string;
 }
 
-// ✅ CORRIGIDO: Mudado de "senha" para "password"
 export interface LoginRequest {
   email: string;
-  password: string;  // ← MUDOU AQUI!
+  password: string;
+}
+
+// Type específico para registro
+export interface RegisterRequest {
+  nome: string;
+  email: string;
+  password: string;
 }
 
 export interface LoginResponse {
   message: string;
   success: boolean;
   token: string;
-  refreshToken?: string; // ✅ NOVO: Adicionado refreshToken opcional
-  accessToken?: string; // Para compatibilidade com backend que usa esse nome
+  refreshToken?: string;
+  accessToken?: string;
 }
 
 export interface AuthContextType {
@@ -26,4 +32,4 @@ export interface AuthContextType {
   logout: () => void;
   isAuthenticated: boolean;
   isLoading: boolean;
-}""
+}

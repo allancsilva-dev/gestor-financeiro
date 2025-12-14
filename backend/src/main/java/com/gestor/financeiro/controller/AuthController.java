@@ -64,26 +64,24 @@ public class AuthController {
     
     @Transactional
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody Usuario usuario) {
-        Optional<Usuario> usuarioExistente = usuarioRepository.findByEmail(usuario.getEmail());
+    public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
+        Optional<Usuario> usuarioExistente = usuarioRepository.findByEmail(request.getEmail());
         if (usuarioExistente.isPresent()) {
             return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body("Email já cadastrado!");
         }
-        
-        String senhaCriptografada = passwordEncoder.encode(usuario.getSenha());
-        usuario.setSenha(senhaCriptografada);
-        
-        Usuario usuarioSalvo = usuarioRepository.save(usuario);
-        
-        return ResponseEntity.ok(usuarioSalvo);
-    }
-
-    // ==========================================
-    // LOGIN (ATUALIZADO COM REFRESH TOKEN)
-    // ==========================================
     
+    Usuario usuario = new Usuario();
+    usuario.setNome(request.getNome());
+    usuario.setEmail(request.getEmail());
+    usuario.setSenha(passwordEncoder.encode(request.getPassword()));
+    
+    Usuario usuarioSalvo = usuarioRepository.save(usuario);
+    
+    return ResponseEntity.ok(usuarioSalvo);
+}
+
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request) {
         Optional<Usuario> usuarioOpt = usuarioRepository.findByEmail(request.getEmail());
@@ -126,10 +124,6 @@ public class AuthController {
         }
     }
 
-    // ==========================================
-    // REFRESH TOKEN (NOVO)
-    // ==========================================
-    
     /**
      * Renova o access token usando o refresh token
      * 
@@ -170,10 +164,6 @@ public class AuthController {
         }
     }
 
-    // ==========================================
-    // LOGOUT (ATUALIZADO COM REFRESH TOKEN)
-    // ==========================================
-    
     /**
      * Logout com revogação de refresh token
      * 
@@ -195,7 +185,7 @@ public class AuthController {
             ));
             
         } catch (Exception e) {
-            // Mesmo com erro, retorna sucesso (logout sempre funciona)
+            
             return ResponseEntity.ok(Map.of(
                 "message", "Logout realizado"
             ));
@@ -230,10 +220,6 @@ public class AuthController {
         }
     }
 
-    // ==========================================
-    // RECUPERAÇÃO DE SENHA (MANTIDO)
-    // ==========================================
-    
     @Transactional
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(@RequestBody ForgotPasswordRequest request) {

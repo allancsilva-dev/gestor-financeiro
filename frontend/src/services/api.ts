@@ -1,17 +1,14 @@
 import axios from 'axios';
 
-// ✅ MUDANÇA 1: Definir a URL base dinamicamente
-// Se estiver na Vercel, usa a variável. Se estiver no PC, usa localhost.
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081/api';
 
 const api = axios.create({
-  baseURL: BASE_URL, // ✅ Usa a constante aqui
+  baseURL: BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Controle de renovação
 let isRefreshing = false;
 let failedQueue: any[] = [];
 
@@ -26,7 +23,6 @@ const processQueue = (error: any, token: string | null = null) => {
   failedQueue = [];
 };
 
-// Interceptor de Request
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
@@ -35,15 +31,11 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Interceptor de Response (Renovação Automática)
 api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    // Se erro 401 e não é tentativa de renovação
     if (error.response?.status === 401 && !originalRequest._retry) {
       
       if (isRefreshing) {
@@ -54,9 +46,7 @@ api.interceptors.response.use(
             originalRequest.headers.Authorization = `Bearer ${token}`;
             return api(originalRequest);
           })
-          .catch((err) => {
-            return Promise.reject(err);
-          });
+          .catch((err) => Promise.reject(err));
       }
 
       originalRequest._retry = true;
@@ -65,7 +55,6 @@ api.interceptors.response.use(
       const refreshToken = localStorage.getItem('refreshToken');
 
       if (!refreshToken) {
-        console.error('❌ Sem refresh token');
         isRefreshing = false;
         localStorage.clear();
         window.location.href = '/login';
@@ -73,42 +62,27 @@ api.interceptors.response.use(
       }
 
       try {
-        console.log('🔄 Token expirado, renovando automaticamente...');
-
-        // Chamar renovação SEM interceptor (evitar loop)
-        // ✅ MUDANÇA 2: Usar a BASE_URL aqui também!
-        // Antes estava 'http://localhost:8081/api/auth/refresh-token'
         const response = await axios.post(
           `${BASE_URL}/auth/refresh-token`, 
           { refreshToken },
-          {
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          }
+          { headers: { 'Content-Type': 'application/json' } }
         );
 
         const { accessToken, token } = response.data;
         const novoToken = accessToken || token;
 
         localStorage.setItem('token', novoToken);
-        api.defaults.headers.common['Authorization'] = `Bearer ${novoToken}`; // Boa prática adicionar essa linha
+        api.defaults.headers.common['Authorization'] = `Bearer ${novoToken}`;
         originalRequest.headers.Authorization = `Bearer ${novoToken}`;
 
         processQueue(null, novoToken);
 
-        console.log('✅ Token renovado automaticamente!');
-
         return api(originalRequest);
 
       } catch (refreshError: any) {
-        console.error('❌ Erro ao renovar token:', refreshError.response?.data || refreshError.message);
-
         processQueue(refreshError, null);
-
         localStorage.clear();
         window.location.href = '/login';
-
         return Promise.reject(refreshError);
 
       } finally {
