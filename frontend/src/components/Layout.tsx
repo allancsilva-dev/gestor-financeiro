@@ -9,7 +9,7 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { logout, usuario } = useAuth(); // ← ADICIONADO usuario
+  const { logout, usuario } = useAuth();
 
   const handleLogout = () => {
     logout();
@@ -25,7 +25,6 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/contas-fixas', label: 'Contas Fixas', icon: <FileText className="w-5 h-5" />, color: 'text-amber-500' },
   ];
 
-  // ✅ Pega a primeira letra do nome para o avatar
   const getInitials = (name?: string) => {
     if (!name) return '?';
     return name.charAt(0).toUpperCase();
@@ -76,7 +75,6 @@ export default function Layout({ children }: LayoutProps) {
 
         {/* User Info & Logout */}
         <div className="absolute bottom-0 w-64 p-4 border-t border-slate-700 bg-slate-800">
-          {/* User Profile - DINÂMICO */}
           <div className="mb-4 p-3 bg-slate-700/50 rounded-xl">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold">
@@ -93,7 +91,6 @@ export default function Layout({ children }: LayoutProps) {
             </div>
           </div>
 
-          {/* Logout Button */}
           <button
             onClick={handleLogout}
             className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 py-2.5 px-4 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 font-medium border border-red-500/20 hover:border-red-500/30"
@@ -104,8 +101,8 @@ export default function Layout({ children }: LayoutProps) {
         </div>
       </aside>
 
-      {/* Conteúdo */}
-      <main className="flex-1 overflow-auto">
+      {/* Conteúdo - COM PADDING */}
+      <main className="flex-1 overflow-auto p-6">
         {children}
       </main>
     </div>

@@ -3,7 +3,35 @@ import Layout from '../components/Layout';
 import carteiraService, { Carteira } from '../services/carteiraService.ts';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-hot-toast';
-import { Wallet, Banknote, PiggyBank, Plus, Trash2, Edit2, ArrowDownCircle, ArrowUpCircle } from 'lucide-react';
+import { Wallet, Banknote, PiggyBank, Plus, Trash2, Edit2, ArrowDownCircle, ArrowUpCircle, Building2 } from 'lucide-react';
+
+const LISTA_BANCOS = [
+  'Agibank',
+  'Banco do Brasil',
+  'Banco Original',
+  'Banco Pan',
+  'Banestes',
+  'Banrisul',
+  'BMG',
+  'Bradesco',
+  'BRB',
+  'BTG Pactual',
+  'C6 Bank',
+  'Caixa Econômica Federal',
+  'Inter',
+  'Itaú',
+  'Mercado Pago',
+  'Neon',
+  'Next',
+  'Nubank',
+  'Outro',
+  'PagBank',
+  'Picpay',
+  'Safra',
+  'Santander',
+  'Sicoob',
+  'Sicredi'
+];
 
 const CarteiraPage = () => {
   const { usuario } = useAuth();
@@ -13,13 +41,11 @@ const CarteiraPage = () => {
   const [editando, setEditando] = useState<Carteira | null>(null);
   const [saldoTotal, setSaldoTotal] = useState(0);
   
-  // Estados do formulário
   const [nome, setNome] = useState('');
   const [tipo, setTipo] = useState<'DINHEIRO' | 'CONTA_BANCARIA' | 'POUPANCA'>('DINHEIRO');
   const [saldo, setSaldo] = useState('');
   const [banco, setBanco] = useState('');
 
-  // Estados de movimentação
   const [carteiraSelecionada, setCarteiraSelecionada] = useState<number | null>(null);
   const [valorMovimentacao, setValorMovimentacao] = useState('');
   const [tipoMovimentacao, setTipoMovimentacao] = useState<'adicionar' | 'remover'>('adicionar');
@@ -163,7 +189,7 @@ const CarteiraPage = () => {
       case 'DINHEIRO':
         return 'bg-green-500';
       case 'CONTA_BANCARIA':
-        return 'bg-blue-500';
+        return 'bg-orange-500';
       case 'POUPANCA':
         return 'bg-purple-500';
       default:
@@ -189,7 +215,7 @@ const CarteiraPage = () => {
     return (
       <Layout>
         <div className="flex items-center justify-center h-64">
-          <div className="text-lg text-gray-600">Carregando...</div>
+          <div className="text-lg text-gray-400">Carregando...</div>
         </div>
       </Layout>
     );
@@ -198,28 +224,26 @@ const CarteiraPage = () => {
   return (
     <Layout>
       <div className="space-y-6">
-        {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Carteira</h1>
-            <p className="text-gray-600 mt-1">Gerencie seu dinheiro, contas bancárias e poupança</p>
+            <h1 className="text-3xl font-bold text-white">Carteira</h1>
+            <p className="text-gray-400 mt-1">Gerencie seu dinheiro, contas bancárias e poupança</p>
           </div>
           <button
             onClick={() => abrirFormulario()}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+            className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-4 py-2 rounded-lg hover:shadow-lg hover:shadow-orange-500/30 flex items-center gap-2 transition-all"
           >
             <Plus className="w-5 h-5" />
             Nova Carteira
           </button>
         </div>
 
-        {/* Card de Saldo Total */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg p-6 text-white shadow-lg">
+        <div className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-lg p-6 text-white shadow-lg">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-blue-100 text-sm font-medium">Saldo Total Disponível</p>
+              <p className="text-orange-100 text-sm font-medium">Saldo Total Disponível</p>
               <p className="text-4xl font-bold mt-2">R$ {formatarMoeda(saldoTotal)}</p>
-              <p className="text-blue-100 text-sm mt-2">{carteiras.length} carteira(s)</p>
+              <p className="text-orange-100 text-sm mt-2">{carteiras.length} carteira(s)</p>
             </div>
             <div className="bg-white/20 p-4 rounded-full">
               <Wallet className="w-12 h-12" />
@@ -227,36 +251,35 @@ const CarteiraPage = () => {
           </div>
         </div>
 
-        {/* Formulário */}
         {mostrarFormulario && (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-bold mb-4">
+          <div className="bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-6">
+            <h2 className="text-xl font-bold text-white mb-4">
               {editando ? 'Editar Carteira' : 'Nova Carteira'}
             </h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
                     Nome *
                   </label>
                   <input
                     type="text"
                     value={nome}
                     onChange={(e) => setNome(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Ex: Carteira Principal"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
+                    placeholder="Salário"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
                     Tipo *
                   </label>
                   <select
                     value={tipo}
                     onChange={(e) => setTipo(e.target.value as any)}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
                     required
                   >
                     <option value="DINHEIRO">Dinheiro</option>
@@ -266,7 +289,7 @@ const CarteiraPage = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
                     Saldo Inicial *
                   </label>
                   <input
@@ -274,42 +297,51 @@ const CarteiraPage = () => {
                     step="0.01"
                     value={saldo}
                     onChange={(e) => setSaldo(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="0,00"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
+                    placeholder="4410"
                     required
                   />
                 </div>
 
                 {tipo === 'CONTA_BANCARIA' && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Banco
+                    <label className="block text-sm font-medium text-gray-400 mb-2">
+                      Banco *
                     </label>
-                    <input
-                      type="text"
-                      value={banco}
-                      onChange={(e) => setBanco(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Ex: Banco do Brasil"
-                    />
+                    <div className="relative">
+                      <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-5 h-5" />
+                      <select
+                        value={banco}
+                        onChange={(e) => setBanco(e.target.value)}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-12 pr-4 py-3 text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
+                        required
+                      >
+                        <option value="">Selecione o banco</option>
+                        {LISTA_BANCOS.map((nomeBanco) => (
+                          <option key={nomeBanco} value={nomeBanco}>
+                            {nomeBanco}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 )}
               </div>
 
-              <div className="flex gap-3 justify-end">
+              <div className="flex gap-3 justify-end pt-4">
                 <button
                   type="button"
                   onClick={() => {
                     setMostrarFormulario(false);
                     resetarFormulario();
                   }}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  className="px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white hover:bg-slate-600 transition"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  className="px-4 py-2 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg hover:shadow-lg hover:shadow-orange-500/30 transition"
                 >
                   {editando ? 'Atualizar' : 'Criar'}
                 </button>
@@ -318,19 +350,18 @@ const CarteiraPage = () => {
           </div>
         )}
 
-        {/* Lista de Carteiras */}
         {carteiras.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-lg shadow">
-            <Wallet className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
+          <div className="text-center py-12 bg-slate-800 border border-slate-700 rounded-lg shadow">
+            <Wallet className="w-16 h-16 text-gray-500 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-white mb-2">
               Nenhuma carteira cadastrada
             </h3>
-            <p className="text-gray-600 mb-4">
+            <p className="text-gray-400 mb-4">
               Comece criando sua primeira carteira para gerenciar seu dinheiro
             </p>
             <button
               onClick={() => abrirFormulario()}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 inline-flex items-center gap-2"
+              className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-6 py-2 rounded-lg hover:shadow-lg hover:shadow-orange-500/30 inline-flex items-center gap-2 transition-all"
             >
               <Plus className="w-5 h-5" />
               Criar Primeira Carteira
@@ -341,17 +372,16 @@ const CarteiraPage = () => {
             {carteiras.map((carteira) => (
               <div
                 key={carteira.id}
-                className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow p-6"
+                className="bg-slate-800 border border-slate-700 rounded-lg shadow-lg hover:shadow-xl transition-shadow p-6"
               >
-                {/* Header do Card */}
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className={`${getCorTipo(carteira.tipo)} p-3 rounded-full text-white`}>
                       {getIconeTipo(carteira.tipo)}
                     </div>
                     <div>
-                      <h3 className="font-bold text-gray-900">{carteira.nome}</h3>
-                      <p className="text-sm text-gray-600">{formatarTipo(carteira.tipo)}</p>
+                      <h3 className="font-bold text-white">{carteira.nome}</h3>
+                      <p className="text-sm text-gray-400">{formatarTipo(carteira.tipo)}</p>
                       {carteira.banco && (
                         <p className="text-xs text-gray-500 mt-1">{carteira.banco}</p>
                       )}
@@ -360,14 +390,14 @@ const CarteiraPage = () => {
                   <div className="flex gap-2">
                     <button
                       onClick={() => abrirFormulario(carteira)}
-                      className="text-blue-600 hover:text-blue-700 p-1"
+                      className="text-orange-400 hover:text-orange-300 p-1 transition"
                       title="Editar"
                     >
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => handleDeletar(carteira.id)}
-                      className="text-red-600 hover:text-red-700 p-1"
+                      className="text-red-400 hover:text-red-300 p-1 transition"
                       title="Deletar"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -375,23 +405,21 @@ const CarteiraPage = () => {
                   </div>
                 </div>
 
-                {/* Saldo */}
                 <div className="mb-4">
-                  <p className="text-sm text-gray-600 mb-1">Saldo Atual</p>
-                  <p className={`text-2xl font-bold ${carteira.saldo >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  <p className="text-sm text-gray-400 mb-1">Saldo Atual</p>
+                  <p className={`text-2xl font-bold ${carteira.saldo >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                     R$ {formatarMoeda(carteira.saldo)}
                   </p>
                 </div>
 
-                {/* Botões de Movimentação */}
-                <div className="flex gap-2 mt-4 pt-4 border-t border-gray-200">
+                <div className="flex gap-2 mt-4 pt-4 border-t border-slate-700">
                   <button
                     onClick={() => {
                       setCarteiraSelecionada(carteira.id);
                       setTipoMovimentacao('adicionar');
                       setValorMovimentacao('');
                     }}
-                    className="flex-1 bg-green-50 text-green-700 px-3 py-2 rounded-lg hover:bg-green-100 flex items-center justify-center gap-2 text-sm font-medium"
+                    className="flex-1 bg-green-500/10 text-green-400 px-3 py-2 rounded-lg hover:bg-green-500/20 flex items-center justify-center gap-2 text-sm font-medium transition"
                   >
                     <ArrowUpCircle className="w-4 h-4" />
                     Adicionar
@@ -402,7 +430,7 @@ const CarteiraPage = () => {
                       setTipoMovimentacao('remover');
                       setValorMovimentacao('');
                     }}
-                    className="flex-1 bg-red-50 text-red-700 px-3 py-2 rounded-lg hover:bg-red-100 flex items-center justify-center gap-2 text-sm font-medium"
+                    className="flex-1 bg-red-500/10 text-red-400 px-3 py-2 rounded-lg hover:bg-red-500/20 flex items-center justify-center gap-2 text-sm font-medium transition"
                   >
                     <ArrowDownCircle className="w-4 h-4" />
                     Remover
@@ -413,16 +441,15 @@ const CarteiraPage = () => {
           </div>
         )}
 
-        {/* Modal de Movimentação */}
         {carteiraSelecionada && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-              <h2 className="text-xl font-bold mb-4">
+          <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center p-4 z-50">
+            <div className="bg-slate-800 border border-slate-700 rounded-lg shadow-2xl max-w-md w-full p-6">
+              <h2 className="text-xl font-bold text-white mb-4">
                 {tipoMovimentacao === 'adicionar' ? 'Adicionar Dinheiro' : 'Remover Dinheiro'}
               </h2>
               <form onSubmit={handleMovimentacao} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
                     Valor (R$)
                   </label>
                   <input
@@ -430,7 +457,7 @@ const CarteiraPage = () => {
                     step="0.01"
                     value={valorMovimentacao}
                     onChange={(e) => setValorMovimentacao(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
                     placeholder="0,00"
                     required
                     autoFocus
@@ -443,13 +470,13 @@ const CarteiraPage = () => {
                       setCarteiraSelecionada(null);
                       setValorMovimentacao('');
                     }}
-                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                    className="px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white hover:bg-slate-600 transition"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
-                    className={`px-4 py-2 rounded-lg text-white ${
+                    className={`px-4 py-2 rounded-lg text-white transition ${
                       tipoMovimentacao === 'adicionar'
                         ? 'bg-green-600 hover:bg-green-700'
                         : 'bg-red-600 hover:bg-red-700'
