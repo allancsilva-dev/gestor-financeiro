@@ -4,6 +4,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -18,6 +20,8 @@ import java.io.IOException;
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
+    private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
+
     @Autowired
     private JwtUtil jwtUtil;
 
@@ -30,14 +34,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     FilterChain filterChain) throws ServletException, IOException {
         
         String requestPath = request.getRequestURI();
-        
-        System.out.println("========================================");
-        System.out.println("🔍 JWT FILTER - URL: " + requestPath);
+        log.debug("JWT filter interceptando URL {}", requestPath);
         
         // ✅ PULA O FILTRO PARA ROTAS PÚBLICAS
         if (requestPath.startsWith("/api/auth/")) {
-            System.out.println("✅ ROTA PÚBLICA - Pulando autenticação JWT");
-            System.out.println("========================================");
+            log.debug("Rota pública de auth detectada, pulando autenticação JWT");
             filterChain.doFilter(request, response);
             return;  // ← IMPORTANTE: Para aqui!
         }
@@ -46,31 +47,31 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String token = null;
         String email = null;
         
-        System.out.println("🔍 Authorization Header: " + authHeader);
+        log.debug("Authorization header recebido");
         
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             token = authHeader.substring(7);
-            System.out.println("✅ Token encontrado: " + token.substring(0, Math.min(20, token.length())) + "...");
+            log.debug("Token Bearer encontrado no header");
             
             try {
                 email = jwtUtil.extractEmail(token);
-                System.out.println("✅ Email extraído: " + email);
+                log.debug("Email extraído do token: {}", email);
             } catch (Exception e) {
-                System.out.println("❌ ERRO ao extrair email: " + e.getMessage());
+                log.warn("Erro ao extrair email do token", e);
             }
         } else {
-            System.out.println("❌ Header Authorization inválido ou não encontrado");
+            log.debug("Header Authorization inválido ou ausente");
         }
         
         if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            System.out.println("🔍 Buscando usuário no banco: " + email);
+            log.debug("Buscando usuário {} no UserDetailsService", email);
             
             try {
                 UserDetails userDetails = userDetailsService.loadUserByUsername(email);
-                System.out.println("✅ Usuário encontrado: " + userDetails.getUsername());
+                log.debug("Usuário encontrado: {}", userDetails.getUsername());
                 
                 if (jwtUtil.validateToken(token, email)) {
-                    System.out.println("✅ Token VÁLIDO!");
+                    log.debug("Token JWT válido");
                     
                     UsernamePasswordAuthenticationToken authToken = 
                         new UsernamePasswordAuthenticationToken(
@@ -81,24 +82,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
-                    
-                    System.out.println("✅ Usuário AUTENTICADO com sucesso!");
+
+                    log.debug("Usuário autenticado com sucesso via JWT");
                 } else {
-                    System.out.println("❌ Token INVÁLIDO!");
+                    log.warn("Token JWT inválido para email {}", email);
                 }
             } catch (Exception e) {
-                System.out.println("❌ ERRO ao buscar usuário: " + e.getMessage());
+                log.warn("Erro ao autenticar usuário via JWT", e);
             }
         } else {
             if (email == null) {
-                System.out.println("⚠️ Email é NULL - não vai autenticar");
+                log.debug("Email ausente após leitura do token; autenticação não será aplicada");
             }
             if (SecurityContextHolder.getContext().getAuthentication() != null) {
-                System.out.println("⚠️ Usuário já está autenticado");
+                log.debug("Usuário já autenticado no contexto");
             }
         }
-        
-        System.out.println("========================================");
         
         filterChain.doFilter(request, response);
     }

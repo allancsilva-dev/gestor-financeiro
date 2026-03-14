@@ -1,5 +1,7 @@
 package com.gestor.financeiro.service;
 
+import com.gestor.financeiro.exception.BusinessException;
+import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.exception.UnauthorizedAccessException;
 import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Usuario;
@@ -41,13 +43,13 @@ public class CarteiraService {
     // Busca carteira por ID
     public Carteira buscarPorId(Long id) {
         return carteiraRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Carteira não encontrada"));
+            .orElseThrow(() -> new ResourceNotFoundException("Carteira não encontrada"));
     }
 
     // Valida ownership para evitar IDOR em operações por ID.
     public Carteira buscarPorIdDoUsuario(Long id, Long usuarioId) {
         Carteira carteira = carteiraRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Carteira não encontrada"));
+            .orElseThrow(() -> new ResourceNotFoundException("Carteira não encontrada"));
 
         if (!carteira.getUsuario().getId().equals(usuarioId)) {
             throw new UnauthorizedAccessException("Acesso negado a esta carteira");
@@ -60,7 +62,7 @@ public class CarteiraService {
     public Carteira criar(Carteira carteira, Long usuarioId) {
         // O usuário vem do token para evitar IDOR via payload.
         Usuario usuario = usuarioRepository.findById(usuarioId)
-            .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+            .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
         
         carteira.setUsuario(usuario);
         
@@ -110,7 +112,7 @@ public class CarteiraService {
         Carteira carteira = buscarPorIdDoUsuario(id, usuarioId);
         
         if (carteira.getSaldo().compareTo(valor) < 0) {
-            throw new RuntimeException("Saldo insuficiente");
+            throw new BusinessException("Saldo insuficiente");
         }
         
         // Atualiza o saldo da carteira

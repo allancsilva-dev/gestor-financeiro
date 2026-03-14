@@ -1,8 +1,12 @@
 package com.gestor.financeiro.service;
 
+import com.gestor.financeiro.exception.BusinessException;
+import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.model.RefreshToken;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.repository.RefreshTokenRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +26,8 @@ import java.util.UUID;
  */
 @Service
 public class RefreshTokenService {
+
+    private static final Logger log = LoggerFactory.getLogger(RefreshTokenService.class);
 
     @Autowired
     private RefreshTokenRepository refreshTokenRepository;
@@ -46,8 +52,8 @@ public class RefreshTokenService {
         // Criar e salvar o token
         RefreshToken refreshToken = new RefreshToken(usuario, tokenValue, dataExpiracao);
         
-        System.out.println(">>> DEBUG: Criando refresh token para usuário: " + usuario.getEmail());
-        System.out.println(">>> DEBUG: Token expira em: " + dataExpiracao);
+        log.info("Criando refresh token para usuário {}", usuario.getEmail());
+        log.debug("Refresh token expira em {}", dataExpiracao);
         
         return refreshTokenRepository.save(refreshToken);
     }
@@ -72,19 +78,19 @@ public class RefreshTokenService {
      */
     public RefreshToken validarRefreshToken(String token) {
         RefreshToken refreshToken = refreshTokenRepository.findByToken(token)
-            .orElseThrow(() -> new RuntimeException("Refresh token não encontrado"));
+            .orElseThrow(() -> new ResourceNotFoundException("Refresh token não encontrado"));
 
         if (refreshToken.isExpirado()) {
-            System.out.println(">>> DEBUG: Refresh token expirado!");
-            throw new RuntimeException("Refresh token expirado");
+            log.warn("Refresh token expirado");
+            throw new BusinessException("Refresh token expirado");
         }
 
         if (refreshToken.getRevogado()) {
-            System.out.println(">>> DEBUG: Refresh token revogado!");
-            throw new RuntimeException("Refresh token revogado");
+            log.warn("Refresh token revogado");
+            throw new BusinessException("Refresh token revogado");
         }
 
-        System.out.println(">>> DEBUG: Refresh token válido para usuário: " + refreshToken.getUsuario().getEmail());
+        log.info("Refresh token válido para usuário {}", refreshToken.getUsuario().getEmail());
         return refreshToken;
     }
 
@@ -101,7 +107,7 @@ public class RefreshTokenService {
             RefreshToken rt = refreshToken.get();
             rt.revogar();
             refreshTokenRepository.save(rt);
-            System.out.println(">>> DEBUG: Token revogado: " + token.substring(0, 20) + "...");
+            log.info("Token revogado com sucesso");
         }
     }
 
@@ -113,7 +119,7 @@ public class RefreshTokenService {
     @Transactional
     public void revogarTodosTokensDoUsuario(Usuario usuario) {
         int count = refreshTokenRepository.revokeAllByUsuario(usuario);
-        System.out.println(">>> DEBUG: " + count + " tokens revogados para usuário: " + usuario.getEmail());
+        log.info("{} tokens revogados para usuário {}", count, usuario.getEmail());
     }
 
     /**
@@ -125,7 +131,7 @@ public class RefreshTokenService {
     @Transactional
     public int limparTokensExpirados() {
         int count = refreshTokenRepository.deleteByDataExpiracaoBefore(LocalDateTime.now());
-        System.out.println(">>> DEBUG: " + count + " tokens expirados deletados do banco");
+        log.info("{} tokens expirados deletados do banco", count);
         return count;
     }
 

@@ -1,5 +1,6 @@
 package com.gestor.financeiro.service;
 
+import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.exception.UnauthorizedAccessException;
 import com.gestor.financeiro.model.Meta;
 import com.gestor.financeiro.model.Usuario;
@@ -29,7 +30,7 @@ public class MetaService {
     // Cria nova meta
     public Meta criar(Meta meta, Long usuarioId) {
         Usuario usuario = usuarioRepository.findById(usuarioId)
-            .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+            .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         meta.setUsuario(usuario);
 
@@ -98,13 +99,13 @@ public class MetaService {
     // Busca por ID
     public Meta buscarPorId(Long id) {
         return metaRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Meta não encontrada"));
+            .orElseThrow(() -> new ResourceNotFoundException("Meta não encontrada"));
     }
 
     // Valida ownership para evitar IDOR em endpoints por ID.
     public Meta buscarPorIdDoUsuario(Long id, Long usuarioId) {
         Meta meta = metaRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Meta não encontrada"));
+            .orElseThrow(() -> new ResourceNotFoundException("Meta não encontrada"));
 
         if (!meta.getUsuario().getId().equals(usuarioId)) {
             throw new UnauthorizedAccessException("Acesso negado a esta meta");

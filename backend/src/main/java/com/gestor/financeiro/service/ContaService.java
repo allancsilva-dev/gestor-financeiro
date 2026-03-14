@@ -1,5 +1,6 @@
 package com.gestor.financeiro.service;
 
+import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.exception.UnauthorizedAccessException;
 import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.Usuario;
@@ -27,7 +28,7 @@ public class ContaService {
     // Cria nova conta
     public Conta criar(Conta conta, Long usuarioId) {
         Usuario usuario = usuarioRepository.findById(usuarioId)
-            .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+            .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         conta.setUsuario(usuario);
 
@@ -57,7 +58,7 @@ public class ContaService {
     // Adiciona gasto na conta (quando faz uma compra)
     public void adicionarGasto(Long contaId, BigDecimal valor) {
         Conta conta = contaRepository.findById(contaId)
-            .orElseThrow(() -> new RuntimeException("Conta não encontrada"));
+            .orElseThrow(() -> new ResourceNotFoundException("Conta não encontrada"));
         
         // Soma o valor ao gasto atual
         conta.setValorGasto(conta.getValorGasto().add(valor));
@@ -67,7 +68,7 @@ public class ContaService {
     // Remove gasto da conta (quando cancela uma compra)
     public void removerGasto(Long contaId, BigDecimal valor) {
         Conta conta = contaRepository.findById(contaId)
-            .orElseThrow(() -> new RuntimeException("Conta não encontrada"));
+            .orElseThrow(() -> new ResourceNotFoundException("Conta não encontrada"));
         
         // Subtrai o valor do gasto atual
         conta.setValorGasto(conta.getValorGasto().subtract(valor));
@@ -85,13 +86,13 @@ public class ContaService {
     // Busca por ID
     public Conta buscarPorId(Long id) {
         return contaRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Conta não encontrada"));
+            .orElseThrow(() -> new ResourceNotFoundException("Conta não encontrada"));
     }
 
     // Valida ownership para evitar IDOR em endpoints por ID.
     public Conta buscarPorIdDoUsuario(Long id, Long usuarioId) {
         Conta conta = contaRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Conta não encontrada"));
+            .orElseThrow(() -> new ResourceNotFoundException("Conta não encontrada"));
 
         if (!conta.getUsuario().getId().equals(usuarioId)) {
             throw new UnauthorizedAccessException("Acesso negado a esta conta");

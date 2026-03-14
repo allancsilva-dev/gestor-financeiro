@@ -1,5 +1,6 @@
 package com.gestor.financeiro.controller;
 
+import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.service.DashboardService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -24,7 +25,7 @@ public class DashboardController {
     public ResponseEntity<Map<String, Object>> obterResumo(Authentication authentication) {
         String email = authentication.getName();
         Usuario usuario = usuarioRepository.findByEmail(email)
-            .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+            .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
         
         Map<String, Object> resumo = dashboardService.obterResumo(usuario.getId());
         return ResponseEntity.ok(resumo);
@@ -35,7 +36,7 @@ public class DashboardController {
     public ResponseEntity<?> gastosPorCategoria(Authentication authentication) {
         String email = authentication.getName();
         Usuario usuario = usuarioRepository.findByEmail(email)
-            .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+            .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
         
         var dados = dashboardService.obterGastosPorCategoria(usuario.getId());
         return ResponseEntity.ok(dados);
@@ -46,7 +47,7 @@ public class DashboardController {
     public ResponseEntity<?> evolucaoMensal(Authentication authentication) {
         String email = authentication.getName();
         Usuario usuario = usuarioRepository.findByEmail(email)
-            .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+            .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
         
         var dados = dashboardService.obterEvolucaoMensal(usuario.getId());
         return ResponseEntity.ok(dados);
@@ -57,7 +58,7 @@ public class DashboardController {
     public ResponseEntity<?> comparacaoMensal(Authentication authentication) {
         String email = authentication.getName();
         Usuario usuario = usuarioRepository.findByEmail(email)
-            .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+            .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
         
         var dados = dashboardService.obterComparacaoMensal(usuario.getId());
         return ResponseEntity.ok(dados);

@@ -1,5 +1,7 @@
 package com.gestor.financeiro.service;
 
+import com.gestor.financeiro.exception.BusinessException;
+import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.exception.UnauthorizedAccessException;
 import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.model.Conta;
@@ -56,14 +58,14 @@ public class TransacaoService {
     @Transactional
     public Transacao criar(Transacao transacao, Long usuarioId) {
         Usuario usuario = usuarioRepository.findById(usuarioId)
-            .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+            .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         transacao.setUsuario(usuario);
         
         // ✅ BUSCA A CATEGORIA DO BANCO (com dados completos)
         if (transacao.getCategoria() != null && transacao.getCategoria().getId() != null) {
             Categoria categoria = categoriaRepository.findById(transacao.getCategoria().getId())
-                .orElseThrow(() -> new RuntimeException("Categoria não encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Categoria não encontrada"));
             
             // Atualiza o valorGasto da categoria
             categoria.setValorGasto(
@@ -78,7 +80,7 @@ public class TransacaoService {
         // ✅ BUSCA A CONTA DO BANCO (com dados completos)
         if (transacao.getConta() != null && transacao.getConta().getId() != null) {
             Conta conta = contaRepository.findById(transacao.getConta().getId())
-                .orElseThrow(() -> new RuntimeException("Conta não encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Conta não encontrada"));
             
             // Adiciona gasto na conta
             contaService.adicionarGasto(conta.getId(), transacao.getValorTotal());
@@ -152,7 +154,7 @@ public class TransacaoService {
         // Remove gasto da categoria
         if (transacao.getCategoria() != null) {
             Categoria categoria = categoriaRepository.findById(transacao.getCategoria().getId())
-                .orElseThrow(() -> new RuntimeException("Categoria não encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Categoria não encontrada"));
             
             categoria.setValorGasto(
                 categoria.getValorGasto().subtract(transacao.getValorTotal())
@@ -166,13 +168,13 @@ public class TransacaoService {
     // Busca por ID
     public Transacao buscarPorId(Long id) {
         return transacaoRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Transação não encontrada"));
+            .orElseThrow(() -> new ResourceNotFoundException("Transação não encontrada"));
     }
 
     // Valida ownership para evitar IDOR em endpoints por ID.
     public Transacao buscarPorIdDoUsuario(Long id, Long usuarioId) {
         Transacao transacao = transacaoRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Transação não encontrada"));
+            .orElseThrow(() -> new ResourceNotFoundException("Transação não encontrada"));
 
         if (!transacao.getUsuario().getId().equals(usuarioId)) {
             throw new UnauthorizedAccessException("Acesso negado a esta transação");

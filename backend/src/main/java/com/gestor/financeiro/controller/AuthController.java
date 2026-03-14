@@ -2,6 +2,8 @@ package com.gestor.financeiro.controller;
 
 import com.gestor.financeiro.config.JwtUtil;
 import com.gestor.financeiro.dto.*;
+import com.gestor.financeiro.exception.BusinessException;
+import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.model.PasswordResetToken;
 import com.gestor.financeiro.model.RefreshToken;
 import com.gestor.financeiro.model.Usuario;
@@ -10,6 +12,8 @@ import com.gestor.financeiro.repository.UsuarioRepository;
 import com.gestor.financeiro.service.EmailService;
 import com.gestor.financeiro.service.RefreshTokenService;
 import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -40,6 +44,8 @@ import java.util.UUID;
 @RequestMapping("/api/auth")
 public class AuthController {
 
+    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
+
     @Autowired
     private UsuarioRepository usuarioRepository;
 
@@ -67,9 +73,7 @@ public class AuthController {
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
         Optional<Usuario> usuarioExistente = usuarioRepository.findByEmail(request.getEmail());
         if (usuarioExistente.isPresent()) {
-            return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body("Email já cadastrado!");
+            throw new BusinessException("Email já cadastrado!");
         }
     
     Usuario usuario = new Usuario();
@@ -87,9 +91,7 @@ public class AuthController {
         Optional<Usuario> usuarioOpt = usuarioRepository.findByEmail(request.getEmail());
         
         if (usuarioOpt.isEmpty()) {
-            return ResponseEntity
-                .status(HttpStatus.UNAUTHORIZED)
-                .body(new LoginResponse("Email ou senha incorretos", false));
+            throw new BusinessException("Email ou senha incorretos");
         }
         
         Usuario usuario = usuarioOpt.get();
@@ -114,13 +116,11 @@ public class AuthController {
                 "email", usuario.getEmail()
             ));
             
-            System.out.println(">>> DEBUG: Login realizado com refresh token para: " + usuario.getEmail());
+            log.info("Login realizado com refresh token para usuário {}", usuario.getEmail());
             
             return ResponseEntity.ok(response);
         } else {
-            return ResponseEntity
-                .status(HttpStatus.UNAUTHORIZED)
-                .body(new LoginResponse("Email ou senha incorretos", false));
+            throw new BusinessException("Email ou senha incorretos");
         }
     }
 
@@ -132,36 +132,27 @@ public class AuthController {
      */
     @PostMapping("/refresh-token")
     public ResponseEntity<?> refreshToken(@Valid @RequestBody Map<String, String> request) {
-        try {
-            String refreshTokenValue = request.get("refreshToken");
-            
-            if (refreshTokenValue == null || refreshTokenValue.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of(
-                    "error", "Refresh token não fornecido"
-                ));
-            }
+        String refreshTokenValue = request.get("refreshToken");
 
-            // Validar refresh token
-            RefreshToken refreshToken = refreshTokenService.validarRefreshToken(refreshTokenValue);
-
-            // Gerar novo access token
-            String novoAccessToken = jwtUtil.generateToken(refreshToken.getUsuario().getEmail());
-
-            // Resposta
-            Map<String, Object> response = new HashMap<>();
-            response.put("accessToken", novoAccessToken);
-            response.put("token", novoAccessToken); // Compatibilidade
-            response.put("refreshToken", refreshTokenValue);
-
-            System.out.println(">>> DEBUG: Access token renovado para: " + refreshToken.getUsuario().getEmail());
-
-            return ResponseEntity.ok(response);
-            
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
-                "error", e.getMessage()
-            ));
+        if (refreshTokenValue == null || refreshTokenValue.isEmpty()) {
+            throw new BusinessException("Refresh token não fornecido");
         }
+
+        // Validar refresh token
+        RefreshToken refreshToken = refreshTokenService.validarRefreshToken(refreshTokenValue);
+
+        // Gerar novo access token
+        String novoAccessToken = jwtUtil.generateToken(refreshToken.getUsuario().getEmail());
+
+        // Resposta
+        Map<String, Object> response = new HashMap<>();
+        response.put("accessToken", novoAccessToken);
+        response.put("token", novoAccessToken); // Compatibilidade
+        response.put("refreshToken", refreshTokenValue);
+
+        log.info("Access token renovado para usuário {}", refreshToken.getUsuario().getEmail());
+
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -172,24 +163,16 @@ public class AuthController {
      */
     @PostMapping("/logout")
     public ResponseEntity<?> logout(@Valid @RequestBody Map<String, String> request) {
-        try {
-            String refreshToken = request.get("refreshToken");
-            
-            if (refreshToken != null && !refreshToken.isEmpty()) {
-                refreshTokenService.revogarToken(refreshToken);
-                System.out.println(">>> DEBUG: Refresh token revogado no logout");
-            }
+        String refreshToken = request.get("refreshToken");
 
-            return ResponseEntity.ok(Map.of(
-                "message", "Logout realizado com sucesso"
-            ));
-            
-        } catch (Exception e) {
-            
-            return ResponseEntity.ok(Map.of(
-                "message", "Logout realizado"
-            ));
+        if (refreshToken != null && !refreshToken.isEmpty()) {
+            refreshTokenService.revogarToken(refreshToken);
+            log.info("Refresh token revogado no logout");
         }
+
+        return ResponseEntity.ok(Map.of(
+            "message", "Logout realizado com sucesso"
+        ));
     }
 
     /**
@@ -200,24 +183,16 @@ public class AuthController {
      */
     @PostMapping("/logout-all")
     public ResponseEntity<?> logoutAll(Authentication authentication) {
-        try {
-            String email = authentication.getName();
-            Usuario usuario = usuarioRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+        String email = authentication.getName();
+        Usuario usuario = usuarioRepository.findByEmail(email)
+            .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
-            refreshTokenService.revogarTodosTokensDoUsuario(usuario);
-            
-            System.out.println(">>> DEBUG: Todos os tokens revogados para: " + email);
+        refreshTokenService.revogarTodosTokensDoUsuario(usuario);
+        log.info("Todos os tokens revogados para usuário {}", email);
 
-            return ResponseEntity.ok(Map.of(
-                "message", "Logout realizado em todos os dispositivos"
-            ));
-            
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of(
-                "error", e.getMessage()
-            ));
-        }
+        return ResponseEntity.ok(Map.of(
+            "message", "Logout realizado em todos os dispositivos"
+        ));
     }
 
     @Transactional
@@ -249,23 +224,17 @@ public class AuthController {
         Optional<PasswordResetToken> tokenOpt = tokenRepository.findByToken(request.getToken());
         
         if (tokenOpt.isEmpty()) {
-            return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body("Token inválido!");
+            throw new BusinessException("Token inválido!");
         }
         
         PasswordResetToken resetToken = tokenOpt.get();
         
         if (resetToken.isExpired()) {
-            return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body("Token expirado! Solicite um novo link de recuperação.");
+            throw new BusinessException("Token expirado! Solicite um novo link de recuperação.");
         }
         
         if (resetToken.getUsado()) {
-            return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body("Token já foi utilizado!");
+            throw new BusinessException("Token já foi utilizado!");
         }
         
         Usuario usuario = resetToken.getUsuario();
@@ -284,23 +253,17 @@ public class AuthController {
         Optional<PasswordResetToken> tokenOpt = tokenRepository.findByToken(token);
         
         if (tokenOpt.isEmpty()) {
-            return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body("Token inválido!");
+            throw new BusinessException("Token inválido!");
         }
         
         PasswordResetToken resetToken = tokenOpt.get();
         
         if (resetToken.isExpired()) {
-            return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body("Token expirado!");
+            throw new BusinessException("Token expirado!");
         }
         
         if (resetToken.getUsado()) {
-            return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body("Token já utilizado!");
+            throw new BusinessException("Token já utilizado!");
         }
         
         return ResponseEntity.ok("Token válido!");

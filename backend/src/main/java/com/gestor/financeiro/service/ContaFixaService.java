@@ -1,5 +1,7 @@
 package com.gestor.financeiro.service;
 
+import com.gestor.financeiro.exception.BusinessException;
+import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.exception.UnauthorizedAccessException;
 import com.gestor.financeiro.model.ContaFixa;
 import com.gestor.financeiro.model.Transacao;
@@ -36,7 +38,7 @@ public class ContaFixaService {
     // Cria nova conta fixa
     public ContaFixa criar(ContaFixa contaFixa, Long usuarioId) {
         Usuario usuario = usuarioRepository.findById(usuarioId)
-            .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+            .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         contaFixa.setUsuario(usuario);
 
@@ -81,7 +83,7 @@ public class ContaFixaService {
         
         // ✅ VERIFICA SE JÁ ESTÁ PAGA ESTE MÊS
         if (conta.getStatus() == StatusPagamento.PAGO) {
-            throw new RuntimeException("Esta conta já foi paga este mês!");
+            throw new BusinessException("Esta conta já foi paga este mês!");
         }
         
         // 1. Cria a transação de saída
@@ -142,13 +144,13 @@ public class ContaFixaService {
     // Busca por ID
     public ContaFixa buscarPorId(Long id) {
         return contaFixaRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Conta fixa não encontrada"));
+            .orElseThrow(() -> new ResourceNotFoundException("Conta fixa não encontrada"));
     }
 
     // Valida ownership para evitar IDOR em operações por ID.
     public ContaFixa buscarPorIdDoUsuario(Long id, Long usuarioId) {
         ContaFixa conta = contaFixaRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Conta fixa não encontrada"));
+            .orElseThrow(() -> new ResourceNotFoundException("Conta fixa não encontrada"));
 
         if (!conta.getUsuario().getId().equals(usuarioId)) {
             throw new UnauthorizedAccessException("Acesso negado a esta conta fixa");

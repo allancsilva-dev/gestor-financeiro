@@ -1,5 +1,6 @@
 package com.gestor.financeiro.service;
 
+import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.exception.UnauthorizedAccessException;
 import com.gestor.financeiro.model.Parcela;
 import com.gestor.financeiro.model.enums.StatusPagamento;
@@ -48,7 +49,7 @@ public class ParcelaService {
     // Valida ownership através da transação dona da parcela.
     public Parcela buscarPorIdDoUsuario(Long id, Long usuarioId) {
         Parcela parcela = parcelaRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Parcela não encontrada"));
+            .orElseThrow(() -> new ResourceNotFoundException("Parcela não encontrada"));
 
         if (!parcela.getTransacao().getUsuario().getId().equals(usuarioId)) {
             throw new UnauthorizedAccessException("Acesso negado a esta parcela");

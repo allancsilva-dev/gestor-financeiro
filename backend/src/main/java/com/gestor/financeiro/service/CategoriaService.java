@@ -1,5 +1,7 @@
 package com.gestor.financeiro.service;
 
+import com.gestor.financeiro.exception.BusinessException;
+import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.exception.UnauthorizedAccessException;
 import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.model.Usuario;
@@ -45,11 +47,11 @@ public class CategoriaService {
         Usuario usuario = authenticatedUserService.getAuthenticatedUser();
         
         Categoria categoria = categoriaRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Categoria não encontrada"));
+            .orElseThrow(() -> new ResourceNotFoundException("Categoria não encontrada"));
         
         // Verifica se a categoria pertence ao usuário logado
         if (!categoria.getUsuario().getId().equals(usuario.getId())) {
-            throw new RuntimeException("Você não tem permissão para editar esta categoria");
+            throw new BusinessException("Você não tem permissão para editar esta categoria");
         }
         
         categoria.setNome(categoriaAtualizada.getNome());
@@ -65,11 +67,11 @@ public class CategoriaService {
         Usuario usuario = authenticatedUserService.getAuthenticatedUser();
         
         Categoria categoria = categoriaRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Categoria não encontrada"));
+            .orElseThrow(() -> new ResourceNotFoundException("Categoria não encontrada"));
         
         // Verifica se a categoria pertence ao usuário logado
         if (!categoria.getUsuario().getId().equals(usuario.getId())) {
-            throw new RuntimeException("Você não tem permissão para deletar esta categoria");
+            throw new BusinessException("Você não tem permissão para deletar esta categoria");
         }
         
         categoria.setAtivo(false);
@@ -79,12 +81,12 @@ public class CategoriaService {
     // Busca categoria por ID
     public Categoria buscarPorId(Long id) {
         return categoriaRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Categoria não encontrada"));
+            .orElseThrow(() -> new ResourceNotFoundException("Categoria não encontrada"));
     }
 
     public Categoria buscarPorIdDoUsuario(Long id, Long usuarioId) {
         Categoria categoria = categoriaRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Categoria não encontrada"));
+            .orElseThrow(() -> new ResourceNotFoundException("Categoria não encontrada"));
 
         if (!categoria.getUsuario().getId().equals(usuarioId)) {
             throw new UnauthorizedAccessException("Acesso negado a esta categoria");
