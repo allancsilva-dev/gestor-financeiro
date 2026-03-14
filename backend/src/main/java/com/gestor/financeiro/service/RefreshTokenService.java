@@ -2,7 +2,7 @@ package com.gestor.financeiro.service;
 
 import com.gestor.financeiro.exception.BusinessException;
 import com.gestor.financeiro.exception.ResourceNotFoundException;
-import com.gestor.financeiro.exception.SessionInvalidatedException;
+import com.gestor.financeiro.exception.TokenReuseDetectedException;
 import com.gestor.financeiro.model.RefreshToken;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.repository.RefreshTokenRepository;
@@ -110,8 +110,8 @@ public class RefreshTokenService {
                 refreshTokenRepository.revokeAllByUsuario(atual.getUsuario());
             }
 
-            log.warn("Reuso de refresh token detectado; sessão invalidada. userId={}, ip={}", userId, clientIp);
-            throw new SessionInvalidatedException("Sessão invalidada por segurança");
+            log.warn("SECURITY: Refresh token reuse detected. userId={}, ip={}", userId, clientIp);
+            throw new TokenReuseDetectedException("Sessão invalidada por segurança. Faça login novamente.");
         }
 
         atual.revogar();

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <springProperty scope="context" name="APP_NAME" source="spring.application.name" defaultValue="financeiro"/>
+
+    <springProfile name="default,dev,test">
+        <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
+            </encoder>
+        </appender>
+
+        <logger name="com.gestor.financeiro" level="DEBUG"/>
+        <logger name="org.springframework.security" level="WARN"/>
+        <logger name="org.hibernate.SQL" level="DEBUG"/>
+        <logger name="org.hibernate.type.descriptor.sql" level="TRACE"/>
+
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
+    <springProfile name="prod">
+        <appender name="CONSOLE_JSON" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder class="net.logstash.logback.encoder.LogstashEncoder"/>
+        </appender>
+
+        <appender name="FILE_JSON" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>logs/${APP_NAME}.log</file>
+            <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+                <fileNamePattern>logs/${APP_NAME}.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+                <maxHistory>30</maxHistory>
+                <totalSizeCap>500MB</totalSizeCap>
+                <maxFileSize>50MB</maxFileSize>
+            </rollingPolicy>
+            <encoder class="net.logstash.logback.encoder.LogstashEncoder"/>
+        </appender>
+
+        <logger name="com.gestor.financeiro" level="INFO"/>
+        <logger name="org.springframework.security" level="WARN"/>
+        <logger name="org.hibernate.SQL" level="WARN"/>
+        <logger name="org.hibernate.type.descriptor.sql" level="OFF"/>
+
+        <root level="INFO">
+            <appender-ref ref="CONSOLE_JSON"/>
+            <appender-ref ref="FILE_JSON"/>
+        </root>
+    </springProfile>
+</configuration>

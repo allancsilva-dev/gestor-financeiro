@@ -112,10 +112,10 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(apiError);
     }
 
-    @ExceptionHandler(SessionInvalidatedException.class)
-    public ResponseEntity<ApiError> handleSessionInvalidated(SessionInvalidatedException ex) {
+    @ExceptionHandler(TokenReuseDetectedException.class)
+    public ResponseEntity<ApiError> handleTokenReuse(TokenReuseDetectedException ex) {
         ApiError apiError = new ApiError(
-            "UNAUTHORIZED",
+            "TOKEN_REUSE_DETECTED",
             ex.getMessage(),
             Instant.now(),
             null

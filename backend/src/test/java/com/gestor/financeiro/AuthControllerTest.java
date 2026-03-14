@@ -14,6 +14,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -200,8 +201,48 @@ class AuthControllerTest {
         mockMvc.perform(post("/api/auth/refresh-token")
                 .cookie(new jakarta.servlet.http.Cookie("refreshToken", refreshToken)))
                         .andExpect(status().isUnauthorized())
-                        .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
-                        .andExpect(jsonPath("$.message").value("Sessão invalidada por segurança"));
+                        .andExpect(jsonPath("$.code").value("TOKEN_REUSE_DETECTED"))
+                        .andExpect(jsonPath("$.message").value("Sessão invalidada por segurança. Faça login novamente."));
+        }
+
+        @Test
+        void refreshToken_deveDetectarReusoAposRotacao() throws Exception {
+                usuarioRepository.save(TestDataFactory.usuario("Alice", "alice@teste.com", passwordEncoder.encode("123456")));
+
+                String loginSetCookie = mockMvc.perform(post("/api/auth/login")
+                                .header("X-Forwarded-For", "10.0.0.17")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(Map.of(
+                                                "email", "alice@teste.com",
+                                                "password", "123456"
+                                ))))
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getHeader("Set-Cookie");
+
+                String tokenA = extrairValorCookie(loginSetCookie);
+
+                String refreshSetCookie = mockMvc.perform(post("/api/auth/refresh-token")
+                                .header("X-Forwarded-For", "10.0.0.17")
+                                .cookie(new jakarta.servlet.http.Cookie("refreshToken", tokenA)))
+                        .andExpect(status().isOk())
+                        .andReturn()
+                        .getResponse()
+                        .getHeader("Set-Cookie");
+
+                assertThat(extrairValorCookie(refreshSetCookie)).isNotEqualTo(tokenA);
+
+                mockMvc.perform(post("/api/auth/refresh-token")
+                                .header("X-Forwarded-For", "10.0.0.99")
+                                .cookie(new jakarta.servlet.http.Cookie("refreshToken", tokenA)))
+                        .andExpect(status().isUnauthorized())
+                        .andExpect(jsonPath("$.code").value("TOKEN_REUSE_DETECTED"))
+                        .andExpect(jsonPath("$.message").value("Sessão invalidada por segurança. Faça login novamente."));
+
+                var usuario = usuarioRepository.findByEmail("alice@teste.com").orElseThrow();
+                long validTokens = refreshTokenRepository.countValidTokensByUsuario(usuario, LocalDateTime.now());
+                assertThat(validTokens).isZero();
     }
 
     @Test
