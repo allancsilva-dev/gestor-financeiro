@@ -70,4 +70,58 @@ describe('useApi', () => {
 
     expect(executor).toHaveBeenCalledTimes(1);
   });
+
+  it('deve marcar failed=true quando retries esgotarem', async () => {
+    const executor = vi.fn(async () => {
+      throw { code: 'ERR_NETWORK' };
+    });
+
+    const { result } = renderHook(() =>
+      useApi(executor, {
+        immediate: true,
+        retry: { retries: 3, initialDelayMs: 1, enabled: true },
+      })
+    );
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(executor).toHaveBeenCalledTimes(4);
+    expect(result.current.failed).toBe(true);
+  });
+
+  it('não deve auto-refetch em re-render quando deps não mudam', async () => {
+    const executor = vi.fn(async () => ({ ok: true }));
+
+    const { result, rerender } = renderHook(
+      ({ tick }) =>
+        useApi(
+          async (signal) => {
+            return executor(signal, tick);
+          },
+          {
+            immediate: true,
+            deps: [],
+          }
+        ),
+      {
+        initialProps: { tick: 1 },
+      }
+    );
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(executor).toHaveBeenCalledTimes(1);
+
+    rerender({ tick: 2 });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(executor).toHaveBeenCalledTimes(1);
+  });
 });

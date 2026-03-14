@@ -21,7 +21,34 @@ const defaultRetry: Required<RetryOptions> = {
   enabled: true,
 };
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const MAX_RETRIES = 3;
+
+const createAbortError = () => {
+  const err = new Error('Request aborted');
+  err.name = 'AbortError';
+  return err;
+};
+
+const sleepWithSignal = (ms: number, signal: AbortSignal) =>
+  new Promise<void>((resolve, reject) => {
+    if (signal.aborted) {
+      reject(createAbortError());
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+
+    const onAbort = () => {
+      clearTimeout(timeoutId);
+      signal.removeEventListener('abort', onAbort);
+      reject(createAbortError());
+    };
+
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
 
 const isAbortError = (error: unknown): boolean => {
   const e = error as { name?: string; code?: string };
@@ -51,25 +78,26 @@ export async function fetchWithRetry<T>(
   retry?: RetryOptions
 ): Promise<T> {
   const config = { ...defaultRetry, ...retry };
+  const retries = Math.max(0, Math.min(config.retries, MAX_RETRIES));
 
   let attempt = 0;
   while (true) {
     if (signal.aborted) {
-      throw new DOMException('Request aborted', 'AbortError');
+      throw createAbortError();
     }
 
     try {
       return await operation();
     } catch (error) {
       attempt += 1;
-      const shouldRetry = config.enabled && attempt <= config.retries && isRetryableError(error);
+      const shouldRetry = config.enabled && attempt <= retries && isRetryableError(error);
 
       if (!shouldRetry) {
         throw error;
       }
 
       const backoffMs = config.initialDelayMs * Math.pow(2, attempt - 1);
-      await sleep(backoffMs);
+      await sleepWithSignal(backoffMs, signal);
     }
   }
 }
@@ -80,6 +108,15 @@ export function useApi<T>(executor: ApiExecutor<T>, options: UseApiOptions = {})
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState<boolean>(immediate);
   const [error, setError] = useState<unknown>(null);
+  const [failed, setFailed] = useState<boolean>(false);
+
+  const executorRef = useRef(executor);
+  const retryRef = useRef(retry);
+  const mountedRef = useRef(true);
+
+  executorRef.current = executor;
+  retryRef.current = retry;
+
   const controllerRef = useRef<AbortController | null>(null);
 
   const run = useCallback(async () => {
@@ -87,39 +124,50 @@ export function useApi<T>(executor: ApiExecutor<T>, options: UseApiOptions = {})
     const controller = new AbortController();
     controllerRef.current = controller;
 
-    setLoading(true);
-    setError(null);
+    if (mountedRef.current) {
+      setLoading(true);
+      setError(null);
+      setFailed(false);
+    }
 
     try {
-      const result = await fetchWithRetry(() => executor(controller.signal), controller.signal, retry);
-      if (!controller.signal.aborted) {
+      const result = await fetchWithRetry(
+        () => executorRef.current(controller.signal),
+        controller.signal,
+        retryRef.current
+      );
+      if (!controller.signal.aborted && mountedRef.current) {
         setData(result);
       }
     } catch (err) {
-      if (!isAbortError(err)) {
+      if (!isAbortError(err) && mountedRef.current) {
         setError(err);
+        setFailed(true);
       }
     } finally {
-      if (!controller.signal.aborted) {
+      if (!controller.signal.aborted && mountedRef.current) {
         setLoading(false);
       }
     }
-  }, [executor, retry]);
+  }, []);
 
   useEffect(() => {
+    mountedRef.current = true;
+
     if (immediate) {
       run();
     }
 
     return () => {
+      mountedRef.current = false;
       controllerRef.current?.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [immediate, run, ...deps]);
+  }, [immediate, ...deps]);
 
   const refetch = useCallback(async () => {
     await run();
   }, [run]);
 
-  return { data, loading, error, refetch, setData };
+  return { data, loading, error, failed, refetch, setData };
 }
