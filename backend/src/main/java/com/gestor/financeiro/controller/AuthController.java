@@ -144,13 +144,14 @@ public class AuthController {
     @Operation(summary = "Renovar access token", description = "Gera novo access token com rotação de refresh token")
     public ResponseEntity<?> refreshToken(HttpServletRequest request) {
         String refreshTokenValue = extractRefreshTokenFromCookies(request);
+        String clientIp = extractClientIp(request);
 
         if (refreshTokenValue == null || refreshTokenValue.isEmpty()) {
             throw new BusinessException("Refresh token não fornecido");
         }
 
         // Rotaciona token: revoga atual e emite um novo.
-        RefreshToken refreshToken = refreshTokenService.rotacionarRefreshToken(refreshTokenValue);
+        RefreshToken refreshToken = refreshTokenService.rotacionarRefreshToken(refreshTokenValue, clientIp);
 
         // Gerar novo access token
         String novoAccessToken = jwtUtil.generateToken(refreshToken.getUsuario().getEmail());
@@ -309,5 +310,14 @@ public class AuthController {
         }
 
         return null;
+    }
+
+    private String extractClientIp(HttpServletRequest request) {
+        String forwardedFor = request.getHeader("X-Forwarded-For");
+        if (forwardedFor != null && !forwardedFor.isBlank()) {
+            return forwardedFor.split(",")[0].trim();
+        }
+
+        return request.getRemoteAddr();
     }
 }

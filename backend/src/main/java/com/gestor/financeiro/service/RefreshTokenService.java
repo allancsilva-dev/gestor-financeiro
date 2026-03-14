@@ -2,9 +2,12 @@ package com.gestor.financeiro.service;
 
 import com.gestor.financeiro.exception.BusinessException;
 import com.gestor.financeiro.exception.ResourceNotFoundException;
+import com.gestor.financeiro.exception.SessionInvalidatedException;
 import com.gestor.financeiro.model.RefreshToken;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.repository.RefreshTokenRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +27,8 @@ import java.util.UUID;
  */
 @Service
 public class RefreshTokenService {
+
+    private static final Logger log = LoggerFactory.getLogger(RefreshTokenService.class);
 
     @Autowired
     private RefreshTokenRepository refreshTokenRepository;
@@ -91,8 +96,24 @@ public class RefreshTokenService {
      * @return novo refresh token persistido
      */
     @Transactional
-    public RefreshToken rotacionarRefreshToken(String tokenAtual) {
-        RefreshToken atual = validarRefreshToken(tokenAtual);
+    public RefreshToken rotacionarRefreshToken(String tokenAtual, String clientIp) {
+        RefreshToken atual = refreshTokenRepository.findByToken(tokenAtual)
+            .orElseThrow(() -> new ResourceNotFoundException("Refresh token não encontrado"));
+
+        if (atual.isExpirado()) {
+            throw new BusinessException("Refresh token expirado");
+        }
+
+        if (atual.getRevogado()) {
+            Long userId = atual.getUsuario() != null ? atual.getUsuario().getId() : null;
+            if (atual.getUsuario() != null) {
+                refreshTokenRepository.revokeAllByUsuario(atual.getUsuario());
+            }
+
+            log.warn("Reuso de refresh token detectado; sessão invalidada. userId={}, ip={}", userId, clientIp);
+            throw new SessionInvalidatedException("Sessão invalidada por segurança");
+        }
+
         atual.revogar();
         refreshTokenRepository.save(atual);
 

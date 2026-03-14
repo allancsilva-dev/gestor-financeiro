@@ -199,8 +199,9 @@ class AuthControllerTest {
 
         mockMvc.perform(post("/api/auth/refresh-token")
                 .cookie(new jakarta.servlet.http.Cookie("refreshToken", refreshToken)))
-            .andExpect(status().isUnprocessableEntity())
-            .andExpect(jsonPath("$.code").value("BUSINESS_ERROR"));
+                        .andExpect(status().isUnauthorized())
+                        .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
+                        .andExpect(jsonPath("$.message").value("Sessão invalidada por segurança"));
     }
 
     @Test

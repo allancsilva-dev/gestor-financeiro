@@ -112,6 +112,18 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(apiError);
     }
 
+    @ExceptionHandler(SessionInvalidatedException.class)
+    public ResponseEntity<ApiError> handleSessionInvalidated(SessionInvalidatedException ex) {
+        ApiError apiError = new ApiError(
+            "UNAUTHORIZED",
+            ex.getMessage(),
+            Instant.now(),
+            null
+        );
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(apiError);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleGeneric(Exception ex) {
         // Log completo fica apenas internamente; resposta pública é genérica por segurança.
