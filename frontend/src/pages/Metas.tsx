@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import Layout from '../components/Layout';
 import CurrencyInput from '../components/CurrencyInput';
 import { formatCurrency } from '../utils/currency';
+import IconPicker from '../components/IconPicker';
 
 export default function Metas() {
   const { usuario } = useAuth();
@@ -31,6 +32,17 @@ export default function Metas() {
   const valorTotalNumerico = formData.valorTotal ? parseFloat(formData.valorTotal) : null;
   const valorMensalNumerico = formData.valorMensal ? parseFloat(formData.valorMensal) : null;
   const valorAdicionarNumerico = valorAdicionar ? parseFloat(valorAdicionar) : null;
+  const [previsaoMesesManual, setPrevisaoMesesManual] = useState('');
+  const [usarPrevisaoManual, setUsarPrevisaoManual] = useState(false);
+
+  const previsaoCalculada =
+    valorTotalNumerico && valorMensalNumerico && valorMensalNumerico > 0
+      ? Math.ceil(valorTotalNumerico / valorMensalNumerico)
+      : null;
+
+  const previsaoMeses = usarPrevisaoManual
+    ? (previsaoMesesManual ? parseInt(previsaoMesesManual, 10) : null)
+    : previsaoCalculada;
 
   const {
     data: metasPaginadas,
@@ -83,9 +95,11 @@ export default function Metas() {
         valorTotal: meta.valorTotal?.toString() || '',
         valorMensal: meta.valorMensal?.toString() || '',
         cor: meta.cor || '#3498DB',
-        icone: meta.icone || 'target',
+        icone: meta.icone || '🎯',
         descricao: meta.descricao || ''
       });
+      setUsarPrevisaoManual(false);
+      setPrevisaoMesesManual('');
     } else {
       // Modo criação
       resetarFormulario();
@@ -100,9 +114,11 @@ export default function Metas() {
       valorTotal: '',
       valorMensal: '',
       cor: '#3498DB',
-      icone: 'target',
+      icone: '🎯',
       descricao: ''
     });
+    setUsarPrevisaoManual(false);
+    setPrevisaoMesesManual('');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -245,11 +261,37 @@ export default function Metas() {
                   </div>
                 </div>
 
-                {formData.valorTotal && formData.valorMensal && (
-                  <p className="text-sm text-gray-600">
-                    📅 Previsão: {Math.ceil(parseFloat(formData.valorTotal) / parseFloat(formData.valorMensal))} meses
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                  <label className="block text-sm font-medium mb-1 text-gray-700">Previsão de Conclusão (meses)</label>
+                  <div className="flex flex-col md:flex-row md:items-center gap-3">
+                    <input
+                      type="number"
+                      min="1"
+                      value={usarPrevisaoManual ? previsaoMesesManual : (previsaoMeses ?? '')}
+                      onChange={(e) => {
+                        setUsarPrevisaoManual(true);
+                        setPrevisaoMesesManual(e.target.value);
+                      }}
+                      className="w-full md:w-48 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                      placeholder="Automatico"
+                    />
+                    {usarPrevisaoManual && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUsarPrevisaoManual(false);
+                          setPrevisaoMesesManual('');
+                        }}
+                        className="text-sm text-blue-700 hover:text-blue-900 font-medium"
+                      >
+                        Usar calculo automatico
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-600 mt-2">
+                    Previsão: {previsaoMeses && Number.isFinite(previsaoMeses) ? `~${previsaoMeses} meses` : '—'}
                   </p>
-                )}
+                </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -264,12 +306,9 @@ export default function Metas() {
 
                   <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">Ícone</label>
-                    <input
-                      type="text"
+                    <IconPicker
                       value={formData.icone}
-                      onChange={(e) => setFormData({ ...formData, icone: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
-                      placeholder="target"
+                      onChange={(icone) => setFormData({ ...formData, icone })}
                     />
                   </div>
                 </div>
@@ -332,7 +371,7 @@ export default function Metas() {
                         className="w-12 h-12 rounded-full flex items-center justify-center text-white text-xl font-bold"
                         style={{ backgroundColor: meta.cor || '#3498DB' }}
                       >
-                        {meta.icone?.charAt(0).toUpperCase() || '🎯'}
+                        {meta.icone || '🎯'}
                       </div>
                       <div>
                         <h3 className="text-xl font-bold text-gray-800">{meta.nome}</h3>
