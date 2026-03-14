@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { useApi } from '../hooks/useApi';
 import toast from 'react-hot-toast';
 import Layout from '../components/Layout';
+import CurrencyInput from '../components/CurrencyInput';
+import { formatCurrency } from '../utils/currency';
 
 export default function Metas() {
   const { usuario } = useAuth();
@@ -26,6 +28,9 @@ export default function Metas() {
   });
 
   const [valorAdicionar, setValorAdicionar] = useState('');
+  const valorTotalNumerico = formData.valorTotal ? parseFloat(formData.valorTotal) : null;
+  const valorMensalNumerico = formData.valorMensal ? parseFloat(formData.valorMensal) : null;
+  const valorAdicionarNumerico = valorAdicionar ? parseFloat(valorAdicionar) : null;
 
   const {
     data: metasPaginadas,
@@ -219,26 +224,22 @@ export default function Metas() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">Valor Total (R$)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.valorTotal}
-                      onChange={(e) => setFormData({ ...formData, valorTotal: e.target.value })}
+                    <CurrencyInput
+                      value={valorTotalNumerico}
+                      onValueChange={(value) => setFormData({ ...formData, valorTotal: value === null ? '' : value.toString() })}
                       className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
-                      placeholder="15000.00"
+                      placeholder="R$ 0,00"
                       required
                     />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">Valor Mensal (R$)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.valorMensal}
-                      onChange={(e) => setFormData({ ...formData, valorMensal: e.target.value })}
+                    <CurrencyInput
+                      value={valorMensalNumerico}
+                      onValueChange={(value) => setFormData({ ...formData, valorMensal: value === null ? '' : value.toString() })}
                       className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
-                      placeholder="500.00"
+                      placeholder="R$ 0,00"
                       required
                     />
                   </div>
@@ -358,8 +359,8 @@ export default function Metas() {
 
                   <div className="mb-4">
                     <div className="flex justify-between text-sm text-gray-600 mb-1">
-                      <span>R$ {(meta.valorReservado || 0).toFixed(2)}</span>
-                      <span>R$ {meta.valorTotal.toFixed(2)}</span>
+                      <span>{formatCurrency(meta.valorReservado || 0)}</span>
+                      <span>{formatCurrency(meta.valorTotal)}</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-4">
                       <div
@@ -379,7 +380,7 @@ export default function Metas() {
                     <div>
                       <p className="text-gray-600">Faltam</p>
                       <p className="font-bold text-gray-800">
-                        R$ {(meta.valorTotal - (meta.valorReservado || 0)).toFixed(2)}
+                        {formatCurrency(meta.valorTotal - (meta.valorReservado || 0))}
                       </p>
                     </div>
                     <div>
@@ -392,13 +393,11 @@ export default function Metas() {
 
                   {mostrarAdicionar === meta.id ? (
                     <div className="space-y-2">
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={valorAdicionar}
-                        onChange={(e) => setValorAdicionar(e.target.value)}
+                      <CurrencyInput
+                        value={valorAdicionarNumerico}
+                        onValueChange={(value) => setValorAdicionar(value === null ? '' : value.toString())}
                         className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
-                        placeholder="Valor a adicionar"
+                        placeholder="R$ 0,00"
                       />
                       <div className="flex gap-2">
                         <button

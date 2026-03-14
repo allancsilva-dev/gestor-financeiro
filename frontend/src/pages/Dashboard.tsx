@@ -8,6 +8,7 @@ import { useApi } from '../hooks/useApi';
 
 import GraficoGastosPorCategoria from '../components/GraficoGastosPorCategoria';
 import GraficoEvolucaoMensal from '../components/GraficoEvolucaoMensal';
+import { formatCurrency } from '../utils/currency';
 
 export default function Dashboard() {
   const { usuario } = useAuth();
@@ -47,16 +48,12 @@ export default function Dashboard() {
     }
   }, [error]);
 
-  const formatarMoeda = (valor: number) => {
-    if (typeof valor !== 'number') {
-      valor = 0;
+  const formatarMoedaComSinal = (valor: number) => {
+    const valorNumerico = typeof valor === 'number' ? valor : 0;
+    if (valorNumerico < 0) {
+      return `-${formatCurrency(Math.abs(valorNumerico))}`;
     }
-    const valorAbsoluto = Math.abs(valor);
-    const formatado = valorAbsoluto.toLocaleString('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
-    return valor < 0 ? `-${formatado}` : formatado;
+    return formatCurrency(valorNumerico);
   };
 
   if (loading) {
@@ -116,11 +113,11 @@ export default function Dashboard() {
                 <span className="text-2xl">💰</span>
               </div>
               <div className="text-4xl font-bold text-white mb-2">
-                R$ {formatarMoeda(resumo.saldoCarteiras)}
+                {formatCurrency(resumo.saldoCarteiras)}
               </div>
               <div className={`text-sm flex items-center gap-1 text-white/90`}>
                 {(resumo.saldo || 0) >= 0 ? '↑' : '↓'}
-                <span>Fluxo do mês: R$ {formatarMoeda(resumo.saldo)}</span>
+                <span>Fluxo do mês: {formatarMoedaComSinal(resumo.saldo)}</span>
               </div>
             </div>
 
@@ -131,7 +128,7 @@ export default function Dashboard() {
                 <span className="text-2xl">📈</span>
               </div>
               <div className="text-4xl font-bold text-blue-400 mb-2">
-                R$ {formatarMoeda(resumo.totalEntradas)}
+                {formatCurrency(resumo.totalEntradas)}
               </div>
               <div className="text-sm text-green-400 flex items-center gap-1">
                 <span>Receitas do mês</span>
@@ -145,7 +142,7 @@ export default function Dashboard() {
                 <span className="text-2xl">📉</span>
               </div>
               <div className="text-4xl font-bold text-red-400 mb-2">
-                R$ {formatarMoeda(resumo.totalSaidas)}
+                {formatCurrency(resumo.totalSaidas)}
               </div>
               <div className="text-sm text-red-400 flex items-center gap-1">
                 <span>Gastos do mês</span>

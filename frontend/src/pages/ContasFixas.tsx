@@ -5,6 +5,8 @@ import { categoriaService } from '../services/categoriaService';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import { Plus, Edit2, Trash2, Check, X, Calendar, DollarSign, Tag } from 'lucide-react';
+import CurrencyInput from '../components/CurrencyInput';
+import { formatCurrency } from '../utils/currency';
 
 export default function ContasFixas() {
   const { usuario } = useAuth();
@@ -158,12 +160,8 @@ export default function ContasFixas() {
       .reduce((total, c) => total + (c.valorReal || c.valorPlanejado), 0);
   };
 
-  const formatarMoeda = (valor: number) => {
-    return valor.toLocaleString('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
-  };
+  const valorPlanejadoNumerico = formData.valorPlanejado ? parseFloat(formData.valorPlanejado) : null;
+  const valorPagamentoNumerico = valorPagamento ? parseFloat(valorPagamento) : null;
 
   if (loading && contasFixas.length === 0) {
     return (
@@ -220,7 +218,7 @@ export default function ContasFixas() {
                 <div>
                   <p className="text-gray-400 text-sm">Pendentes</p>
                   <p className="text-2xl font-bold text-red-400">
-                    R$ {formatarMoeda(calcularTotalPendente())}
+                    {formatCurrency(calcularTotalPendente())}
                   </p>
                 </div>
               </div>
@@ -234,7 +232,7 @@ export default function ContasFixas() {
                 <div>
                   <p className="text-gray-400 text-sm">Pagas</p>
                   <p className="text-2xl font-bold text-green-400">
-                    R$ {formatarMoeda(calcularTotalPago())}
+                    {formatCurrency(calcularTotalPago())}
                   </p>
                 </div>
               </div>
@@ -268,13 +266,11 @@ export default function ContasFixas() {
                     <label className="block text-sm font-medium text-gray-400 mb-2">
                       Valor Planejado (R$) *
                     </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.valorPlanejado}
-                      onChange={(e) => setFormData({ ...formData, valorPlanejado: e.target.value })}
+                    <CurrencyInput
+                      value={valorPlanejadoNumerico}
+                      onValueChange={(value) => setFormData({ ...formData, valorPlanejado: value === null ? '' : value.toString() })}
                       className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                      placeholder="1500.00"
+                      placeholder="R$ 0,00"
                       required
                     />
                   </div>
@@ -399,7 +395,7 @@ export default function ContasFixas() {
                   {/* Valor */}
                   <div className="mb-4">
                     <p className="text-3xl font-bold text-white">
-                      R$ {formatarMoeda(conta.valorPlanejado)}
+                      {formatCurrency(conta.valorPlanejado)}
                     </p>
                     <p className="text-sm text-gray-400 mt-1">
                       <Calendar className="w-4 h-4 inline mr-1" />
@@ -419,7 +415,7 @@ export default function ContasFixas() {
                       </div>
                       {conta.valorReal && (
                         <p className="text-sm text-gray-400 mt-1">
-                          Valor pago: R$ {formatarMoeda(conta.valorReal)}
+                          Valor pago: {formatCurrency(conta.valorReal)}
                         </p>
                       )}
                     </div>
@@ -435,13 +431,11 @@ export default function ContasFixas() {
                   {conta.status !== 'PAGO' && (
                     pagandoConta === conta.id ? (
                       <div className="space-y-2">
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={valorPagamento}
-                          onChange={(e) => setValorPagamento(e.target.value)}
+                        <CurrencyInput
+                          value={valorPagamentoNumerico}
+                          onValueChange={(value) => setValorPagamento(value === null ? '' : value.toString())}
                           className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white"
-                          placeholder="Valor pago"
+                          placeholder="R$ 0,00"
                           autoFocus
                         />
                         <div className="flex gap-2">

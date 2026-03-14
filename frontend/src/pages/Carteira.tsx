@@ -4,6 +4,8 @@ import carteiraService, { Carteira } from '../services/carteiraService.ts';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-hot-toast';
 import { Wallet, Banknote, PiggyBank, Plus, Trash2, Edit2, ArrowDownCircle, ArrowUpCircle, Building2 } from 'lucide-react';
+import CurrencyInput from '../components/CurrencyInput';
+import { formatCurrency } from '../utils/currency';
 
 const LISTA_BANCOS = [
   'Agibank',
@@ -49,6 +51,8 @@ const CarteiraPage = () => {
   const [carteiraSelecionada, setCarteiraSelecionada] = useState<number | null>(null);
   const [valorMovimentacao, setValorMovimentacao] = useState('');
   const [tipoMovimentacao, setTipoMovimentacao] = useState<'adicionar' | 'remover'>('adicionar');
+  const saldoNumerico = saldo ? parseFloat(saldo) : null;
+  const valorMovimentacaoNumerico = valorMovimentacao ? parseFloat(valorMovimentacao) : null;
 
   useEffect(() => {
     if (usuario?.id) {
@@ -197,13 +201,6 @@ const CarteiraPage = () => {
     }
   };
 
-  const formatarMoeda = (valor: number) => {
-    return valor.toLocaleString('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
-  };
-
   const formatarTipo = (tipo: string) => {
     return tipo.replace('_', ' ').toLowerCase()
       .split(' ')
@@ -242,7 +239,7 @@ const CarteiraPage = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-orange-100 text-sm font-medium">Saldo Total Disponível</p>
-              <p className="text-4xl font-bold mt-2">R$ {formatarMoeda(saldoTotal)}</p>
+              <p className="text-4xl font-bold mt-2">{formatCurrency(saldoTotal)}</p>
               <p className="text-orange-100 text-sm mt-2">{carteiras.length} carteira(s)</p>
             </div>
             <div className="bg-white/20 p-4 rounded-full">
@@ -292,13 +289,11 @@ const CarteiraPage = () => {
                   <label className="block text-sm font-medium text-gray-400 mb-2">
                     Saldo Inicial *
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={saldo}
-                    onChange={(e) => setSaldo(e.target.value)}
+                  <CurrencyInput
+                    value={saldoNumerico}
+                    onValueChange={(value) => setSaldo(value === null ? '' : value.toString())}
                     className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
-                    placeholder="4410"
+                    placeholder="R$ 0,00"
                     required
                   />
                 </div>
@@ -408,7 +403,7 @@ const CarteiraPage = () => {
                 <div className="mb-4">
                   <p className="text-sm text-gray-400 mb-1">Saldo Atual</p>
                   <p className={`text-2xl font-bold ${carteira.saldo >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    R$ {formatarMoeda(carteira.saldo)}
+                    {formatCurrency(carteira.saldo)}
                   </p>
                 </div>
 
@@ -452,13 +447,11 @@ const CarteiraPage = () => {
                   <label className="block text-sm font-medium text-gray-400 mb-2">
                     Valor (R$)
                   </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={valorMovimentacao}
-                    onChange={(e) => setValorMovimentacao(e.target.value)}
+                  <CurrencyInput
+                    value={valorMovimentacaoNumerico}
+                    onValueChange={(value) => setValorMovimentacao(value === null ? '' : value.toString())}
                     className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
-                    placeholder="0,00"
+                    placeholder="R$ 0,00"
                     required
                     autoFocus
                   />

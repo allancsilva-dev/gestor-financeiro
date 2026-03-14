@@ -3,6 +3,8 @@ import { contaService, Conta } from '../services/contaService';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import Layout from '../components/Layout';
+import CurrencyInput from '../components/CurrencyInput';
+import { formatCurrency } from '../utils/currency';
 
 export default function Contas() {
   const { usuario } = useAuth();
@@ -129,12 +131,7 @@ export default function Contas() {
     }
   };
 
-  const formatarMoeda = (valor: number) => {
-    return valor.toLocaleString('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
-  };
+  const limiteTotalNumerico = formData.limiteTotal ? parseFloat(formData.limiteTotal) : null;
 
   return (
     <Layout>
@@ -185,14 +182,11 @@ export default function Contas() {
 
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">Limite Total (R$)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.limiteTotal}
-                    onChange={(e) => setFormData({ ...formData, limiteTotal: e.target.value })}
+                  <CurrencyInput
+                    value={limiteTotalNumerico}
+                    onValueChange={(value) => setFormData({ ...formData, limiteTotal: value === null ? '' : value.toString() })}
                     className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
-                    placeholder="3000.00"
+                    placeholder="R$ 0,00"
                     required
                   />
                 </div>
@@ -295,21 +289,21 @@ export default function Contas() {
                     <div>
                       <p className="text-sm text-gray-600">Limite Total</p>
                       <p className="text-lg font-bold text-gray-800">
-                        R$ {formatarMoeda(conta.limiteTotal || 0)}
+                        {formatCurrency(conta.limiteTotal || 0)}
                       </p>
                     </div>
 
                     <div>
                       <p className="text-sm text-gray-600">Valor Gasto</p>
                       <p className={`text-lg font-bold ${(conta.valorGasto || 0) > (conta.limiteTotal || 0) ? 'text-red-600' : 'text-green-600'}`}>
-                        R$ {formatarMoeda(conta.valorGasto || 0)}
+                        {formatCurrency(conta.valorGasto || 0)}
                       </p>
                     </div>
 
                     <div>
                       <p className="text-sm text-gray-600 mb-1">Disponível</p>
                       <p className="text-sm font-semibold text-blue-600 mb-2">
-                        R$ {formatarMoeda((conta.limiteTotal || 0) - (conta.valorGasto || 0))}
+                        {formatCurrency((conta.limiteTotal || 0) - (conta.valorGasto || 0))}
                       </p>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div

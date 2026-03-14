@@ -6,6 +6,8 @@ import { useAuth } from '../context/AuthContext'; // ← ADICIONADO
 import toast from 'react-hot-toast';
 import Layout from '../components/Layout';
 import CategoriaDropdown from '../components/CategoriaDropdown';
+import CurrencyInput from '../components/CurrencyInput';
+import { formatCurrency } from '../utils/currency';
 
 export default function Transacoes() {
   const { usuario } = useAuth(); // ← ADICIONADO
@@ -193,12 +195,7 @@ export default function Transacoes() {
     }
   };
 
-  const formatarMoeda = (valor: number) => {
-    return valor.toLocaleString('pt-BR', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
-  };
+  const valorTotalNumerico = formData.valorTotal ? parseFloat(formData.valorTotal) : null;
 
   return (
     <Layout>
@@ -240,14 +237,11 @@ export default function Transacoes() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">Valor Total (R$)</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={formData.valorTotal}
-                      onChange={(e) => setFormData({ ...formData, valorTotal: e.target.value })}
+                    <CurrencyInput
+                      value={valorTotalNumerico}
+                      onValueChange={(value) => setFormData({ ...formData, valorTotal: value === null ? '' : value.toString() })}
                       className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
-                      placeholder="100.00"
+                      placeholder="R$ 0,00"
                       required
                     />
                   </div>
@@ -333,7 +327,7 @@ export default function Transacoes() {
                         />
                         {formData.totalParcelas && formData.valorTotal && (
                           <p className="text-sm text-gray-600 mt-1">
-                            {formData.totalParcelas}x de R$ {formatarMoeda(parseFloat(formData.valorTotal) / parseInt(formData.totalParcelas))}
+                            {formData.totalParcelas}x de {formatCurrency(parseFloat(formData.valorTotal) / parseInt(formData.totalParcelas))}
                           </p>
                         )}
                       </div>
@@ -407,7 +401,7 @@ export default function Transacoes() {
                             <p className="font-medium text-gray-800">{t.descricao}</p>
                             {t.parcelado && (
                               <p className="text-xs text-gray-500">
-                                {t.totalParcelas}x de R$ {formatarMoeda(t.valorParcela || 0)}
+                                {t.totalParcelas}x de {formatCurrency(t.valorParcela || 0)}
                               </p>
                             )}
                           </div>
@@ -426,7 +420,7 @@ export default function Transacoes() {
                         </td>
                         <td className="px-6 py-4">
                           <span className={`font-semibold ${t.tipo === 'ENTRADA' ? 'text-green-600' : 'text-red-600'}`}>
-                            {t.tipo === 'ENTRADA' ? '+' : '-'} R$ {formatarMoeda(t.valorTotal || 0)}
+                            {t.tipo === 'ENTRADA' ? '+' : '-'} {formatCurrency(t.valorTotal || 0)}
                           </span>
                         </td>
                         <td className="px-6 py-4">
