@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { metaService, Meta } from '../services/metaService';
 import { useAuth } from '../context/AuthContext';
+import { useApi } from '../hooks/useApi';
 import toast from 'react-hot-toast';
 import Layout from '../components/Layout';
 
@@ -26,26 +27,46 @@ export default function Metas() {
 
   const [valorAdicionar, setValorAdicionar] = useState('');
 
-  useEffect(() => {
-    if (usuario?.id) {
-      carregarMetas();
+  const {
+    data: metasPaginadas,
+    loading: loadingLista,
+    error: erroLista,
+    refetch,
+  } = useApi(
+    (signal) => {
+      if (!usuario?.id) {
+        return Promise.resolve(null as any);
+      }
+      return metaService.listarPorUsuarioPaginado(paginaAtual, tamanhoPagina, signal);
+    },
+    {
+      immediate: !!usuario?.id,
+      deps: [usuario?.id, paginaAtual],
     }
-  }, [usuario, paginaAtual]);
+  );
+
+  useEffect(() => {
+    if (metasPaginadas) {
+      setMetas(metasPaginadas.content || []);
+      setTotalPaginas(Math.max(metasPaginadas.totalPages || 1, 1));
+    }
+  }, [metasPaginadas]);
+
+  useEffect(() => {
+    if (erroLista) {
+      const erroApi = erroLista as any;
+      const mensagem = erroApi?.userMessage || erroApi?.response?.data?.message || 'Erro ao carregar metas';
+      toast.error(mensagem);
+      console.error(erroLista);
+    }
+  }, [erroLista]);
 
   const carregarMetas = async () => {
-    if (!usuario?.id) return;
-
-    try {
-      setLoading(true);
-      const data = await metaService.listarPorUsuarioPaginado(paginaAtual, tamanhoPagina);
-      setMetas(data.content || []);
-      setTotalPaginas(Math.max(data.totalPages || 1, 1));
-    } catch (error: any) {
-      toast.error('Erro ao carregar metas');
-      console.error(error);
-    } finally {
-      setLoading(false);
+    if (!usuario?.id) {
+      return;
     }
+
+    await refetch();
   };
 
   const abrirFormulario = (meta?: Meta) => {
@@ -287,7 +308,7 @@ export default function Metas() {
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {loading ? (
+            {loading || loadingLista ? (
               <div className="col-span-2 text-center py-12">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 <p className="mt-2 text-gray-600">Carregando...</p>

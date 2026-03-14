@@ -18,6 +18,7 @@ export const clearAccessToken = () => {
 const api = axios.create({
   baseURL: BASE_URL,
   withCredentials: true,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -58,6 +59,10 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    if (error?.code === 'ECONNABORTED') {
+      error.userMessage = 'A requisição demorou mais que o esperado. Tente novamente.';
+    }
+
     const originalRequest = error.config;
     const requestUrl = originalRequest?.url || '';
     const isAuthEndpoint = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/refresh-token');

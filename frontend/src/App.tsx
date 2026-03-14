@@ -1,17 +1,31 @@
+import { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import Register from './pages/Register';
-import ForgotPassword from './pages/ForgotPassword';
-import ResetPassword from './pages/ResetPassword';
-import Categorias from './pages/Categorias';
-import Contas from './pages/contas';
-import Transacoes from './pages/Transacoes';
-import Metas from './pages/Metas';
-import CarteiraPage from './pages/Carteira';
-import ContasFixas from './pages/ContasFixas';
+import ErrorBoundary from './components/ErrorBoundary';
+
+const Login = lazy(() => import('./pages/Login'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Register = lazy(() => import('./pages/Register'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const Categorias = lazy(() => import('./pages/Categorias'));
+const Contas = lazy(() => import('./pages/contas'));
+const Transacoes = lazy(() => import('./pages/Transacoes'));
+const Metas = lazy(() => import('./pages/Metas'));
+const CarteiraPage = lazy(() => import('./pages/Carteira'));
+const ContasFixas = lazy(() => import('./pages/ContasFixas'));
+
+function RouteFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-900">
+      <div className="text-center">
+        <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-orange-500"></div>
+        <p className="mt-3 text-slate-300">Carregando tela...</p>
+      </div>
+    </div>
+  );
+}
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -99,8 +113,12 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Toaster position="top-right" />
-        <AppRoutes />
+        <ErrorBoundary>
+          <Toaster position="top-right" />
+          <Suspense fallback={<RouteFallback />}>
+            <AppRoutes />
+          </Suspense>
+        </ErrorBoundary>
       </AuthProvider>
     </BrowserRouter>
   );

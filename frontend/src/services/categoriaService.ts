@@ -13,16 +13,18 @@ export interface Categoria {
 
 export const categoriaService = {
   // Listar minhas categorias
-  listarMinhas: async (page = 0, size = 20) => {
+  listarMinhas: async (page = 0, size = 20, signal?: AbortSignal) => {
     const response = await api.get<PagedResponse<Categoria>>('/categorias/minhas', {
       params: { page, size },
+      signal,
     });
     return response.data.content ?? [];
   },
 
-  listarMinhasPaginado: async (page = 0, size = 20) => {
+  listarMinhasPaginado: async (page = 0, size = 20, signal?: AbortSignal) => {
     const response = await api.get<PagedResponse<Categoria>>('/categorias/minhas', {
       params: { page, size },
+      signal,
     });
     return response.data;
   },

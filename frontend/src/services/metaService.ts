@@ -16,16 +16,18 @@ export interface Meta {
 }
 
 export const metaService = {
-  listarPorUsuario: async (_usuarioId: number, page = 0, size = 20) => {
+  listarPorUsuario: async (_usuarioId: number, page = 0, size = 20, signal?: AbortSignal) => {
     const response = await api.get<PagedResponse<Meta>>('/metas/minhas', {
       params: { page, size },
+      signal,
     });
     return response.data.content ?? [];
   },
 
-  listarPorUsuarioPaginado: async (page = 0, size = 20) => {
+  listarPorUsuarioPaginado: async (page = 0, size = 20, signal?: AbortSignal) => {
     const response = await api.get<PagedResponse<Meta>>('/metas/minhas', {
       params: { page, size },
+      signal,
     });
     return response.data;
   },

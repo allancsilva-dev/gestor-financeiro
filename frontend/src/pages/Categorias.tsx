@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { categoriaService, Categoria } from '../services/categoriaService';
+import { useApi } from '../hooks/useApi';
 import toast from 'react-hot-toast';
 import Layout from '../components/Layout';
 
@@ -19,25 +20,36 @@ export default function Categorias() {
     valorEsperado: ''
   });
 
-  useEffect(() => {
-    carregarCategorias();
-  }, [paginaAtual]);
+  const {
+    data: categoriasPaginadas,
+    loading: loadingLista,
+    error: erroLista,
+    refetch,
+  } = useApi(
+    (signal) => categoriaService.listarMinhasPaginado(paginaAtual, tamanhoPagina, signal),
+    { deps: [paginaAtual] }
+  );
 
-  const carregarCategorias = async () => {
-    try {
-      setLoading(true);
+  useEffect(() => {
+    if (categoriasPaginadas) {
+      setCategorias(categoriasPaginadas.content || []);
+      setTotalPaginas(Math.max(categoriasPaginadas.totalPages || 1, 1));
       setErro(null);
-      const data = await categoriaService.listarMinhasPaginado(paginaAtual, tamanhoPagina);
-      setCategorias(data.content || []);
-      setTotalPaginas(Math.max(data.totalPages || 1, 1));
-    } catch (error: any) {
-      const mensagem = error.response?.data?.message || error.message || 'Erro ao carregar categorias';
+    }
+  }, [categoriasPaginadas]);
+
+  useEffect(() => {
+    if (erroLista) {
+      const erroApi = erroLista as any;
+      const mensagem = erroApi?.userMessage || erroApi?.response?.data?.message || erroApi?.message || 'Erro ao carregar categorias';
       setErro(mensagem);
       toast.error(mensagem);
-      console.error('Erro completo:', error);
-    } finally {
-      setLoading(false);
+      console.error('Erro completo:', erroLista);
     }
+  }, [erroLista]);
+
+  const carregarCategorias = async () => {
+    await refetch();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -180,7 +192,7 @@ export default function Categorias() {
 
           {/* Lista de Categorias */}
           <div className="bg-white rounded-lg shadow-md overflow-hidden">
-            {loading ? (
+            {loading || loadingLista ? (
               <div className="text-center py-12">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                 <p className="mt-2 text-gray-600">Carregando...</p>

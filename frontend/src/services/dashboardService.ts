@@ -21,21 +21,26 @@ export interface ResumoComparado {
 }
 
 const dashboardService = {
+  resumo: async (signal?: AbortSignal): Promise<any> => {
+    const response = await api.get('/dashboard/resumo', { signal });
+    return response.data;
+  },
+
   // Buscar gastos por categoria do mês atual
-  gastosPorCategoria: async (): Promise<GastosPorCategoria[]> => {
-    const response = await api.get('/dashboard/gastos-por-categoria');
+  gastosPorCategoria: async (signal?: AbortSignal): Promise<GastosPorCategoria[]> => {
+    const response = await api.get('/dashboard/gastos-por-categoria', { signal });
     return response.data;
   },
 
   // Buscar evolução dos últimos 6 meses
-  evolucaoMensal: async (): Promise<EvolucaoMensal[]> => {
-    const response = await api.get('/dashboard/evolucao-mensal');
+  evolucaoMensal: async (signal?: AbortSignal): Promise<EvolucaoMensal[]> => {
+    const response = await api.get('/dashboard/evolucao-mensal', { signal });
     return response.data;
   },
 
   // Buscar comparação mês atual vs anterior
-  comparacaoMensal: async (): Promise<ResumoComparado[]> => {
-    const response = await api.get('/dashboard/comparacao-mensal');
+  comparacaoMensal: async (signal?: AbortSignal): Promise<ResumoComparado[]> => {
+    const response = await api.get('/dashboard/comparacao-mensal', { signal });
     return response.data;
   }
 };

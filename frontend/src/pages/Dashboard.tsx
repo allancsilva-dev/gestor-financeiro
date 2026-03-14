@@ -4,51 +4,48 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 // --- 1. IMPORTAMOS O TIPO DO SERVICE ---
 import dashboardService, { EvolucaoMensal } from '../services/dashboardService';
-import api from '../services/api'; 
+import { useApi } from '../hooks/useApi';
 
 import GraficoGastosPorCategoria from '../components/GraficoGastosPorCategoria';
 import GraficoEvolucaoMensal from '../components/GraficoEvolucaoMensal';
 
 export default function Dashboard() {
-  const [resumo, setResumo] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const { usuario } = useAuth();
 
-  // --- 2. CORRIGIMOS A TIPAGEM DOS ESTADOS ---
-  const [gastosPorCategoria, setGastosPorCategoria] = useState<any[]>([]);
-  const [evolucaoMensal, setEvolucaoMensal] = useState<EvolucaoMensal[]>([]);
+  const { data, loading, error, refetch } = useApi(
+    async (signal) => {
+      if (!usuario?.id) {
+        return null;
+      }
 
-  useEffect(() => {
-    if (usuario?.id) {
-      carregarDados();
-    }
-  }, [usuario]);
-
-  const carregarDados = async () => {
-    if (!usuario?.id) return;
-
-    try {
-      setLoading(true);
-
-      const [resumoResponse, gastosData, evolucaoData] = await Promise.all([
-        api.get(`/dashboard/resumo`), 
-        dashboardService.gastosPorCategoria(),
-        dashboardService.evolucaoMensal()
+      const [resumoData, gastosData, evolucaoData] = await Promise.all([
+        dashboardService.resumo(signal),
+        dashboardService.gastosPorCategoria(signal),
+        dashboardService.evolucaoMensal(signal),
       ]);
 
-      // (Removi os console.log para limpar o console)
-
-      setResumo(resumoResponse.data); 
-      setGastosPorCategoria(gastosData);
-      setEvolucaoMensal(evolucaoData); // <-- O erro estava aqui
-
-    } catch (error: any) {
-      console.error("ERRO AO CARREGAR DADOS:", error);
-      toast.error('Erro ao carregar dashboard');
-    } finally {
-      setLoading(false);
+      return {
+        resumo: resumoData,
+        gastosPorCategoria: gastosData,
+        evolucaoMensal: evolucaoData,
+      };
+    },
+    {
+      immediate: !!usuario?.id,
+      deps: [usuario?.id],
     }
-  };
+  );
+
+  const resumo = data?.resumo;
+  const gastosPorCategoria = (data?.gastosPorCategoria || []) as any[];
+  const evolucaoMensal = (data?.evolucaoMensal || []) as EvolucaoMensal[];
+
+  useEffect(() => {
+    if (error) {
+      toast.error('Erro ao carregar dashboard');
+      console.error('ERRO AO CARREGAR DADOS:', error);
+    }
+  }, [error]);
 
   const formatarMoeda = (valor: number) => {
     if (typeof valor !== 'number') {
@@ -68,7 +65,7 @@ export default function Dashboard() {
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
             <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
-            <p className="mt-4 text-gray-400">Carregar dashboard...</p>
+            <p className="mt-4 text-gray-400">Carregando dashboard...</p>
           </div>
         </div>
       </Layout>
@@ -82,7 +79,13 @@ export default function Dashboard() {
           <div className="text-center p-8 bg-slate-800 rounded-lg">
             <h3 className="text-xl text-white font-bold mb-2">Ops!</h3>
             <p className="text-red-400">Não foi possível carregar os dados do dashboard.</p>
-            <p className="text-gray-400 mt-2">Verifique o console para mais detalhes.</p>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              className="mt-4 px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white"
+            >
+              Tentar novamente
+            </button>
           </div>
         </div>
       </Layout>
