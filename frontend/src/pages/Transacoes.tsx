@@ -24,6 +24,7 @@ export default function Transacoes() {
     descricao: '',
     valorTotal: '',
     tipo: 'SAIDA' as 'ENTRADA' | 'SAIDA',
+    tipoConta: 'CREDITO' as Conta['tipo'],
     data: new Date().toISOString().split('T')[0],
     categoriaNome: '',
     categoriaCor: '',
@@ -67,6 +68,7 @@ export default function Transacoes() {
         descricao: transacao.descricao,
         valorTotal: transacao.valorTotal?.toString() || '',
         tipo: transacao.tipo,
+        tipoConta: transacao.conta?.tipo || 'CREDITO',
         data: transacao.data,
         categoriaNome: transacao.categoria?.nome || '',
         categoriaCor: transacao.categoria?.cor || '',
@@ -88,6 +90,7 @@ export default function Transacoes() {
       descricao: '',
       valorTotal: '',
       tipo: 'SAIDA',
+      tipoConta: 'CREDITO',
       data: new Date().toISOString().split('T')[0],
       categoriaNome: '',
       categoriaCor: '',
@@ -196,6 +199,13 @@ export default function Transacoes() {
   };
 
   const valorTotalNumerico = formData.valorTotal ? parseFloat(formData.valorTotal) : null;
+  const contasPorTipo = contas.filter((conta) => conta.tipo === formData.tipoConta);
+  const tipoContaLabels: Record<Conta['tipo'], string> = {
+    CREDITO: 'Cartão de Crédito',
+    DEBITO: 'Débito',
+    DINHEIRO: 'Dinheiro',
+    POUPANCA: 'Poupança',
+  };
 
   return (
     <Layout>
@@ -269,6 +279,21 @@ export default function Transacoes() {
                   </div>
 
                   <div>
+                    <label className="block text-sm font-medium mb-1 text-gray-700">Tipo de Conta</label>
+                    <select
+                      value={formData.tipoConta}
+                      onChange={(e) => setFormData({ ...formData, tipoConta: e.target.value as Conta['tipo'], contaId: '' })}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="CREDITO">Cartão de Crédito</option>
+                      <option value="DEBITO">Débito</option>
+                      <option value="DINHEIRO">Dinheiro</option>
+                      <option value="POUPANCA">Poupança</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">Conta</label>
                     <select
                       value={formData.contaId}
@@ -277,14 +302,18 @@ export default function Transacoes() {
                       required
                     >
                       <option value="">Selecione...</option>
-                      {contas.map((conta) => (
+                      {contasPorTipo.map((conta) => (
                         <option key={conta.id} value={conta.id}>
-                          {conta.nome} ({conta.tipo})
+                          {conta.nome} ({tipoContaLabels[conta.tipo]})
                         </option>
                       ))}
                     </select>
+                    {contasPorTipo.length === 0 && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Nenhuma conta do tipo {tipoContaLabels[formData.tipoConta]} cadastrada.
+                      </p>
+                    )}
                   </div>
-                </div>
 
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">Data</label>
