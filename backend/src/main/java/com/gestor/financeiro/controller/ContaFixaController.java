@@ -14,7 +14,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/contas-fixas")
-@CrossOrigin(origins = "*")
 public class ContaFixaController {
 
     @Autowired

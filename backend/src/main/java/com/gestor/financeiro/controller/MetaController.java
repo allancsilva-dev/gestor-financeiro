@@ -12,7 +12,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/metas")
-@CrossOrigin(origins = "*")
 public class MetaController {
     
     @Autowired
