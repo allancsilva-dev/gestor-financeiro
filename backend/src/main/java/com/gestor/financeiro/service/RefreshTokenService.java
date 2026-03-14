@@ -95,6 +95,23 @@ public class RefreshTokenService {
     }
 
     /**
+     * Rotaciona refresh token válido (revoga o antigo e cria um novo para o mesmo usuário).
+     *
+     * @param tokenAtual o refresh token atual
+     * @return novo refresh token persistido
+     */
+    @Transactional
+    public RefreshToken rotacionarRefreshToken(String tokenAtual) {
+        RefreshToken atual = validarRefreshToken(tokenAtual);
+        atual.revogar();
+        refreshTokenRepository.save(atual);
+
+        RefreshToken novo = criarRefreshToken(atual.getUsuario());
+        log.info("Refresh token rotacionado para usuário {}", atual.getUsuario().getEmail());
+        return novo;
+    }
+
+    /**
      * Revoga um refresh token (usado no logout)
      * 
      * @param token o valor do token a ser revogado

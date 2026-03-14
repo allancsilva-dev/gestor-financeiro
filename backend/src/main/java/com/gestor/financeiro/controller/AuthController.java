@@ -151,8 +151,8 @@ public class AuthController {
             throw new BusinessException("Refresh token não fornecido");
         }
 
-        // Validar refresh token
-        RefreshToken refreshToken = refreshTokenService.validarRefreshToken(refreshTokenValue);
+        // Rotaciona token: revoga atual e emite um novo.
+        RefreshToken refreshToken = refreshTokenService.rotacionarRefreshToken(refreshTokenValue);
 
         // Gerar novo access token
         String novoAccessToken = jwtUtil.generateToken(refreshToken.getUsuario().getEmail());
@@ -162,7 +162,7 @@ public class AuthController {
         response.put("token", novoAccessToken);
         response.put("accessToken", novoAccessToken);
 
-        ResponseCookie refreshCookie = buildRefreshTokenCookie(refreshTokenValue, REFRESH_COOKIE_MAX_AGE_SECONDS);
+        ResponseCookie refreshCookie = buildRefreshTokenCookie(refreshToken.getToken(), REFRESH_COOKIE_MAX_AGE_SECONDS);
 
         log.info("Access token renovado para usuário {}", refreshToken.getUsuario().getEmail());
 
@@ -208,9 +208,11 @@ public class AuthController {
         refreshTokenService.revogarTodosTokensDoUsuario(usuario);
         log.info("Todos os tokens revogados para usuário {}", email);
 
-        return ResponseEntity.ok(Map.of(
-            "message", "Logout realizado em todos os dispositivos"
-        ));
+        ResponseCookie clearCookie = buildRefreshTokenCookie("", 0);
+
+        return ResponseEntity.ok()
+            .header(HttpHeaders.SET_COOKIE, clearCookie.toString())
+            .body(Map.of("message", "Logout realizado em todos os dispositivos"));
     }
 
     @Transactional

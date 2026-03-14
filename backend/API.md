@@ -36,7 +36,7 @@ Cadastra novo usuário.
 ---
 
 ### POST `/api/auth/login`
-Realiza login e retorna access token + refresh token.
+Realiza login e retorna access token. O refresh token é enviado em cookie HttpOnly.
 
 **Body:**
 ```json
@@ -52,7 +52,6 @@ Realiza login e retorna access token + refresh token.
   "message": "Login realizado com sucesso!",
   "success": true,
   "accessToken": "eyJhbGci...",
-  "refreshToken": "uuid-token...",
   "token": "eyJhbGci...",
   "usuario": {
     "id": 1,
@@ -62,42 +61,37 @@ Realiza login e retorna access token + refresh token.
 }
 ```
 
+**Set-Cookie:** `refreshToken=...; HttpOnly; Path=/api/auth; SameSite=Lax`
+
 **Errors:** `401` — Email ou senha incorretos
 
 ---
 
 ### POST `/api/auth/refresh-token`
-Renova o access token usando o refresh token.
+Renova o access token usando o refresh token enviado por cookie HttpOnly.
 
-**Body:**
-```json
-{
-  "refreshToken": "uuid-token..."
-}
-```
+O refresh token é rotacionado a cada renovação (token anterior é revogado).
+
+**Body:** `{}` (vazio)
 
 **Response `200`:**
 ```json
 {
   "accessToken": "eyJhbGci...",
-  "token": "eyJhbGci...",
-  "refreshToken": "uuid-token..."
+  "token": "eyJhbGci..."
 }
 ```
+
+**Set-Cookie:** novo `refreshToken=...` HttpOnly
 
 **Errors:** `400` — Refresh token não fornecido | `401` — Token inválido ou expirado
 
 ---
 
 ### POST `/api/auth/logout`
-Revoga o refresh token do dispositivo atual.
+Revoga o refresh token do dispositivo atual enviado por cookie HttpOnly.
 
-**Body:**
-```json
-{
-  "refreshToken": "uuid-token..."
-}
-```
+**Body:** `{}` (vazio)
 
 **Response `200`:**
 ```json
@@ -105,6 +99,8 @@ Revoga o refresh token do dispositivo atual.
   "message": "Logout realizado com sucesso"
 }
 ```
+
+**Set-Cookie:** `refreshToken=` com `Max-Age=0` (limpa cookie)
 
 ---
 
@@ -119,6 +115,8 @@ Revoga todos os refresh tokens do usuário (todos os dispositivos).
   "message": "Logout realizado em todos os dispositivos"
 }
 ```
+
+**Set-Cookie:** `refreshToken=` com `Max-Age=0` (limpa cookie do dispositivo atual)
 
 ---
 
