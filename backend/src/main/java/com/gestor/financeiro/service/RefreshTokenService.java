@@ -5,8 +5,6 @@ import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.model.RefreshToken;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.repository.RefreshTokenRepository;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,8 +24,6 @@ import java.util.UUID;
  */
 @Service
 public class RefreshTokenService {
-
-    private static final Logger log = LoggerFactory.getLogger(RefreshTokenService.class);
 
     @Autowired
     private RefreshTokenRepository refreshTokenRepository;
@@ -51,9 +47,6 @@ public class RefreshTokenService {
         
         // Criar e salvar o token
         RefreshToken refreshToken = new RefreshToken(usuario, tokenValue, dataExpiracao);
-        
-        log.info("Criando refresh token para usuário {}", usuario.getEmail());
-        log.debug("Refresh token expira em {}", dataExpiracao);
         
         return refreshTokenRepository.save(refreshToken);
     }
@@ -81,16 +74,13 @@ public class RefreshTokenService {
             .orElseThrow(() -> new ResourceNotFoundException("Refresh token não encontrado"));
 
         if (refreshToken.isExpirado()) {
-            log.warn("Refresh token expirado");
             throw new BusinessException("Refresh token expirado");
         }
 
         if (refreshToken.getRevogado()) {
-            log.warn("Refresh token revogado");
             throw new BusinessException("Refresh token revogado");
         }
 
-        log.info("Refresh token válido para usuário {}", refreshToken.getUsuario().getEmail());
         return refreshToken;
     }
 
@@ -107,7 +97,6 @@ public class RefreshTokenService {
         refreshTokenRepository.save(atual);
 
         RefreshToken novo = criarRefreshToken(atual.getUsuario());
-        log.info("Refresh token rotacionado para usuário {}", atual.getUsuario().getEmail());
         return novo;
     }
 
@@ -124,7 +113,6 @@ public class RefreshTokenService {
             RefreshToken rt = refreshToken.get();
             rt.revogar();
             refreshTokenRepository.save(rt);
-            log.info("Token revogado com sucesso");
         }
     }
 
@@ -135,8 +123,7 @@ public class RefreshTokenService {
      */
     @Transactional
     public void revogarTodosTokensDoUsuario(Usuario usuario) {
-        int count = refreshTokenRepository.revokeAllByUsuario(usuario);
-        log.info("{} tokens revogados para usuário {}", count, usuario.getEmail());
+        refreshTokenRepository.revokeAllByUsuario(usuario);
     }
 
     /**
@@ -147,9 +134,7 @@ public class RefreshTokenService {
      */
     @Transactional
     public int limparTokensExpirados() {
-        int count = refreshTokenRepository.deleteByDataExpiracaoBefore(LocalDateTime.now());
-        log.info("{} tokens expirados deletados do banco", count);
-        return count;
+        return refreshTokenRepository.deleteByDataExpiracaoBefore(LocalDateTime.now());
     }
 
     /**

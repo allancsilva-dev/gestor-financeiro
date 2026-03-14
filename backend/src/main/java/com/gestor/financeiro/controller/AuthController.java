@@ -14,8 +14,6 @@ import com.gestor.financeiro.service.RefreshTokenService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -50,8 +48,6 @@ public class AuthController {
     private static final String REFRESH_COOKIE_NAME = "refreshToken";
 
     private static final long REFRESH_COOKIE_MAX_AGE_SECONDS = 7L * 24 * 3600;
-
-    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
     @Autowired
     private UsuarioRepository usuarioRepository;
@@ -125,8 +121,6 @@ public class AuthController {
 
             ResponseCookie refreshCookie = buildRefreshTokenCookie(refreshToken.getToken(), REFRESH_COOKIE_MAX_AGE_SECONDS);
             
-            log.info("Login realizado com refresh token para usuário {}", usuario.getEmail());
-            
             return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
                 .body(response);
@@ -161,8 +155,6 @@ public class AuthController {
 
         ResponseCookie refreshCookie = buildRefreshTokenCookie(refreshToken.getToken(), REFRESH_COOKIE_MAX_AGE_SECONDS);
 
-        log.info("Access token renovado para usuário {}", refreshToken.getUsuario().getEmail());
-
         return ResponseEntity.ok()
             .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
             .body(response);
@@ -180,7 +172,6 @@ public class AuthController {
 
         if (refreshToken != null && !refreshToken.isEmpty()) {
             refreshTokenService.revogarToken(refreshToken);
-            log.info("Refresh token revogado no logout");
         }
 
         ResponseCookie clearCookie = buildRefreshTokenCookie("", 0);
@@ -203,8 +194,6 @@ public class AuthController {
             .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         refreshTokenService.revogarTodosTokensDoUsuario(usuario);
-        log.info("Todos os tokens revogados para usuário {}", email);
-
         ResponseCookie clearCookie = buildRefreshTokenCookie("", 0);
 
         return ResponseEntity.ok()
