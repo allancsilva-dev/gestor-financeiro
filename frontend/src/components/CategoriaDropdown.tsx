@@ -16,7 +16,7 @@ export default function CategoriaDropdown({ value, onChange }: CategoriaDropdown
     onChange({
       nome: categoria.nome,
       cor: categoria.cor,
-      icone: categoria.id
+      icone: String(categoria.id).slice(0, 10)
     });
     setIsOpen(false);
   };

@@ -48,9 +48,7 @@ export default function Transacoes() {
       ]);
       setTransacoes(transacoesData.content || []);
       setTotalPaginas(Math.max(transacoesData.totalPages || 1, 1));
-      // Filtrar apenas cartões de crédito
-      const cartoes = contasData.filter((c: Conta) => c.tipo === 'CREDITO');
-      setContas(cartoes);
+      setContas(contasData);
     } catch (error: any) {
       toast.error('Erro ao carregar dados');
       console.error(error);
@@ -126,7 +124,7 @@ export default function Transacoes() {
       // Primeiro, buscar ou criar a categoria
       let categoriaId;
       try {
-        const categoriasExistentes = await categoriaService.listarMinhas();
+        const categoriasExistentes = await categoriaService.listarMinhas(0, 100);
         const categoriaExistente = categoriasExistentes.find(
           (c: any) => c.nome.toLowerCase() === formData.categoriaNome.toLowerCase()
         );
@@ -151,13 +149,12 @@ export default function Transacoes() {
       }
       
       const transacaoParaEnviar: any = {
-        usuario: { id: usuario.id }, // ← CORRIGIDO!
-        conta: { id: parseInt(formData.contaId) },
-        categoria: { id: categoriaId },
         descricao: formData.descricao,
-        valorTotal: parseFloat(formData.valorTotal),
+        valor: parseFloat(formData.valorTotal),
         tipo: formData.tipo,
         data: formData.data,
+        categoriaId,
+        contaId: parseInt(formData.contaId),
         parcelado: formData.parcelado,
         totalParcelas: formData.parcelado ? parseInt(formData.totalParcelas) : null
       };
@@ -278,7 +275,7 @@ export default function Transacoes() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium mb-1 text-gray-700">Cartão</label>
+                    <label className="block text-sm font-medium mb-1 text-gray-700">Conta</label>
                     <select
                       value={formData.contaId}
                       onChange={(e) => setFormData({ ...formData, contaId: e.target.value })}
@@ -287,7 +284,9 @@ export default function Transacoes() {
                     >
                       <option value="">Selecione...</option>
                       {contas.map((conta) => (
-                        <option key={conta.id} value={conta.id}>{conta.nome}</option>
+                        <option key={conta.id} value={conta.id}>
+                          {conta.nome} ({conta.tipo})
+                        </option>
                       ))}
                     </select>
                   </div>

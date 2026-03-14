@@ -37,7 +37,7 @@ export default function ContasFixas() {
       setLoading(true);
       const [contasData, categoriasData] = await Promise.all([
         contaFixaService.listarAtivas(usuario.id),
-        categoriaService.listarMinhas()
+        categoriaService.listarMinhas(0, 100)
       ]);
       setContasFixas(contasData);
       setCategorias(categoriasData);

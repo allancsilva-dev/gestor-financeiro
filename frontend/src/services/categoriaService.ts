@@ -18,7 +18,11 @@ export const categoriaService = {
       params: { page, size },
       signal,
     });
-    return response.data.content ?? [];
+    const data = response.data as unknown as PagedResponse<Categoria> | Categoria[];
+    if (Array.isArray(data)) {
+      return data;
+    }
+    return data.content ?? [];
   },
 
   listarMinhasPaginado: async (page = 0, size = 20, signal?: AbortSignal) => {
