@@ -1,8 +1,10 @@
 package com.gestor.financeiro.controller;
 
+import com.gestor.financeiro.dto.ContaRequest;
 import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.ContaService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -36,8 +38,9 @@ public class ContaController {
     
     // POST /api/contas - Cria nova conta
     @PostMapping
-    public ResponseEntity<Conta> criar(@RequestBody Conta conta) {
+    public ResponseEntity<Conta> criar(@Valid @RequestBody ContaRequest request) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        Conta conta = toEntity(request);
         Conta contaCriada = contaService.criar(conta, usuarioId);
         return ResponseEntity.ok(contaCriada);
     }
@@ -46,9 +49,10 @@ public class ContaController {
     @PutMapping("/{id}")
     public ResponseEntity<Conta> atualizar(
         @PathVariable Long id, 
-        @RequestBody Conta conta
+        @Valid @RequestBody ContaRequest request
     ) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        Conta conta = toEntity(request);
         Conta contaAtualizada = contaService.atualizar(id, conta, usuarioId);
         return ResponseEntity.ok(contaAtualizada);
     }
@@ -59,5 +63,16 @@ public class ContaController {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         contaService.deletar(id, usuarioId);
         return ResponseEntity.noContent().build();
+    }
+
+    private Conta toEntity(ContaRequest request) {
+        Conta conta = new Conta();
+        conta.setNome(request.getNome());
+        conta.setTipo(request.getTipo());
+        conta.setLimiteTotal(request.getLimiteTotal());
+        conta.setDiaFechamento(request.getDiaFechamento());
+        conta.setDiaVencimento(request.getDiaVencimento());
+        conta.setCor(request.getCor());
+        return conta;
     }
 }

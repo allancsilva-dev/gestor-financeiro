@@ -1,8 +1,11 @@
 package com.gestor.financeiro.controller;
 
+import com.gestor.financeiro.dto.MetaRequest;
+import com.gestor.financeiro.dto.ValorRequest;
 import com.gestor.financeiro.model.Meta;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.MetaService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -56,8 +59,9 @@ public class MetaController {
     
     // POST /api/metas - Cria nova meta
     @PostMapping
-    public ResponseEntity<Meta> criar(@RequestBody Meta meta) {
+    public ResponseEntity<Meta> criar(@Valid @RequestBody MetaRequest request) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        Meta meta = toEntity(request);
         Meta metaCriada = metaService.criar(meta, usuarioId);
         return ResponseEntity.ok(metaCriada);
     }
@@ -66,9 +70,10 @@ public class MetaController {
     @PutMapping("/{id}")
     public ResponseEntity<Meta> atualizar(
         @PathVariable Long id, 
-        @RequestBody Meta meta
+        @Valid @RequestBody MetaRequest request
     ) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        Meta meta = toEntity(request);
         Meta metaAtualizada = metaService.atualizar(id, meta, usuarioId);
         return ResponseEntity.ok(metaAtualizada);
     }
@@ -77,10 +82,10 @@ public class MetaController {
     @PutMapping("/{id}/adicionar")
     public ResponseEntity<Meta> adicionarValor(
         @PathVariable Long id, 
-        @RequestBody Map<String, BigDecimal> request
+        @Valid @RequestBody ValorRequest request
     ) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
-        BigDecimal valor = request.get("valor");
+        BigDecimal valor = request.getValor();
         Meta meta = metaService.adicionarValor(id, valor, usuarioId);
         return ResponseEntity.ok(meta);
     }
@@ -89,10 +94,10 @@ public class MetaController {
     @PutMapping("/{id}/remover")
     public ResponseEntity<Meta> removerValor(
         @PathVariable Long id, 
-        @RequestBody Map<String, BigDecimal> request
+        @Valid @RequestBody ValorRequest request
     ) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
-        BigDecimal valor = request.get("valor");
+        BigDecimal valor = request.getValor();
         Meta meta = metaService.removerValor(id, valor, usuarioId);
         return ResponseEntity.ok(meta);
     }
@@ -103,5 +108,17 @@ public class MetaController {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         metaService.deletar(id, usuarioId);
         return ResponseEntity.noContent().build();
+    }
+
+    private Meta toEntity(MetaRequest request) {
+        Meta meta = new Meta();
+        meta.setNome(request.getNome());
+        meta.setValorTotal(request.getValorTotal());
+        meta.setValorMensal(request.getValorMensal());
+        meta.setDataPrevista(request.getDataLimite());
+        meta.setCor(request.getCor());
+        meta.setIcone(request.getIcone());
+        meta.setDescricao(request.getDescricao());
+        return meta;
     }
 }

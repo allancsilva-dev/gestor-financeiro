@@ -9,6 +9,7 @@ import com.gestor.financeiro.repository.PasswordResetTokenRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
 import com.gestor.financeiro.service.EmailService;
 import com.gestor.financeiro.service.RefreshTokenService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -63,7 +64,7 @@ public class AuthController {
     
     @Transactional
     @PostMapping("/register")
-    public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
+    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
         Optional<Usuario> usuarioExistente = usuarioRepository.findByEmail(request.getEmail());
         if (usuarioExistente.isPresent()) {
             return ResponseEntity
@@ -82,7 +83,7 @@ public class AuthController {
 }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
         Optional<Usuario> usuarioOpt = usuarioRepository.findByEmail(request.getEmail());
         
         if (usuarioOpt.isEmpty()) {
@@ -93,7 +94,7 @@ public class AuthController {
         
         Usuario usuario = usuarioOpt.get();
         
-        if (passwordEncoder.matches(request.getSenha(), usuario.getSenha())) {
+        if (passwordEncoder.matches(request.getPassword(), usuario.getSenha())) {
             // Gerar access token (15 minutos)
             String accessToken = jwtUtil.generateToken(usuario.getEmail());
             
@@ -130,7 +131,7 @@ public class AuthController {
      * Body: { "refreshToken": "..." }
      */
     @PostMapping("/refresh-token")
-    public ResponseEntity<?> refreshToken(@RequestBody Map<String, String> request) {
+    public ResponseEntity<?> refreshToken(@Valid @RequestBody Map<String, String> request) {
         try {
             String refreshTokenValue = request.get("refreshToken");
             
@@ -170,7 +171,7 @@ public class AuthController {
      * Body: { "refreshToken": "..." }
      */
     @PostMapping("/logout")
-    public ResponseEntity<?> logout(@RequestBody Map<String, String> request) {
+    public ResponseEntity<?> logout(@Valid @RequestBody Map<String, String> request) {
         try {
             String refreshToken = request.get("refreshToken");
             
@@ -221,7 +222,7 @@ public class AuthController {
 
     @Transactional
     @PostMapping("/forgot-password")
-    public ResponseEntity<?> forgotPassword(@RequestBody ForgotPasswordRequest request) {
+    public ResponseEntity<?> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         Optional<Usuario> usuarioOpt = usuarioRepository.findByEmail(request.getEmail());
         
         if (usuarioOpt.isEmpty()) {
@@ -244,7 +245,7 @@ public class AuthController {
 
     @Transactional
     @PostMapping("/reset-password")
-    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest request) {
+    public ResponseEntity<?> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         Optional<PasswordResetToken> tokenOpt = tokenRepository.findByToken(request.getToken());
         
         if (tokenOpt.isEmpty()) {

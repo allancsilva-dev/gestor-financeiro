@@ -1,7 +1,15 @@
 package com.gestor.financeiro.dto;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
 public class ResetPasswordRequest {
+
+    @NotBlank(message = "Campo obrigatório")
     private String token;
+
+    @NotBlank(message = "Campo obrigatório")
+    @Size(min = 6, message = "Senha deve ter no mínimo 6 caracteres")
     private String novaSenha;
     
     public ResetPasswordRequest() {}

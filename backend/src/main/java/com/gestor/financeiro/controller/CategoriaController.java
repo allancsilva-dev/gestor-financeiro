@@ -5,6 +5,7 @@ import com.gestor.financeiro.dto.CategoriaUpdateRequest;
 import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.CategoriaService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -36,7 +37,7 @@ public class CategoriaController {
 
     // Criar categoria
     @PostMapping
-    public ResponseEntity<Categoria> criar(@RequestBody CategoriaCreateRequest request) {
+    public ResponseEntity<Categoria> criar(@Valid @RequestBody CategoriaCreateRequest request) {
         Categoria categoria = new Categoria();
         categoria.setNome(request.nome());
         categoria.setCor(request.cor());
@@ -51,7 +52,7 @@ public class CategoriaController {
     @PutMapping("/{id}")
     public ResponseEntity<Categoria> atualizar(
             @PathVariable Long id,
-            @RequestBody CategoriaUpdateRequest request
+            @Valid @RequestBody CategoriaUpdateRequest request
     ) {
         Categoria categoriaAtualizada = new Categoria();
         categoriaAtualizada.setNome(request.nome());

@@ -1,14 +1,17 @@
 package com.gestor.financeiro.controller;
 
+import com.gestor.financeiro.dto.ContaFixaRequest;
+import com.gestor.financeiro.dto.ValorRequest;
+import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.model.ContaFixa;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.ContaFixaService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/contas-fixas")
@@ -38,16 +41,18 @@ public class ContaFixaController {
 
     // POST /api/contas-fixas - Cria nova conta fixa
     @PostMapping
-    public ResponseEntity<ContaFixa> criar(@RequestBody ContaFixa contaFixa) {
+    public ResponseEntity<ContaFixa> criar(@Valid @RequestBody ContaFixaRequest request) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        ContaFixa contaFixa = toEntity(request);
         ContaFixa novaConta = contaFixaService.criar(contaFixa, usuarioId);
         return ResponseEntity.ok(novaConta);
     }
 
     // PUT /api/contas-fixas/{id} - Atualiza conta fixa
     @PutMapping("/{id}")
-    public ResponseEntity<ContaFixa> atualizar(@PathVariable Long id, @RequestBody ContaFixa contaFixa) {
+    public ResponseEntity<ContaFixa> atualizar(@PathVariable Long id, @Valid @RequestBody ContaFixaRequest request) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        ContaFixa contaFixa = toEntity(request);
         ContaFixa contaAtualizada = contaFixaService.atualizar(id, contaFixa, usuarioId);
         return ResponseEntity.ok(contaAtualizada);
     }
@@ -64,11 +69,26 @@ public class ContaFixaController {
     @PutMapping("/{id}/pagar")
     public ResponseEntity<ContaFixa> marcarComoPaga(
         @PathVariable Long id,
-        @RequestBody Map<String, BigDecimal> body
+        @Valid @RequestBody ValorRequest request
     ) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
-        BigDecimal valorPago = body.get("valorPago");
+        BigDecimal valorPago = request.getValor();
         ContaFixa contaPaga = contaFixaService.marcarComoPaga(id, valorPago, usuarioId);
         return ResponseEntity.ok(contaPaga);
+    }
+
+    private ContaFixa toEntity(ContaFixaRequest request) {
+        ContaFixa contaFixa = new ContaFixa();
+        contaFixa.setNome(request.getDescricao());
+        contaFixa.setValorPlanejado(request.getValor());
+        contaFixa.setDiaVencimento(request.getDiaVencimento());
+        contaFixa.setRecorrente(request.getRecorrente());
+        contaFixa.setObservacoes(request.getObservacoes());
+
+        Categoria categoria = new Categoria();
+        categoria.setId(request.getCategoriaIdNormalizada());
+        contaFixa.setCategoria(categoria);
+
+        return contaFixa;
     }
 }
