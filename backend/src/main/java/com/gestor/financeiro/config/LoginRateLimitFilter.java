@@ -32,7 +32,11 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
 
     private final ConcurrentHashMap<String, List<Long>> attemptsByKey = new ConcurrentHashMap<>();
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
+
+    public LoginRateLimitFilter(ObjectMapper objectMapper) {
+        this.objectMapper = objectMapper;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
