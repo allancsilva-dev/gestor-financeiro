@@ -33,6 +33,9 @@ public class SecurityConfig {
     @Autowired
     private JwtAuthenticationFilter jwtAuthenticationFilter;
 
+    @Autowired
+    private LoginRateLimitFilter loginRateLimitFilter;
+
     @Value("${CORS_ALLOWED_ORIGINS:http://localhost:5173}")
     private String corsAllowedOrigins;
 
@@ -94,6 +97,7 @@ public class SecurityConfig {
             .sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )
+            .addFilterBefore(loginRateLimitFilter, JwtAuthenticationFilter.class)
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
