@@ -6,6 +6,8 @@ import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.repository.ContaRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
@@ -21,8 +23,8 @@ public class ContaService {
     private UsuarioRepository usuarioRepository;
     
     // Lista contas ativas do usuário
-    public List<Conta> listarPorUsuario(Long usuarioId) {
-        return contaRepository.findByUsuarioIdAndAtivoTrue(usuarioId);
+    public Page<Conta> listarPorUsuario(Long usuarioId, Pageable pageable) {
+        return contaRepository.findByUsuarioIdAndAtivoTrue(usuarioId, pageable);
     }
     
     // Cria nova conta

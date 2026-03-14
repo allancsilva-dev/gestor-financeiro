@@ -1,6 +1,8 @@
 package com.gestor.financeiro.repository;
 
 import com.gestor.financeiro.model.Parcela;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import java.util.List;
@@ -15,6 +17,8 @@ public interface ParcelaRepository extends JpaRepository<Parcela, Long> {
     List<Parcela> findByTransacaoId(Long transacaoId);
 
     List<Parcela> findByTransacaoIdAndTransacaoUsuarioId(Long transacaoId, Long usuarioId);
+
+    Page<Parcela> findByTransacaoIdAndTransacaoUsuarioId(Long transacaoId, Long usuarioId, Pageable pageable);
 
     Optional<Parcela> findByIdAndTransacaoUsuarioId(Long id, Long usuarioId);
 }

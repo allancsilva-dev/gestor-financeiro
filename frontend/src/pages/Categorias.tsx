@@ -8,6 +8,9 @@ export default function Categorias() {
   const [mostrarForm, setMostrarForm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [paginaAtual, setPaginaAtual] = useState(0);
+  const [totalPaginas, setTotalPaginas] = useState(1);
+  const tamanhoPagina = 20;
   
   const [formData, setFormData] = useState({
     nome: '',
@@ -18,14 +21,15 @@ export default function Categorias() {
 
   useEffect(() => {
     carregarCategorias();
-  }, []);
+  }, [paginaAtual]);
 
   const carregarCategorias = async () => {
     try {
       setLoading(true);
       setErro(null);
-      const data = await categoriaService.listarMinhas();
-      setCategorias(data);
+      const data = await categoriaService.listarMinhasPaginado(paginaAtual, tamanhoPagina);
+      setCategorias(data.content || []);
+      setTotalPaginas(Math.max(data.totalPages || 1, 1));
     } catch (error: any) {
       const mensagem = error.response?.data?.message || error.message || 'Erro ao carregar categorias';
       setErro(mensagem);
@@ -187,49 +191,71 @@ export default function Categorias() {
                 <p className="text-gray-400 text-sm mt-2">Clique em "+ Nova Categoria" para começar</p>
               </div>
             ) : (
-              <table className="w-full">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Categoria</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Valor Esperado</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Valor Gasto</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {categorias.map((cat) => (
-                    <tr key={cat.id} className="border-t border-gray-200 hover:bg-gray-50 transition">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-sm"
-                            style={{ backgroundColor: cat.cor || '#666' }}
-                          >
-                            {cat.icone?.charAt(0).toUpperCase() || '?'}
-                          </div>
-                          <span className="font-medium text-gray-800">{cat.nome}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-gray-700">
-                        R$ {(cat.valorEsperado || 0).toFixed(2)}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`font-semibold ${(cat.valorGasto || 0) > (cat.valorEsperado || 0) ? 'text-red-600' : 'text-green-600'}`}>
-                          R$ {(cat.valorGasto || 0).toFixed(2)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <button
-                          onClick={() => handleDeletar(cat.id!)}
-                          className="text-red-600 hover:text-red-800 font-medium transition"
-                        >
-                          Deletar
-                        </button>
-                      </td>
+              <>
+                <table className="w-full">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Categoria</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Valor Esperado</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Valor Gasto</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Ações</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {categorias.map((cat) => (
+                      <tr key={cat.id} className="border-t border-gray-200 hover:bg-gray-50 transition">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div
+                              className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-sm"
+                              style={{ backgroundColor: cat.cor || '#666' }}
+                            >
+                              {cat.icone?.charAt(0).toUpperCase() || '?'}
+                            </div>
+                            <span className="font-medium text-gray-800">{cat.nome}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-gray-700">
+                          R$ {(cat.valorEsperado || 0).toFixed(2)}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`font-semibold ${(cat.valorGasto || 0) > (cat.valorEsperado || 0) ? 'text-red-600' : 'text-green-600'}`}>
+                            R$ {(cat.valorGasto || 0).toFixed(2)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <button
+                            onClick={() => handleDeletar(cat.id!)}
+                            className="text-red-600 hover:text-red-800 font-medium transition"
+                          >
+                            Deletar
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
+                  <button
+                    onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 0))}
+                    disabled={paginaAtual === 0}
+                    className="px-4 py-2 rounded-lg border border-gray-300 disabled:opacity-50"
+                  >
+                    Anterior
+                  </button>
+                  <span className="text-sm text-gray-600">
+                    Página {paginaAtual + 1} de {totalPaginas}
+                  </span>
+                  <button
+                    onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas - 1))}
+                    disabled={paginaAtual >= totalPaginas - 1}
+                    className="px-4 py-2 rounded-lg border border-gray-300 disabled:opacity-50"
+                  >
+                    Próximo
+                  </button>
+                </div>
+              </>
             )}
           </div>
         </div>

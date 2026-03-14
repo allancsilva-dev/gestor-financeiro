@@ -11,6 +11,9 @@ export default function Metas() {
   const [mostrarAdicionar, setMostrarAdicionar] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [editando, setEditando] = useState<Meta | null>(null);
+  const [paginaAtual, setPaginaAtual] = useState(0);
+  const [totalPaginas, setTotalPaginas] = useState(1);
+  const tamanhoPagina = 20;
   
   const [formData, setFormData] = useState({
     nome: '',
@@ -27,15 +30,16 @@ export default function Metas() {
     if (usuario?.id) {
       carregarMetas();
     }
-  }, [usuario]);
+  }, [usuario, paginaAtual]);
 
   const carregarMetas = async () => {
     if (!usuario?.id) return;
 
     try {
       setLoading(true);
-      const data = await metaService.listarPorUsuario(usuario.id);
-      setMetas(data);
+      const data = await metaService.listarPorUsuarioPaginado(paginaAtual, tamanhoPagina);
+      setMetas(data.content || []);
+      setTotalPaginas(Math.max(data.totalPages || 1, 1));
     } catch (error: any) {
       toast.error('Erro ao carregar metas');
       console.error(error);
@@ -405,6 +409,28 @@ export default function Metas() {
               ))
             )}
           </div>
+
+          {!loading && metas.length > 0 && (
+            <div className="flex items-center justify-between mt-6">
+              <button
+                onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 0))}
+                disabled={paginaAtual === 0}
+                className="px-4 py-2 rounded-lg border border-gray-300 disabled:opacity-50"
+              >
+                Anterior
+              </button>
+              <span className="text-sm text-gray-600">
+                Página {paginaAtual + 1} de {totalPaginas}
+              </span>
+              <button
+                onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas - 1))}
+                disabled={paginaAtual >= totalPaginas - 1}
+                className="px-4 py-2 rounded-lg border border-gray-300 disabled:opacity-50"
+              >
+                Próximo
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </Layout>

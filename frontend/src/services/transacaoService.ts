@@ -1,4 +1,5 @@
 import api from './api';
+import type { PagedResponse } from '../types';
 
 export interface Transacao {
   id?: number;
@@ -17,13 +18,27 @@ export interface Transacao {
 }
 
 export const transacaoService = {
-  listarPorUsuario: async (usuarioId: number) => {
-    const response = await api.get(`/transacoes/usuario/${usuarioId}`);
+  listarPorUsuario: async (_usuarioId: number, page = 0, size = 20) => {
+    const response = await api.get<PagedResponse<Transacao>>('/transacoes/minhas', {
+      params: { page, size },
+    });
+    return response.data.content ?? [];
+  },
+
+  listarPorUsuarioPaginado: async (page = 0, size = 20) => {
+    const response = await api.get<PagedResponse<Transacao>>('/transacoes/minhas', {
+      params: { page, size },
+    });
     return response.data;
   },
 
   criar: async (transacao: any) => {
     const response = await api.post('/transacoes', transacao);
+    return response.data;
+  },
+
+  atualizar: async (id: number, transacao: any) => {
+    const response = await api.put(`/transacoes/${id}`, transacao);
     return response.data;
   },
 

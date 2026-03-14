@@ -1,4 +1,5 @@
 import api from './api';
+import type { PagedResponse } from '../types';
 
 export interface Conta {
   id?: number;
@@ -14,8 +15,17 @@ export interface Conta {
 }
 
 export const contaService = {
-  listarPorUsuario: async (usuarioId: number) => {
-    const response = await api.get(`/contas/usuario/${usuarioId}`);
+  listarPorUsuario: async (_usuarioId: number, page = 0, size = 20) => {
+    const response = await api.get<PagedResponse<Conta>>('/contas/minhas', {
+      params: { page, size },
+    });
+    return response.data.content ?? [];
+  },
+
+  listarPorUsuarioPaginado: async (page = 0, size = 20) => {
+    const response = await api.get<PagedResponse<Conta>>('/contas/minhas', {
+      params: { page, size },
+    });
     return response.data;
   },
 

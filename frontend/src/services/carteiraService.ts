@@ -1,4 +1,5 @@
 import api from './api';
+import type { PagedResponse } from '../types';
 
 export interface Carteira {
   id: number;
@@ -13,8 +14,17 @@ export interface Carteira {
 
 const carteiraService = {
   // Listar todas as carteiras do usuário
-  listarCarteiras: async (usuarioId: number): Promise<Carteira[]> => {
-    const response = await api.get(`/carteiras/usuario/${usuarioId}`);
+  listarCarteiras: async (_usuarioId: number, page = 0, size = 20): Promise<Carteira[]> => {
+    const response = await api.get<PagedResponse<Carteira>>('/carteiras/minhas', {
+      params: { page, size },
+    });
+    return response.data.content ?? [];
+  },
+
+  listarCarteirasPaginado: async (page = 0, size = 20): Promise<PagedResponse<Carteira>> => {
+    const response = await api.get<PagedResponse<Carteira>>('/carteiras/minhas', {
+      params: { page, size },
+    });
     return response.data;
   },
 
@@ -54,8 +64,8 @@ const carteiraService = {
   },
 
   // Calcular saldo total
-  calcularSaldoTotal: async (usuarioId: number): Promise<number> => {
-    const response = await api.get(`/carteiras/usuario/${usuarioId}/saldo-total`);
+  calcularSaldoTotal: async (_usuarioId: number): Promise<number> => {
+    const response = await api.get('/carteiras/minhas/saldo-total');
     return response.data;
   }
 };

@@ -6,6 +6,8 @@ import com.gestor.financeiro.model.Meta;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.repository.MetaRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
@@ -23,8 +25,8 @@ public class MetaService {
     private UsuarioRepository usuarioRepository;
     
     // Lista metas ativas do usuário
-    public List<Meta> listarPorUsuario(Long usuarioId) {
-        return metaRepository.findByUsuarioIdAndAtivaTrue(usuarioId);
+    public Page<Meta> listarPorUsuario(Long usuarioId, Pageable pageable) {
+        return metaRepository.findByUsuarioIdAndAtivaTrue(usuarioId, pageable);
     }
     
     // Cria nova meta

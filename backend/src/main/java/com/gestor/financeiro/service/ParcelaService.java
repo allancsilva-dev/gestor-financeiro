@@ -5,6 +5,8 @@ import com.gestor.financeiro.exception.UnauthorizedAccessException;
 import com.gestor.financeiro.model.Parcela;
 import com.gestor.financeiro.model.enums.StatusPagamento;
 import com.gestor.financeiro.repository.ParcelaRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.time.LocalDate;
@@ -17,8 +19,8 @@ public class ParcelaService {
     private ParcelaRepository parcelaRepository;
     
     // Busca todas as parcelas de uma transação
-    public List<Parcela> listarPorTransacao(Long transacaoId, Long usuarioId) {
-        return parcelaRepository.findByTransacaoIdAndTransacaoUsuarioId(transacaoId, usuarioId);
+    public Page<Parcela> listarPorTransacao(Long transacaoId, Long usuarioId, Pageable pageable) {
+        return parcelaRepository.findByTransacaoIdAndTransacaoUsuarioId(transacaoId, usuarioId, pageable);
     }
     
     // Marca parcela como PAGA

@@ -1,4 +1,5 @@
 import api from './api';
+import type { PagedResponse } from '../types';
 
 export interface Categoria {
   id?: number;
@@ -12,8 +13,17 @@ export interface Categoria {
 
 export const categoriaService = {
   // Listar minhas categorias
-  listarMinhas: async () => {
-    const response = await api.get('/categorias/minhas');
+  listarMinhas: async (page = 0, size = 20) => {
+    const response = await api.get<PagedResponse<Categoria>>('/categorias/minhas', {
+      params: { page, size },
+    });
+    return response.data.content ?? [];
+  },
+
+  listarMinhasPaginado: async (page = 0, size = 20) => {
+    const response = await api.get<PagedResponse<Categoria>>('/categorias/minhas', {
+      params: { page, size },
+    });
     return response.data;
   },
 

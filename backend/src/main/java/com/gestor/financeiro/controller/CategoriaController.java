@@ -5,12 +5,15 @@ import com.gestor.financeiro.dto.CategoriaUpdateRequest;
 import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.CategoriaService;
+import com.gestor.financeiro.util.PaginationUtils;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/categorias")
@@ -24,8 +27,11 @@ public class CategoriaController {
 
     // Lista categorias do usuário logado
     @GetMapping("/minhas")
-    public ResponseEntity<List<Categoria>> listarMinhas() {
-        return ResponseEntity.ok(categoriaService.listarMinhasCategorias());
+    public ResponseEntity<Page<Categoria>> listarMinhas(
+        @PageableDefault(size = 20, sort = "nome", direction = Sort.Direction.ASC) Pageable pageable
+    ) {
+        Pageable cappedPageable = PaginationUtils.enforceMaxSize(pageable, 100);
+        return ResponseEntity.ok(categoriaService.listarMinhasCategorias(cappedPageable));
     }
 
     // GET /api/categorias/{id} - Busca categoria por ID com validação de ownership

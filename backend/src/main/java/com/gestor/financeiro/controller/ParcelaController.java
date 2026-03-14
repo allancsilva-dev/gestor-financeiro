@@ -3,10 +3,14 @@ package com.gestor.financeiro.controller;
 import com.gestor.financeiro.model.Parcela;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.ParcelaService;
+import com.gestor.financeiro.util.PaginationUtils;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/parcelas")
@@ -20,9 +24,13 @@ public class ParcelaController {
     
     // GET /api/parcelas/transacao/{transacaoId} - Lista parcelas de uma transação
     @GetMapping("/transacao/{transacaoId}")
-    public ResponseEntity<List<Parcela>> listarPorTransacao(@PathVariable Long transacaoId) {
+    public ResponseEntity<Page<Parcela>> listarPorTransacao(
+        @PathVariable Long transacaoId,
+        @PageableDefault(size = 20, sort = "numeroParcela", direction = Sort.Direction.ASC) Pageable pageable
+    ) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
-        List<Parcela> parcelas = parcelaService.listarPorTransacao(transacaoId, usuarioId);
+        Pageable cappedPageable = PaginationUtils.enforceMaxSize(pageable, 100);
+        Page<Parcela> parcelas = parcelaService.listarPorTransacao(transacaoId, usuarioId, cappedPageable);
         return ResponseEntity.ok(parcelas);
     }
     

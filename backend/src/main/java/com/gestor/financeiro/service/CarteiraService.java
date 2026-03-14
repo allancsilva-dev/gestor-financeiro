@@ -12,6 +12,8 @@ import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
 import com.gestor.financeiro.repository.TransacaoRepository;
 import com.gestor.financeiro.repository.CategoriaRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,8 +38,8 @@ public class CarteiraService {
     private CategoriaRepository categoriaRepository;
     
     // Lista carteiras do usuário
-    public List<Carteira> listarPorUsuario(Long usuarioId) {
-        return carteiraRepository.findByUsuarioId(usuarioId);
+    public Page<Carteira> listarPorUsuario(Long usuarioId, Pageable pageable) {
+        return carteiraRepository.findByUsuarioId(usuarioId, pageable);
     }
     
     // Busca carteira por ID

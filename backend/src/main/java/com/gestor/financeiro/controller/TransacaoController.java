@@ -6,13 +6,17 @@ import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.TransacaoService;
+import com.gestor.financeiro.util.PaginationUtils;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/transacoes")
@@ -26,20 +30,25 @@ public class TransacaoController {
     
     // GET /api/transacoes/minhas - Lista transações do usuário autenticado
     @GetMapping("/minhas")
-    public ResponseEntity<List<Transacao>> listar() {
+    public ResponseEntity<Page<Transacao>> listar(
+        @PageableDefault(size = 20, sort = "data", direction = Sort.Direction.DESC) Pageable pageable
+    ) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
-        List<Transacao> transacoes = transacaoService.listarPorUsuario(usuarioId);
+        Pageable cappedPageable = PaginationUtils.enforceMaxSize(pageable, 100);
+        Page<Transacao> transacoes = transacaoService.listarPorUsuario(usuarioId, cappedPageable);
         return ResponseEntity.ok(transacoes);
     }
     
     // GET /api/transacoes/periodo - Lista transações por período
     @GetMapping("/periodo")
-    public ResponseEntity<List<Transacao>> listarPorPeriodo(
+    public ResponseEntity<Page<Transacao>> listarPorPeriodo(
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
-        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fim
+        @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fim,
+        @PageableDefault(size = 20, sort = "data", direction = Sort.Direction.DESC) Pageable pageable
     ) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
-        List<Transacao> transacoes = transacaoService.listarPorPeriodo(usuarioId, inicio, fim);
+        Pageable cappedPageable = PaginationUtils.enforceMaxSize(pageable, 100);
+        Page<Transacao> transacoes = transacaoService.listarPorPeriodo(usuarioId, inicio, fim, cappedPageable);
         return ResponseEntity.ok(transacoes);
     }
     

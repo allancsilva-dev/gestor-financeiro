@@ -11,6 +11,8 @@ import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.ContaFixaRepository;
 import com.gestor.financeiro.repository.TransacaoRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,8 +33,8 @@ public class ContaFixaService {
     private UsuarioRepository usuarioRepository;
     
     // Lista contas fixas ativas do usuário
-    public List<ContaFixa> listarPorUsuario(Long usuarioId) {
-        return contaFixaRepository.findByUsuarioIdAndAtivoTrue(usuarioId);
+    public Page<ContaFixa> listarPorUsuario(Long usuarioId, Pageable pageable) {
+        return contaFixaRepository.findByUsuarioIdAndAtivoTrue(usuarioId, pageable);
     }
     
     // Cria nova conta fixa

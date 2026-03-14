@@ -14,6 +14,8 @@ import com.gestor.financeiro.repository.ContaRepository;
 import com.gestor.financeiro.repository.ParcelaRepository;
 import com.gestor.financeiro.repository.TransacaoRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,13 +47,13 @@ public class TransacaoService {
     private UsuarioRepository usuarioRepository;
     
     // Lista transações do usuário
-    public List<Transacao> listarPorUsuario(Long usuarioId) {
-        return transacaoRepository.findByUsuarioId(usuarioId);
+    public Page<Transacao> listarPorUsuario(Long usuarioId, Pageable pageable) {
+        return transacaoRepository.findByUsuarioId(usuarioId, pageable);
     }
     
     // Lista transações de um período
-    public List<Transacao> listarPorPeriodo(Long usuarioId, LocalDate inicio, LocalDate fim) {
-        return transacaoRepository.findByUsuarioIdAndDataBetween(usuarioId, inicio, fim);
+    public Page<Transacao> listarPorPeriodo(Long usuarioId, LocalDate inicio, LocalDate fim, Pageable pageable) {
+        return transacaoRepository.findByUsuarioIdAndDataBetween(usuarioId, inicio, fim, pageable);
     }
     
     // Cria transação (com ou sem parcelamento)

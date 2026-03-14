@@ -6,12 +6,16 @@ import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.model.ContaFixa;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.ContaFixaService;
+import com.gestor.financeiro.util.PaginationUtils;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/contas-fixas")
@@ -25,9 +29,12 @@ public class ContaFixaController {
 
     // GET /api/contas-fixas/minhas - Lista contas fixas do usuário autenticado
     @GetMapping("/minhas")
-    public ResponseEntity<List<ContaFixa>> listarPorUsuario() {
+    public ResponseEntity<Page<ContaFixa>> listarPorUsuario(
+        @PageableDefault(size = 20, sort = "diaVencimento", direction = Sort.Direction.ASC) Pageable pageable
+    ) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
-        List<ContaFixa> contas = contaFixaService.listarPorUsuario(usuarioId);
+        Pageable cappedPageable = PaginationUtils.enforceMaxSize(pageable, 100);
+        Page<ContaFixa> contas = contaFixaService.listarPorUsuario(usuarioId, cappedPageable);
         return ResponseEntity.ok(contas);
     }
 

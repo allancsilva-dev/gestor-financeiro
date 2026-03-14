@@ -14,6 +14,9 @@ export default function Transacoes() {
   const [mostrarForm, setMostrarForm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [editando, setEditando] = useState<any | null>(null);
+  const [paginaAtual, setPaginaAtual] = useState(0);
+  const [totalPaginas, setTotalPaginas] = useState(1);
+  const tamanhoPagina = 20;
   
   const [formData, setFormData] = useState({
     descricao: '',
@@ -32,7 +35,7 @@ export default function Transacoes() {
     if (usuario?.id) { // ← ADICIONADO: só carrega se tiver usuário
       carregarDados();
     }
-  }, [usuario]);
+  }, [usuario, paginaAtual]);
 
   const carregarDados = async () => {
     if (!usuario?.id) return; // ← ADICIONADO: proteção
@@ -40,10 +43,11 @@ export default function Transacoes() {
     try {
       setLoading(true);
       const [transacoesData, contasData] = await Promise.all([
-        transacaoService.listarPorUsuario(usuario.id), // ← CORRIGIDO!
+        transacaoService.listarPorUsuarioPaginado(paginaAtual, tamanhoPagina),
         contaService.listarPorUsuario(usuario.id)      // ← CORRIGIDO!
       ]);
-      setTransacoes(transacoesData);
+      setTransacoes(transacoesData.content || []);
+      setTotalPaginas(Math.max(transacoesData.totalPages || 1, 1));
       // Filtrar apenas cartões de crédito
       const cartoes = contasData.filter((c: Conta) => c.tipo === 'CREDITO');
       setContas(cartoes);
@@ -381,70 +385,92 @@ export default function Transacoes() {
                 <p className="text-gray-400 text-sm mt-2">Clique em "+ Nova Transação" para começar</p>
               </div>
             ) : (
-              <table className="w-full">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Data</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Descrição</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Categoria</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Cartão</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Valor</th>
-                    <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {transacoes.map((t) => (
-                    <tr key={t.id} className="border-t border-gray-200 hover:bg-gray-50 transition">
-                      <td className="px-6 py-4 text-gray-700">
-                        {new Date(t.data).toLocaleDateString('pt-BR')}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div>
-                          <p className="font-medium text-gray-800">{t.descricao}</p>
-                          {t.parcelado && (
-                            <p className="text-xs text-gray-500">
-                              {t.totalParcelas}x de R$ {formatarMoeda(t.valorParcela || 0)}
-                            </p>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="inline-flex items-center gap-2">
-                          <span
-                            className="w-3 h-3 rounded-full"
-                            style={{ backgroundColor: t.categoria?.cor || '#666' }}
-                          ></span>
-                          {t.categoria?.nome || 'N/A'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-gray-700">
-                        {t.conta?.nome || 'N/A'}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`font-semibold ${t.tipo === 'ENTRADA' ? 'text-green-600' : 'text-red-600'}`}>
-                          {t.tipo === 'ENTRADA' ? '+' : '-'} R$ {formatarMoeda(t.valorTotal || 0)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex gap-3">
-                          <button
-                            onClick={() => abrirFormulario(t)}
-                            className="text-blue-600 hover:text-blue-800 font-medium transition"
-                          >
-                            Editar
-                          </button>
-                          <button
-                            onClick={() => handleDeletar(t.id!)}
-                            className="text-red-600 hover:text-red-800 font-medium transition"
-                          >
-                            Deletar
-                          </button>
-                        </div>
-                      </td>
+              <>
+                <table className="w-full">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Data</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Descrição</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Categoria</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Cartão</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Valor</th>
+                      <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">Ações</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {transacoes.map((t) => (
+                      <tr key={t.id} className="border-t border-gray-200 hover:bg-gray-50 transition">
+                        <td className="px-6 py-4 text-gray-700">
+                          {new Date(t.data).toLocaleDateString('pt-BR')}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div>
+                            <p className="font-medium text-gray-800">{t.descricao}</p>
+                            {t.parcelado && (
+                              <p className="text-xs text-gray-500">
+                                {t.totalParcelas}x de R$ {formatarMoeda(t.valorParcela || 0)}
+                              </p>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="inline-flex items-center gap-2">
+                            <span
+                              className="w-3 h-3 rounded-full"
+                              style={{ backgroundColor: t.categoria?.cor || '#666' }}
+                            ></span>
+                            {t.categoria?.nome || 'N/A'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-gray-700">
+                          {t.conta?.nome || 'N/A'}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`font-semibold ${t.tipo === 'ENTRADA' ? 'text-green-600' : 'text-red-600'}`}>
+                            {t.tipo === 'ENTRADA' ? '+' : '-'} R$ {formatarMoeda(t.valorTotal || 0)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex gap-3">
+                            <button
+                              onClick={() => abrirFormulario(t)}
+                              className="text-blue-600 hover:text-blue-800 font-medium transition"
+                            >
+                              Editar
+                            </button>
+                            <button
+                              onClick={() => handleDeletar(t.id!)}
+                              className="text-red-600 hover:text-red-800 font-medium transition"
+                            >
+                              Deletar
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200">
+                  <button
+                    onClick={() => setPaginaAtual((prev) => Math.max(prev - 1, 0))}
+                    disabled={paginaAtual === 0}
+                    className="px-4 py-2 rounded-lg border border-gray-300 disabled:opacity-50"
+                  >
+                    Anterior
+                  </button>
+                  <span className="text-sm text-gray-600">
+                    Página {paginaAtual + 1} de {totalPaginas}
+                  </span>
+                  <button
+                    onClick={() => setPaginaAtual((prev) => Math.min(prev + 1, totalPaginas - 1))}
+                    disabled={paginaAtual >= totalPaginas - 1}
+                    className="px-4 py-2 rounded-lg border border-gray-300 disabled:opacity-50"
+                  >
+                    Próximo
+                  </button>
+                </div>
+              </>
             )}
           </div>
         </div>

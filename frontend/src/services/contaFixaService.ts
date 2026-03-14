@@ -1,4 +1,5 @@
 import api from './api';
+import type { PagedResponse } from '../types';
 
 export interface ContaFixa {
   id: number;
@@ -23,8 +24,17 @@ export interface ContaFixa {
 
 const contaFixaService = {
   // Listar contas fixas ativas do usuário
-  listarAtivas: async (usuarioId: number): Promise<ContaFixa[]> => {
-    const response = await api.get(`/contas-fixas/usuario/${usuarioId}`);
+  listarAtivas: async (_usuarioId: number, page = 0, size = 20): Promise<ContaFixa[]> => {
+    const response = await api.get<PagedResponse<ContaFixa>>('/contas-fixas/minhas', {
+      params: { page, size },
+    });
+    return response.data.content ?? [];
+  },
+
+  listarAtivasPaginado: async (page = 0, size = 20): Promise<PagedResponse<ContaFixa>> => {
+    const response = await api.get<PagedResponse<ContaFixa>>('/contas-fixas/minhas', {
+      params: { page, size },
+    });
     return response.data;
   },
 
@@ -54,7 +64,7 @@ const contaFixaService = {
   // ✅ CORRIGIDO: Envia valorPago no BODY ao invés de query param
   marcarComoPaga: async (id: number, valorPago: number): Promise<ContaFixa> => {
     const response = await api.put(`/contas-fixas/${id}/pagar`, {
-      valorPago: valorPago
+      valor: valorPago
     });
     return response.data;
   }

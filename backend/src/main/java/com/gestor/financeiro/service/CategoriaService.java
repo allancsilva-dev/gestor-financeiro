@@ -6,6 +6,8 @@ import com.gestor.financeiro.exception.UnauthorizedAccessException;
 import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.repository.CategoriaRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -21,9 +23,9 @@ public class CategoriaService {
     private AuthenticatedUserService authenticatedUserService;
     
     // Lista categorias ativas do usuário LOGADO
-    public List<Categoria> listarMinhasCategorias() {
+    public Page<Categoria> listarMinhasCategorias(Pageable pageable) {
         Usuario usuario = authenticatedUserService.getAuthenticatedUser();
-        return categoriaRepository.findByUsuarioIdAndAtivoTrue(usuario.getId());
+        return categoriaRepository.findByUsuarioIdAndAtivoTrue(usuario.getId(), pageable);
     }
     
     // ✅ CORRIGIDO - Pega usuário do TOKEN
