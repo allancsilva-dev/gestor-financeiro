@@ -1,6 +1,7 @@
 package com.gestor.financeiro.controller;
 
 import com.gestor.financeiro.model.Meta;
+import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.MetaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -16,10 +17,14 @@ public class MetaController {
     
     @Autowired
     private MetaService metaService;
+
+    @Autowired
+    private AuthenticatedUserService authenticatedUserService;
     
-    // GET /api/metas/usuario/{usuarioId} - Lista metas do usuário
-    @GetMapping("/usuario/{usuarioId}")
-    public ResponseEntity<List<Meta>> listar(@PathVariable Long usuarioId) {
+    // GET /api/metas/minhas - Lista metas do usuário autenticado
+    @GetMapping("/minhas")
+    public ResponseEntity<List<Meta>> listar() {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         List<Meta> metas = metaService.listarPorUsuario(usuarioId);
         return ResponseEntity.ok(metas);
     }
@@ -27,15 +32,17 @@ public class MetaController {
     // GET /api/metas/{id} - Busca meta por ID
     @GetMapping("/{id}")
     public ResponseEntity<Meta> buscarPorId(@PathVariable Long id) {
-        Meta meta = metaService.buscarPorId(id);
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        Meta meta = metaService.buscarPorIdDoUsuario(id, usuarioId);
         return ResponseEntity.ok(meta);
     }
     
     // GET /api/metas/{id}/progresso - Calcula progresso da meta
     @GetMapping("/{id}/progresso")
     public ResponseEntity<Map<String, Object>> calcularProgresso(@PathVariable Long id) {
-        Meta meta = metaService.buscarPorId(id);
-        BigDecimal progresso = metaService.calcularProgresso(id);
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        Meta meta = metaService.buscarPorIdDoUsuario(id, usuarioId);
+        BigDecimal progresso = metaService.calcularProgresso(id, usuarioId);
         
         Map<String, Object> resultado = new HashMap<>();
         resultado.put("metaId", id);
@@ -50,7 +57,8 @@ public class MetaController {
     // POST /api/metas - Cria nova meta
     @PostMapping
     public ResponseEntity<Meta> criar(@RequestBody Meta meta) {
-        Meta metaCriada = metaService.criar(meta);
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        Meta metaCriada = metaService.criar(meta, usuarioId);
         return ResponseEntity.ok(metaCriada);
     }
     
@@ -60,7 +68,8 @@ public class MetaController {
         @PathVariable Long id, 
         @RequestBody Meta meta
     ) {
-        Meta metaAtualizada = metaService.atualizar(id, meta);
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        Meta metaAtualizada = metaService.atualizar(id, meta, usuarioId);
         return ResponseEntity.ok(metaAtualizada);
     }
     
@@ -70,8 +79,9 @@ public class MetaController {
         @PathVariable Long id, 
         @RequestBody Map<String, BigDecimal> request
     ) {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         BigDecimal valor = request.get("valor");
-        Meta meta = metaService.adicionarValor(id, valor);
+        Meta meta = metaService.adicionarValor(id, valor, usuarioId);
         return ResponseEntity.ok(meta);
     }
     
@@ -81,15 +91,17 @@ public class MetaController {
         @PathVariable Long id, 
         @RequestBody Map<String, BigDecimal> request
     ) {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         BigDecimal valor = request.get("valor");
-        Meta meta = metaService.removerValor(id, valor);
+        Meta meta = metaService.removerValor(id, valor, usuarioId);
         return ResponseEntity.ok(meta);
     }
     
     // DELETE /api/metas/{id} - Deleta meta
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
-        metaService.deletar(id);
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        metaService.deletar(id, usuarioId);
         return ResponseEntity.noContent().build();
     }
 }

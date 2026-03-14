@@ -4,6 +4,7 @@ import com.gestor.financeiro.model.Parcela;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import java.util.List;
+import java.util.Optional;
 
 @Repository // Indica que é um Repository (Spring gerencia automaticamente)
 public interface ParcelaRepository extends JpaRepository<Parcela, Long> {
@@ -12,4 +13,8 @@ public interface ParcelaRepository extends JpaRepository<Parcela, Long> {
     // Busca todas as parcelas de uma transação específica
     // Spring cria a query automaticamente: SELECT * FROM parcelas WHERE transacao_id = ?
     List<Parcela> findByTransacaoId(Long transacaoId);
+
+    List<Parcela> findByTransacaoIdAndTransacaoUsuarioId(Long transacaoId, Long usuarioId);
+
+    Optional<Parcela> findByIdAndTransacaoUsuarioId(Long id, Long usuarioId);
 }

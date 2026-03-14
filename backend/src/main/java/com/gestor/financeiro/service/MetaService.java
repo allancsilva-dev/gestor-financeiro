@@ -1,7 +1,10 @@
 package com.gestor.financeiro.service;
 
+import com.gestor.financeiro.exception.UnauthorizedAccessException;
 import com.gestor.financeiro.model.Meta;
+import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.repository.MetaRepository;
+import com.gestor.financeiro.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
@@ -14,6 +17,9 @@ public class MetaService {
     
     @Autowired
     private MetaRepository metaRepository;
+
+    @Autowired
+    private UsuarioRepository usuarioRepository;
     
     // Lista metas ativas do usuário
     public List<Meta> listarPorUsuario(Long usuarioId) {
@@ -21,7 +27,12 @@ public class MetaService {
     }
     
     // Cria nova meta
-    public Meta criar(Meta meta) {
+    public Meta criar(Meta meta, Long usuarioId) {
+        Usuario usuario = usuarioRepository.findById(usuarioId)
+            .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+
+        meta.setUsuario(usuario);
+
         // Valores padrão
         if (meta.getAtiva() == null) meta.setAtiva(true);
         if (meta.getValorReservado() == null) meta.setValorReservado(BigDecimal.ZERO);
@@ -31,9 +42,8 @@ public class MetaService {
     }
     
     // Adiciona valor à meta (quando o usuário guarda dinheiro)
-    public Meta adicionarValor(Long metaId, BigDecimal valor) {
-        Meta meta = metaRepository.findById(metaId)
-            .orElseThrow(() -> new RuntimeException("Meta não encontrada"));
+    public Meta adicionarValor(Long metaId, BigDecimal valor, Long usuarioId) {
+        Meta meta = buscarPorIdDoUsuario(metaId, usuarioId);
         
         // Soma ao valor reservado
         meta.setValorReservado(meta.getValorReservado().add(valor));
@@ -48,9 +58,8 @@ public class MetaService {
     }
     
     // Remove valor da meta (caso retire dinheiro)
-    public Meta removerValor(Long metaId, BigDecimal valor) {
-        Meta meta = metaRepository.findById(metaId)
-            .orElseThrow(() -> new RuntimeException("Meta não encontrada"));
+    public Meta removerValor(Long metaId, BigDecimal valor, Long usuarioId) {
+        Meta meta = buscarPorIdDoUsuario(metaId, usuarioId);
         
         meta.setValorReservado(meta.getValorReservado().subtract(valor));
         
@@ -64,9 +73,8 @@ public class MetaService {
     }
     
     // Atualiza meta
-    public Meta atualizar(Long id, Meta metaAtualizada) {
-        Meta meta = metaRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Meta não encontrada"));
+    public Meta atualizar(Long id, Meta metaAtualizada, Long usuarioId) {
+        Meta meta = buscarPorIdDoUsuario(id, usuarioId);
         
         meta.setNome(metaAtualizada.getNome());
         meta.setValorTotal(metaAtualizada.getValorTotal());
@@ -80,9 +88,8 @@ public class MetaService {
     }
     
     // Desativa meta
-    public void deletar(Long id) {
-        Meta meta = metaRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Meta não encontrada"));
+    public void deletar(Long id, Long usuarioId) {
+        Meta meta = buscarPorIdDoUsuario(id, usuarioId);
         
         meta.setAtiva(false);
         metaRepository.save(meta);
@@ -93,10 +100,22 @@ public class MetaService {
         return metaRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Meta não encontrada"));
     }
+
+    // Valida ownership para evitar IDOR em endpoints por ID.
+    public Meta buscarPorIdDoUsuario(Long id, Long usuarioId) {
+        Meta meta = metaRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Meta não encontrada"));
+
+        if (!meta.getUsuario().getId().equals(usuarioId)) {
+            throw new UnauthorizedAccessException("Acesso negado a esta meta");
+        }
+
+        return meta;
+    }
     
     // Calcula porcentagem de conclusão da meta
-    public BigDecimal calcularProgresso(Long metaId) {
-        Meta meta = buscarPorId(metaId);
+    public BigDecimal calcularProgresso(Long metaId, Long usuarioId) {
+        Meta meta = buscarPorIdDoUsuario(metaId, usuarioId);
         
         if (meta.getValorTotal().compareTo(BigDecimal.ZERO) == 0) {
             return BigDecimal.ZERO;

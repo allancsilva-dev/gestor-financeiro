@@ -8,12 +8,15 @@ import org.springframework.data.repository.query.Param; // Importar
 import org.springframework.stereotype.Repository;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
     
     // Busca TODAS as transações do usuário
     List<Transacao> findByUsuarioId(Long usuarioId);
+
+    Optional<Transacao> findByIdAndUsuarioId(Long id, Long usuarioId);
     
     // Busca transações de uma categoria específica
     List<Transacao> findByUsuarioIdAndCategoriaId(Long usuarioId, Long categoriaId);

@@ -1,7 +1,10 @@
 package com.gestor.financeiro.service;
 
+import com.gestor.financeiro.exception.UnauthorizedAccessException;
 import com.gestor.financeiro.model.Conta;
+import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.repository.ContaRepository;
+import com.gestor.financeiro.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
@@ -12,6 +15,9 @@ public class ContaService {
     
     @Autowired
     private ContaRepository contaRepository;
+
+    @Autowired
+    private UsuarioRepository usuarioRepository;
     
     // Lista contas ativas do usuário
     public List<Conta> listarPorUsuario(Long usuarioId) {
@@ -19,7 +25,12 @@ public class ContaService {
     }
     
     // Cria nova conta
-    public Conta criar(Conta conta) {
+    public Conta criar(Conta conta, Long usuarioId) {
+        Usuario usuario = usuarioRepository.findById(usuarioId)
+            .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+
+        conta.setUsuario(usuario);
+
         // Inicializa valores padrão
         if (conta.getAtivo() == null) conta.setAtivo(true);
         if (conta.getValorGasto() == null) conta.setValorGasto(BigDecimal.ZERO);
@@ -30,9 +41,8 @@ public class ContaService {
     }
     
     // Atualiza conta
-    public Conta atualizar(Long id, Conta contaAtualizada) {
-        Conta conta = contaRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Conta não encontrada"));
+    public Conta atualizar(Long id, Conta contaAtualizada, Long usuarioId) {
+        Conta conta = buscarPorIdDoUsuario(id, usuarioId);
         
         conta.setNome(contaAtualizada.getNome());
         conta.setTipo(contaAtualizada.getTipo());
@@ -65,9 +75,8 @@ public class ContaService {
     }
     
     // Desativa conta
-    public void deletar(Long id) {
-        Conta conta = contaRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Conta não encontrada"));
+    public void deletar(Long id, Long usuarioId) {
+        Conta conta = buscarPorIdDoUsuario(id, usuarioId);
         
         conta.setAtivo(false);
         contaRepository.save(conta);
@@ -77,5 +86,17 @@ public class ContaService {
     public Conta buscarPorId(Long id) {
         return contaRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Conta não encontrada"));
+    }
+
+    // Valida ownership para evitar IDOR em endpoints por ID.
+    public Conta buscarPorIdDoUsuario(Long id, Long usuarioId) {
+        Conta conta = contaRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Conta não encontrada"));
+
+        if (!conta.getUsuario().getId().equals(usuarioId)) {
+            throw new UnauthorizedAccessException("Acesso negado a esta conta");
+        }
+
+        return conta;
     }
 }

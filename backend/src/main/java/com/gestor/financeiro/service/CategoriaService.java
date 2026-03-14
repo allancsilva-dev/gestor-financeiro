@@ -1,11 +1,11 @@
 package com.gestor.financeiro.service;
 
+import com.gestor.financeiro.exception.UnauthorizedAccessException;
 import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.repository.CategoriaRepository;
-import com.gestor.financeiro.repository.UsuarioRepository;
+import com.gestor.financeiro.security.AuthenticatedUserService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import java.util.List;
 
@@ -14,35 +14,20 @@ public class CategoriaService {
     
     @Autowired
     private CategoriaRepository categoriaRepository;
-    
+
     @Autowired
-    private UsuarioRepository usuarioRepository;
-    
-    // ✅ PEGA O USUÁRIO LOGADO DO TOKEN
-    private Usuario getUsuarioLogado() {
-        // Pega o email do usuário autenticado (vem do JWT)
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        
-        // Busca o usuário no banco pelo email
-        return usuarioRepository.findByEmail(email)
-            .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
-    }
+    private AuthenticatedUserService authenticatedUserService;
     
     // Lista categorias ativas do usuário LOGADO
     public List<Categoria> listarMinhasCategorias() {
-        Usuario usuario = getUsuarioLogado();
+        Usuario usuario = authenticatedUserService.getAuthenticatedUser();
         return categoriaRepository.findByUsuarioIdAndAtivoTrue(usuario.getId());
-    }
-    
-    // Lista categorias de um usuário específico (admin)
-    public List<Categoria> listarPorUsuario(Long usuarioId) {
-        return categoriaRepository.findByUsuarioIdAndAtivoTrue(usuarioId);
     }
     
     // ✅ CORRIGIDO - Pega usuário do TOKEN
     public Categoria criar(Categoria categoria) {
         // Pega o usuário autenticado do token
-        Usuario usuario = getUsuarioLogado();
+        Usuario usuario = authenticatedUserService.getAuthenticatedUser();
         
         // Associa o usuário à categoria
         categoria.setUsuario(usuario);
@@ -57,7 +42,7 @@ public class CategoriaService {
     
     // Atualiza categoria existente
     public Categoria atualizar(Long id, Categoria categoriaAtualizada) {
-        Usuario usuario = getUsuarioLogado();
+        Usuario usuario = authenticatedUserService.getAuthenticatedUser();
         
         Categoria categoria = categoriaRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Categoria não encontrada"));
@@ -77,7 +62,7 @@ public class CategoriaService {
     
     // "Deleta" categoria (só marca como inativa)
     public void deletar(Long id) {
-        Usuario usuario = getUsuarioLogado();
+        Usuario usuario = authenticatedUserService.getAuthenticatedUser();
         
         Categoria categoria = categoriaRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Categoria não encontrada"));
@@ -95,5 +80,16 @@ public class CategoriaService {
     public Categoria buscarPorId(Long id) {
         return categoriaRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Categoria não encontrada"));
+    }
+
+    public Categoria buscarPorIdDoUsuario(Long id, Long usuarioId) {
+        Categoria categoria = categoriaRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Categoria não encontrada"));
+
+        if (!categoria.getUsuario().getId().equals(usuarioId)) {
+            throw new UnauthorizedAccessException("Acesso negado a esta categoria");
+        }
+
+        return categoria;
     }
 }

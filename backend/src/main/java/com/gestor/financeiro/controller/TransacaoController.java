@@ -1,6 +1,7 @@
 package com.gestor.financeiro.controller;
 
 import com.gestor.financeiro.model.Transacao;
+import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.TransacaoService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -15,10 +16,14 @@ public class TransacaoController {
     
     @Autowired
     private TransacaoService transacaoService;
+
+    @Autowired
+    private AuthenticatedUserService authenticatedUserService;
     
-    // GET /api/transacoes/usuario/{usuarioId} - Lista transações do usuário
-    @GetMapping("/usuario/{usuarioId}")
-    public ResponseEntity<List<Transacao>> listar(@PathVariable Long usuarioId) {
+    // GET /api/transacoes/minhas - Lista transações do usuário autenticado
+    @GetMapping("/minhas")
+    public ResponseEntity<List<Transacao>> listar() {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         List<Transacao> transacoes = transacaoService.listarPorUsuario(usuarioId);
         return ResponseEntity.ok(transacoes);
     }
@@ -26,10 +31,10 @@ public class TransacaoController {
     // GET /api/transacoes/periodo - Lista transações por período
     @GetMapping("/periodo")
     public ResponseEntity<List<Transacao>> listarPorPeriodo(
-        @RequestParam Long usuarioId,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fim
     ) {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         List<Transacao> transacoes = transacaoService.listarPorPeriodo(usuarioId, inicio, fim);
         return ResponseEntity.ok(transacoes);
     }
@@ -37,14 +42,16 @@ public class TransacaoController {
     // GET /api/transacoes/{id} - Busca transação por ID
     @GetMapping("/{id}")
     public ResponseEntity<Transacao> buscarPorId(@PathVariable Long id) {
-        Transacao transacao = transacaoService.buscarPorId(id);
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        Transacao transacao = transacaoService.buscarPorIdDoUsuario(id, usuarioId);
         return ResponseEntity.ok(transacao);
     }
     
     // POST /api/transacoes - Cria nova transação
     @PostMapping
     public ResponseEntity<Transacao> criar(@RequestBody Transacao transacao) {
-        Transacao transacaoCriada = transacaoService.criar(transacao);
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        Transacao transacaoCriada = transacaoService.criar(transacao, usuarioId);
         return ResponseEntity.ok(transacaoCriada);
     }
     
@@ -54,14 +61,16 @@ public class TransacaoController {
         @PathVariable Long id, 
         @RequestBody Transacao transacao
     ) {
-        Transacao transacaoAtualizada = transacaoService.atualizar(id, transacao);
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        Transacao transacaoAtualizada = transacaoService.atualizar(id, transacao, usuarioId);
         return ResponseEntity.ok(transacaoAtualizada);
     }
     
     // DELETE /api/transacoes/{id} - Deleta transação
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
-        transacaoService.deletar(id);
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        transacaoService.deletar(id, usuarioId);
         return ResponseEntity.noContent().build();
     }
 }

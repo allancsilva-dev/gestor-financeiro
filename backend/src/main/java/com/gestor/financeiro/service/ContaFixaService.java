@@ -1,11 +1,14 @@
 package com.gestor.financeiro.service;
 
+import com.gestor.financeiro.exception.UnauthorizedAccessException;
 import com.gestor.financeiro.model.ContaFixa;
 import com.gestor.financeiro.model.Transacao;
+import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.StatusPagamento;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.ContaFixaRepository;
 import com.gestor.financeiro.repository.TransacaoRepository;
+import com.gestor.financeiro.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +24,9 @@ public class ContaFixaService {
     
     @Autowired
     private TransacaoRepository transacaoRepository;
+
+    @Autowired
+    private UsuarioRepository usuarioRepository;
     
     // Lista contas fixas ativas do usuário
     public List<ContaFixa> listarPorUsuario(Long usuarioId) {
@@ -28,7 +34,12 @@ public class ContaFixaService {
     }
     
     // Cria nova conta fixa
-    public ContaFixa criar(ContaFixa contaFixa) {
+    public ContaFixa criar(ContaFixa contaFixa, Long usuarioId) {
+        Usuario usuario = usuarioRepository.findById(usuarioId)
+            .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+
+        contaFixa.setUsuario(usuario);
+
         // Valores padrão
         if (contaFixa.getAtivo() == null) contaFixa.setAtivo(true);
         if (contaFixa.getRecorrente() == null) contaFixa.setRecorrente(true);
@@ -65,9 +76,8 @@ public class ContaFixaService {
     
     // ✅ CORRIGIDO: Mantém como PAGO e só avança o vencimento
     @Transactional
-    public ContaFixa marcarComoPaga(Long id, BigDecimal valorPago) {
-        ContaFixa conta = contaFixaRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Conta fixa não encontrada"));
+    public ContaFixa marcarComoPaga(Long id, BigDecimal valorPago, Long usuarioId) {
+        ContaFixa conta = buscarPorIdDoUsuario(id, usuarioId);
         
         // ✅ VERIFICA SE JÁ ESTÁ PAGA ESTE MÊS
         if (conta.getStatus() == StatusPagamento.PAGO) {
@@ -106,9 +116,8 @@ public class ContaFixaService {
     }
     
     // Atualiza conta fixa
-    public ContaFixa atualizar(Long id, ContaFixa contaAtualizada) {
-        ContaFixa conta = contaFixaRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Conta fixa não encontrada"));
+    public ContaFixa atualizar(Long id, ContaFixa contaAtualizada, Long usuarioId) {
+        ContaFixa conta = buscarPorIdDoUsuario(id, usuarioId);
         
         conta.setNome(contaAtualizada.getNome());
         conta.setValorPlanejado(contaAtualizada.getValorPlanejado());
@@ -123,9 +132,8 @@ public class ContaFixaService {
     }
     
     // Desativa conta fixa
-    public void deletar(Long id) {
-        ContaFixa conta = contaFixaRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Conta fixa não encontrada"));
+    public void deletar(Long id, Long usuarioId) {
+        ContaFixa conta = buscarPorIdDoUsuario(id, usuarioId);
         
         conta.setAtivo(false);
         contaFixaRepository.save(conta);
@@ -135,6 +143,18 @@ public class ContaFixaService {
     public ContaFixa buscarPorId(Long id) {
         return contaFixaRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Conta fixa não encontrada"));
+    }
+
+    // Valida ownership para evitar IDOR em operações por ID.
+    public ContaFixa buscarPorIdDoUsuario(Long id, Long usuarioId) {
+        ContaFixa conta = contaFixaRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Conta fixa não encontrada"));
+
+        if (!conta.getUsuario().getId().equals(usuarioId)) {
+            throw new UnauthorizedAccessException("Acesso negado a esta conta fixa");
+        }
+
+        return conta;
     }
     
     // ✅ NOVO: Reseta contas pagas quando passa o vencimento

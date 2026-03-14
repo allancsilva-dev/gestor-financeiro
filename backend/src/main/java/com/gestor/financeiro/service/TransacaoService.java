@@ -1,14 +1,17 @@
 package com.gestor.financeiro.service;
 
+import com.gestor.financeiro.exception.UnauthorizedAccessException;
 import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.Parcela;
 import com.gestor.financeiro.model.Transacao;
+import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.StatusPagamento;
 import com.gestor.financeiro.repository.CategoriaRepository;
 import com.gestor.financeiro.repository.ContaRepository;
 import com.gestor.financeiro.repository.ParcelaRepository;
 import com.gestor.financeiro.repository.TransacaoRepository;
+import com.gestor.financeiro.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +38,9 @@ public class TransacaoService {
     
     @Autowired
     private ContaService contaService;
+
+    @Autowired
+    private UsuarioRepository usuarioRepository;
     
     // Lista transações do usuário
     public List<Transacao> listarPorUsuario(Long usuarioId) {
@@ -48,7 +54,11 @@ public class TransacaoService {
     
     // Cria transação (com ou sem parcelamento)
     @Transactional
-    public Transacao criar(Transacao transacao) {
+    public Transacao criar(Transacao transacao, Long usuarioId) {
+        Usuario usuario = usuarioRepository.findById(usuarioId)
+            .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+
+        transacao.setUsuario(usuario);
         
         // ✅ BUSCA A CATEGORIA DO BANCO (com dados completos)
         if (transacao.getCategoria() != null && transacao.getCategoria().getId() != null) {
@@ -115,9 +125,8 @@ public class TransacaoService {
     
     // Atualiza transação
     @Transactional
-    public Transacao atualizar(Long id, Transacao transacaoAtualizada) {
-        Transacao transacao = transacaoRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Transação não encontrada"));
+    public Transacao atualizar(Long id, Transacao transacaoAtualizada, Long usuarioId) {
+        Transacao transacao = buscarPorIdDoUsuario(id, usuarioId);
         
         transacao.setDescricao(transacaoAtualizada.getDescricao());
         transacao.setValorTotal(transacaoAtualizada.getValorTotal());
@@ -129,9 +138,8 @@ public class TransacaoService {
     
     // Deleta transação
     @Transactional
-    public void deletar(Long id) {
-        Transacao transacao = transacaoRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Transação não encontrada"));
+    public void deletar(Long id, Long usuarioId) {
+        Transacao transacao = buscarPorIdDoUsuario(id, usuarioId);
         
         // Remove gasto da conta
         if (transacao.getConta() != null) {
@@ -159,5 +167,17 @@ public class TransacaoService {
     public Transacao buscarPorId(Long id) {
         return transacaoRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Transação não encontrada"));
+    }
+
+    // Valida ownership para evitar IDOR em endpoints por ID.
+    public Transacao buscarPorIdDoUsuario(Long id, Long usuarioId) {
+        Transacao transacao = transacaoRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Transação não encontrada"));
+
+        if (!transacao.getUsuario().getId().equals(usuarioId)) {
+            throw new UnauthorizedAccessException("Acesso negado a esta transação");
+        }
+
+        return transacao;
     }
 }

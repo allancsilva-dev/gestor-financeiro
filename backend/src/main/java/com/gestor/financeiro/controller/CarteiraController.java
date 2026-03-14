@@ -1,6 +1,7 @@
 package com.gestor.financeiro.controller;
 
 import com.gestor.financeiro.model.Carteira;
+import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.CarteiraService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -15,10 +16,14 @@ public class CarteiraController {
     
     @Autowired
     private CarteiraService carteiraService;
+
+    @Autowired
+    private AuthenticatedUserService authenticatedUserService;
     
-    // GET /api/carteiras/usuario/{usuarioId} - Lista carteiras do usuário
-    @GetMapping("/usuario/{usuarioId}")
-    public ResponseEntity<List<Carteira>> listar(@PathVariable Long usuarioId) {
+    // GET /api/carteiras/minhas - Lista carteiras do usuário autenticado
+    @GetMapping("/minhas")
+    public ResponseEntity<List<Carteira>> listar() {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         List<Carteira> carteiras = carteiraService.listarPorUsuario(usuarioId);
         return ResponseEntity.ok(carteiras);
     }
@@ -26,14 +31,16 @@ public class CarteiraController {
     // GET /api/carteiras/{id} - Busca carteira por ID
     @GetMapping("/{id}")
     public ResponseEntity<Carteira> buscarPorId(@PathVariable Long id) {
-        Carteira carteira = carteiraService.buscarPorId(id);
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        Carteira carteira = carteiraService.buscarPorIdDoUsuario(id, usuarioId);
         return ResponseEntity.ok(carteira);
     }
     
     // POST /api/carteiras - Cria nova carteira
     @PostMapping
     public ResponseEntity<Carteira> criar(@RequestBody Carteira carteira) {
-        Carteira carteiraCriada = carteiraService.criar(carteira);
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        Carteira carteiraCriada = carteiraService.criar(carteira, usuarioId);
         return ResponseEntity.ok(carteiraCriada);
     }
     
@@ -43,7 +50,8 @@ public class CarteiraController {
         @PathVariable Long id,
         @RequestBody Carteira carteira
     ) {
-        Carteira carteiraAtualizada = carteiraService.atualizar(id, carteira);
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        Carteira carteiraAtualizada = carteiraService.atualizar(id, carteira, usuarioId);
         return ResponseEntity.ok(carteiraAtualizada);
     }
     
@@ -53,8 +61,9 @@ public class CarteiraController {
         @PathVariable Long id,
         @RequestBody Map<String, BigDecimal> request
     ) {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         BigDecimal valor = request.get("valor");
-        Carteira carteira = carteiraService.adicionarDinheiro(id, valor);
+        Carteira carteira = carteiraService.adicionarDinheiro(id, valor, usuarioId);
         return ResponseEntity.ok(carteira);
     }
     
@@ -64,14 +73,16 @@ public class CarteiraController {
         @PathVariable Long id,
         @RequestBody Map<String, BigDecimal> request
     ) {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         BigDecimal valor = request.get("valor");
-        Carteira carteira = carteiraService.removerDinheiro(id, valor);
+        Carteira carteira = carteiraService.removerDinheiro(id, valor, usuarioId);
         return ResponseEntity.ok(carteira);
     }
     
-    // GET /api/carteiras/usuario/{usuarioId}/saldo-total - Calcula saldo total
-    @GetMapping("/usuario/{usuarioId}/saldo-total")
-    public ResponseEntity<BigDecimal> calcularSaldoTotal(@PathVariable Long usuarioId) {
+    // GET /api/carteiras/minhas/saldo-total - Calcula saldo total do usuário autenticado
+    @GetMapping("/minhas/saldo-total")
+    public ResponseEntity<BigDecimal> calcularSaldoTotal() {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         BigDecimal saldoTotal = carteiraService.calcularSaldoTotal(usuarioId);
         return ResponseEntity.ok(saldoTotal);
     }
@@ -79,7 +90,8 @@ public class CarteiraController {
     // DELETE /api/carteiras/{id} - Deleta carteira
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
-        carteiraService.deletar(id);
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        carteiraService.deletar(id, usuarioId);
         return ResponseEntity.noContent().build();
     }
 }

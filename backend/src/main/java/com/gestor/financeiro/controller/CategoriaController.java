@@ -3,6 +3,7 @@ package com.gestor.financeiro.controller;
 import com.gestor.financeiro.dto.CategoriaCreateRequest;
 import com.gestor.financeiro.dto.CategoriaUpdateRequest;
 import com.gestor.financeiro.model.Categoria;
+import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.CategoriaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -17,16 +18,20 @@ public class CategoriaController {
     @Autowired
     private CategoriaService categoriaService;
 
+    @Autowired
+    private AuthenticatedUserService authenticatedUserService;
+
     // Lista categorias do usuário logado
     @GetMapping("/minhas")
     public ResponseEntity<List<Categoria>> listarMinhas() {
         return ResponseEntity.ok(categoriaService.listarMinhasCategorias());
     }
 
-    // Lista categorias por ID de usuário (apenas admin)
-    @GetMapping("/usuario/{usuarioId}")
-    public ResponseEntity<List<Categoria>> listarPorUsuario(@PathVariable Long usuarioId) {
-        return ResponseEntity.ok(categoriaService.listarPorUsuario(usuarioId));
+    // GET /api/categorias/{id} - Busca categoria por ID com validação de ownership
+    @GetMapping("/{id}")
+    public ResponseEntity<Categoria> buscarPorId(@PathVariable Long id) {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        return ResponseEntity.ok(categoriaService.buscarPorIdDoUsuario(id, usuarioId));
     }
 
     // Criar categoria

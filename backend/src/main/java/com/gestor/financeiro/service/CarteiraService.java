@@ -1,5 +1,6 @@
 package com.gestor.financeiro.service;
 
+import com.gestor.financeiro.exception.UnauthorizedAccessException;
 import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.Transacao;
@@ -42,11 +43,23 @@ public class CarteiraService {
         return carteiraRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Carteira não encontrada"));
     }
+
+    // Valida ownership para evitar IDOR em operações por ID.
+    public Carteira buscarPorIdDoUsuario(Long id, Long usuarioId) {
+        Carteira carteira = carteiraRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Carteira não encontrada"));
+
+        if (!carteira.getUsuario().getId().equals(usuarioId)) {
+            throw new UnauthorizedAccessException("Acesso negado a esta carteira");
+        }
+
+        return carteira;
+    }
     
     // Cria nova carteira
-    public Carteira criar(Carteira carteira) {
-        // Verifica se o usuário existe
-        Usuario usuario = usuarioRepository.findById(carteira.getUsuario().getId())
+    public Carteira criar(Carteira carteira, Long usuarioId) {
+        // O usuário vem do token para evitar IDOR via payload.
+        Usuario usuario = usuarioRepository.findById(usuarioId)
             .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
         
         carteira.setUsuario(usuario);
@@ -60,8 +73,8 @@ public class CarteiraService {
     }
     
     // Atualiza carteira
-    public Carteira atualizar(Long id, Carteira carteiraAtualizada) {
-        Carteira carteira = buscarPorId(id);
+    public Carteira atualizar(Long id, Carteira carteiraAtualizada, Long usuarioId) {
+        Carteira carteira = buscarPorIdDoUsuario(id, usuarioId);
         
         carteira.setNome(carteiraAtualizada.getNome());
         carteira.setTipo(carteiraAtualizada.getTipo());
@@ -73,8 +86,8 @@ public class CarteiraService {
     
     // Adiciona dinheiro E cria transação de ENTRADA
     @Transactional
-    public Carteira adicionarDinheiro(Long id, BigDecimal valor) {
-        Carteira carteira = buscarPorId(id);
+    public Carteira adicionarDinheiro(Long id, BigDecimal valor, Long usuarioId) {
+        Carteira carteira = buscarPorIdDoUsuario(id, usuarioId);
         
         // Atualiza o saldo da carteira
         carteira.setSaldo(carteira.getSaldo().add(valor));
@@ -93,8 +106,8 @@ public class CarteiraService {
     
     // Remove dinheiro E cria transação de SAÍDA
     @Transactional
-    public Carteira removerDinheiro(Long id, BigDecimal valor) {
-        Carteira carteira = buscarPorId(id);
+    public Carteira removerDinheiro(Long id, BigDecimal valor, Long usuarioId) {
+        Carteira carteira = buscarPorIdDoUsuario(id, usuarioId);
         
         if (carteira.getSaldo().compareTo(valor) < 0) {
             throw new RuntimeException("Saldo insuficiente");
@@ -169,6 +182,11 @@ public class CarteiraService {
     // Deleta carteira
     public void deletar(Long id) {
         Carteira carteira = buscarPorId(id);
+        carteiraRepository.delete(carteira);
+    }
+
+    public void deletar(Long id, Long usuarioId) {
+        Carteira carteira = buscarPorIdDoUsuario(id, usuarioId);
         carteiraRepository.delete(carteira);
     }
 }

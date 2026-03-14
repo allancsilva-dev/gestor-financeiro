@@ -1,5 +1,6 @@
 package com.gestor.financeiro.service;
 
+import com.gestor.financeiro.exception.UnauthorizedAccessException;
 import com.gestor.financeiro.model.Parcela;
 import com.gestor.financeiro.model.enums.StatusPagamento;
 import com.gestor.financeiro.repository.ParcelaRepository;
@@ -15,14 +16,13 @@ public class ParcelaService {
     private ParcelaRepository parcelaRepository;
     
     // Busca todas as parcelas de uma transação
-    public List<Parcela> listarPorTransacao(Long transacaoId) {
-        return parcelaRepository.findByTransacaoId(transacaoId);
+    public List<Parcela> listarPorTransacao(Long transacaoId, Long usuarioId) {
+        return parcelaRepository.findByTransacaoIdAndTransacaoUsuarioId(transacaoId, usuarioId);
     }
     
     // Marca parcela como PAGA
-    public Parcela marcarComoPaga(Long parcelaId) {
-        Parcela parcela = parcelaRepository.findById(parcelaId)
-            .orElseThrow(() -> new RuntimeException("Parcela não encontrada"));
+    public Parcela marcarComoPaga(Long parcelaId, Long usuarioId) {
+        Parcela parcela = buscarPorIdDoUsuario(parcelaId, usuarioId);
         
         parcela.setStatus(StatusPagamento.PAGO);
         parcela.setDataPagamento(LocalDate.now()); // Data de hoje
@@ -31,9 +31,8 @@ public class ParcelaService {
     }
     
     // Marca parcela como PENDENTE (desfazer pagamento)
-    public Parcela marcarComoPendente(Long parcelaId) {
-        Parcela parcela = parcelaRepository.findById(parcelaId)
-            .orElseThrow(() -> new RuntimeException("Parcela não encontrada"));
+    public Parcela marcarComoPendente(Long parcelaId, Long usuarioId) {
+        Parcela parcela = buscarPorIdDoUsuario(parcelaId, usuarioId);
         
         parcela.setStatus(StatusPagamento.PENDENTE);
         parcela.setDataPagamento(null);
@@ -42,9 +41,20 @@ public class ParcelaService {
     }
     
     // Busca parcela por ID
-    public Parcela buscarPorId(Long id) {
-        return parcelaRepository.findById(id)
+    public Parcela buscarPorId(Long id, Long usuarioId) {
+        return buscarPorIdDoUsuario(id, usuarioId);
+    }
+
+    // Valida ownership através da transação dona da parcela.
+    public Parcela buscarPorIdDoUsuario(Long id, Long usuarioId) {
+        Parcela parcela = parcelaRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Parcela não encontrada"));
+
+        if (!parcela.getTransacao().getUsuario().getId().equals(usuarioId)) {
+            throw new UnauthorizedAccessException("Acesso negado a esta parcela");
+        }
+
+        return parcela;
     }
     
     // Atualiza status de parcelas atrasadas (executa todo dia)
