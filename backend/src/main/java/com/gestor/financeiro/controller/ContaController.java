@@ -1,6 +1,7 @@
 package com.gestor.financeiro.controller;
 
 import com.gestor.financeiro.dto.ContaRequest;
+import com.gestor.financeiro.dto.ContaResponseDto;
 import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.ContaService;
@@ -15,7 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/contas")
+@RequestMapping("/api/v1/contas")
 public class ContaController {
     
     @Autowired
@@ -26,42 +27,42 @@ public class ContaController {
     
     // GET /api/contas/minhas - Lista contas do usuário autenticado
     @GetMapping("/minhas")
-    public ResponseEntity<Page<Conta>> listar(
+    public ResponseEntity<Page<ContaResponseDto>> listar(
         @PageableDefault(size = 20, sort = "nome", direction = Sort.Direction.ASC) Pageable pageable
     ) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Pageable cappedPageable = PaginationUtils.enforceMaxSize(pageable, 100);
         Page<Conta> contas = contaService.listarPorUsuario(usuarioId, cappedPageable);
-        return ResponseEntity.ok(contas);
+        return ResponseEntity.ok(contas.map(ContaResponseDto::fromEntity));
     }
     
     // GET /api/contas/{id} - Busca conta por ID
     @GetMapping("/{id}")
-    public ResponseEntity<Conta> buscarPorId(@PathVariable Long id) {
+    public ResponseEntity<ContaResponseDto> buscarPorId(@PathVariable Long id) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Conta conta = contaService.buscarPorIdDoUsuario(id, usuarioId);
-        return ResponseEntity.ok(conta);
+        return ResponseEntity.ok(ContaResponseDto.fromEntity(conta));
     }
     
     // POST /api/contas - Cria nova conta
     @PostMapping
-    public ResponseEntity<Conta> criar(@Valid @RequestBody ContaRequest request) {
+    public ResponseEntity<ContaResponseDto> criar(@Valid @RequestBody ContaRequest request) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Conta conta = toEntity(request);
         Conta contaCriada = contaService.criar(conta, usuarioId);
-        return ResponseEntity.ok(contaCriada);
+        return ResponseEntity.ok(ContaResponseDto.fromEntity(contaCriada));
     }
     
     // PUT /api/contas/{id} - Atualiza conta
     @PutMapping("/{id}")
-    public ResponseEntity<Conta> atualizar(
+    public ResponseEntity<ContaResponseDto> atualizar(
         @PathVariable Long id, 
         @Valid @RequestBody ContaRequest request
     ) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Conta conta = toEntity(request);
         Conta contaAtualizada = contaService.atualizar(id, conta, usuarioId);
-        return ResponseEntity.ok(contaAtualizada);
+        return ResponseEntity.ok(ContaResponseDto.fromEntity(contaAtualizada));
     }
     
     // DELETE /api/contas/{id} - Deleta conta

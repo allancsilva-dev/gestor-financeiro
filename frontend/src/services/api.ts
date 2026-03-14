@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081/api';
+const API_VERSION = '/v1';
 
 let accessToken: string | null = null;
 
@@ -40,6 +41,14 @@ const processQueue = (error: unknown, token: string | null = null) => {
 };
 
 api.interceptors.request.use((config) => {
+  const requestUrl = config.url || '';
+  const isAuthEndpoint = requestUrl.startsWith('/auth');
+
+  // Todos os endpoints não-auth usam /api/v1 para versionamento explícito.
+  if (!isAuthEndpoint && requestUrl.startsWith('/') && !requestUrl.startsWith(API_VERSION + '/')) {
+    config.url = `${API_VERSION}${requestUrl}`;
+  }
+
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`;
   }

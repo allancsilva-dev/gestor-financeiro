@@ -1,5 +1,6 @@
 package com.gestor.financeiro.controller;
 
+import com.gestor.financeiro.dto.UsuarioResponseDto;
 import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.repository.UsuarioRepository;
@@ -9,7 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/usuarios")
+@RequestMapping("/api/v1/usuarios")
 public class UsuarioController {
 
     @Autowired
@@ -19,7 +20,7 @@ public class UsuarioController {
     private AuthenticatedUserService authenticatedUserService;
 
     @GetMapping("/me")
-    public ResponseEntity<?> getCurrentUser() {
+    public ResponseEntity<UsuarioResponseDto> getCurrentUser() {
         Usuario usuarioAutenticado = authenticatedUserService.getAuthenticatedUser();
         String email = usuarioAutenticado.getEmail();
         
@@ -27,8 +28,6 @@ public class UsuarioController {
         Usuario usuario = usuarioRepository.findByEmail(email)
             .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
         
-        // Retorna os dados (SEM a senha!)
-        usuario.setSenha(null);
-        return ResponseEntity.ok(usuario);
+        return ResponseEntity.ok(UsuarioResponseDto.fromEntity(usuario));
     }
 }

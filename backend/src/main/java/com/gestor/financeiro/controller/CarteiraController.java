@@ -1,5 +1,6 @@
 package com.gestor.financeiro.controller;
 
+import com.gestor.financeiro.dto.CarteiraResponseDto;
 import com.gestor.financeiro.dto.CarteiraRequest;
 import com.gestor.financeiro.dto.ValorRequest;
 import com.gestor.financeiro.model.Carteira;
@@ -17,7 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
 
 @RestController
-@RequestMapping("/api/carteiras")
+@RequestMapping("/api/v1/carteiras")
 public class CarteiraController {
     
     @Autowired
@@ -28,66 +29,66 @@ public class CarteiraController {
     
     // GET /api/carteiras/minhas - Lista carteiras do usuário autenticado
     @GetMapping("/minhas")
-    public ResponseEntity<Page<Carteira>> listar(
+    public ResponseEntity<Page<CarteiraResponseDto>> listar(
         @PageableDefault(size = 20, sort = "nome", direction = Sort.Direction.ASC) Pageable pageable
     ) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Pageable cappedPageable = PaginationUtils.enforceMaxSize(pageable, 100);
         Page<Carteira> carteiras = carteiraService.listarPorUsuario(usuarioId, cappedPageable);
-        return ResponseEntity.ok(carteiras);
+        return ResponseEntity.ok(carteiras.map(CarteiraResponseDto::fromEntity));
     }
     
     // GET /api/carteiras/{id} - Busca carteira por ID
     @GetMapping("/{id}")
-    public ResponseEntity<Carteira> buscarPorId(@PathVariable Long id) {
+    public ResponseEntity<CarteiraResponseDto> buscarPorId(@PathVariable Long id) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Carteira carteira = carteiraService.buscarPorIdDoUsuario(id, usuarioId);
-        return ResponseEntity.ok(carteira);
+        return ResponseEntity.ok(CarteiraResponseDto.fromEntity(carteira));
     }
     
     // POST /api/carteiras - Cria nova carteira
     @PostMapping
-    public ResponseEntity<Carteira> criar(@Valid @RequestBody CarteiraRequest request) {
+    public ResponseEntity<CarteiraResponseDto> criar(@Valid @RequestBody CarteiraRequest request) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Carteira carteira = toEntity(request);
         Carteira carteiraCriada = carteiraService.criar(carteira, usuarioId);
-        return ResponseEntity.ok(carteiraCriada);
+        return ResponseEntity.ok(CarteiraResponseDto.fromEntity(carteiraCriada));
     }
     
     // PUT /api/carteiras/{id} - Atualiza carteira
     @PutMapping("/{id}")
-    public ResponseEntity<Carteira> atualizar(
+    public ResponseEntity<CarteiraResponseDto> atualizar(
         @PathVariable Long id,
         @Valid @RequestBody CarteiraRequest request
     ) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Carteira carteira = toEntity(request);
         Carteira carteiraAtualizada = carteiraService.atualizar(id, carteira, usuarioId);
-        return ResponseEntity.ok(carteiraAtualizada);
+        return ResponseEntity.ok(CarteiraResponseDto.fromEntity(carteiraAtualizada));
     }
     
     // POST /api/carteiras/{id}/adicionar - Adiciona dinheiro
     @PostMapping("/{id}/adicionar")
-    public ResponseEntity<Carteira> adicionarDinheiro(
+    public ResponseEntity<CarteiraResponseDto> adicionarDinheiro(
         @PathVariable Long id,
         @Valid @RequestBody ValorRequest request
     ) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         BigDecimal valor = request.getValor();
         Carteira carteira = carteiraService.adicionarDinheiro(id, valor, usuarioId);
-        return ResponseEntity.ok(carteira);
+        return ResponseEntity.ok(CarteiraResponseDto.fromEntity(carteira));
     }
     
     // POST /api/carteiras/{id}/remover - Remove dinheiro
     @PostMapping("/{id}/remover")
-    public ResponseEntity<Carteira> removerDinheiro(
+    public ResponseEntity<CarteiraResponseDto> removerDinheiro(
         @PathVariable Long id,
         @Valid @RequestBody ValorRequest request
     ) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         BigDecimal valor = request.getValor();
         Carteira carteira = carteiraService.removerDinheiro(id, valor, usuarioId);
-        return ResponseEntity.ok(carteira);
+        return ResponseEntity.ok(CarteiraResponseDto.fromEntity(carteira));
     }
     
     // GET /api/carteiras/minhas/saldo-total - Calcula saldo total do usuário autenticado

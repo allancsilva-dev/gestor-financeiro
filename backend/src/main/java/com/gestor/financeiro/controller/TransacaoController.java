@@ -1,6 +1,7 @@
 package com.gestor.financeiro.controller;
 
 import com.gestor.financeiro.dto.TransacaoRequest;
+import com.gestor.financeiro.dto.TransacaoResponseDto;
 import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.Transacao;
@@ -19,7 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 
 @RestController
-@RequestMapping("/api/transacoes")
+@RequestMapping("/api/v1/transacoes")
 public class TransacaoController {
     
     @Autowired
@@ -30,18 +31,18 @@ public class TransacaoController {
     
     // GET /api/transacoes/minhas - Lista transações do usuário autenticado
     @GetMapping("/minhas")
-    public ResponseEntity<Page<Transacao>> listar(
+    public ResponseEntity<Page<TransacaoResponseDto>> listar(
         @PageableDefault(size = 20, sort = "data", direction = Sort.Direction.DESC) Pageable pageable
     ) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Pageable cappedPageable = PaginationUtils.enforceMaxSize(pageable, 100);
         Page<Transacao> transacoes = transacaoService.listarPorUsuario(usuarioId, cappedPageable);
-        return ResponseEntity.ok(transacoes);
+        return ResponseEntity.ok(transacoes.map(TransacaoResponseDto::fromEntity));
     }
     
     // GET /api/transacoes/periodo - Lista transações por período
     @GetMapping("/periodo")
-    public ResponseEntity<Page<Transacao>> listarPorPeriodo(
+    public ResponseEntity<Page<TransacaoResponseDto>> listarPorPeriodo(
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fim,
         @PageableDefault(size = 20, sort = "data", direction = Sort.Direction.DESC) Pageable pageable
@@ -49,36 +50,36 @@ public class TransacaoController {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Pageable cappedPageable = PaginationUtils.enforceMaxSize(pageable, 100);
         Page<Transacao> transacoes = transacaoService.listarPorPeriodo(usuarioId, inicio, fim, cappedPageable);
-        return ResponseEntity.ok(transacoes);
+        return ResponseEntity.ok(transacoes.map(TransacaoResponseDto::fromEntity));
     }
     
     // GET /api/transacoes/{id} - Busca transação por ID
     @GetMapping("/{id}")
-    public ResponseEntity<Transacao> buscarPorId(@PathVariable Long id) {
+    public ResponseEntity<TransacaoResponseDto> buscarPorId(@PathVariable Long id) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Transacao transacao = transacaoService.buscarPorIdDoUsuario(id, usuarioId);
-        return ResponseEntity.ok(transacao);
+        return ResponseEntity.ok(TransacaoResponseDto.fromEntity(transacao));
     }
     
     // POST /api/transacoes - Cria nova transação
     @PostMapping
-    public ResponseEntity<Transacao> criar(@Valid @RequestBody TransacaoRequest request) {
+    public ResponseEntity<TransacaoResponseDto> criar(@Valid @RequestBody TransacaoRequest request) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Transacao transacao = toEntity(request);
         Transacao transacaoCriada = transacaoService.criar(transacao, usuarioId);
-        return ResponseEntity.ok(transacaoCriada);
+        return ResponseEntity.ok(TransacaoResponseDto.fromEntity(transacaoCriada));
     }
     
     // PUT /api/transacoes/{id} - Atualiza transação
     @PutMapping("/{id}")
-    public ResponseEntity<Transacao> atualizar(
+    public ResponseEntity<TransacaoResponseDto> atualizar(
         @PathVariable Long id, 
         @Valid @RequestBody TransacaoRequest request
     ) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Transacao transacao = toEntity(request);
         Transacao transacaoAtualizada = transacaoService.atualizar(id, transacao, usuarioId);
-        return ResponseEntity.ok(transacaoAtualizada);
+        return ResponseEntity.ok(TransacaoResponseDto.fromEntity(transacaoAtualizada));
     }
     
     // DELETE /api/transacoes/{id} - Deleta transação

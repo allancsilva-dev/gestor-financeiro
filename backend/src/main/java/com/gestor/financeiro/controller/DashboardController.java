@@ -11,7 +11,7 @@ import com.gestor.financeiro.model.Usuario;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/dashboard")
+@RequestMapping("/api/v1/dashboard")
 public class DashboardController {
 
     @Autowired

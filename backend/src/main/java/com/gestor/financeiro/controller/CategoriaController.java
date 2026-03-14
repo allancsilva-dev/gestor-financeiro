@@ -1,6 +1,7 @@
 package com.gestor.financeiro.controller;
 
 import com.gestor.financeiro.dto.CategoriaCreateRequest;
+import com.gestor.financeiro.dto.CategoriaResponseDto;
 import com.gestor.financeiro.dto.CategoriaUpdateRequest;
 import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.security.AuthenticatedUserService;
@@ -16,7 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/categorias")
+@RequestMapping("/api/v1/categorias")
 public class CategoriaController {
 
     @Autowired
@@ -27,23 +28,23 @@ public class CategoriaController {
 
     // Lista categorias do usuário logado
     @GetMapping("/minhas")
-    public ResponseEntity<Page<Categoria>> listarMinhas(
+    public ResponseEntity<Page<CategoriaResponseDto>> listarMinhas(
         @PageableDefault(size = 20, sort = "nome", direction = Sort.Direction.ASC) Pageable pageable
     ) {
         Pageable cappedPageable = PaginationUtils.enforceMaxSize(pageable, 100);
-        return ResponseEntity.ok(categoriaService.listarMinhasCategorias(cappedPageable));
+        return ResponseEntity.ok(categoriaService.listarMinhasCategorias(cappedPageable).map(CategoriaResponseDto::fromEntity));
     }
 
     // GET /api/categorias/{id} - Busca categoria por ID com validação de ownership
     @GetMapping("/{id}")
-    public ResponseEntity<Categoria> buscarPorId(@PathVariable Long id) {
+    public ResponseEntity<CategoriaResponseDto> buscarPorId(@PathVariable Long id) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
-        return ResponseEntity.ok(categoriaService.buscarPorIdDoUsuario(id, usuarioId));
+        return ResponseEntity.ok(CategoriaResponseDto.fromEntity(categoriaService.buscarPorIdDoUsuario(id, usuarioId)));
     }
 
     // Criar categoria
     @PostMapping
-    public ResponseEntity<Categoria> criar(@Valid @RequestBody CategoriaCreateRequest request) {
+    public ResponseEntity<CategoriaResponseDto> criar(@Valid @RequestBody CategoriaCreateRequest request) {
         Categoria categoria = new Categoria();
         categoria.setNome(request.nome());
         categoria.setCor(request.cor());
@@ -51,12 +52,12 @@ public class CategoriaController {
         categoria.setValorEsperado(request.valorEsperado());
 
         Categoria categoriaCriada = categoriaService.criar(categoria);
-        return ResponseEntity.ok(categoriaCriada);
+        return ResponseEntity.ok(CategoriaResponseDto.fromEntity(categoriaCriada));
     }
 
     // Atualizar categoria
     @PutMapping("/{id}")
-    public ResponseEntity<Categoria> atualizar(
+    public ResponseEntity<CategoriaResponseDto> atualizar(
             @PathVariable Long id,
             @Valid @RequestBody CategoriaUpdateRequest request
     ) {
@@ -66,7 +67,7 @@ public class CategoriaController {
         categoriaAtualizada.setIcone(request.icone());
         categoriaAtualizada.setValorEsperado(request.valorEsperado());
 
-        return ResponseEntity.ok(categoriaService.atualizar(id, categoriaAtualizada));
+        return ResponseEntity.ok(CategoriaResponseDto.fromEntity(categoriaService.atualizar(id, categoriaAtualizada)));
     }
 
     // Deletar (inativar)

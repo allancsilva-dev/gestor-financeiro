@@ -113,11 +113,9 @@ public class AuthController {
             // Gerar refresh token (7 dias)
             RefreshToken refreshToken = refreshTokenService.criarRefreshToken(usuario);
             
-            // Mantém token legado para compatibilidade durante a migração.
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Login realizado com sucesso!");
             response.put("success", true);
-            response.put("token", accessToken);
             response.put("accessToken", accessToken);
             response.put("usuario", Map.of(
                 "id", usuario.getId(),
@@ -159,7 +157,6 @@ public class AuthController {
 
         // Resposta
         Map<String, Object> response = new HashMap<>();
-        response.put("token", novoAccessToken);
         response.put("accessToken", novoAccessToken);
 
         ResponseCookie refreshCookie = buildRefreshTokenCookie(refreshToken.getToken(), REFRESH_COOKIE_MAX_AGE_SECONDS);
