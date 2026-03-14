@@ -20,8 +20,7 @@ export interface RegisterRequest {
 export interface LoginResponse {
   message: string;
   success: boolean;
-  token: string;
-  refreshToken?: string;
+  token?: string;
   accessToken?: string;
 }
 

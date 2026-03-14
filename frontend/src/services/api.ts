@@ -2,17 +2,33 @@ import axios from 'axios';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081/api';
 
+let accessToken: string | null = null;
+
+export const setAccessToken = (token: string | null) => {
+  accessToken = token;
+};
+
+export const getAccessToken = () => accessToken;
+
+export const clearAccessToken = () => {
+  accessToken = null;
+};
+
 const api = axios.create({
   baseURL: BASE_URL,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
 let isRefreshing = false;
-let failedQueue: any[] = [];
+let failedQueue: Array<{
+  resolve: (value: string | null) => void;
+  reject: (reason?: unknown) => void;
+}> = [];
 
-const processQueue = (error: any, token: string | null = null) => {
+const processQueue = (error: unknown, token: string | null = null) => {
   failedQueue.forEach((prom) => {
     if (error) {
       prom.reject(error);
@@ -24,9 +40,8 @@ const processQueue = (error: any, token: string | null = null) => {
 };
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  if (accessToken) {
+    config.headers.Authorization = `Bearer ${accessToken}`;
   }
   return config;
 });
@@ -35,15 +50,19 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+    const requestUrl = originalRequest?.url || '';
+    const isAuthEndpoint = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/refresh-token');
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && !originalRequest?._retry && !isAuthEndpoint) {
       
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
         })
           .then((token) => {
-            originalRequest.headers.Authorization = `Bearer ${token}`;
+            if (token) {
+              originalRequest.headers.Authorization = `Bearer ${token}`;
+            }
             return api(originalRequest);
           })
           .catch((err) => Promise.reject(err));
@@ -52,26 +71,20 @@ api.interceptors.response.use(
       originalRequest._retry = true;
       isRefreshing = true;
 
-      const refreshToken = localStorage.getItem('refreshToken');
-
-      if (!refreshToken) {
-        isRefreshing = false;
-        localStorage.clear();
-        window.location.href = '/login';
-        return Promise.reject(error);
-      }
-
       try {
         const response = await axios.post(
           `${BASE_URL}/auth/refresh-token`, 
-          { refreshToken },
-          { headers: { 'Content-Type': 'application/json' } }
+          {},
+          {
+            headers: { 'Content-Type': 'application/json' },
+            withCredentials: true,
+          }
         );
 
         const { accessToken, token } = response.data;
         const novoToken = accessToken || token;
 
-        localStorage.setItem('token', novoToken);
+        setAccessToken(novoToken);
         api.defaults.headers.common['Authorization'] = `Bearer ${novoToken}`;
         originalRequest.headers.Authorization = `Bearer ${novoToken}`;
 
@@ -81,7 +94,7 @@ api.interceptors.response.use(
 
       } catch (refreshError: any) {
         processQueue(refreshError, null);
-        localStorage.clear();
+        clearAccessToken();
         window.location.href = '/login';
         return Promise.reject(refreshError);
 

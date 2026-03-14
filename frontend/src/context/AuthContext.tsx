@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import type { Usuario, AuthContextType } from '../types';
 import { authService } from '../services/authService';
+import { clearAccessToken } from '../services/api';
 import toast from 'react-hot-toast';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -12,47 +13,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 useEffect(() => {
   async function checkAuthStatus() {
-    const storedToken = localStorage.getItem('token');
-    const storedRefreshToken = localStorage.getItem('refreshToken');
-    
-    if (storedToken && storedRefreshToken) {
-      setToken(storedToken);
-      try {
+    try {
+      const novoToken = await authService.refreshToken();
+
+      if (novoToken) {
+        setToken(novoToken);
         const user = await authService.getMe();
         setUsuario(user);
-      } catch (error: any) {
-        console.error('Falha ao validar token:', error);
-        
-        // Se for 401 ou 403, tentar renovar o token
-        if (error.response?.status === 401 || error.response?.status === 403) {
-          console.log('🔄 Tentando renovar token no checkAuthStatus...');
-          
-          try {
-            const novoToken = await authService.refreshToken();
-            
-            if (novoToken) {
-              setToken(novoToken);
-              
-              // Tentar buscar usuário novamente com novo token
-              const user = await authService.getMe();
-              setUsuario(user);
-              
-              console.log('✅ Token renovado e usuário carregado');
-              setIsLoading(false);
-              return;
-            }
-          } catch (refreshError) {
-            console.error('❌ Erro ao renovar token:', refreshError);
-          }
-        }
-        
-        // Se falhou tudo, limpar localStorage
+      } else {
         setToken(null);
         setUsuario(null);
-        localStorage.removeItem('token');
-        localStorage.removeItem('refreshToken');
       }
+    } catch (error) {
+      console.error('Falha ao restaurar sessão:', error);
+      setToken(null);
+      setUsuario(null);
+      clearAccessToken();
     }
+
     setIsLoading(false);
   }
   
@@ -66,9 +44,10 @@ useEffect(() => {
         password: senha
       });
       
-      if (response.success && response.token) {
-        setToken(response.token);
-        localStorage.setItem('token', response.token);
+      const novoToken = response.accessToken || response.token;
+
+      if (response.success && novoToken) {
+        setToken(novoToken);
         
         const user = await authService.getMe();
         setUsuario(user);

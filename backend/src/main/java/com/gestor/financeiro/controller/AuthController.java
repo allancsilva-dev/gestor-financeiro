@@ -11,12 +11,15 @@ import com.gestor.financeiro.repository.PasswordResetTokenRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
 import com.gestor.financeiro.service.EmailService;
 import com.gestor.financeiro.service.RefreshTokenService;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,6 +47,10 @@ import java.util.UUID;
 @RequestMapping("/api/auth")
 public class AuthController {
 
+    private static final String REFRESH_COOKIE_NAME = "refreshToken";
+
+    private static final long REFRESH_COOKIE_MAX_AGE_SECONDS = 7L * 24 * 3600;
+
     private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
     @Autowired
@@ -63,6 +70,9 @@ public class AuthController {
 
     @Autowired
     private RefreshTokenService refreshTokenService;
+
+    @org.springframework.beans.factory.annotation.Value("${cookie.secure:false}")
+    private boolean cookieSecure;
 
     // ==========================================
     // REGISTRO
@@ -103,22 +113,25 @@ public class AuthController {
             // Gerar refresh token (7 dias)
             RefreshToken refreshToken = refreshTokenService.criarRefreshToken(usuario);
             
-            // Montar resposta com AMBOS os tokens
+            // Mantém token legado para compatibilidade durante a migração.
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Login realizado com sucesso!");
             response.put("success", true);
-            response.put("token", accessToken); // Mantém compatibilidade com frontend antigo
+            response.put("token", accessToken);
             response.put("accessToken", accessToken);
-            response.put("refreshToken", refreshToken.getToken());
             response.put("usuario", Map.of(
                 "id", usuario.getId(),
                 "nome", usuario.getNome(),
                 "email", usuario.getEmail()
             ));
+
+            ResponseCookie refreshCookie = buildRefreshTokenCookie(refreshToken.getToken(), REFRESH_COOKIE_MAX_AGE_SECONDS);
             
             log.info("Login realizado com refresh token para usuário {}", usuario.getEmail());
             
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
+                .body(response);
         } else {
             throw new BusinessException("Email ou senha incorretos");
         }
@@ -128,11 +141,11 @@ public class AuthController {
      * Renova o access token usando o refresh token
      * 
      * POST /api/auth/refresh-token
-     * Body: { "refreshToken": "..." }
+     * Cookie HttpOnly: refreshToken
      */
     @PostMapping("/refresh-token")
-    public ResponseEntity<?> refreshToken(@Valid @RequestBody Map<String, String> request) {
-        String refreshTokenValue = request.get("refreshToken");
+    public ResponseEntity<?> refreshToken(HttpServletRequest request) {
+        String refreshTokenValue = extractRefreshTokenFromCookies(request);
 
         if (refreshTokenValue == null || refreshTokenValue.isEmpty()) {
             throw new BusinessException("Refresh token não fornecido");
@@ -146,33 +159,38 @@ public class AuthController {
 
         // Resposta
         Map<String, Object> response = new HashMap<>();
+        response.put("token", novoAccessToken);
         response.put("accessToken", novoAccessToken);
-        response.put("token", novoAccessToken); // Compatibilidade
-        response.put("refreshToken", refreshTokenValue);
+
+        ResponseCookie refreshCookie = buildRefreshTokenCookie(refreshTokenValue, REFRESH_COOKIE_MAX_AGE_SECONDS);
 
         log.info("Access token renovado para usuário {}", refreshToken.getUsuario().getEmail());
 
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok()
+            .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
+            .body(response);
     }
 
     /**
      * Logout com revogação de refresh token
      * 
      * POST /api/auth/logout
-     * Body: { "refreshToken": "..." }
+     * Cookie HttpOnly: refreshToken
      */
     @PostMapping("/logout")
-    public ResponseEntity<?> logout(@Valid @RequestBody Map<String, String> request) {
-        String refreshToken = request.get("refreshToken");
+    public ResponseEntity<?> logout(HttpServletRequest request) {
+        String refreshToken = extractRefreshTokenFromCookies(request);
 
         if (refreshToken != null && !refreshToken.isEmpty()) {
             refreshTokenService.revogarToken(refreshToken);
             log.info("Refresh token revogado no logout");
         }
 
-        return ResponseEntity.ok(Map.of(
-            "message", "Logout realizado com sucesso"
-        ));
+        ResponseCookie clearCookie = buildRefreshTokenCookie("", 0);
+
+        return ResponseEntity.ok()
+            .header(HttpHeaders.SET_COOKIE, clearCookie.toString())
+            .body(Map.of("message", "Logout realizado com sucesso"));
     }
 
     /**
@@ -267,5 +285,30 @@ public class AuthController {
         }
         
         return ResponseEntity.ok("Token válido!");
+    }
+
+    private ResponseCookie buildRefreshTokenCookie(String tokenValue, long maxAgeSeconds) {
+        return ResponseCookie.from(REFRESH_COOKIE_NAME, tokenValue)
+            .httpOnly(true)
+            .secure(cookieSecure)
+            .path("/api/auth")
+            .sameSite("Lax")
+            .maxAge(maxAgeSeconds)
+            .build();
+    }
+
+    private String extractRefreshTokenFromCookies(HttpServletRequest request) {
+        Cookie[] cookies = request.getCookies();
+        if (cookies == null) {
+            return null;
+        }
+
+        for (Cookie cookie : cookies) {
+            if (REFRESH_COOKIE_NAME.equals(cookie.getName())) {
+                return cookie.getValue();
+            }
+        }
+
+        return null;
     }
 }

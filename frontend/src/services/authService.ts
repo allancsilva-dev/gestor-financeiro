@@ -1,14 +1,16 @@
 import api from './api';
+import { clearAccessToken, setAccessToken } from './api';
 import type { LoginRequest, LoginResponse, Usuario, RegisterRequest } from '../types';
 
 export const authService = {
   async login(data: LoginRequest): Promise<LoginResponse> {
     const response = await api.post<LoginResponse>('/auth/login', data);
-    
-    if (response.data.success && response.data.refreshToken) {
-      localStorage.setItem('refreshToken', response.data.refreshToken);
+
+    const accessToken = response.data.accessToken || response.data.token;
+    if (response.data.success && accessToken) {
+      setAccessToken(accessToken);
     }
-    
+
     return response.data;
   },
 
@@ -34,25 +36,21 @@ export const authService = {
 
   async refreshToken(): Promise<string | null> {
     try {
-      const refreshToken = localStorage.getItem('refreshToken');
+      const response = await api.post('/auth/refresh-token', {});
+      const novoAccessToken = response.data.accessToken || response.data.token;
 
-      if (!refreshToken) {
-        console.error('Refresh token não encontrado');
+      if (!novoAccessToken) {
         return null;
       }
 
-      const response = await api.post('/auth/refresh-token', { refreshToken });
-      const novoAccessToken = response.data.accessToken || response.data.token;
-      
-      localStorage.setItem('token', novoAccessToken);
+      setAccessToken(novoAccessToken);
 
       return novoAccessToken;
 
     } catch (error: any) {
       console.error('Erro ao renovar token:', error.response?.data || error.message);
-      
-      localStorage.removeItem('token');
-      localStorage.removeItem('refreshToken');
+
+      clearAccessToken();
       
       return null;
     }
@@ -60,17 +58,12 @@ export const authService = {
 
   async logout(): Promise<void> {
     try {
-      const refreshToken = localStorage.getItem('refreshToken');
-
-      if (refreshToken) {
-        await api.post('/auth/logout', { refreshToken });
-      }
+      await api.post('/auth/logout', {});
 
     } catch (error) {
       console.error('Erro ao revogar refresh token:', error);
     } finally {
-      localStorage.removeItem('token');
-      localStorage.removeItem('refreshToken');
+      clearAccessToken();
     }
   },
 };
