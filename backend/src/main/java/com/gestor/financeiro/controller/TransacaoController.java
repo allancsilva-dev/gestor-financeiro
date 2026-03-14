@@ -8,6 +8,8 @@ import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.TransacaoService;
 import com.gestor.financeiro.util.PaginationUtils;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -21,6 +23,7 @@ import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/v1/transacoes")
+@Tag(name = "Transações", description = "Gestão de receitas e despesas do usuário autenticado")
 public class TransacaoController {
     
     @Autowired
@@ -31,6 +34,7 @@ public class TransacaoController {
     
     // GET /api/transacoes/minhas - Lista transações do usuário autenticado
     @GetMapping("/minhas")
+    @Operation(summary = "Listar transações", description = "Retorna transações paginadas do usuário autenticado")
     public ResponseEntity<Page<TransacaoResponseDto>> listar(
         @PageableDefault(size = 20, sort = "data", direction = Sort.Direction.DESC) Pageable pageable
     ) {
@@ -42,6 +46,7 @@ public class TransacaoController {
     
     // GET /api/transacoes/periodo - Lista transações por período
     @GetMapping("/periodo")
+    @Operation(summary = "Listar por período", description = "Retorna transações paginadas filtradas por intervalo de datas")
     public ResponseEntity<Page<TransacaoResponseDto>> listarPorPeriodo(
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fim,
@@ -55,6 +60,7 @@ public class TransacaoController {
     
     // GET /api/transacoes/{id} - Busca transação por ID
     @GetMapping("/{id}")
+    @Operation(summary = "Buscar transação por ID", description = "Retorna uma transação específica validando ownership")
     public ResponseEntity<TransacaoResponseDto> buscarPorId(@PathVariable Long id) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Transacao transacao = transacaoService.buscarPorIdDoUsuario(id, usuarioId);
@@ -63,6 +69,7 @@ public class TransacaoController {
     
     // POST /api/transacoes - Cria nova transação
     @PostMapping
+    @Operation(summary = "Criar transação", description = "Cria uma nova transação para o usuário autenticado")
     public ResponseEntity<TransacaoResponseDto> criar(@Valid @RequestBody TransacaoRequest request) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Transacao transacao = toEntity(request);
@@ -72,6 +79,7 @@ public class TransacaoController {
     
     // PUT /api/transacoes/{id} - Atualiza transação
     @PutMapping("/{id}")
+    @Operation(summary = "Atualizar transação", description = "Atualiza uma transação existente validando ownership")
     public ResponseEntity<TransacaoResponseDto> atualizar(
         @PathVariable Long id, 
         @Valid @RequestBody TransacaoRequest request
@@ -84,6 +92,7 @@ public class TransacaoController {
     
     // DELETE /api/transacoes/{id} - Deleta transação
     @DeleteMapping("/{id}")
+    @Operation(summary = "Remover transação", description = "Exclui uma transação do usuário autenticado")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         transacaoService.deletar(id, usuarioId);

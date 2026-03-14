@@ -3,6 +3,7 @@ package com.gestor.financeiro.repository;
 import com.gestor.financeiro.model.Parcela;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import java.util.List;
@@ -14,11 +15,15 @@ public interface ParcelaRepository extends JpaRepository<Parcela, Long> {
     
     // Busca todas as parcelas de uma transação específica
     // Spring cria a query automaticamente: SELECT * FROM parcelas WHERE transacao_id = ?
+    @EntityGraph(attributePaths = {"transacao"})
     List<Parcela> findByTransacaoId(Long transacaoId);
 
+    @EntityGraph(attributePaths = {"transacao"})
     List<Parcela> findByTransacaoIdAndTransacaoUsuarioId(Long transacaoId, Long usuarioId);
 
+    @EntityGraph(attributePaths = {"transacao"})
     Page<Parcela> findByTransacaoIdAndTransacaoUsuarioId(Long transacaoId, Long usuarioId, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"transacao"})
     Optional<Parcela> findByIdAndTransacaoUsuarioId(Long id, Long usuarioId);
 }

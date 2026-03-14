@@ -41,6 +41,9 @@ public class SecurityConfig {
     @Value("${CORS_ALLOWED_ORIGINS:http://localhost:5173}")
     private String corsAllowedOrigins;
 
+    @Value("${app.docs.public:true}")
+    private boolean docsPublic;
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -92,10 +95,18 @@ public class SecurityConfig {
                     "default-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'self'"
                 ))
             )
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**").permitAll()
-                .anyRequest().authenticated()
-            )
+            .authorizeHttpRequests(auth -> {
+                auth.requestMatchers("/api/auth/**", "/actuator/health", "/actuator/info").permitAll();
+
+                // Swagger fica livre em dev e protegido em produção via app.docs.public.
+                if (docsPublic) {
+                    auth.requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll();
+                } else {
+                    auth.requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").authenticated();
+                }
+
+                auth.anyRequest().authenticated();
+            })
             .exceptionHandling(ex -> ex
                 // Sem credenciais válidas, retorna 401 para clientes web/mobile.
                 .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))

@@ -7,6 +7,7 @@ import com.gestor.financeiro.model.Meta;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.MetaService;
 import com.gestor.financeiro.util.PaginationUtils;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -21,6 +22,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/metas")
+@Tag(name = "Metas", description = "Gestão de metas financeiras")
 public class MetaController {
     
     @Autowired

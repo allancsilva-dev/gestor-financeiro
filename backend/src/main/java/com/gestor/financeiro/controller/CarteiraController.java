@@ -7,6 +7,7 @@ import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.CarteiraService;
 import com.gestor.financeiro.util.PaginationUtils;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -19,6 +20,7 @@ import java.math.BigDecimal;
 
 @RestController
 @RequestMapping("/api/v1/carteiras")
+@Tag(name = "Carteiras", description = "Gestão de carteiras e saldo")
 public class CarteiraController {
     
     @Autowired

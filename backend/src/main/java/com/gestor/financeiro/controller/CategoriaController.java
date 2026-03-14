@@ -7,6 +7,7 @@ import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.CategoriaService;
 import com.gestor.financeiro.util.PaginationUtils;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/categorias")
+@Tag(name = "Categorias", description = "Gestão de categorias financeiras")
 public class CategoriaController {
 
     @Autowired

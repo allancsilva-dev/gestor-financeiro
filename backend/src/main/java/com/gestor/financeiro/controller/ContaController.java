@@ -6,6 +6,7 @@ import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.ContaService;
 import com.gestor.financeiro.util.PaginationUtils;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/contas")
+@Tag(name = "Contas", description = "Gestão de contas bancárias e cartões")
 public class ContaController {
     
     @Autowired

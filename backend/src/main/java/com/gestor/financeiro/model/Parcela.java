@@ -15,7 +15,7 @@ public class Parcela {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "transacao_id", nullable = false)
     private Transacao transacao;
     

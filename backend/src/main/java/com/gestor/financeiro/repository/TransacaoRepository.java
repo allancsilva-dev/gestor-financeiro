@@ -4,6 +4,7 @@ import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query; // Importar
 import org.springframework.data.repository.query.Param; // Importar
@@ -16,23 +17,30 @@ import java.util.Optional;
 public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
     
     // Busca TODAS as transações do usuário
+    @EntityGraph(attributePaths = {"categoria", "conta"})
     List<Transacao> findByUsuarioId(Long usuarioId);
 
     // Busca transações paginadas do usuário.
+    @EntityGraph(attributePaths = {"categoria", "conta"})
     Page<Transacao> findByUsuarioId(Long usuarioId, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"categoria", "conta"})
     Optional<Transacao> findByIdAndUsuarioId(Long id, Long usuarioId);
     
     // Busca transações de uma categoria específica
+    @EntityGraph(attributePaths = {"categoria", "conta"})
     List<Transacao> findByUsuarioIdAndCategoriaId(Long usuarioId, Long categoriaId);
     
     // Busca transações por tipo (ENTRADA ou SAIDA)
+    @EntityGraph(attributePaths = {"categoria", "conta"})
     List<Transacao> findByUsuarioIdAndTipo(Long usuarioId, TipoTransacao tipo);
     
     // Busca transações em um período (entre duas datas)
+    @EntityGraph(attributePaths = {"categoria", "conta"})
     List<Transacao> findByUsuarioIdAndDataBetween(Long usuarioId, LocalDate inicio, LocalDate fim);
 
     // Busca transações em período com paginação.
+    @EntityGraph(attributePaths = {"categoria", "conta"})
     Page<Transacao> findByUsuarioIdAndDataBetween(Long usuarioId, LocalDate inicio, LocalDate fim, Pageable pageable);
 
     // --- ADIÇÃO NECESSÁRIA ---

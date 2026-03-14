@@ -5,12 +5,14 @@ import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.repository.UsuarioRepository;
 import com.gestor.financeiro.security.AuthenticatedUserService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/usuarios")
+@Tag(name = "Usuários", description = "Dados do usuário autenticado")
 public class UsuarioController {
 
     @Autowired

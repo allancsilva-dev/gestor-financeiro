@@ -11,6 +11,8 @@ import com.gestor.financeiro.repository.PasswordResetTokenRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
 import com.gestor.financeiro.service.EmailService;
 import com.gestor.financeiro.service.RefreshTokenService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -43,6 +45,7 @@ import java.util.UUID;
  */
 @RestController
 @RequestMapping("/api/auth")
+@Tag(name = "Autenticação", description = "Fluxos de login, registro, sessão e recuperação de senha")
 public class AuthController {
 
     private static final String REFRESH_COOKIE_NAME = "refreshToken";
@@ -76,6 +79,7 @@ public class AuthController {
     
     @Transactional
     @PostMapping("/register")
+    @Operation(summary = "Registrar usuário", description = "Cria uma nova conta de usuário")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
         Optional<Usuario> usuarioExistente = usuarioRepository.findByEmail(request.getEmail());
         if (usuarioExistente.isPresent()) {
@@ -93,6 +97,7 @@ public class AuthController {
 }
 
     @PostMapping("/login")
+    @Operation(summary = "Realizar login", description = "Autentica e retorna access token com refresh token em cookie HttpOnly")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
         Optional<Usuario> usuarioOpt = usuarioRepository.findByEmail(request.getEmail());
         
@@ -136,6 +141,7 @@ public class AuthController {
      * Cookie HttpOnly: refreshToken
      */
     @PostMapping("/refresh-token")
+    @Operation(summary = "Renovar access token", description = "Gera novo access token com rotação de refresh token")
     public ResponseEntity<?> refreshToken(HttpServletRequest request) {
         String refreshTokenValue = extractRefreshTokenFromCookies(request);
 
@@ -167,6 +173,7 @@ public class AuthController {
      * Cookie HttpOnly: refreshToken
      */
     @PostMapping("/logout")
+    @Operation(summary = "Logout atual", description = "Revoga refresh token da sessão atual")
     public ResponseEntity<?> logout(HttpServletRequest request) {
         String refreshToken = extractRefreshTokenFromCookies(request);
 
@@ -188,6 +195,7 @@ public class AuthController {
      * Headers: Authorization: Bearer {token}
      */
     @PostMapping("/logout-all")
+    @Operation(summary = "Logout global", description = "Revoga todos os refresh tokens do usuário")
     public ResponseEntity<?> logoutAll(Authentication authentication) {
         String email = authentication.getName();
         Usuario usuario = usuarioRepository.findByEmail(email)
@@ -203,6 +211,7 @@ public class AuthController {
 
     @Transactional
     @PostMapping("/forgot-password")
+    @Operation(summary = "Solicitar recuperação de senha", description = "Gera token temporário para reset de senha")
     public ResponseEntity<?> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         Optional<Usuario> usuarioOpt = usuarioRepository.findByEmail(request.getEmail());
         
@@ -226,6 +235,7 @@ public class AuthController {
 
     @Transactional
     @PostMapping("/reset-password")
+    @Operation(summary = "Resetar senha", description = "Aplica nova senha com token válido de recuperação")
     public ResponseEntity<?> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         Optional<PasswordResetToken> tokenOpt = tokenRepository.findByToken(request.getToken());
         
@@ -255,6 +265,7 @@ public class AuthController {
     }
 
     @GetMapping("/validate-token")
+    @Operation(summary = "Validar token de recuperação", description = "Confere validade do token de reset de senha")
     public ResponseEntity<?> validateToken(@RequestParam String token) {
         Optional<PasswordResetToken> tokenOpt = tokenRepository.findByToken(token);
         
