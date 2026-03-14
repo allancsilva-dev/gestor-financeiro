@@ -106,13 +106,25 @@ gestor-financeiro/
 
 ## 📡 API Endpoints
 
-Ver documentação completa em [DOCS.md](./docs/API.md)
+Documentação completa da API em: [backend/API.md](backend/API.md)
 
 Principais endpoints:
 - `POST /api/auth/login` - Login
 - `POST /api/auth/refresh-token` - Renovar token
 - `GET /api/dashboard/resumo` - Dashboard
 - `GET /api/transacoes/usuario/{id}` - Transações
+
+Exemplo rápido (autenticação):
+
+```bash
+# Login e obter access token
+curl -X POST http://localhost:8081/api/auth/login \
+	-H "Content-Type: application/json" \
+	-d '{"email":"dev@example.com","senha":"senha"}'
+
+# Usar o access token:
+curl -H "Authorization: Bearer <ACCESS_TOKEN>" http://localhost:8081/api/dashboard/resumo
+```
 
 ---
 
