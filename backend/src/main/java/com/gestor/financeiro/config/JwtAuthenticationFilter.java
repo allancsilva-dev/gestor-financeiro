@@ -55,20 +55,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             
             try {
                 email = jwtUtil.extractEmail(token);
-                log.debug("Email extraído do token: {}", email);
+                log.debug("Claims básicas do token extraídas com sucesso");
             } catch (Exception e) {
-                log.warn("Erro ao extrair email do token", e);
+                // Evita despejar stacktrace para erros esperados de token inválido.
+                log.warn("Token JWT inválido ou malformado: {}", e.getClass().getSimpleName());
             }
         } else {
             log.debug("Header Authorization inválido ou ausente");
         }
         
         if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            log.debug("Buscando usuário {} no UserDetailsService", email);
+            log.debug("Buscando usuário no UserDetailsService para concluir autenticação JWT");
             
             try {
                 UserDetails userDetails = userDetailsService.loadUserByUsername(email);
-                log.debug("Usuário encontrado: {}", userDetails.getUsername());
+                log.debug("Usuário encontrado para autenticação JWT");
                 
                 if (jwtUtil.validateToken(token, email)) {
                     log.debug("Token JWT válido");
@@ -85,10 +86,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                     log.debug("Usuário autenticado com sucesso via JWT");
                 } else {
-                    log.warn("Token JWT inválido para email {}", email);
+                    log.warn("Token JWT inválido após validação de assinatura/expiração");
                 }
             } catch (Exception e) {
-                log.warn("Erro ao autenticar usuário via JWT", e);
+                log.warn("Falha ao autenticar via JWT: {}", e.getClass().getSimpleName());
             }
         } else {
             if (email == null) {
