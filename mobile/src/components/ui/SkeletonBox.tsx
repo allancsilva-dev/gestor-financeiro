@@ -3,7 +3,7 @@ import { Animated, ViewStyle } from 'react-native';
 import { useTheme } from '../../theme';
 
 interface Props {
-  width: number | string;
+  width: number | `${number}%` | 'auto';
   height: number;
   borderRadius?: number;
 }
@@ -30,7 +30,7 @@ export const SkeletonBox: React.FC<Props> = ({ width, height, borderRadius = 8 }
   }) as unknown as string;
 
   const style: ViewStyle = {
-    width,
+    width: width as any,
     height,
     borderRadius,
     backgroundColor,
