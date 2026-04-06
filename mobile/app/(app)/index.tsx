@@ -1,5 +1,6 @@
 import React from 'react';
 import { ScrollView, View, Text, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../src/services/api';
 import { DashboardResumo, Transacao, PagedResponse } from '../../src/types';
@@ -22,8 +23,12 @@ export default function Dashboard() {
   });
   
   const { usuario } = useAuth();
+  const insets = useSafeAreaInsets();
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.bg }]} contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.bg }]}
+      contentContainerStyle={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 32 }}
+    >
       <View style={styles.header}>
         <View>
           <Text style={{ color: colors.textSecondary, fontSize: 11 }}>{getGreeting()}</Text>
@@ -42,15 +47,15 @@ export default function Dashboard() {
         ) : resumoQuery.data ? (
           <>
             <Text style={{ color: colors.textSecondary, fontSize: 9, letterSpacing: 0.8 }}>SALDO TOTAL</Text>
-            <Text style={{ color: colors.textPrimary, fontSize: 28, fontWeight: '800' }}>{formatCurrency(resumoQuery.data.saldoTotal)}</Text>
+            <Text style={{ color: colors.textPrimary, fontSize: 28, fontWeight: '800' }}>{formatCurrency(Number(resumoQuery.data.saldoCarteiras ?? 0))}</Text>
             <View style={{ flexDirection: 'row', marginTop: 12, gap: 12 }}>
               <View>
                 <Text style={{ color: colors.textSecondary, fontSize: 8 }}>ENTRADAS</Text>
-                <Text style={{ color: colors.success, fontSize: 13, fontWeight: '600' }}>{formatCurrency(resumoQuery.data.totalEntradas)}</Text>
+                <Text style={{ color: colors.success, fontSize: 13, fontWeight: '600' }}>{formatCurrency(Number(resumoQuery.data.totalEntradas ?? 0))}</Text>
               </View>
               <View>
                 <Text style={{ color: colors.textSecondary, fontSize: 8 }}>SAÍDAS</Text>
-                <Text style={{ color: colors.danger, fontSize: 13, fontWeight: '600' }}>{formatCurrency(resumoQuery.data.totalSaidas)}</Text>
+                <Text style={{ color: colors.danger, fontSize: 13, fontWeight: '600' }}>{formatCurrency(Number(resumoQuery.data.totalSaidas ?? 0))}</Text>
               </View>
             </View>
           </>
@@ -90,7 +95,7 @@ export default function Dashboard() {
                 <Text style={{ color: colors.textPrimary, fontSize: 13, fontWeight: '500' }}>{t.descricao}</Text>
                 {t.categoria?.nome ? <Text style={{ color: colors.textSecondary, fontSize: 11 }}>{t.categoria.nome}</Text> : null}
               </View>
-              <Text style={{ color: t.valor >= 0 ? colors.success : colors.danger, fontSize: 13, fontWeight: '600' }}>{formatCurrency(t.valor)}</Text>
+              <Text style={{ color: t.tipo === 'ENTRADA' ? colors.success : colors.danger, fontSize: 13, fontWeight: '600' }}>{formatCurrency(Number(t.valorTotal ?? 0))}</Text>
             </View>
           ))
         )}
