@@ -1,4 +1,6 @@
 // Utilitários de formatação — sempre usar aqui (não usar Intl direto nos componentes)
+import { TipoCarteira, TipoConta, StatusPagamento } from '../types';
+
 export const formatCurrency = (value: number): string =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
@@ -29,3 +31,44 @@ export const getGreeting = (): string => {
 
 export const getInitials = (nome: string): string =>
   nome.trim().split(' ').slice(0, 2).map(n => n[0].toUpperCase()).join('');
+
+// Converte data do formato DD/MM/AAAA para YYYY-MM-DD (necessário para enviar ao backend)
+export const parseDateBR = (dataBR: string): string => {
+  const [day, month, year] = dataBR.split('/');
+  return `${year}-${month}-${day}`;
+};
+
+// Verifica se uma string está no formato DD/MM/AAAA
+export const isValidDateBR = (value: string): boolean =>
+  /^\d{2}\/\d{2}\/\d{4}$/.test(value);
+
+export const TIPO_CARTEIRA_LABEL: Record<TipoCarteira, string> = {
+  DINHEIRO: 'Dinheiro',
+  CONTA_BANCARIA: 'Conta Bancária',
+  POUPANCA: 'Poupança',
+};
+
+export const TIPO_CONTA_LABEL: Record<TipoConta, string> = {
+  CREDITO: 'Crédito',
+  DEBITO: 'Débito',
+  DINHEIRO: 'Dinheiro',
+  POUPANCA: 'Poupança',
+};
+
+export const STATUS_LABEL: Record<StatusPagamento, string> = {
+  PAGO: 'Pago',
+  PENDENTE: 'Pendente',
+  ATRASADO: 'Atrasado',
+  CANCELADO: 'Cancelado',
+};
+
+export const CATEGORY_COLORS = [
+  '#00c8ff', // azul brand
+  '#2ed573', // verde
+  '#ff4757', // vermelho
+  '#ffa502', // amarelo
+  '#8b2fff', // roxo
+  '#ff6b81', // rosa
+  '#1e90ff', // azul royal
+  '#ff6348', // laranja
+];
