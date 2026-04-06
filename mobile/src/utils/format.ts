@@ -35,7 +35,7 @@ export const getInitials = (nome: string): string =>
 // Converte data do formato DD/MM/AAAA para YYYY-MM-DD (necessário para enviar ao backend)
 export const parseDateBR = (dataBR: string): string => {
   const [day, month, year] = dataBR.split('/');
-  return `${year}-${month}-${day}`;
+  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 };
 
 // Verifica se uma string está no formato DD/MM/AAAA
