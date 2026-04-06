@@ -1,10 +1,10 @@
 import api from './api';
-import { Categoria, CategoriaRequest } from '../types';
+import { Categoria, CategoriaRequest, PagedResponse } from '../types';
 
 export const categoriaService = {
   // retorna array direto — categorias raramente passam de 100
   listar: () =>
-    api.get<{ content: Categoria[] }>('/v1/categorias/minhas?page=0&size=100')
+    api.get<PagedResponse<Categoria>>('/v1/categorias/minhas?page=0&size=100')
        .then(r => r.data.content),
 
   criar: (data: CategoriaRequest) =>
