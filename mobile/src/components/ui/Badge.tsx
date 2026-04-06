@@ -1,41 +1,30 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text } from 'react-native';
 import { useTheme } from '../../theme';
-import { BadgeStatus } from '../../types';
+import { StatusPagamento } from '../../types';
+import { STATUS_LABEL } from '../../utils/format';
 
-interface Props {
-  status: BadgeStatus;
-  label: string;
+interface BadgeProps {
+  status: StatusPagamento;
 }
 
-export const Badge: React.FC<Props> = ({ status, label }) => {
+export default function Badge({ status }: BadgeProps) {
   const colors = useTheme();
-  const map = {
-    ativo: { bg: colors.successBg, color: colors.success },
-    pendente: { bg: colors.warningBg, color: colors.warning },
-    inativo: { bg: colors.dangerBg, color: colors.danger },
-    cancelado: { bg: colors.dangerBg, color: colors.danger },
+
+  const config = {
+    PAGO:      { bg: colors.successBg, text: colors.success },
+    PENDENTE:  { bg: colors.warningBg, text: colors.warning },
+    ATRASADO:  { bg: colors.dangerBg,  text: colors.danger  },
+    CANCELADO: { bg: colors.dangerBg,  text: colors.danger  },
   } as const;
 
-  const styles = StyleSheet.create({
-    container: {
-      paddingHorizontal: 8,
-      paddingVertical: 2,
-      borderRadius: 20,
-      backgroundColor: map[status].bg,
-    },
-    text: {
-      fontSize: 10,
-      fontWeight: '700' as any,
-      color: map[status].color,
-    },
-  });
+  const { bg, text } = config[status] ?? config.PENDENTE;
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.text}>{label}</Text>
+    <View style={{ backgroundColor: bg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 20, alignSelf: 'flex-start' }}>
+      <Text style={{ color: text, fontSize: 10, fontWeight: '700' }}>
+        {STATUS_LABEL[status] ?? status}
+      </Text>
     </View>
   );
-};
-
-export default Badge;
+}
