@@ -5,7 +5,7 @@ import { authService } from '../services/authService';
 interface AuthContextType {
   usuario: Usuario | null;
   isAuthenticated: boolean;
-  isLoading: false;
+  isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
 }
@@ -38,6 +38,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 export const useAuth = (): AuthContextType => {
   const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  if (!ctx) throw new Error('useAuth deve ser usado dentro do AuthProvider');
   return ctx;
 };
