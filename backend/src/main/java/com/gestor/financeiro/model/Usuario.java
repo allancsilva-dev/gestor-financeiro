@@ -5,6 +5,8 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 @Getter @Setter
 @NoArgsConstructor
 @Entity
@@ -23,4 +25,10 @@ public class Usuario {
 
     @Column(nullable = false)
     private String senha;
+
+    @Column(nullable = false)
+    private int failedAttempts = 0;
+
+    @Column
+    private LocalDateTime lockedUntil;
 }

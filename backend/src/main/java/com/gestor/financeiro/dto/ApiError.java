@@ -7,6 +7,10 @@ public record ApiError(
     String code,
     String message,
     Instant timestamp,
+    String requestId,
     Map<String, String> details
 ) {
+    public ApiError(String code, String message, Instant timestamp, Map<String, String> details) {
+        this(code, message, timestamp, null, details);
+    }
 }

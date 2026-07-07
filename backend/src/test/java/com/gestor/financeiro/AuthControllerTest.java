@@ -58,11 +58,37 @@ class AuthControllerTest {
                 .content(objectMapper.writeValueAsString(Map.of(
                         "nome", "Alice",
                         "email", "alice@teste.com",
-                        "password", "123456"
+                        "password", "Senha1234"
                 ))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.id").exists())
             .andExpect(jsonPath("$.email").value("alice@teste.com"));
+    }
+
+    @Test
+    void register_deveFalharComSenhaFraca() throws Exception {
+        mockMvc.perform(post("/api/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "nome", "Alice",
+                        "email", "alice2@teste.com",
+                        "password", "12345678"
+                ))))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void register_deveFalharComSenhaCurta() throws Exception {
+        mockMvc.perform(post("/api/auth/register")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "nome", "Alice",
+                        "email", "alice3@teste.com",
+                        "password", "Ab1"
+                ))))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }
 
     @Test
@@ -74,7 +100,7 @@ class AuthControllerTest {
                 .content(objectMapper.writeValueAsString(Map.of(
                         "nome", "Alice 2",
                         "email", "alice@teste.com",
-                        "password", "123456"
+                        "password", "Senha1234"
                 ))))
             .andExpect(status().isUnprocessableEntity())
             .andExpect(jsonPath("$.code").value("BUSINESS_ERROR"));
@@ -87,7 +113,7 @@ class AuthControllerTest {
                 .content(objectMapper.writeValueAsString(Map.of(
                         "nome", "",
                         "email", "email-invalido",
-                        "password", "123"
+                        "password", "12"
                 ))))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
@@ -127,14 +153,12 @@ class AuthControllerTest {
 
     @Test
     void login_deveAplicarRateLimit() throws Exception {
-        usuarioRepository.save(TestDataFactory.usuario("Alice", "alice@teste.com", passwordEncoder.encode("123456")));
-
         for (int i = 0; i < 5; i++) {
             mockMvc.perform(post("/api/auth/login")
                     .header("X-Forwarded-For", "10.0.0.13")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(Map.of(
-                            "email", "alice@teste.com",
+                            "email", "nao-existe" + i + "@teste.com",
                             "password", "senha-errada"
                     ))))
                 .andExpect(status().isUnprocessableEntity());
@@ -144,7 +168,7 @@ class AuthControllerTest {
                 .header("X-Forwarded-For", "10.0.0.13")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
-                        "email", "alice@teste.com",
+                        "email", "nao-existe@teste.com",
                         "password", "senha-errada"
                 ))))
             .andExpect(status().isTooManyRequests())
@@ -272,6 +296,78 @@ class AuthControllerTest {
             .getHeader("Set-Cookie");
 
         assertThat(logoutSetCookie).contains("Max-Age=0");
+    }
+
+    @Test
+    void login_deveBloquearContaAposFalhasConsecutivas() throws Exception {
+        usuarioRepository.save(TestDataFactory.usuario("Alice", "alice@teste.com", passwordEncoder.encode("123456")));
+
+        String ip = "10.0.0.20";
+        for (int i = 0; i < 3; i++) {
+            mockMvc.perform(post("/api/auth/login")
+                    .header("X-Forwarded-For", ip + i)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(Map.of(
+                            "email", "alice@teste.com",
+                            "password", "senha-errada"
+                    ))))
+                .andExpect(status().isUnprocessableEntity());
+        }
+
+        mockMvc.perform(post("/api/auth/login")
+                .header("X-Forwarded-For", "10.0.0.30")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "email", "alice@teste.com",
+                        "password", "senha-errada"
+                ))))
+            .andExpect(status().isTooManyRequests())
+            .andExpect(jsonPath("$.code").value("ACCOUNT_LOCKED"));
+    }
+
+    @Test
+    void login_deveResetarFalhasAposSucesso() throws Exception {
+        usuarioRepository.save(TestDataFactory.usuario("Alice", "alice@teste.com", passwordEncoder.encode("123456")));
+
+        mockMvc.perform(post("/api/auth/login")
+                .header("X-Forwarded-For", "10.0.0.40")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "email", "alice@teste.com",
+                        "password", "senha-errada"
+                ))))
+            .andExpect(status().isUnprocessableEntity());
+
+        mockMvc.perform(post("/api/auth/login")
+                .header("X-Forwarded-For", "10.0.0.41")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "email", "alice@teste.com",
+                        "password", "123456"
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.accessToken").exists());
+
+        mockMvc.perform(post("/api/auth/login")
+                .header("X-Forwarded-For", "10.0.0.42")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "email", "alice@teste.com",
+                        "password", "senha-errada"
+                ))))
+            .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    void resetPassword_deveFalharComSenhaFraca() throws Exception {
+        mockMvc.perform(post("/api/auth/reset-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "token", "fake-token",
+                        "novaSenha", "12345678"
+                ))))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }
 
     private String extrairValorCookie(String setCookie) {

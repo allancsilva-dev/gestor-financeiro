@@ -6,7 +6,10 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -20,15 +23,29 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class LoginRateLimitFilter extends OncePerRequestFilter {
 
+    private static final Logger log = LoggerFactory.getLogger(LoginRateLimitFilter.class);
+
     private static final long WINDOW_MILLIS = 60_000L;
 
     private static final int LOGIN_LIMIT = 5;
 
     private static final int FORGOT_PASSWORD_LIMIT = 3;
 
+    private static final int REGISTER_LIMIT = 5;
+
+    private static final int RESET_PASSWORD_LIMIT = 5;
+
+    private static final int VALIDATE_TOKEN_LIMIT = 10;
+
     private static final String LOGIN_PATH = "/api/auth/login";
 
     private static final String FORGOT_PASSWORD_PATH = "/api/auth/forgot-password";
+
+    private static final String REGISTER_PATH = "/api/auth/register";
+
+    private static final String RESET_PASSWORD_PATH = "/api/auth/reset-password";
+
+    private static final String VALIDATE_TOKEN_PATH = "/api/auth/validate-token";
 
     private final ConcurrentHashMap<String, List<Long>> attemptsByKey = new ConcurrentHashMap<>();
 
@@ -73,8 +90,28 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
             timestamps.add(now);
         }
 
-        cleanupIfEmptyOldEntry(key);
         filterChain.doFilter(request, response);
+    }
+
+    @Scheduled(fixedRate = 60_000)
+    public void cleanupExpiredEntries() {
+        long now = System.currentTimeMillis();
+        int removed = 0;
+
+        for (Map.Entry<String, List<Long>> entry : attemptsByKey.entrySet()) {
+            List<Long> timestamps = entry.getValue();
+            synchronized (timestamps) {
+                timestamps.removeIf(ts -> (now - ts) > WINDOW_MILLIS);
+                if (timestamps.isEmpty()) {
+                    attemptsByKey.remove(entry.getKey(), entry.getValue());
+                    removed++;
+                }
+            }
+        }
+
+        if (removed > 0) {
+            log.debug("Rate limit cleanup: {} expired entries removed", removed);
+        }
     }
 
     private int resolveLimitForPath(String path) {
@@ -88,6 +125,18 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
 
         if (path.equals(FORGOT_PASSWORD_PATH)) {
             return FORGOT_PASSWORD_LIMIT;
+        }
+
+        if (path.equals(REGISTER_PATH)) {
+            return REGISTER_LIMIT;
+        }
+
+        if (path.equals(RESET_PASSWORD_PATH)) {
+            return RESET_PASSWORD_LIMIT;
+        }
+
+        if (path.equals(VALIDATE_TOKEN_PATH)) {
+            return VALIDATE_TOKEN_LIMIT;
         }
 
         return -1;
@@ -123,18 +172,5 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
         );
 
         objectMapper.writeValue(response.getWriter(), apiError);
-    }
-
-    private void cleanupIfEmptyOldEntry(String key) {
-        List<Long> timestamps = attemptsByKey.get(key);
-        if (timestamps == null) {
-            return;
-        }
-
-        synchronized (timestamps) {
-            if (timestamps.isEmpty()) {
-                attemptsByKey.remove(key, timestamps);
-            }
-        }
     }
 }

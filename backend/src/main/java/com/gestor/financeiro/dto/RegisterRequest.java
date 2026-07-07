@@ -1,5 +1,6 @@
 package com.gestor.financeiro.dto;
 
+import com.gestor.financeiro.validation.ValidPassword;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -15,7 +16,7 @@ public class RegisterRequest {
     private String email;
 
     @NotBlank(message = "Campo obrigatório")
-    @Size(min = 6, message = "Senha deve ter no mínimo 6 caracteres")
+    @ValidPassword
     private String password;
 
     public RegisterRequest() {}

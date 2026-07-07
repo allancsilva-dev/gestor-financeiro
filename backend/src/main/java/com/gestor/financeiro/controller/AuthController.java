@@ -2,6 +2,7 @@ package com.gestor.financeiro.controller;
 
 import com.gestor.financeiro.config.JwtUtil;
 import com.gestor.financeiro.dto.*;
+import com.gestor.financeiro.exception.AccountLockedException;
 import com.gestor.financeiro.exception.BusinessException;
 import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.model.PasswordResetToken;
@@ -17,6 +18,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.ResponseCookie;
@@ -25,6 +27,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -73,6 +76,12 @@ public class AuthController {
     @org.springframework.beans.factory.annotation.Value("${cookie.secure:false}")
     private boolean cookieSecure;
 
+    @Value("${security.auth.max-failed-attempts:5}")
+    private int maxFailedAttempts;
+
+    @Value("${security.auth.lockout-minutes:15}")
+    private int lockoutMinutes;
+
     // ==========================================
     // REGISTRO
     // ==========================================
@@ -106,14 +115,21 @@ public class AuthController {
         }
         
         Usuario usuario = usuarioOpt.get();
-        
+
+        if (isAccountLocked(usuario)) {
+            long remainingSeconds = java.time.Duration.between(LocalDateTime.now(), usuario.getLockedUntil()).getSeconds();
+            throw new AccountLockedException(
+                String.format("Conta temporariamente bloqueada. Tente novamente em %d segundos.", Math.max(0, remainingSeconds))
+            );
+        }
+
         if (passwordEncoder.matches(request.getPassword(), usuario.getSenha())) {
-            // Gerar access token (15 minutos)
+            resetFailedAttempts(usuario);
+
             String accessToken = jwtUtil.generateToken(usuario.getEmail());
-            
-            // Gerar refresh token (7 dias)
+
             RefreshToken refreshToken = refreshTokenService.criarRefreshToken(usuario);
-            
+
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Login realizado com sucesso!");
             response.put("success", true);
@@ -130,6 +146,7 @@ public class AuthController {
                 .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
                 .body(response);
         } else {
+            incrementFailedAttempts(usuario);
             throw new BusinessException("Email ou senha incorretos");
         }
     }
@@ -285,6 +302,32 @@ public class AuthController {
         }
         
         return ResponseEntity.ok("Token válido!");
+    }
+
+    private boolean isAccountLocked(Usuario usuario) {
+        if (usuario.getLockedUntil() == null) {
+            return false;
+        }
+        if (LocalDateTime.now().isAfter(usuario.getLockedUntil())) {
+            usuario.setLockedUntil(null);
+            usuarioRepository.save(usuario);
+            return false;
+        }
+        return true;
+    }
+
+    private void resetFailedAttempts(Usuario usuario) {
+        usuario.setFailedAttempts(0);
+        usuario.setLockedUntil(null);
+        usuarioRepository.save(usuario);
+    }
+
+    private void incrementFailedAttempts(Usuario usuario) {
+        usuario.setFailedAttempts(usuario.getFailedAttempts() + 1);
+        if (usuario.getFailedAttempts() >= maxFailedAttempts) {
+            usuario.setLockedUntil(LocalDateTime.now().plusMinutes(lockoutMinutes));
+        }
+        usuarioRepository.save(usuario);
     }
 
     private ResponseCookie buildRefreshTokenCookie(String tokenValue, long maxAgeSeconds) {

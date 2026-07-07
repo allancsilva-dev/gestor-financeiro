@@ -19,11 +19,9 @@ public class EmailService {
      * Mas para desenvolvimento, vamos apenas mostrar no console!
      */
     public void enviarEmailRecuperacaoSenha(String emailDestino, String token) {
-        String linkRecuperacao = "http://localhost:5173/reset-password?token=" + token;
+        String maskedEmail = maskEmail(emailDestino);
+        log.info("Email de recuperação solicitado para {}", maskedEmail);
 
-        log.info("Email de recuperação solicitado para {}", emailDestino);
-        log.debug("Link de recuperação gerado: {}", linkRecuperacao);
-        
         // TODO: Implementar envio real de email quando for para produção
         // Exemplo com JavaMailSender:
         /*
@@ -33,5 +31,18 @@ public class EmailService {
         message.setText("Link: " + linkRecuperacao);
         mailSender.send(message);
         */
+    }
+
+    private String maskEmail(String email) {
+        if (email == null || !email.contains("@")) {
+            return "***";
+        }
+        int atIndex = email.indexOf("@");
+        String localPart = email.substring(0, atIndex);
+        String domain = email.substring(atIndex);
+        if (localPart.length() <= 2) {
+            return localPart.charAt(0) + "***" + domain;
+        }
+        return localPart.charAt(0) + "***" + localPart.charAt(localPart.length() - 1) + domain;
     }
 }
