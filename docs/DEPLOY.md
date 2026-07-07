@@ -220,7 +220,41 @@ psql "postgresql://user:password@host.neon.tech/neondb?sslmode=require"
 
 #### **Criar tabelas (primeira vez):**
 
-O Spring Boot vai criar as tabelas automaticamente com `ddl-auto=update`!
+As tabelas são criadas automaticamente pelo Flyway via migrations versionadas.
+A aplicação executa as migrations em `db/migration/` no startup.
+
+Para banco novo: o Flyway aplica `V1__baseline_schema.sql` e cria todas as tabelas.
+Para banco existente com tabelas: use `spring.flyway.baseline-on-migrate=true` (padrão em dev).
+
+#### **Migrations com Flyway**
+
+O projeto usa Flyway para versionamento de schema. Migrations ficam em `backend/src/main/resources/db/migration/`.
+
+**Criar nova migration:**
+```sql
+-- V2__descricao_da_mudanca.sql
+ALTER TABLE transacoes ADD COLUMN nova_coluna VARCHAR(255);
+```
+
+**Rodar migrations manualmente:**
+```bash
+cd backend
+./mvnw flyway:migrate
+```
+
+**Validar schema contra entidades JPA:**
+```bash
+./mvnw spring-boot:run  # Flyway roda migrations no startup
+```
+O Hibernate valida (`ddl-auto=validate`) se as entidades batem com o schema do banco.
+
+**Resetar banco local:**
+```bash
+# Apagar e recriar
+psql -U postgres -c "DROP DATABASE gestor_financeiro"
+psql -U postgres -c "CREATE DATABASE gestor_financeiro"
+# Rodar aplicação — Flyway cria tudo
+```
 
 ---
 

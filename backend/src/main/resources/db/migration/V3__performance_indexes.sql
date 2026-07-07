@@ -1,0 +1,11 @@
+CREATE INDEX IF NOT EXISTS idx_transacoes_usuario_data ON transacoes(usuario_id, data);
+CREATE INDEX IF NOT EXISTS idx_transacoes_usuario_tipo_data ON transacoes(usuario_id, tipo, data);
+CREATE INDEX IF NOT EXISTS idx_transacoes_categoria ON transacoes(categoria_id);
+CREATE INDEX IF NOT EXISTS idx_transacoes_conta ON transacoes(conta_id);
+CREATE INDEX IF NOT EXISTS idx_parcelas_status_vencimento ON parcelas(status, data_vencimento);
+CREATE INDEX IF NOT EXISTS idx_parcelas_transacao ON parcelas(transacao_id);
+CREATE INDEX IF NOT EXISTS idx_contas_fixas_status_vencimento ON contas_fixas(status, data_proximo_vencimento);
+CREATE INDEX IF NOT EXISTS idx_categorias_usuario ON categorias(usuario_id);
+CREATE INDEX IF NOT EXISTS idx_contas_usuario ON contas(usuario_id);
+CREATE INDEX IF NOT EXISTS idx_metas_usuario ON metas(usuario_id);
+CREATE INDEX IF NOT EXISTS idx_carteiras_usuario ON carteiras(usuario_id);
