@@ -1,0 +1,376 @@
+<mxfile host="65bd71144e">
+    <diagram id="arquitetura" name="01 Arquitetura">
+        <mxGraphModel dx="336" dy="670" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1000" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="arch-title" value="Gestor Financeiro - Visao geral do sistema" style="text;html=1;strokeColor=none;fillColor=none;fontSize=24;fontStyle=1;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="360" y="20" width="680" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="clients-zone" value="Clientes" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F4FF;strokeColor=#6BA5D7;fontSize=16;fontStyle=1;align=left;verticalAlign=top;spacingLeft=14;spacingTop=8;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="90" width="500" height="310" as="geometry"/>
+                </mxCell>
+                <mxCell id="web" value="Frontend web&lt;br&gt;&lt;b&gt;React 19 + TypeScript + Vite&lt;/b&gt;&lt;br&gt;Tailwind CSS, React Router, Recharts&lt;br&gt;&lt;br&gt;Rotas publicas: /login, /register, forgot/reset&lt;br&gt;Rotas privadas: dashboard, categorias, contas, transacoes, metas, carteira, contas-fixas&lt;br&gt;&lt;br&gt;Axios: base /api; interceptor adiciona /v1 em endpoints nao-auth&lt;br&gt;Auth: accessToken em memoria + refreshToken em cookie HttpOnly" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#4F8FCF;fontSize=12;align=left;verticalAlign=top;spacing=10;" parent="1" vertex="1">
+                    <mxGeometry x="90" y="140" width="210" height="220" as="geometry"/>
+                </mxCell>
+                <mxCell id="mobile" value="Mobile&lt;br&gt;&lt;b&gt;Expo SDK 54 + React Native 0.81&lt;/b&gt;&lt;br&gt;Expo Router, TanStack Query, NativeWind&lt;br&gt;&lt;br&gt;Rotas: (auth)/login, (app)/dashboard, transacoes, metas, perfil, more/*&lt;br&gt;&lt;br&gt;Axios: base hardcoded http://192.168.15.3:8081/api&lt;br&gt;Services chamam /v1/* para dominios&lt;br&gt;Auth atual: token em memoria; Secure Store instalado mas nao usado" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#4F8FCF;fontSize=12;align=left;verticalAlign=top;spacing=10;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="140" width="210" height="220" as="geometry"/>
+                </mxCell>
+                <mxCell id="api-zone" value="API backend" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0F7EA;strokeColor=#82B366;fontSize=16;fontStyle=1;align=left;verticalAlign=top;spacingLeft=14;spacingTop=8;" parent="1" vertex="1">
+                    <mxGeometry x="620" y="90" width="520" height="520" as="geometry"/>
+                </mxCell>
+                <mxCell id="spring" value="Spring Boot 3.5.7 / Java 17&lt;br&gt;Porta dev: 8081 | prod: ${PORT:8080}&lt;br&gt;API publica: /api/auth/*&lt;br&gt;API versionada: /api/v1/*&lt;br&gt;Swagger: /swagger-ui.html&lt;br&gt;Actuator: /actuator/health, /actuator/info" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#5A9E3F;fontSize=13;align=left;verticalAlign=top;spacing=10;" parent="1" vertex="1">
+                    <mxGeometry x="650" y="135" width="460" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="security" value="Security layer&lt;br&gt;Spring Security&lt;br&gt;JwtAuthenticationFilter&lt;br&gt;BCryptPasswordEncoder&lt;br&gt;LoginRateLimitFilter&lt;br&gt;CORS por env/fallback" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=12;align=left;verticalAlign=top;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="650" y="275" width="140" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="controllers" value="Controllers REST&lt;br&gt;Auth, Usuario&lt;br&gt;Dashboard&lt;br&gt;Transacao, Parcela&lt;br&gt;Categoria, Conta&lt;br&gt;Carteira, ContaFixa&lt;br&gt;Meta" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#82B366;fontSize=12;align=left;verticalAlign=top;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="815" y="275" width="130" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="services" value="Services&lt;br&gt;Regras de negocio&lt;br&gt;Ownership manual&lt;br&gt;JWT/refresh token&lt;br&gt;Operacoes financeiras&lt;br&gt;Dashboard agregado&lt;br&gt;Email reset stub" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#82B366;fontSize=12;align=left;verticalAlign=top;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="970" y="275" width="140" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="repos" value="Repositories&lt;br&gt;Spring Data JPA&lt;br&gt;Queries por usuarioId&lt;br&gt;DTO mapping em services&lt;br&gt;PaginationUtils" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#82B366;fontSize=12;align=left;verticalAlign=top;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="735" y="445" width="180" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="exceptions" value="GlobalExceptionHandler&lt;br&gt;ApiError&lt;br&gt;BusinessException&lt;br&gt;UnauthorizedAccessException&lt;br&gt;ResourceNotFoundException&lt;br&gt;TokenReuseDetectedException" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontSize=12;align=left;verticalAlign=top;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="940" y="445" width="170" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="db-zone" value="Dados" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F0FF;strokeColor=#9673A6;fontSize=16;fontStyle=1;align=left;verticalAlign=top;spacingLeft=14;spacingTop=8;" parent="1" vertex="1">
+                    <mxGeometry x="620" y="650" width="520" height="210" as="geometry"/>
+                </mxCell>
+                <mxCell id="postgres" value="PostgreSQL&lt;br&gt;Banco dev: gestor_financeiro&lt;br&gt;Hibernate ddl-auto=update&lt;br&gt;Sem Flyway/Liquibase&lt;br&gt;&lt;br&gt;Tabelas principais:&lt;br&gt;usuarios, categorias, contas, carteiras, transacoes, parcelas, contas_fixas, metas, refresh_tokens, password_reset_tokens" style="shape=cylinder3d;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#FFFFFF;strokeColor=#9673A6;fontSize=12;align=center;verticalAlign=middle;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="680" y="700" width="210" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="h2" value="H2&lt;br&gt;Somente testes" style="shape=cylinder3d;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#FFFFFF;strokeColor=#9673A6;fontSize=12;align=center;verticalAlign=middle;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="930" y="720" width="120" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="external-zone" value="Integracoes / operacao" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF7E6;strokeColor=#D79B00;fontSize=16;fontStyle=1;align=left;verticalAlign=top;spacingLeft=14;spacingTop=8;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="450" width="500" height="250" as="geometry"/>
+                </mxCell>
+                <mxCell id="email" value="EmailService&lt;br&gt;Password reset&lt;br&gt;Status atual: stub/log console" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#D79B00;fontSize=12;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="95" y="510" width="140" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="openapi" value="SpringDoc OpenAPI&lt;br&gt;/swagger-ui.html&lt;br&gt;publico em dev&lt;br&gt;autenticado em prod" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#D79B00;fontSize=12;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="255" y="510" width="130" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="actuator" value="Actuator&lt;br&gt;/actuator/health&lt;br&gt;/actuator/info&lt;br&gt;sem health DB custom" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#D79B00;fontSize=12;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="405" y="510" width="120" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="notes" value="Pontos atuais importantes&lt;br&gt;- Single-tenant por usuario_id&lt;br&gt;- Ownership validado nos services, caso a caso&lt;br&gt;- Refresh token rotacionado no banco&lt;br&gt;- Mobile sem persistencia/refresh automatico&lt;br&gt;- Produção ainda depende de configs seguras e migrations versionadas" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontSize=12;align=left;verticalAlign=top;spacing=10;" parent="1" vertex="1">
+                    <mxGeometry x="90" y="740" width="430" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge-web-api" value="HTTPS JSON&lt;br&gt;Authorization: Bearer JWT&lt;br&gt;Cookie refreshToken" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#4F8FCF;fontSize=11;" parent="1" source="web" target="spring" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge-mobile-api" value="HTTP/HTTPS JSON&lt;br&gt;Authorization: Bearer JWT" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#4F8FCF;fontSize=11;" parent="1" source="mobile" target="spring" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge-sec-ctrl" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#82B366;" parent="1" source="security" target="controllers" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge-ctrl-svc" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#82B366;" parent="1" source="controllers" target="services" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge-svc-repo" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#82B366;" parent="1" source="services" target="repos" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge-repo-db" value="JPA / SQL" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#9673A6;fontSize=11;" parent="1" source="repos" target="postgres" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge-tests-h2" value="tests" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#9673A6;fontSize=11;dashed=1;" parent="1" source="spring" target="h2" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge-email" value="forgot/reset password" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#D79B00;fontSize=11;dashed=1;" parent="1" source="services" target="email" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+    <diagram id="auth-flow" name="02 Auth flow">
+        <mxGraphModel dx="876" dy="670" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1000" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="auth-title" value="Fluxo de autenticacao e sessao" style="text;html=1;strokeColor=none;fillColor=none;fontSize=24;fontStyle=1;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="360" y="20" width="680" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="a-user" value="Usuario&lt;br&gt;email + senha" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F4FF;strokeColor=#4F8FCF;fontSize=13;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="70" y="130" width="140" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="a-login" value="POST /api/auth/login" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#4F8FCF;fontSize=13;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="260" y="130" width="170" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="a-rate" value="LoginRateLimitFilter&lt;br&gt;5/min/IP&lt;br&gt;forgot-password: 3/min/IP" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=12;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="480" y="120" width="170" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="a-controller" value="AuthController.login()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#82B366;fontSize=13;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="700" y="130" width="170" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="a-authmgr" value="AuthenticationManager&lt;br&gt;CustomUserDetailsService&lt;br&gt;BCryptPasswordEncoder" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0F7EA;strokeColor=#82B366;fontSize=12;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="920" y="120" width="190" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="a-decision" value="Credenciais OK?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=12;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="1160" y="125" width="120" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="a-error" value="401&lt;br&gt;Mensagem generica&lt;br&gt;Email ou senha incorretos" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontSize=12;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="1125" y="250" width="190" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="a-jwt" value="JwtUtil.generateToken()&lt;br&gt;HS256&lt;br&gt;expiracao: 15 min&lt;br&gt;subject: email" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#82B366;fontSize=12;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="80" y="330" width="180" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="a-refresh" value="RefreshTokenService.criarRefreshToken()&lt;br&gt;UUID v4&lt;br&gt;validade: 7 dias&lt;br&gt;revogado=false" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#82B366;fontSize=12;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="330" width="210" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="a-db" value="refresh_tokens&lt;br&gt;usuario_id&lt;br&gt;token unique&lt;br&gt;data_expiracao&lt;br&gt;data_criacao&lt;br&gt;revogado" style="shape=cylinder3d;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#F5F0FF;strokeColor=#9673A6;fontSize=12;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="590" y="325" width="150" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="a-response" value="HTTP 200&lt;br&gt;Body: { accessToken, usuario }&lt;br&gt;Set-Cookie: refreshToken&lt;br&gt;HttpOnly, SameSite=Lax&lt;br&gt;Path=/api/auth&lt;br&gt;Secure em prod" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F4FF;strokeColor=#4F8FCF;fontSize=12;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="800" y="315" width="240" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="a-web-store" value="Web AuthContext&lt;br&gt;accessToken em memoria&lt;br&gt;refreshToken no cookie&lt;br&gt;getMe em /api/v1/usuarios/me" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#4F8FCF;fontSize=12;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="1100" y="350" width="210" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="a-req" value="Requests protegidas&lt;br&gt;Authorization: Bearer accessToken&lt;br&gt;/api/v1/*" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#4F8FCF;fontSize=12;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="90" y="560" width="200" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="a-jwtfilter" value="JwtAuthenticationFilter&lt;br&gt;valida token&lt;br&gt;seta SecurityContext" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0F7EA;strokeColor=#82B366;fontSize=12;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="350" y="555" width="180" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="a-401" value="401 em endpoint protegido" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=12;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="590" y="565" width="170" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="a-refreshcall" value="Web interceptor&lt;br&gt;fila requisicoes concorrentes&lt;br&gt;POST /api/auth/refresh-token" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#4F8FCF;fontSize=12;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="820" y="550" width="210" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="a-rotate" value="RefreshTokenService&lt;br&gt;verifica expiracao/revogado&lt;br&gt;rotaciona token&lt;br&gt;reuse detectado =&gt; revoga todos tokens do usuario" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0F7EA;strokeColor=#82B366;fontSize=12;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="1090" y="535" width="230" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="a-mobile-note" value="Mobile atual&lt;br&gt;POST /api/auth/login&lt;br&gt;guarda access token em store/memoria&lt;br&gt;sem refresh automatico no interceptor&lt;br&gt;withCredentials=false" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontSize=12;align=left;verticalAlign=top;spacing=10;" parent="1" vertex="1">
+                    <mxGeometry x="90" y="760" width="320" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="a-reset-note" value="Recuperacao de senha&lt;br&gt;POST /api/auth/forgot-password cria PasswordResetToken&lt;br&gt;EmailService ainda e stub/log console&lt;br&gt;POST /api/auth/reset-password redefine senha e marca token usado" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF7E6;strokeColor=#D79B00;fontSize=12;align=left;verticalAlign=top;spacing=10;" parent="1" vertex="1">
+                    <mxGeometry x="470" y="760" width="390" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="ae1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#4F8FCF;" parent="1" source="a-user" target="a-login" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="ae2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#4F8FCF;" parent="1" source="a-login" target="a-rate" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="ae3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#82B366;" parent="1" source="a-rate" target="a-controller" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="ae4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#82B366;" parent="1" source="a-controller" target="a-authmgr" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="ae5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#82B366;" parent="1" source="a-authmgr" target="a-decision" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="ae6" value="nao" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#B85450;fontSize=11;" parent="1" source="a-decision" target="a-error" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="ae7" value="sim" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#82B366;fontSize=11;" parent="1" source="a-decision" target="a-jwt" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="ae8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#82B366;" parent="1" source="a-jwt" target="a-refresh" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="ae9" value="persistir" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#9673A6;fontSize=11;" parent="1" source="a-refresh" target="a-db" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="ae10" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#4F8FCF;" parent="1" source="a-db" target="a-response" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="ae11" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#4F8FCF;" parent="1" source="a-response" target="a-web-store" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="ae12" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#4F8FCF;" parent="1" source="a-web-store" target="a-req" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="ae13" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#82B366;" parent="1" source="a-req" target="a-jwtfilter" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="ae14" value="se expirado" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#D6B656;fontSize=11;" parent="1" source="a-jwtfilter" target="a-401" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="ae15" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#4F8FCF;" parent="1" source="a-401" target="a-refreshcall" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="ae16" value="cookie refreshToken" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#82B366;fontSize=11;" parent="1" source="a-refreshcall" target="a-rotate" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="ae17" value="novo accessToken + novo cookie" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#4F8FCF;fontSize=11;" parent="1" source="a-rotate" target="a-web-store" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+    <diagram id="ownership-flow" name="03 Ownership">
+        <mxGraphModel dx="876" dy="670" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1000" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="own-title" value="Fluxo single-tenant / ownership" style="text;html=1;strokeColor=none;fillColor=none;fontSize=24;fontStyle=1;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="360" y="20" width="680" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="o-req" value="Request protegido&lt;br&gt;Ex.: GET /api/v1/transacoes/42&lt;br&gt;Authorization: Bearer eyJ..." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F4FF;strokeColor=#4F8FCF;fontSize=12;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="70" y="120" width="210" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="o-filter" value="JwtAuthenticationFilter&lt;br&gt;valida JWT&lt;br&gt;extrai subject=email" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=12;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="340" y="120" width="180" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="o-context" value="SecurityContextHolder&lt;br&gt;Authentication.name = email" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0F7EA;strokeColor=#82B366;fontSize=12;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="580" y="130" width="190" height="70" as="geometry"/>
+                </mxCell>
+                <mxCell id="o-authsvc" value="AuthenticatedUserService&lt;br&gt;getAuthenticatedUserId()&lt;br&gt;busca Usuario por email" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#82B366;fontSize=12;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="830" y="115" width="210" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="o-userdb" value="usuarios&lt;br&gt;id, nome, email, senha" style="shape=cylinder3d;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#F5F0FF;strokeColor=#9673A6;fontSize=12;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="1100" y="120" width="150" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="o-controller" value="Controller do recurso&lt;br&gt;recebe id/path/query/body&lt;br&gt;nao aceita usuario_id no body" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#82B366;fontSize=12;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="330" width="220" height="90" as="geometry"/>
+                </mxCell>
+                <mxCell id="o-service" value="Service&lt;br&gt;usa userId autenticado&lt;br&gt;buscarPorIdDoUsuario(id,userId)&lt;br&gt;regras de negocio" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#82B366;fontSize=12;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="400" y="315" width="240" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="o-repo" value="Repository&lt;br&gt;findByUsuarioId(...)&lt;br&gt;findById + checagem manual&lt;br&gt;queries por usuarioId" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#82B366;fontSize=12;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="730" y="315" width="220" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="o-resource" value="Recurso no banco&lt;br&gt;transacoes, categorias, contas,&lt;br&gt;carteiras, contas_fixas, metas&lt;br&gt;todas com usuario_id&lt;br&gt;parcelas herdam ownership via transacao" style="shape=cylinder3d;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#F5F0FF;strokeColor=#9673A6;fontSize=12;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="1030" y="300" width="230" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="o-decision" value="resource.usuario.id == userId?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=12;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="500" y="550" width="170" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="o-ok" value="OK&lt;br&gt;retorna DTO&lt;br&gt;200/201/204" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=12;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="780" y="565" width="160" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="o-forbid" value="Bloqueia acesso&lt;br&gt;UnauthorizedAccessException&lt;br&gt;GlobalExceptionHandler&lt;br&gt;403" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontSize=12;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="230" y="555" width="190" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="o-list" value="Listagens&lt;br&gt;/minhas e dashboard&lt;br&gt;sempre filtram por userId&lt;br&gt;ex.: findByUsuarioId(userId, pageable)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F4FF;strokeColor=#4F8FCF;fontSize=12;align=left;verticalAlign=top;spacing=10;" parent="1" vertex="1">
+                    <mxGeometry x="100" y="740" width="290" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="o-risk" value="Ponto de atencao documentado&lt;br&gt;Ownership e manual por service; novos endpoints podem esquecer checagem.&lt;br&gt;Auditoria tambem marcou risco em TransacaoService: categoriaId/contaId na criacao precisam validacao completa de ownership." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontSize=12;align=left;verticalAlign=top;spacing=10;" parent="1" vertex="1">
+                    <mxGeometry x="470" y="735" width="520" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="oe1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#4F8FCF;" parent="1" source="o-req" target="o-filter" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="oe2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#82B366;" parent="1" source="o-filter" target="o-context" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="oe3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#82B366;" parent="1" source="o-context" target="o-authsvc" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="oe4" value="SELECT por email" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#9673A6;fontSize=11;" parent="1" source="o-authsvc" target="o-userdb" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="oe5" value="userId" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#82B366;fontSize=11;" parent="1" source="o-authsvc" target="o-controller" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="oe6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#82B366;" parent="1" source="o-controller" target="o-service" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="oe7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#82B366;" parent="1" source="o-service" target="o-repo" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="oe8" value="SQL/JPA" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#9673A6;fontSize=11;" parent="1" source="o-repo" target="o-resource" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="oe9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#D6B656;" parent="1" source="o-resource" target="o-decision" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="oe10" value="sim" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#82B366;fontSize=11;" parent="1" source="o-decision" target="o-ok" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="oe11" value="nao" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;strokeColor=#B85450;fontSize=11;" parent="1" source="o-decision" target="o-forbid" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+    <diagram id="erd" name="04 ERD">
+        <mxGraphModel dx="876" dy="670" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1000" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="erd-title" value="Modelo de dados - entidades JPA principais" style="text;html=1;strokeColor=none;fillColor=none;fontSize=24;fontStyle=1;align=center;verticalAlign=middle;" parent="1" vertex="1">
+                    <mxGeometry x="360" y="20" width="680" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-usuario" value="usuarios&lt;br&gt;&lt;b&gt;Usuario&lt;/b&gt;&lt;br&gt;id&lt;br&gt;nome&lt;br&gt;email unique&lt;br&gt;senha" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#E8F4FF;strokeColor=#4F8FCF;fontSize=12;align=left;verticalAlign=top;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="590" y="90" width="180" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-categoria" value="categorias&lt;br&gt;&lt;b&gt;Categoria&lt;/b&gt;&lt;br&gt;id&lt;br&gt;usuario_id FK&lt;br&gt;nome, cor, icone&lt;br&gt;valorEsperado&lt;br&gt;valorGasto&lt;br&gt;ativo" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#82B366;fontSize=12;align=left;verticalAlign=top;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="70" y="280" width="180" height="160" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-conta" value="contas&lt;br&gt;&lt;b&gt;Conta&lt;/b&gt;&lt;br&gt;id&lt;br&gt;usuario_id FK&lt;br&gt;nome&lt;br&gt;tipo CREDITO/DEBITO/DINHEIRO/POUPANCA&lt;br&gt;limiteTotal, limiteUsado&lt;br&gt;saldo, dataFechamento, cor, icone, ativo" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#82B366;fontSize=12;align=left;verticalAlign=top;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="300" y="260" width="220" height="190" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-carteira" value="carteiras&lt;br&gt;&lt;b&gt;Carteira&lt;/b&gt;&lt;br&gt;id&lt;br&gt;usuario_id FK&lt;br&gt;nome&lt;br&gt;tipo DINHEIRO/CONTA_BANCARIA/POUPANCA&lt;br&gt;saldo&lt;br&gt;banco" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#82B366;fontSize=12;align=left;verticalAlign=top;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="570" y="290" width="180" height="150" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-meta" value="metas&lt;br&gt;&lt;b&gt;Meta&lt;/b&gt;&lt;br&gt;id&lt;br&gt;usuario_id FK&lt;br&gt;nome&lt;br&gt;valorTotal&lt;br&gt;valorReservado&lt;br&gt;valorMensal&lt;br&gt;dataPrevista&lt;br&gt;ativa, cor, icone, descricao" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#82B366;fontSize=12;align=left;verticalAlign=top;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="800" y="280" width="200" height="170" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-token" value="refresh_tokens&lt;br&gt;&lt;b&gt;RefreshToken&lt;/b&gt;&lt;br&gt;id&lt;br&gt;usuario_id FK&lt;br&gt;token unique&lt;br&gt;data_expiracao&lt;br&gt;data_criacao&lt;br&gt;revogado" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=12;align=left;verticalAlign=top;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="1050" y="260" width="190" height="160" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-reset" value="password_reset_tokens&lt;br&gt;&lt;b&gt;PasswordResetToken&lt;/b&gt;&lt;br&gt;id&lt;br&gt;usuario_id FK&lt;br&gt;token unique&lt;br&gt;dataExpiracao&lt;br&gt;usado" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=12;align=left;verticalAlign=top;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="1050" y="470" width="190" height="140" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-transacao" value="transacoes&lt;br&gt;&lt;b&gt;Transacao&lt;/b&gt;&lt;br&gt;id&lt;br&gt;usuario_id FK&lt;br&gt;conta_id FK opcional&lt;br&gt;categoria_id FK opcional&lt;br&gt;descricao&lt;br&gt;valorTotal&lt;br&gt;tipo ENTRADA/SAIDA&lt;br&gt;data&lt;br&gt;status&lt;br&gt;parcelado, numeroParcelas&lt;br&gt;valorParcela, observacoes, ativo" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#82B366;fontSize=12;align=left;verticalAlign=top;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="570" width="230" height="230" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-parcela" value="parcelas&lt;br&gt;&lt;b&gt;Parcela&lt;/b&gt;&lt;br&gt;id&lt;br&gt;transacao_id FK&lt;br&gt;numeroParcela&lt;br&gt;totalParcelas&lt;br&gt;valor&lt;br&gt;dataVencimento&lt;br&gt;status PAGO/PENDENTE/ATRASADO/CANCELADO&lt;br&gt;dataPagamento" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#82B366;fontSize=12;align=left;verticalAlign=top;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="620" y="610" width="220" height="180" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-contafixa" value="contas_fixas&lt;br&gt;&lt;b&gt;ContaFixa&lt;/b&gt;&lt;br&gt;id&lt;br&gt;usuario_id FK&lt;br&gt;categoria_id FK opcional&lt;br&gt;nome&lt;br&gt;valorPlanejado&lt;br&gt;valorReal&lt;br&gt;diaVencimento&lt;br&gt;dataPagamento&lt;br&gt;status, recorrente, ativa, observacoes" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#82B366;fontSize=12;align=left;verticalAlign=top;spacing=8;" parent="1" vertex="1">
+                    <mxGeometry x="70" y="580" width="210" height="210" as="geometry"/>
+                </mxCell>
+                <mxCell id="e-note" value="Cardinalidades refletem FKs reais no codigo JPA.&lt;br&gt;Usuario e raiz de ownership single-tenant.&lt;br&gt;Categoria e Conta sao opcionais em Transacao; Categoria opcional em ContaFixa.&lt;br&gt;Parcela pertence a Transacao, nao diretamente a Usuario." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontSize=12;align=left;verticalAlign=top;spacing=10;" parent="1" vertex="1">
+                    <mxGeometry x="900" y="690" width="350" height="120" as="geometry"/>
+                </mxCell>
+                <mxCell id="er1" value="1:N" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmany;startArrow=ERone;strokeColor=#82B366;fontSize=11;" parent="1" source="e-usuario" target="e-categoria" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="er2" value="1:N" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmany;startArrow=ERone;strokeColor=#82B366;fontSize=11;" parent="1" source="e-usuario" target="e-conta" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="er3" value="1:N" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmany;startArrow=ERone;strokeColor=#82B366;fontSize=11;" parent="1" source="e-usuario" target="e-carteira" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="er4" value="1:N" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmany;startArrow=ERone;strokeColor=#82B366;fontSize=11;" parent="1" source="e-usuario" target="e-meta" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="er5" value="1:N" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmany;startArrow=ERone;strokeColor=#82B366;fontSize=11;" parent="1" source="e-usuario" target="e-token" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="er6" value="1:N" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmany;startArrow=ERone;strokeColor=#82B366;fontSize=11;" parent="1" source="e-usuario" target="e-reset" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="er7" value="1:N" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmany;startArrow=ERone;strokeColor=#82B366;fontSize=11;" parent="1" source="e-usuario" target="e-transacao" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="er8" value="1:N" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmany;startArrow=ERone;strokeColor=#82B366;fontSize=11;" parent="1" source="e-usuario" target="e-contafixa" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="er9" value="1:N opcional" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmany;startArrow=ERone;strokeColor=#4F8FCF;fontSize=11;" parent="1" source="e-categoria" target="e-transacao" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="er10" value="1:N opcional" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmany;startArrow=ERone;strokeColor=#4F8FCF;fontSize=11;" parent="1" source="e-conta" target="e-transacao" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="er11" value="1:N" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmany;startArrow=ERone;strokeColor=#4F8FCF;fontSize=11;" parent="1" source="e-transacao" target="e-parcela" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="er12" value="1:N opcional" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=ERmany;startArrow=ERone;strokeColor=#4F8FCF;fontSize=11;" parent="1" source="e-categoria" target="e-contafixa" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
