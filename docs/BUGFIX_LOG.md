@@ -144,5 +144,30 @@ Registro de bugs corrigidos. Mantido pelo `docs-reporter`.
 
 ---
 
+## BUG-0008 — Correções pós-auditoria de CORS, CSRF, rate limit e VPS
+
+- **Problema relacionado:** PROB-0008, PROB-0010, PROB-0019, PEND-001, PEND-002
+- **Data:** 2026-07-07
+- **Area:** backend, frontend, seguranca, banco
+- **Sintoma:** CORS de produção ainda podia herdar fallback localhost pelo `@Value` do código. `validate-token` era `GET`, mas o rate limit só processava `POST`. Refresh/logout usavam cookie HttpOnly sem defesa CSRF ponta a ponta. Validação PostgreSQL real não tinha profile para VPS informada.
+- **Correcao aplicada:**
+  1. `SecurityConfig` passou a ler `cors.allowed.origins`, respeitando profile prod com default vazio.
+  2. `LoginRateLimitFilter` passou a limitar `GET /api/auth/validate-token`.
+  3. Criado `RefreshTokenCsrfFilter` para exigir `X-CSRF-Token` em `refresh-token` e `logout` quando `refreshToken` cookie existe.
+  4. `AuthController` passou a emitir/rotacionar cookie `csrfToken` e limpar refresh + CSRF no logout.
+  5. Frontend envia `X-CSRF-Token` automaticamente em refresh/logout, inclusive no refresh do interceptor.
+  6. Logs de payload de cadastro removidos do frontend.
+  7. Profile padrão do backend passou a ser `vps`; `application-dev.properties` aceita override por env; `application-vps.properties` e `application-prod.properties` apontam para `187.77.61.191:5433/dbnexos-gestor-financeiro`.
+  8. `LOCAL_POSTGRES_VALIDATION.md` documenta execução com profile `vps`.
+  9. Conectividade TCP com `187.77.61.191:5433` validada.
+  10. Smoke Spring Boot contra profile `vps` tentou conectar no PostgreSQL remoto; servidor respondeu, mas rejeitou senha para `admin_nexos`.
+- **Arquivos alterados:** `SecurityConfig.java`, `LoginRateLimitFilter.java`, `RefreshTokenCsrfFilter.java`, `AuthController.java`, `AuthControllerTest.java`, `api.ts`, `authService.ts`, `application.properties`, `application-dev.properties`, `application-prod.properties`, `application-vps.properties`, `logback-spring.xml`, `.env.example`, `README-backend.md`, `LOCAL_POSTGRES_VALIDATION.md`, `CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md`
+- **Testes/validacoes executadas:** `./mvnw -q -Dtest=AuthControllerTest test` -> 17/17 PASS; `./mvnw -q test` -> 36/36 PASS; `npm run build` no frontend -> PASS; `nc -vz -w 5 187.77.61.191 5433` -> PASS.
+- **Resultado:** PASS_COM_RESSALVA
+- **Ressalvas:** Smoke Flyway/schema no PostgreSQL VPS nao executou porque a credencial de `admin_nexos` foi rejeitada.
+- **Commit:** pendente
+
+---
+
 > Este arquivo e mantido pelo `docs-reporter`. Bugs corrigidos devem ser registrados com o proximo ID
 > sequencial (BUG-0002, BUG-0003, ...). Para historico de versoes, consulte `docs/CHANGELOG.md`.

@@ -49,7 +49,7 @@ docker compose down -v
 
 ## 3. Rodar aplicacao contra PostgreSQL local
 
-O profile `dev` esta configurado em `application-dev.properties` com as mesmas credenciais do Docker Compose.
+O profile `dev` esta configurado em `application-dev.properties` com as mesmas credenciais do Docker Compose por padrao, mas aceita override por `DATABASE_URL`, `DB_USERNAME` e `DB_PASSWORD`.
 
 ```bash
 cd backend
@@ -100,7 +100,59 @@ docker compose up -d      # Recria container com banco vazio
 
 ---
 
-## 6. Credenciais de acesso
+## 6. Validar com PostgreSQL da VPS
+
+Profile `vps` aponta para o banco PostgreSQL principal na VPS Hostinger.
+
+Dados conhecidos:
+
+| Campo | Valor |
+|---|---|
+| Host | `187.77.61.191` |
+| Porta | `5433` |
+| Banco | `dbnexos-gestor-financeiro` |
+| Usuario padrao | `admin_nexos` |
+
+Senha nao deve ser registrada neste repositorio. Informe por variavel de ambiente:
+
+```bash
+cd backend
+DATABASE_URL=jdbc:postgresql://187.77.61.191:5433/dbnexos-gestor-financeiro \
+DB_USERNAME=admin_nexos \
+DB_PASSWORD=SUA_SENHA \
+JWT_SECRET=SUA_CHAVE_JWT_COM_32_BYTES_OU_MAIS \
+./mvnw spring-boot:run -Dspring-boot.run.profiles=vps
+```
+
+O startup deve:
+
+1. conectar no PostgreSQL remoto;
+2. executar Flyway;
+3. validar schema com `ddl-auto=validate`;
+4. expor `/actuator/health`.
+
+Se o banco remoto ja tiver tabelas existentes, `spring.flyway.baseline-on-migrate=true` no profile `vps` permite baseline controlado.
+
+Validacao executada em 2026-07-07:
+
+```bash
+nc -vz -w 5 187.77.61.191 5433
+# Connection to 187.77.61.191 port 5433 [tcp/pyrrho] succeeded!
+```
+
+Resultado: porta TCP acessivel. Smoke Flyway/schema ainda depende de usuario e senha.
+
+Validacao executada em 2026-07-07 com `DB_USERNAME=admin_nexos`:
+
+```text
+FATAL: password authentication failed for user "admin_nexos"
+```
+
+Resultado: servidor PostgreSQL acessivel, mas credencial rejeitada. Smoke Flyway/schema nao executou porque a conexao autenticada falhou.
+
+---
+
+## 7. Credenciais de acesso local
 
 | Campo | Valor |
 |---|---|
@@ -118,9 +170,10 @@ psql -h localhost -p 5432 -U postgres -d gestor_financeiro
 
 ---
 
-## 7. Observacoes
+## 8. Observacoes
 
 - Profile `dev` usa `spring.flyway.baseline-on-migrate=true` para suportar banco existente com tabelas.
+- Profile `vps` usa `jdbc:postgresql://187.77.61.191:5433/dbnexos-gestor-financeiro` e `admin_nexos` por padrao. Exige `DB_PASSWORD` e `JWT_SECRET`.
 - Para banco limpo, o Flyway cria tudo; para banco ja populado, aplica apenas migrations pendentes.
 - O volume `pgdata` mantem dados entre restarts. Use `down -v` para limpeza completa.
 - Testes automatizados (`mvn test`) continuam usando H2 in-memory com profile `test`.

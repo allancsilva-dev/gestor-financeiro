@@ -15,15 +15,11 @@ export const authService = {
   },
 
   async register(data: { nome: string; email: string; senha: string }): Promise<Usuario> {
-    console.log('Dados recebidos:', JSON.stringify(data, null, 2));
-
     const registerData: RegisterRequest = {
       nome: data.nome,
       email: data.email,
       password: data.senha,
     };
-
-    console.log('Enviando para backend:', JSON.stringify(registerData, null, 2));
 
     const response = await api.post<Usuario>('/auth/register', registerData);
     return response.data;

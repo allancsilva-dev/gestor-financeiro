@@ -38,7 +38,10 @@ public class SecurityConfig {
     @Autowired
     private LoginRateLimitFilter loginRateLimitFilter;
 
-    @Value("${CORS_ALLOWED_ORIGINS:http://localhost:5173}")
+    @Autowired
+    private RefreshTokenCsrfFilter refreshTokenCsrfFilter;
+
+    @Value("${cors.allowed.origins:}")
     private String corsAllowedOrigins;
 
     @Value("${app.docs.public:true}")
@@ -118,6 +121,7 @@ public class SecurityConfig {
             .sessionManagement(session -> session
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )
+            .addFilterBefore(refreshTokenCsrfFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(loginRateLimitFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

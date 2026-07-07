@@ -28,6 +28,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.security.SecureRandom;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -52,8 +54,10 @@ import java.util.UUID;
 public class AuthController {
 
     private static final String REFRESH_COOKIE_NAME = "refreshToken";
+    private static final String CSRF_COOKIE_NAME = "csrfToken";
 
     private static final long REFRESH_COOKIE_MAX_AGE_SECONDS = 7L * 24 * 3600;
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     @Autowired
     private UsuarioRepository usuarioRepository;
@@ -141,9 +145,10 @@ public class AuthController {
             ));
 
             ResponseCookie refreshCookie = buildRefreshTokenCookie(refreshToken.getToken(), REFRESH_COOKIE_MAX_AGE_SECONDS);
+            ResponseCookie csrfCookie = buildCsrfCookie(createCsrfToken(), REFRESH_COOKIE_MAX_AGE_SECONDS);
             
             return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
+                .header(HttpHeaders.SET_COOKIE, refreshCookie.toString(), csrfCookie.toString())
                 .body(response);
         } else {
             incrementFailedAttempts(usuario);
@@ -178,9 +183,10 @@ public class AuthController {
         response.put("accessToken", novoAccessToken);
 
         ResponseCookie refreshCookie = buildRefreshTokenCookie(refreshToken.getToken(), REFRESH_COOKIE_MAX_AGE_SECONDS);
+        ResponseCookie csrfCookie = buildCsrfCookie(createCsrfToken(), REFRESH_COOKIE_MAX_AGE_SECONDS);
 
         return ResponseEntity.ok()
-            .header(HttpHeaders.SET_COOKIE, refreshCookie.toString())
+            .header(HttpHeaders.SET_COOKIE, refreshCookie.toString(), csrfCookie.toString())
             .body(response);
     }
 
@@ -200,9 +206,10 @@ public class AuthController {
         }
 
         ResponseCookie clearCookie = buildRefreshTokenCookie("", 0);
+        ResponseCookie clearCsrfCookie = buildCsrfCookie("", 0);
 
         return ResponseEntity.ok()
-            .header(HttpHeaders.SET_COOKIE, clearCookie.toString())
+            .header(HttpHeaders.SET_COOKIE, clearCookie.toString(), clearCsrfCookie.toString())
             .body(Map.of("message", "Logout realizado com sucesso"));
     }
 
@@ -221,9 +228,10 @@ public class AuthController {
 
         refreshTokenService.revogarTodosTokensDoUsuario(usuario);
         ResponseCookie clearCookie = buildRefreshTokenCookie("", 0);
+        ResponseCookie clearCsrfCookie = buildCsrfCookie("", 0);
 
         return ResponseEntity.ok()
-            .header(HttpHeaders.SET_COOKIE, clearCookie.toString())
+            .header(HttpHeaders.SET_COOKIE, clearCookie.toString(), clearCsrfCookie.toString())
             .body(Map.of("message", "Logout realizado em todos os dispositivos"));
     }
 
@@ -338,6 +346,22 @@ public class AuthController {
             .sameSite("Lax")
             .maxAge(maxAgeSeconds)
             .build();
+    }
+
+    private ResponseCookie buildCsrfCookie(String tokenValue, long maxAgeSeconds) {
+        return ResponseCookie.from(CSRF_COOKIE_NAME, tokenValue)
+            .httpOnly(false)
+            .secure(cookieSecure)
+            .path("/api/auth")
+            .sameSite("Lax")
+            .maxAge(maxAgeSeconds)
+            .build();
+    }
+
+    private String createCsrfToken() {
+        byte[] bytes = new byte[32];
+        SECURE_RANDOM.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 
     private String extractRefreshTokenFromCookies(HttpServletRequest request) {

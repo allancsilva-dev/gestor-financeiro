@@ -537,12 +537,12 @@ Use esta seção como diário objetivo de execução.
 
 ---
 
-# 6. Quadro de pendências abertas
+# 6. Quadro de pendências
 
 | ID | Data | PR origem | Pendência | Severidade | Responsável | Status | Próxima ação |
 |---|---|---|---|---|---|---|---|
-| PEND-001 | 2026-07-07 | PR-FOUNDATION-01/07 | Validação com PostgreSQL real não executada | BAIXA | pendente | `ABERTA` | Rodar Docker/PostgreSQL e smoke de Flyway |
-| PEND-002 | 2026-07-07 | PR-FOUNDATION-05 | CSRF frontend web pendente (PROB-0019) | ALTA | pendente | `ABERTA` | Definir estratégia backend+frontend |
+| PEND-001 | 2026-07-07 | PR-FOUNDATION-01/07 | Validação Flyway/schema com PostgreSQL VPS não executada | MEDIA | pendente | `ABERTA` | Porta TCP OK; startup chegou no PostgreSQL, mas credencial `admin_nexos` foi rejeitada. Confirmar senha/usuario e rerodar profile `vps` |
+| PEND-002 | 2026-07-07 | PR-FOUNDATION-05 | CSRF frontend web pendente (PROB-0019) | ALTA | IA executora | `FECHADA` | Backend exige `X-CSRF-Token`; frontend envia header em refresh/logout |
 | PEND-003 | 2026-07-07 | Fase 0 | Commit/PR não realizado | BAIXA | pendente | `ABERTA` | Commitar alterações após revisão |
 
 ---
@@ -589,30 +589,35 @@ Fechar ressalvas da Fase 0: PostgreSQL validation, account lockout, política de
 
 | Comando | Resultado |
 |---|---|
-| `mvn test` | 34/34 PASS, BUILD SUCCESS |
+| `mvn test` pós-auditoria | 36/36 PASS |
+| `AuthControllerTest` pós-auditoria | 17/17 PASS |
 | Startup PostgreSQL local | NAO_EXECUTADO — Docker indisponível |
-| Flyway com PostgreSQL | NAO_EXECUTADO — Docker indisponível |
+| Conectividade TCP PostgreSQL VPS | PASS — `187.77.61.191:5433` acessível |
+| Flyway/schema com PostgreSQL VPS | NAO_EXECUTADO — credencial `admin_nexos` rejeitada |
 
 ### Resumo das ressalvas fechadas
 
 | Ressalva | Status |
 |---|---|
-| PostgreSQL validation | PARCIAL — Docker Compose criado, sem execucao |
+| PostgreSQL validation | PARCIAL — Docker Compose e profile VPS criados; TCP VPS OK; sem smoke Flyway/schema |
 | Account lockout | FECHADO — implementado e testado |
 | Política de senha | FECHADO — @ValidPassword min 8 chars, 1 letra, 1 digito |
 | Memory leak rate limit | FECHADO — @Scheduled cleanup 60s |
+| CORS produção sem fallback localhost | FECHADO — SecurityConfig usa `cors.allowed.origins` |
+| Rate limit em `validate-token` GET | FECHADO — filtro aceita GET para `/api/auth/validate-token` |
+| CSRF refresh/logout web | FECHADO — cookie `csrfToken` + header `X-CSRF-Token` |
 
 ### Pendências remanescentes
 
 | Pendência | Severidade |
 |---|---|
-| Validacao com PostgreSQL real (Docker indisponivel) | BAIXA |
+| Validacao com PostgreSQL VPS (credencial rejeitada) | MEDIA |
 | Commit nao realizado | BAIXA |
 
 ### Decisao final
 
 **Status final:** `PASS_COM_RESSALVA`
-**Resumo:** 3 das 4 ressalvas fechadas com implementacao e testes. PostgreSQL validation: Docker Compose e profile dev criados, mas execucao nao possivel sem Docker runtime.
+**Resumo:** Ressalvas de segurança pós-auditoria fechadas: CORS, rate limit de `validate-token` GET e CSRF para refresh/logout web. PostgreSQL validation: Docker Compose, profile dev e profile VPS criados; porta VPS OK; smoke remoto tentou autenticar com `admin_nexos`, mas o PostgreSQL rejeitou a senha.
 **Pode avancar para Fase 1?** `SIM`
 
 ---
@@ -661,26 +666,26 @@ A Fase 0 pode ser considerada concluída com ressalvas quando itens bloqueantes 
 | Listagens críticas paginadas | `SIM` | PaginationUtils + Pageable |
 | Índices críticos aplicados | `SIM` | PR-04, V3 |
 | Cookie seguro em produção | `SIM` | PR-05, cookie.secure=true |
-| CORS restrito em produção | `SIM` | PR-05, sem fallback |
+| CORS restrito em produção | `SIM` | SecurityConfig usa `cors.allowed.origins`; prod default vazio |
 | Secrets obrigatórios sem default inseguro | `PARCIAL` | Prod OK, dev mantém |
-| CSRF tratado quando aplicável | `PARCIAL` | Backend justificado; frontend PROB-0019 aberto |
-| Rate limit em endpoints sensíveis | `SIM` | PR-05, 5 endpoints |
+| CSRF tratado quando aplicável | `SIM` | `csrfToken` cookie + `X-CSRF-Token` em refresh/logout; frontend atualizado |
+| Rate limit em endpoints sensíveis | `SIM` | Login/register/reset/forgot e `validate-token` GET |
 | Logs sem token/PII/senha | `SIM` | PR-05, maskEmail |
 | Envelope de erro padronizado | `SIM` | PR-06, ApiError+requestId |
 | `requestId` implementado | `SIM` | PR-06, RequestIdFilter |
 | Health check real de banco | `SIM` | DataSourceHealthIndicator |
 | Documentação atualizada | `SIM` | 7 PRs documentados |
-| Testes/smokes executados ou justificados | `SIM` | 34/34, H2; PostgreSQL real pendente |
+| Testes/smokes executados ou justificados | `SIM_COM_RESSALVA` | 36/36 backend H2; frontend build OK; PostgreSQL VPS pendente |
 
 ---
 
 # 10. Status final da Fase 0
 
-**Status:** `CONCLUIDA`
+**Status:** `CONCLUIDA_COM_RESSALVAS`
 **Data de conclusão:** 2026-07-07
-**Resumo final:** 7 PRs executados. Flyway (PASS_COM_RESSALVA), IDOR (PASS), Locking/Transactional (PASS_COM_RESSALVA), Performance (PASS_COM_RESSALVA), Seguranca (PASS_COM_RESSALVA), Erro/Observabilidade (PASS), Fechamento ressalvas (PASS_COM_RESSALVA). 34 testes.
-**Pendencias remanescentes:** PostgreSQL validation real pendente (Docker Compose criado, nao executado). CSRF frontend web pendente (PROB-0019). Commit nao realizado.
-**Riscos aceitos:** Testes apenas com H2. Docker indisponivel no ambiente de execucao.
+**Resumo final:** 7 PRs executados + correções pós-auditoria em CORS, rate limit `validate-token`, CSRF refresh/logout e profile VPS PostgreSQL. Backend pós-auditoria: 36/36 PASS.
+**Pendencias remanescentes:** PostgreSQL validation VPS pendente por credencial rejeitada para `admin_nexos` e smoke Flyway/schema. Commit nao realizado.
+**Riscos aceitos:** Testes automatizados usam H2. PostgreSQL remoto ainda nao validado neste ambiente.
 **Proxima fase autorizada:** Fase 1 — Produto financeiro essencial
 
 Status possíveis:

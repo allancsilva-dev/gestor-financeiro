@@ -60,12 +60,13 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
 
-        if (!"POST".equalsIgnoreCase(request.getMethod())) {
+        String path = request.getRequestURI();
+
+        if (!isRateLimitedMethod(request.getMethod(), path)) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        String path = request.getRequestURI();
         int limit = resolveLimitForPath(path);
 
         if (limit <= 0) {
@@ -140,6 +141,14 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
         }
 
         return -1;
+    }
+
+    private boolean isRateLimitedMethod(String method, String path) {
+        if ("POST".equalsIgnoreCase(method)) {
+            return true;
+        }
+
+        return "GET".equalsIgnoreCase(method) && VALIDATE_TOKEN_PATH.equals(path);
     }
 
     private String buildClientKey(HttpServletRequest request, String path) {

@@ -2,6 +2,8 @@ import axios from 'axios';
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8081/api';
 const API_VERSION = '/v1';
+const CSRF_COOKIE_NAME = 'csrfToken';
+const CSRF_HEADER_NAME = 'X-CSRF-Token';
 
 let accessToken: string | null = null;
 
@@ -41,6 +43,43 @@ const processQueue = (error: unknown, token: string | null = null) => {
   failedQueue = [];
 };
 
+const getCookieValue = (name: string): string | null => {
+  const cookie = document.cookie
+    .split('; ')
+    .find((item) => item.startsWith(`${name}=`));
+
+  if (!cookie) {
+    return null;
+  }
+
+  return decodeURIComponent(cookie.split('=', 2)[1]);
+};
+
+const isCsrfProtectedAuthMutation = (url: string, method?: string): boolean => {
+  if ((method || 'get').toLowerCase() !== 'post') {
+    return false;
+  }
+
+  return url.includes('/auth/refresh-token') || url.includes('/auth/logout');
+};
+
+const applyCsrfHeader = (headers: any) => {
+  const csrfToken = getCookieValue(CSRF_COOKIE_NAME);
+  if (!csrfToken) {
+    return headers;
+  }
+
+  if (headers && typeof headers.set === 'function') {
+    headers.set(CSRF_HEADER_NAME, csrfToken);
+    return headers;
+  }
+
+  return {
+    ...(headers || {}),
+    [CSRF_HEADER_NAME]: csrfToken,
+  };
+};
+
 api.interceptors.request.use((config) => {
   const requestUrl = config.url || '';
   const isAuthEndpoint = requestUrl.startsWith('/auth');
@@ -53,6 +92,11 @@ api.interceptors.request.use((config) => {
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`;
   }
+
+  if (isCsrfProtectedAuthMutation(config.url || '', config.method)) {
+    config.headers = applyCsrfHeader(config.headers);
+  }
+
   return config;
 });
 
@@ -90,7 +134,7 @@ api.interceptors.response.use(
           `${BASE_URL}/auth/refresh-token`, 
           {},
           {
-            headers: { 'Content-Type': 'application/json' },
+            headers: applyCsrfHeader({ 'Content-Type': 'application/json' }),
             withCredentials: true,
           }
         );

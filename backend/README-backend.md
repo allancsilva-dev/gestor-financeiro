@@ -105,6 +105,22 @@ DB_PASSWORD=sua_senha
 JWT_SECRET=seu_jwt_secret_aqui
 ```
 
+Para usar o banco principal na VPS Hostinger, use o profile `vps`:
+
+```env
+SPRING_PROFILES_ACTIVE=vps
+DATABASE_URL=jdbc:postgresql://187.77.61.191:5433/dbnexos-gestor-financeiro
+DB_USERNAME=admin_nexos
+DB_PASSWORD=sua_senha
+JWT_SECRET=seu_jwt_secret_aqui
+```
+
+O profile padrão do backend é `vps`. Para desenvolvimento local com PostgreSQL local/Docker, defina:
+
+```env
+SPRING_PROFILES_ACTIVE=dev
+```
+
 > Para gerar um JWT Secret seguro: https://randomkeygen.com/
 
 4. Crie o banco de dados no PostgreSQL:

@@ -15,9 +15,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -133,7 +135,8 @@ class AuthControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.accessToken").exists())
             .andExpect(jsonPath("$.token").doesNotExist())
-            .andExpect(cookie().exists("refreshToken"));
+            .andExpect(cookie().exists("refreshToken"))
+            .andExpect(cookie().exists("csrfToken"));
     }
 
     @Test
@@ -179,7 +182,7 @@ class AuthControllerTest {
     void refreshToken_deveRenovarComCookieValido() throws Exception {
         usuarioRepository.save(TestDataFactory.usuario("Alice", "alice@teste.com", passwordEncoder.encode("123456")));
 
-        String setCookie = mockMvc.perform(post("/api/auth/login")
+        List<String> setCookies = mockMvc.perform(post("/api/auth/login")
                 .header("X-Forwarded-For", "10.0.0.14")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
@@ -189,22 +192,50 @@ class AuthControllerTest {
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
-            .getHeader("Set-Cookie");
+            .getHeaders("Set-Cookie");
 
-        String refreshToken = extrairValorCookie(setCookie);
+        String refreshToken = extrairValorCookie(setCookies, "refreshToken");
+        String csrfToken = extrairValorCookie(setCookies, "csrfToken");
 
         mockMvc.perform(post("/api/auth/refresh-token")
+                .header("X-CSRF-Token", csrfToken)
+                .cookie(new jakarta.servlet.http.Cookie("csrfToken", csrfToken))
                 .cookie(new jakarta.servlet.http.Cookie("refreshToken", refreshToken)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.accessToken").exists())
-            .andExpect(cookie().exists("refreshToken"));
+            .andExpect(cookie().exists("refreshToken"))
+            .andExpect(cookie().exists("csrfToken"));
+    }
+
+    @Test
+    void refreshToken_deveFalharSemCsrfToken() throws Exception {
+        usuarioRepository.save(TestDataFactory.usuario("Alice", "alice@teste.com", passwordEncoder.encode("123456")));
+
+        List<String> setCookies = mockMvc.perform(post("/api/auth/login")
+                .header("X-Forwarded-For", "10.0.0.18")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "email", "alice@teste.com",
+                        "password", "123456"
+                ))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getHeaders("Set-Cookie");
+
+        String refreshToken = extrairValorCookie(setCookies, "refreshToken");
+
+        mockMvc.perform(post("/api/auth/refresh-token")
+                .cookie(new jakarta.servlet.http.Cookie("refreshToken", refreshToken)))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("CSRF_REQUIRED"));
     }
 
     @Test
     void refreshToken_deveFalharComTokenRevogado() throws Exception {
         usuarioRepository.save(TestDataFactory.usuario("Alice", "alice@teste.com", passwordEncoder.encode("123456")));
 
-        String setCookie = mockMvc.perform(post("/api/auth/login")
+        List<String> setCookies = mockMvc.perform(post("/api/auth/login")
                 .header("X-Forwarded-For", "10.0.0.15")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
@@ -214,15 +245,20 @@ class AuthControllerTest {
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
-            .getHeader("Set-Cookie");
+            .getHeaders("Set-Cookie");
 
-        String refreshToken = extrairValorCookie(setCookie);
+        String refreshToken = extrairValorCookie(setCookies, "refreshToken");
+        String csrfToken = extrairValorCookie(setCookies, "csrfToken");
 
         mockMvc.perform(post("/api/auth/logout")
+                .header("X-CSRF-Token", csrfToken)
+                .cookie(new jakarta.servlet.http.Cookie("csrfToken", csrfToken))
                 .cookie(new jakarta.servlet.http.Cookie("refreshToken", refreshToken)))
             .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/auth/refresh-token")
+                .header("X-CSRF-Token", csrfToken)
+                .cookie(new jakarta.servlet.http.Cookie("csrfToken", csrfToken))
                 .cookie(new jakarta.servlet.http.Cookie("refreshToken", refreshToken)))
                         .andExpect(status().isUnauthorized())
                         .andExpect(jsonPath("$.code").value("TOKEN_REUSE_DETECTED"))
@@ -233,7 +269,7 @@ class AuthControllerTest {
         void refreshToken_deveDetectarReusoAposRotacao() throws Exception {
                 usuarioRepository.save(TestDataFactory.usuario("Alice", "alice@teste.com", passwordEncoder.encode("123456")));
 
-                String loginSetCookie = mockMvc.perform(post("/api/auth/login")
+                List<String> loginSetCookies = mockMvc.perform(post("/api/auth/login")
                                 .header("X-Forwarded-For", "10.0.0.17")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(Map.of(
@@ -243,22 +279,27 @@ class AuthControllerTest {
                         .andExpect(status().isOk())
                         .andReturn()
                         .getResponse()
-                        .getHeader("Set-Cookie");
+                        .getHeaders("Set-Cookie");
 
-                String tokenA = extrairValorCookie(loginSetCookie);
+                String tokenA = extrairValorCookie(loginSetCookies, "refreshToken");
+                String csrfToken = extrairValorCookie(loginSetCookies, "csrfToken");
 
-                String refreshSetCookie = mockMvc.perform(post("/api/auth/refresh-token")
+                List<String> refreshSetCookies = mockMvc.perform(post("/api/auth/refresh-token")
                                 .header("X-Forwarded-For", "10.0.0.17")
+                                .header("X-CSRF-Token", csrfToken)
+                                .cookie(new jakarta.servlet.http.Cookie("csrfToken", csrfToken))
                                 .cookie(new jakarta.servlet.http.Cookie("refreshToken", tokenA)))
                         .andExpect(status().isOk())
                         .andReturn()
                         .getResponse()
-                        .getHeader("Set-Cookie");
+                        .getHeaders("Set-Cookie");
 
-                assertThat(extrairValorCookie(refreshSetCookie)).isNotEqualTo(tokenA);
+                assertThat(extrairValorCookie(refreshSetCookies, "refreshToken")).isNotEqualTo(tokenA);
 
                 mockMvc.perform(post("/api/auth/refresh-token")
                                 .header("X-Forwarded-For", "10.0.0.99")
+                                .header("X-CSRF-Token", csrfToken)
+                                .cookie(new jakarta.servlet.http.Cookie("csrfToken", csrfToken))
                                 .cookie(new jakarta.servlet.http.Cookie("refreshToken", tokenA)))
                         .andExpect(status().isUnauthorized())
                         .andExpect(jsonPath("$.code").value("TOKEN_REUSE_DETECTED"))
@@ -273,7 +314,7 @@ class AuthControllerTest {
     void logout_deveLimparCookie() throws Exception {
         usuarioRepository.save(TestDataFactory.usuario("Alice", "alice@teste.com", passwordEncoder.encode("123456")));
 
-        String setCookie = mockMvc.perform(post("/api/auth/login")
+        List<String> setCookies = mockMvc.perform(post("/api/auth/login")
                 .header("X-Forwarded-For", "10.0.0.16")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
@@ -283,19 +324,23 @@ class AuthControllerTest {
             .andExpect(status().isOk())
             .andReturn()
             .getResponse()
-            .getHeader("Set-Cookie");
+            .getHeaders("Set-Cookie");
 
-        String refreshToken = extrairValorCookie(setCookie);
+        String refreshToken = extrairValorCookie(setCookies, "refreshToken");
+        String csrfToken = extrairValorCookie(setCookies, "csrfToken");
 
-        String logoutSetCookie = mockMvc.perform(post("/api/auth/logout")
+        List<String> logoutSetCookies = mockMvc.perform(post("/api/auth/logout")
+                .header("X-CSRF-Token", csrfToken)
+                .cookie(new jakarta.servlet.http.Cookie("csrfToken", csrfToken))
                 .cookie(new jakarta.servlet.http.Cookie("refreshToken", refreshToken)))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.message").value("Logout realizado com sucesso"))
             .andReturn()
             .getResponse()
-            .getHeader("Set-Cookie");
+            .getHeaders("Set-Cookie");
 
-        assertThat(logoutSetCookie).contains("Max-Age=0");
+        assertThat(logoutSetCookies).anySatisfy(cookie -> assertThat(cookie).contains("refreshToken=", "Max-Age=0"));
+        assertThat(logoutSetCookies).anySatisfy(cookie -> assertThat(cookie).contains("csrfToken=", "Max-Age=0"));
     }
 
     @Test
@@ -370,8 +415,28 @@ class AuthControllerTest {
             .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }
 
-    private String extrairValorCookie(String setCookie) {
-        assertThat(setCookie).isNotNull();
+    @Test
+    void validateToken_deveAplicarRateLimitEmGet() throws Exception {
+        for (int i = 0; i < 10; i++) {
+            mockMvc.perform(get("/api/auth/validate-token")
+                    .header("X-Forwarded-For", "10.0.0.50")
+                    .param("token", "fake-token-" + i))
+                .andExpect(status().isUnprocessableEntity());
+        }
+
+        mockMvc.perform(get("/api/auth/validate-token")
+                .header("X-Forwarded-For", "10.0.0.50")
+                .param("token", "fake-token-final"))
+            .andExpect(status().isTooManyRequests())
+            .andExpect(header().string("Retry-After", "60"));
+    }
+
+    private String extrairValorCookie(List<String> setCookies, String nome) {
+        assertThat(setCookies).isNotNull();
+        String setCookie = setCookies.stream()
+            .filter(cookie -> cookie.startsWith(nome + "="))
+            .findFirst()
+            .orElseThrow();
         String parChaveValor = setCookie.split(";", 2)[0];
         return parChaveValor.split("=", 2)[1];
     }
