@@ -2,7 +2,7 @@
 
 Documentacao de alto nivel sobre como o sistema funciona. Mantido pelo `docs-reporter`.
 
-**Ultima atualizacao:** 2026-07-06
+**Ultima atualizacao:** 2026-07-07
 
 ---
 
@@ -164,7 +164,7 @@ O sistema e **single-tenant** — nao ha multi-tenancy corporativa. Cada usuario
 
 1. **Migrations versionadas implementadas (Flyway):** `V1__baseline_schema.sql` com 10 tabelas. `ddl-auto=validate` em dev e prod. PROB-0006 resolvido.
 2. **Sem testes no mobile:** nao ha scripts de test/lint configurados no `mobile/package.json`.
-3. **Cobertura de testes backend limitada:** apenas 6 arquivos de teste (Auth, Transacao, Security, Infrastructure, Application, TestDataFactory).
+3. **Cobertura de testes backend limitada:** suite atual passa com 34 testes, mas cobre poucos fluxos comparado ao tamanho do domínio.
 4. **Cobertura de testes frontend limitada:** poucos testes Vitest configurados.
 5. **Sem politica de privacidade documentada:** relevante para conformidade LGPD.
 6. **Sem exportacao de dados do usuario:** nao ha endpoint de portabilidade (LGPD).
@@ -182,7 +182,7 @@ O sistema e **single-tenant** — nao ha multi-tenancy corporativa. Cada usuario
 17. **CSRF ausente no frontend web:** withCredentials:true sem token CSRF (PROB-0019).
 18. **Queries otimizadas:** findAll() substituido por JPQL UPDATE filtrado (PROB-0003, PROB-0020 resolvidos).
 19. **Dashboard otimizado:** agregacoes SQL SUM/COUNT, zero carregamento de entidades em memoria (PROB-0004 resolvido).
-20. **49 `any` types no frontend:** zero type safety nos services (PROB-0027).
+20. **54 `any` types no frontend:** zero type safety nos services e componentes (PROB-0027).
 
 ## Pontos frageis atuais
 
@@ -199,13 +199,14 @@ O sistema e **single-tenant** — nao ha multi-tenancy corporativa. Cada usuario
 11. **Operacoes transacionais corrigidas:** todos os metodos de escrita com @Transactional (PROB-0012 resolvido).
 12. **@Autowired field injection em vez de constructor injection:** dificulta testes unitarios e immutability.
 
-## Auditoria mais recente
+## Auditoria e estado atual
 
 - **Data:** 2026-07-06
 - **Tipo:** Auditoria completa de seguranca, bugs e codigo inacabado (read-only)
 - **Escopo:** backend (100%), frontend web (100%), mobile (100%)
-- **Resultado:** PASS_COM_RESSALVA — sistema funcional mas nao pronto para producao
-- **Achados:** 15 CRITICAL, 12 HIGH, 32 MEDIUM, 24 LOW (83 total)
+- **Resultado original:** PASS_COM_RESSALVA — sistema funcional mas nao pronto para producao
+- **Achados originais:** 15 CRITICAL, 12 HIGH, 32 MEDIUM, 24 LOW (83 total)
 - **Relatorio:** `docs/REVIEW_REPORTS/2026-07-06_full-system_security-and-bug-audit.md`
 - **Problem Ledger:** 30 problemas registrados (PROB-0001 a PROB-0030)
 - **Backlog:** 35 itens registrados (BACKLOG-0001 a BACKLOG-0035)
+- **Atualizacao pos-auditoria:** Fase 0 backend concluida em 2026-07-07 com ressalvas; backend passou 34/34 testes. Pendencias atuais concentram-se em validacao PostgreSQL real, mobile P0/P1, CSRF frontend, limpeza frontend/mobile, CI/CD e deploy.

@@ -63,7 +63,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Prioridade:** P0
 - **Area:** mobile
 - **Motivo:** Usuario perde sessao toda vez que abre o app
-- **Dependencias:** PROB-0013 resolvido
+- **Dependencias:** Resolver PROB-0013
 - **Criterio de aceite:** Token armazenado no SecureStore; sessao restaurada no cold start; sem flash de login
 - **Risco se ficar pendente:** Experiencia de usuario inaceitavel
 - **Status:** ABERTO
@@ -76,7 +76,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Prioridade:** P0
 - **Area:** mobile
 - **Motivo:** IP fixo quebra app em qualquer rede que nao a do dev
-- **Dependencias:** PROB-0014 resolvido
+- **Dependencias:** Resolver PROB-0014
 - **Criterio de aceite:** URL da API configurada via expo-constants ou env var
 - **Risco se ficar pendente:** App inutilizavel fora da rede do dev
 - **Status:** ABERTO
@@ -90,9 +90,9 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Area:** backend, seguranca
 - **Motivo:** Minimo de 6 caracteres sem requisitos de complexidade para app financeiro
 - **Dependencias:** PROB-0007 resolvido
-- **Criterio de aceite:** Min 8 chars, 1 maiuscula, 1 minuscula, 1 digito, 1 especial
+- **Criterio de aceite:** Min 8 chars, ao menos 1 letra e 1 digito, aplicado em registro e reset de senha
 - **Risco se ficar pendente:** Contas vulneraveis a ataques de forca bruta
-- **Status:** ABERTO
+- **Status:** FECHADO (PR-FOUNDATION-07, 2026-07-07)
 
 ---
 
@@ -141,8 +141,8 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Prioridade:** P1
 - **Area:** backend, seguranca
 - **Motivo:** Fallbacks inseguros se env vars nao setadas
-- **Dependencias:** PROB-0009 resolvido
-- **Criterio de aceite:** App falha na inicializacao sem DB_PASSWORD e JWT_SECRET setados
+- **Dependencias:** PROB-0009 parcial
+- **Criterio de aceite:** Decidir se ambiente dev deve falhar sem DB_PASSWORD/JWT_SECRET ou manter defaults locais documentados
 - **Risco se ficar pendente:** Seguranca comprometida em configuracao padrao
 - **Status:** ABERTO
 
@@ -157,7 +157,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** PROB-0005, PROB-0006, PROB-0010 resolvidos
 - **Criterio de aceite:** cookie.secure=true, CORS sem fallback, ddl-auto=validate em prod
 - **Risco se ficar pendente:** Cookies inseguros, CORS permissivo, schema drift
-- **Status:** ABERTO
+- **Status:** FECHADO (PR-FOUNDATION-05, 2026-07-07)
 
 ---
 
@@ -180,7 +180,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Prioridade:** P1
 - **Area:** mobile
 - **Motivo:** Botoes que parecem clicaveis mas nao fazem nada
-- **Dependencias:** PROB-0015 resolvido
+- **Dependencias:** Resolver PROB-0015
 - **Criterio de aceite:** "Esqueceu a senha" navega para forgot-password; "Ver todas" navega para lista
 - **Risco se ficar pendente:** UX quebrada, frustracao do usuario
 - **Status:** ABERTO
@@ -193,7 +193,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Prioridade:** P1
 - **Area:** mobile
 - **Motivo:** Codigo morto causando confusao
-- **Dependencias:** PROB-0025 resolvido
+- **Dependencias:** Resolver PROB-0025
 - **Criterio de aceite:** App.tsx removido; index.ts limpo ou re-exportando expo-router
 - **Risco se ficar pendente:** Confusao para devs — "qual entry point esta sendo usado?"
 - **Status:** ABERTO
@@ -206,7 +206,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Prioridade:** P0
 - **Area:** mobile
 - **Motivo:** Endpoint 404 — dados nao carregam na tela de perfil
-- **Dependencias:** PROB-0016 resolvido
+- **Dependencias:** Resolver PROB-0016
 - **Criterio de aceite:** Perfil carrega dados do dashboard corretamente
 - **Risco se ficar pendente:** Tela de perfil quebrada
 - **Status:** ABERTO
@@ -219,7 +219,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Prioridade:** P1
 - **Area:** mobile
 - **Motivo:** Falhas silenciosas — usuario nao sabe que operacao falhou
-- **Dependencias:** PROB-0017 resolvido
+- **Dependencias:** Resolver restante de PROB-0017
 - **Criterio de aceite:** Toda mutation com onError que mostra Alert ou toast
 - **Risco se ficar pendente:** Usuario acredita que operacao foi concluida mas nao foi
 - **Status:** ABERTO
@@ -232,7 +232,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Prioridade:** P2
 - **Area:** mobile
 - **Motivo:** Codigo duplicado em 5 arquivos
-- **Dependencias:** PROB-0028 resolvido
+- **Dependencias:** Resolver PROB-0028
 - **Criterio de aceite:** Funcao parseCurrencyBR exportada de format.ts; 5 arquivos importam dela
 - **Risco se ficar pendente:** Manutencao fragil — bug de parse precisa ser corrigido em 5 lugares
 - **Status:** ABERTO
@@ -245,7 +245,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Prioridade:** P2
 - **Area:** backend
 - **Motivo:** API atual deprecated; upgrade necessario para correcoes de seguranca
-- **Dependencias:** PROB-0022 resolvido
+- **Dependencias:** Resolver PROB-0022
 - **Criterio de aceite:** jjwt 0.12.x; `Jwts.parser().verifyWith(key).build().parseSignedClaims(token)`
 - **Risco se ficar pendente:** Sem patches de seguranca do jjwt
 - **Status:** ABERTO
@@ -259,9 +259,9 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Area:** backend, seguranca
 - **Motivo:** Rate limit por IP nao protege contra ataque distribuido
 - **Dependencias:** PROB-0023 resolvido
-- **Criterio de aceite:** Conta bloqueada por 15min apos 10 falhas; mensagem clara ao usuario
+- **Criterio de aceite:** Conta bloqueada por limite configuravel de falhas; default atual 5 falhas por 15min; mensagem clara ao usuario
 - **Risco se ficar pendente:** Senhas vulneraveis a brute force multi-IP
-- **Status:** ABERTO
+- **Status:** FECHADO (PR-FOUNDATION-07, 2026-07-07)
 
 ---
 
@@ -274,7 +274,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** PROB-0024 resolvido
 - **Criterio de aceite:** Scheduled task limpa entradas expiradas a cada 60s
 - **Risco se ficar pendente:** Memory leak em uptime prolongado
-- **Status:** ABERTO
+- **Status:** FECHADO (PR-FOUNDATION-07, 2026-07-07)
 
 ---
 
@@ -296,8 +296,8 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Titulo:** Substituir `any` por tipos explicitos nos metodos de service do frontend
 - **Prioridade:** P2
 - **Area:** frontend
-- **Motivo:** 49 ocorrencias de `any` removem type safety
-- **Dependencias:** PROB-0027 resolvido
+- **Motivo:** 54 ocorrencias de `any` removem type safety
+- **Dependencias:** Resolver PROB-0027
 - **Criterio de aceite:** Zero any nos arquivos de service; parametros tipados com interfaces do types/index.ts
 - **Risco se ficar pendente:** Erros de tipo so descobertos em runtime
 - **Status:** ABERTO
@@ -401,7 +401,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Prioridade:** P3
 - **Area:** frontend
 - **Motivo:** URLs invalidas mostram tela em branco
-- **Dependencias:** PROB-0029 resolvido
+- **Dependencias:** Resolver PROB-0029
 - **Criterio de aceite:** Rota `*` renderiza NotFound com link para Dashboard ou Login
 - **Risco se ficar pendente:** UX ruim para URLs erradas
 - **Status:** ABERTO
@@ -414,8 +414,8 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Prioridade:** P3
 - **Area:** frontend
 - **Motivo:** Logs de debug em producao
-- **Dependencias:** PROB-0030 resolvido
-- **Criterio de aceite:** Zero console.log; console.error apenas em ErrorBoundary
+- **Dependencias:** Resolver PROB-0030
+- **Criterio de aceite:** Zero console.log; console.error apenas em ErrorBoundary ou logger condicional
 - **Risco se ficar pendente:** Console poluido; dados vazados em logs
 - **Status:** ABERTO
 

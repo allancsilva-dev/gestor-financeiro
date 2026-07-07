@@ -1,9 +1,10 @@
 # Protocolo de Execução — Fundação Técnica do Gestor Financeiro
 
-**Projeto:** Gestor Financeiro  
-**Data:** 2026-07-07  
-**Documento complementar de:** `GESTOR_FINANCEIRO_ALTO_NIVEL_PROXIMOS_PASSOS.md`  
+**Projeto:** Gestor Financeiro
+**Data:** 2026-07-07
+**Documento complementar de:** `GESTOR_FINANCEIRO_ALTO_NIVEL_PROXIMOS_PASSOS.md`
 **Finalidade:** transformar a direção estratégica do projeto em um protocolo operacional para execução segura, incremental e rastreável por IA ou agente executor.
+**Status atual:** protocolo histórico. A Fase 0 foi executada em 2026-07-07 e o estado vigente está em `CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md`, `PROBLEM_LEDGER.md` e `BACKLOG.md`.
 
 ---
 
@@ -15,7 +16,7 @@ O documento principal define **o que é um gestor financeiro pessoal de alto ní
 
 Este documento define **como a IA deve executar as mudanças no sistema**, um PR por vez, sem misturar escopos, sem antecipar features e sem marcar como concluído algo que não tenha evidência objetiva.
 
-A partir deste ponto, toda execução técnica da Fase 0 deve seguir este protocolo.
+A execução técnica da Fase 0 seguiu este protocolo. Para novos trabalhos, usar este arquivo como referência histórica e seguir o estado atual registrado no checklist/backlog.
 
 ---
 
@@ -498,16 +499,25 @@ Com este arquivo complementar, o projeto passa a ter dois documentos centrais pa
 1. `GESTOR_FINANCEIRO_ALTO_NIVEL_PROXIMOS_PASSOS.md` — direção técnica e visão de produto de alto nível;
 2. `PROTOCOLO_EXECUCAO_FOUNDATION_GESTOR_FINANCEIRO.md` — protocolo operacional para a IA executar a Fase 0 com segurança.
 
-A próxima ação recomendada é iniciar o primeiro PR da Fase 0:
+A ação recomendada originalmente era iniciar o primeiro PR da Fase 0:
 
 ```text
 PR-FOUNDATION-01 — Banco versionado com Flyway
 ```
 
-Status atual recomendado:
+Status recomendado original:
 
 ```text
 NAO_APTO_PARA_DEPLOY
-APTO_PARA_FASE_0_FOUNDATION
+OBSOLETO_APTO_PARA_FASE_0_FOUNDATION
 APTO_PARA_EXECUCAO_CONTROLADA_POR_PR
+```
+
+Status vigente após execução da Fase 0:
+
+```text
+NAO_APTO_PARA_DEPLOY
+APTO_PARA_POS_FASE_0_ESTABILIZACAO
+PENDENTE_VALIDACAO_POSTGRESQL_REAL
+PENDENTE_MOBILE_FRONTEND_P0_P1
 ```

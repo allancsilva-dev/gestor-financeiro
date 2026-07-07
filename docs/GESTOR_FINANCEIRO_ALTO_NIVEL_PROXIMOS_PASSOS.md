@@ -1,7 +1,7 @@
 # Gestor Financeiro Pessoal de Alto Nível — Direção Técnica e Próximos Passos
 
-**Projeto:** Gestor Financeiro  
-**Data:** 2026-07-07  
+**Projeto:** Gestor Financeiro
+**Data:** 2026-07-07
 **Objetivo:** definir o que caracteriza um gestor financeiro pessoal de alto nível e qual deve ser a sequência correta de evolução do projeto, considerando robustez, segurança, integridade financeira, performance, UX e capacidade de crescimento.
 
 ---
@@ -22,16 +22,16 @@ Um gestor financeiro pessoal de alto nível não é apenas uma tela para cadastr
 
 Ele deve responder quatro perguntas fundamentais com precisão:
 
-1. **Quanto eu tenho agora?**  
+1. **Quanto eu tenho agora?**
    Saldo consolidado em carteiras, contas, cartões, metas e compromissos pendentes.
 
-2. **Para onde meu dinheiro está indo?**  
+2. **Para onde meu dinheiro está indo?**
    Gastos por categoria, recorrências, padrões mensais, variações e alertas.
 
-3. **O que vai acontecer nos próximos dias ou meses?**  
+3. **O que vai acontecer nos próximos dias ou meses?**
    Contas futuras, parcelas, faturas, metas, orçamento projetado e risco de saldo negativo.
 
-4. **O que eu deveria fazer?**  
+4. **O que eu deveria fazer?**
    Recomendações, limites, alertas, planejamento, economia possível e priorização de compromissos.
 
 A diferença entre um sistema simples e um sistema de alto nível está na confiabilidade. Se o usuário paga uma parcela, move saldo, edita uma transação, exclui uma conta ou altera uma meta, o sistema precisa manter consistência absoluta. Em finanças pessoais, uma diferença pequena de saldo já destrói a confiança do produto.
@@ -123,81 +123,68 @@ O fluxo principal já existe: cadastro, login, dashboard, categorias, contas, ca
 
 ### 4.2 Problemas críticos registrados
 
-O `PROBLEM_LEDGER.md` registra 30 problemas abertos. Os mais críticos para continuidade são:
+O `PROBLEM_LEDGER.md` registra 30 problemas auditados. A Fase 0 fechou os principais riscos backend: IDOR, race condition com `@Version`, `findAll()` massivo, agregação em memória no dashboard, `cookie.secure`, `ddl-auto=update`, política de senha, rate limit, CORS de produção, logs de reset, `@Transactional`, delete sem ownership, account lockout e limpeza do mapa de rate limit.
 
-- `PROB-0001`: IDOR no `TransacaoService` envolvendo ownership de `categoriaId` e `contaId`;
-- `PROB-0002`: race condition em saldo de carteira;
-- `PROB-0003`: `findAll()` massivo em tarefas agendadas;
-- `PROB-0004`: agregação em memória no dashboard;
-- `PROB-0005`: `cookie.secure` ausente em produção;
-- `PROB-0006`: `ddl-auto=update` em produção;
-- `PROB-0007`: política de senha fraca;
-- `PROB-0008`: rate limit incompleto;
-- `PROB-0009`: secrets com default inseguro;
-- `PROB-0010`: CORS de produção com fallback para localhost;
-- `PROB-0011`: e-mail e token de reset logados;
-- `PROB-0012`: `@Transactional` ausente em operações de escrita;
-- `PROB-0013` a `PROB-0017`: problemas estruturais no mobile;
-- `PROB-0019`: CSRF ausente no frontend;
-- `PROB-0021`: delete sem ownership em `CarteiraService`;
-- `PROB-0029`: frontend sem rota 404;
-- `PROB-0030`: `console.log` em produção.
+Os riscos relevantes ainda abertos ou parciais estão concentrados em mobile, frontend e validação operacional:
 
-Esses itens impedem um aceite técnico sério. Eles devem ser tratados antes de novas features de produto.
+- `PROB-0009`: defaults fracos permanecem em ambiente dev por decisão local;
+- `PROB-0013` a `PROB-0018`: problemas estruturais no mobile;
+- `PROB-0019`: CSRF no frontend web ainda aberto;
+- `PROB-0022`: API deprecated do JJWT;
+- `PROB-0025` a `PROB-0030`: limpeza mobile/frontend, tipagem, rota 404 e logs.
 
-### 4.3 Contradição documental
+A base backend está mais estável, mas o sistema ainda não deve ir para produção pública sem fechar P0/P1 de mobile/frontend e validar PostgreSQL real.
 
-O arquivo `PROXIMOS_PASSOS.md` antigo coloca deploy em produção como prioridade alta. Porém, os arquivos mais recentes `PROBLEM_LEDGER.md`, `BACKLOG.md` e `SYSTEM_OVERVIEW.md` mostram pendências P0/P1 que tornam o deploy arriscado.
+### 4.3 Contradição documental resolvida
 
-Portanto, a decisão correta é substituir a prioridade antiga por uma etapa de estabilização técnica antes do deploy.
+O arquivo `PROXIMOS_PASSOS.md` antigo coloca deploy em produção como prioridade alta. O estado atual pós-Fase 0 mostra que deploy ainda depende de validação PostgreSQL real, CI/CD, configuração operacional e fechamento das pendências abertas em mobile/frontend.
+
+Portanto, a prioridade antiga de deploy deve ser lida como obsoleta. A prioridade atual é estabilizar clientes, validar banco real e preparar operação.
 
 ---
 
-## 5. Decisões existentes que devem ser questionadas
+## 5. Decisões técnicas e estado atual
 
 ### 5.1 `ddl-auto=update`
 
-**Decisão atual:** usar Hibernate para atualizar o schema automaticamente.  
-**Problema:** em sistema financeiro, isso cria risco de schema drift, alteração silenciosa, perda de previsibilidade e diferença entre ambientes.  
-**Decisão recomendada:** migrar imediatamente para Flyway.  
-**Critério de aceite:** aplicação sobe com banco limpo usando migrations; produção usa `ddl-auto=validate` ou `none`.
+**Estado atual:** corrigido na Fase 0. O backend usa Flyway e `ddl-auto=validate`.
+**Risco residual:** validação de startup com PostgreSQL real ainda pendente.
+**Próximo passo:** executar validação com Docker/PostgreSQL ou ambiente equivalente.
 
 ### 5.2 Ownership manual espalhado
 
-**Decisão atual:** cada service valida ownership manualmente.  
-**Problema:** já existem falhas registradas, como uso de categoria/conta sem garantir que pertencem ao usuário.  
-**Decisão recomendada:** padronizar repositories e services com métodos obrigatórios por usuário.  
-**Critério de aceite:** nenhum fluxo autenticado acessa entidade financeira por `id` isolado.
+**Estado atual:** principais fluxos corrigidos com métodos por `usuarioId`.
+**Risco residual:** ownership continua sendo disciplina manual de service/repository.
+**Próximo passo:** manter padrão obrigatório em novos PRs e ampliar testes negativos quando novos recursos surgirem.
 
 ### 5.3 Atualização direta de saldo
 
-**Decisão atual:** entidades financeiras alteram saldo/valores sem locking otimista.  
-**Problema:** duas operações simultâneas podem corromper saldo.  
-**Decisão recomendada:** adicionar `@Version` em entidades financeiras e tratar conflito.  
-**Critério de aceite:** conflito concorrente retorna erro controlado e não grava saldo incorreto.
+**Estado atual:** `@Version` adicionado nas entidades financeiras principais e escritas críticas usam `@Transactional`.
+**Risco residual:** teste de concorrência real com PostgreSQL ainda pendente.
+**Próximo passo:** validar conflito em banco real antes de deploy.
 
 ### 5.4 Dashboard calculado em memória
 
-**Decisão atual:** carregar dados e somar com Stream.  
-**Problema:** não escala com histórico real.  
-**Decisão recomendada:** agregações SQL/JPQL com `SUM`, `GROUP BY`, filtros por período e índices adequados.  
-**Critério de aceite:** dashboard deve responder rápido com alto volume de transações.
+**Estado atual:** dashboard usa agregações no repositório para somatórios críticos.
+**Risco residual:** performance real ainda validada só com H2/testes locais.
+**Próximo passo:** executar carga mínima em PostgreSQL com volume representativo.
 
 ### 5.5 Mobile tratado como extensão simples
 
-**Decisão atual:** mobile existe, mas com IP fixo, token volátil e erros silenciosos.  
-**Problema:** isso torna o app inviável fora do ambiente local.  
-**Decisão recomendada:** tratar mobile como cliente oficial da API, com sessão persistida, env por ambiente, paths corretos e feedback de erro.  
+**Decisão atual:** mobile existe, mas com IP fixo, token volátil e erros silenciosos.
+**Problema:** isso torna o app inviável fora do ambiente local.
+**Decisão recomendada:** tratar mobile como cliente oficial da API, com sessão persistida, env por ambiente, paths corretos e feedback de erro.
 **Critério de aceite:** app abre, restaura sessão, consome API correta e informa falhas.
 
 ---
 
-## 6. Próximo passo correto: Fase 0 — Fundação obrigatória
+## 6. Fase 0 — Fundação backend executada
 
-Esta fase deve ser executada antes de qualquer nova funcionalidade de produto. O objetivo é transformar o MVP funcional em uma base confiável.
+Esta fase foi executada em 2026-07-07 com status geral `CONCLUIDA` e ressalvas. O objetivo foi transformar o MVP funcional em uma base backend mais confiável.
 
 ### PR-FOUNDATION-01 — Banco versionado com Flyway
 
+**Status:** `PASS_COM_RESSALVA`
 **Objetivo:** remover dependência de `ddl-auto=update` e criar governança real de schema.
 
 **Escopo:**
@@ -218,6 +205,7 @@ Esta fase deve ser executada antes de qualquer nova funcionalidade de produto. O
 
 ### PR-FOUNDATION-02 — Ownership e IDOR
 
+**Status:** `PASS`
 **Objetivo:** impedir acesso cruzado entre usuários em todos os fluxos financeiros.
 
 **Escopo:**
@@ -236,6 +224,7 @@ Esta fase deve ser executada antes de qualquer nova funcionalidade de produto. O
 
 ### PR-FOUNDATION-03 — Integridade financeira e locking
 
+**Status:** `PASS_COM_RESSALVA`
 **Objetivo:** impedir corrupção de saldo e inconsistência em operações simultâneas.
 
 **Escopo:**
@@ -255,6 +244,7 @@ Esta fase deve ser executada antes de qualquer nova funcionalidade de produto. O
 
 ### PR-FOUNDATION-04 — Performance de consultas críticas
 
+**Status:** `PASS_COM_RESSALVA`
 **Objetivo:** remover padrões que quebram com volume real.
 
 **Escopo:**
@@ -274,6 +264,7 @@ Esta fase deve ser executada antes de qualquer nova funcionalidade de produto. O
 
 ### PR-FOUNDATION-05 — Segurança de sessão, cookies, CORS e CSRF
 
+**Status:** `PASS_COM_RESSALVA`
 **Objetivo:** fechar riscos básicos de autenticação e sessão.
 
 **Escopo:**
@@ -297,6 +288,7 @@ Esta fase deve ser executada antes de qualquer nova funcionalidade de produto. O
 
 ### PR-FOUNDATION-06 — Contrato de erro e observabilidade mínima
 
+**Status:** `PASS`
 **Objetivo:** tornar falhas rastreáveis e compreensíveis.
 
 **Escopo:**
@@ -640,18 +632,18 @@ Uma entrega só deve ser aceita quando cumprir todos os pontos aplicáveis:
 
 ### Agora
 
-Executar Fase 0 completa:
+Fechar pendências pós-Fase 0:
 
-1. Flyway e `ddl-auto=validate`;
-2. IDOR e ownership;
-3. locking financeiro e `@Transactional`;
-4. queries críticas e dashboard SQL;
-5. segurança de sessão, CSRF, CORS, secrets e logs;
-6. erro padronizado e health check de banco.
+1. validar Flyway/startup com PostgreSQL real;
+2. corrigir mobile P0: token persistente, URL por ambiente, path `/v1/dashboard/resumo`;
+3. corrigir mobile P1: handlers mortos, erros silenciosos restantes, entry points zumbis;
+4. decidir e implementar estratégia CSRF do frontend web ou documentar dispensa técnica completa;
+5. limpar logs frontend/mobile e rota 404;
+6. atualizar CI/build para backend, frontend e mobile.
 
 ### Depois
 
-Executar Fase 1:
+Executar Fase 1 depois que pendências P0/P1 estiverem fechadas:
 
 1. onboarding financeiro;
 2. orçamento mensal;
@@ -693,12 +685,12 @@ Executar Fase 4:
 
 ## 15. Recomendação final
 
-O projeto não deve ser colocado em “OK” apenas porque funciona localmente. O caminho correto é tratar o sistema como produto financeiro desde agora.
+O projeto não deve ser colocado em “OK” apenas porque o backend passa nos testes locais. O caminho correto é tratar o sistema como produto financeiro completo: backend, frontend, mobile, banco real e operação.
 
-A próxima entrega deve ser uma fundação técnica obrigatória, não uma feature. O primeiro marco de qualidade deve ser: **dados financeiros íntegros, usuário isolado, banco versionado, sessão segura, consultas escaláveis e falhas rastreáveis.**
+A fundação backend foi executada. A próxima entrega deve fechar as pendências de cliente e validação operacional. O marco de qualidade atual deve ser: **backend validado em PostgreSQL real, mobile utilizável fora da rede local, frontend sem lacunas básicas de segurança/UX e pipeline de build confiável.**
 
-Depois que essa base estiver fechada, a análise deve ser refeita. Somente então vale decidir os próximos incrementos de produto, como orçamento, faturas, projeções, relatórios, exportação, mobile completo e deploy público.
+Depois que essa base estiver fechada, a análise deve ser refeita. Somente então vale decidir os próximos incrementos de produto, como orçamento, faturas, projeções, relatórios, exportação e deploy público.
 
-**Status recomendado atual:** `NAO_APTO_PARA_DEPLOY`  
-**Status recomendado para desenvolvimento:** `APTO_PARA_FASE_0_FOUNDATION`  
-**Prioridade real:** corrigir fundação antes de expandir produto.
+**Status recomendado atual:** `NAO_APTO_PARA_DEPLOY`
+**Status recomendado para desenvolvimento:** `APTO_PARA_POS_FASE_0_ESTABILIZACAO`
+**Prioridade real:** fechar mobile/frontend e validação PostgreSQL antes de expandir produto.

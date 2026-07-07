@@ -322,17 +322,17 @@ Registro central de problemas encontrados no sistema. Mantido pelo `docs-reporte
 - **Data:** 2026-07-06
 - **Origem:** auditoria completa do sistema
 - **Severidade:** HIGH
-- **Status:** ABERTO
+- **Status:** PARCIAL
 - **Area:** mobile
 - **Sintoma:** Se API falhar ao criar carteira ou marcar conta fixa como paga, usuario nao recebe nenhum feedback. Operacao falha silenciosamente.
-- **Causa raiz:** `criacaoMutation` em carteiras.tsx sem `onError`. `pagarMutation` em contas-fixas.tsx sem `onError`. Try/catch vazio em handleSalvar.
+- **Causa raiz:** `criarMutation` em carteiras.tsx sem `onError`. `pagarMutation` em contas-fixas.tsx sem `onError`. Try/catch vazio em handleSalvar.
 - **Impacto tecnico:** Usuario acredita que operacao foi concluida mas nao foi. Dados inconsistentes.
 - **Arquivos relacionados:** `mobile/app/(app)/more/carteiras.tsx:26-49`, `mobile/app/(app)/more/contas-fixas.tsx:24-31`
 - **Solucao proposta:** Adicionar onError handlers com Alert.alert() ou toast
-- **Solucao aplicada:** pendente
-- **Evidencias:** Mutations sem onError callback, blocos catch vazios
+- **Solucao aplicada:** parcial — criar conta fixa ja possui `onError`; criar carteira e pagar conta fixa ainda nao.
+- **Evidencias:** `carteiras.tsx` ainda tem `catch` vazio; `contas-fixas.tsx` tem `onError` em `criarMutation`, mas nao em `pagarMutation`.
 - **Riscos residuais:** Nenhum alem da UX melhorada
-- **Proximo passo:** Implementar onError em todas as mutations
+- **Proximo passo:** Implementar `onError` restante em carteira e pagamento de conta fixa
 
 ---
 
@@ -522,22 +522,22 @@ Registro central de problemas encontrados no sistema. Mantido pelo `docs-reporte
 
 ---
 
-## PROB-0027 — Frontend: 49 any types
+## PROB-0027 — Frontend: 54 any types
 
 - **ID:** PROB-0027
-- **Titulo:** Uso excessivo de 'any' em todo o frontend — 19 arquivos afetados
+- **Titulo:** Uso excessivo de 'any' em todo o frontend
 - **Data:** 2026-07-06
 - **Origem:** auditoria completa do sistema
 - **Severidade:** MEDIUM
 - **Status:** ABERTO
 - **Area:** frontend
-- **Sintoma:** 49 declaracoes `any` em 19 arquivos. Service methods recebem `any` em vez de tipos definidos.
+- **Sintoma:** 54 ocorrencias de `any` no frontend. Service methods recebem `any` em vez de tipos definidos.
 - **Causa raiz:** Tipos definidos em types/index.ts mas nao usados nas assinaturas dos services
 - **Impacto tecnico:** Zero type safety nas chamadas de API. Erros de tipagem so descobertos em runtime.
-- **Arquivos relacionados:** 19 arquivos em frontend/src/
+- **Arquivos relacionados:** `frontend/src/`
 - **Solucao proposta:** Substituir `any` por tipos explicitos (Categoria, Transacao, Carteira, etc.)
 - **Solucao aplicada:** pendente
-- **Evidencias:** Busca por `: any` revelou 49 ocorrencias
+- **Evidencias:** Busca atual por `\bany\b` revelou 54 ocorrencias.
 - **Riscos residuais:** Pode revelar erros de tipo antes escondidos — corrigir durante migracao
 - **Proximo passo:** Tipar metodos de service prioritariamente
 
@@ -588,7 +588,7 @@ Registro central de problemas encontrados no sistema. Mantido pelo `docs-reporte
 ## PROB-0030 — Frontend: console.log em produção
 
 - **ID:** PROB-0030
-- **Titulo:** Cinco console.log() e 25+ console.error() em codigo de producao frontend
+- **Titulo:** Cinco console.log() e 29 console.error() em codigo de producao frontend
 - **Data:** 2026-07-06
 - **Origem:** auditoria completa do sistema
 - **Severidade:** LOW
@@ -597,10 +597,10 @@ Registro central de problemas encontrados no sistema. Mantido pelo `docs-reporte
 - **Sintoma:** Logs de debug visiveis no console do navegador em producao
 - **Causa raiz:** console.log/error nao removidos apos desenvolvimento
 - **Impacto tecnico:** Console poluido. Vazamento de dados em console.error (emails, tokens em alguns casos).
-- **Arquivos relacionados:** authService.ts (x2), Login.tsx, GraficoEvolucaoMensal.tsx, GraficoGastosPorCategoria.tsx + 25 console.error em 15 arquivos
+- **Arquivos relacionados:** authService.ts (x2), Login.tsx, GraficoEvolucaoMensal.tsx, GraficoGastosPorCategoria.tsx + 29 console.error em frontend/src
 - **Solucao proposta:** Remover console.log. Manter console.error com gate de ambiente ou migrar para servico de logging.
 - **Solucao aplicada:** pendente
-- **Evidencias:** Busca por console.log e console.error
+- **Evidencias:** Busca atual: 5 `console.log`, 29 `console.error`
 - **Riscos residuais:** Perda de debugging em dev — usar logger condicional
 - **Proximo passo:** Limpeza de console.log; avaliar console.error caso a caso
 

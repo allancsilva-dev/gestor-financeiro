@@ -2,8 +2,10 @@
 
 Roadmap e planejamento de funcionalidades futuras do Gestor Financeiro.
 
-**Última atualização:** 30/11/2025  
+**Última atualização:** 30/11/2025
 **Versão atual:** 1.4.0
+
+> **Documento legado.** Este roadmap foi escrito antes da auditoria e da Fase 0 concluída em 2026-07-07. Para prioridade atual, usar `GESTOR_FINANCEIRO_ALTO_NIVEL_PROXIMOS_PASSOS.md`, `BACKLOG.md`, `PROBLEM_LEDGER.md` e `CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md`. Deploy não é prioridade imediata enquanto PostgreSQL real, mobile P0/P1, frontend CSRF/logs/404 e CI/CD estiverem pendentes.
 
 ---
 
@@ -21,8 +23,8 @@ Roadmap e planejamento de funcionalidades futuras do Gestor Financeiro.
 ## 🔴 Prioridade ALTA (v1.5.0)
 
 ### **1. Deploy em Produção** 🚀
-**Status:** ⏳ Pronto para iniciar  
-**Tempo estimado:** 1-2 horas  
+**Status:** ⏸️ Adiado — bloqueado por pendências pós-Fase 0
+**Tempo estimado:** 1-2 horas
 **Prioridade:** CRÍTICA
 
 **Tarefas:**
@@ -38,8 +40,8 @@ Roadmap e planejamento de funcionalidades futuras do Gestor Financeiro.
 ---
 
 ### **2. Remover Logs de Debug** 🔧
-**Status:** ⏳ Pendente  
-**Tempo estimado:** 15 minutos  
+**Status:** ⏳ Pendente
+**Tempo estimado:** 15 minutos
 **Prioridade:** ALTA
 
 **Arquivos:**
@@ -52,8 +54,8 @@ Roadmap e planejamento de funcionalidades futuras do Gestor Financeiro.
 ---
 
 ### **3. Rate Limiting** 🛡️
-**Status:** ⏳ Pendente  
-**Tempo estimado:** 1 hora  
+**Status:** ⏳ Pendente
+**Tempo estimado:** 1 hora
 **Prioridade:** ALTA (Segurança)
 
 **Funcionalidade:**
@@ -66,8 +68,8 @@ Roadmap e planejamento de funcionalidades futuras do Gestor Financeiro.
 ---
 
 ### **4. Skeleton Loaders** ✨
-**Status:** ⏳ Pendente  
-**Tempo estimado:** 45 minutos  
+**Status:** ⏳ Pendente
+**Tempo estimado:** 45 minutos
 **Prioridade:** ALTA (UX)
 
 **Onde aplicar:**
@@ -83,7 +85,7 @@ Roadmap e planejamento de funcionalidades futuras do Gestor Financeiro.
 ## 🟡 Prioridade MÉDIA (v1.6.0)
 
 ### **5. Filtros no Dashboard** 🔍
-**Status:** ⏳ Planejado  
+**Status:** ⏳ Planejado
 **Tempo estimado:** 2-3 horas
 
 **Funcionalidades:**
@@ -95,7 +97,7 @@ Roadmap e planejamento de funcionalidades futuras do Gestor Financeiro.
 ---
 
 ### **6. Exportar Dados (CSV/PDF)** 📥
-**Status:** ⏳ Planejado  
+**Status:** ⏳ Planejado
 **Tempo estimado:** 2 horas
 
 **Funcionalidades:**
@@ -108,7 +110,7 @@ Roadmap e planejamento de funcionalidades futuras do Gestor Financeiro.
 ---
 
 ### **7. Edição de Transações** ✏️
-**Status:** ⏳ Planejado  
+**Status:** ⏳ Planejado
 **Tempo estimado:** 1-2 horas
 
 **Funcionalidade:**
@@ -119,7 +121,7 @@ Roadmap e planejamento de funcionalidades futuras do Gestor Financeiro.
 ---
 
 ### **8. Terceiro Gráfico (Comparação Mensal)** 📊
-**Status:** ✅ Backend pronto | ⏳ Frontend pendente  
+**Status:** ✅ Backend pronto | ⏳ Frontend pendente
 **Tempo estimado:** 30 minutos
 
 **Funcionalidade:**
@@ -132,7 +134,7 @@ Roadmap e planejamento de funcionalidades futuras do Gestor Financeiro.
 ## 🟢 Prioridade BAIXA (v1.7.0)
 
 ### **9. Dark/Light Mode** 🌓
-**Status:** ⏳ Planejado  
+**Status:** ⏳ Planejado
 **Tempo estimado:** 1-2 horas
 
 **Funcionalidade:**
@@ -143,7 +145,7 @@ Roadmap e planejamento de funcionalidades futuras do Gestor Financeiro.
 ---
 
 ### **10. Notificações Push** 🔔
-**Status:** ⏳ Planejado  
+**Status:** ⏳ Planejado
 **Tempo estimado:** 3-4 horas
 
 **Funcionalidades:**
@@ -154,7 +156,7 @@ Roadmap e planejamento de funcionalidades futuras do Gestor Financeiro.
 ---
 
 ### **11. Categorias Pré-definidas** 🏷️
-**Status:** ⏳ Planejado  
+**Status:** ⏳ Planejado
 **Tempo estimado:** 1 hora
 
 **Funcionalidade:**
@@ -167,7 +169,7 @@ Roadmap e planejamento de funcionalidades futuras do Gestor Financeiro.
 ---
 
 ### **12. Busca de Transações** 🔎
-**Status:** ⏳ Planejado  
+**Status:** ⏳ Planejado
 **Tempo estimado:** 1 hora
 
 **Funcionalidade:**
@@ -181,7 +183,7 @@ Roadmap e planejamento de funcionalidades futuras do Gestor Financeiro.
 ## 🔮 Futuro Distante (v2.0.0)
 
 ### **13. App Mobile (React Native)** 📱
-**Status:** 💡 Ideia  
+**Status:** 💡 Ideia
 **Tempo estimado:** 2-3 semanas
 
 **Funcionalidades:**
@@ -192,7 +194,7 @@ Roadmap e planejamento de funcionalidades futuras do Gestor Financeiro.
 ---
 
 ### **14. Multi-moeda** 💱
-**Status:** 💡 Ideia  
+**Status:** 💡 Ideia
 **Tempo estimado:** 1 semana
 
 **Funcionalidade:**
@@ -203,7 +205,7 @@ Roadmap e planejamento de funcionalidades futuras do Gestor Financeiro.
 ---
 
 ### **15. Compartilhamento de Despesas** 👥
-**Status:** 💡 Ideia  
+**Status:** 💡 Ideia
 **Tempo estimado:** 2 semanas
 
 **Funcionalidade:**
@@ -214,7 +216,7 @@ Roadmap e planejamento de funcionalidades futuras do Gestor Financeiro.
 ---
 
 ### **16. Investimentos** 📈
-**Status:** 💡 Ideia  
+**Status:** 💡 Ideia
 **Tempo estimado:** 3 semanas
 
 **Funcionalidades:**
@@ -226,7 +228,7 @@ Roadmap e planejamento de funcionalidades futuras do Gestor Financeiro.
 ---
 
 ### **17. Inteligência Artificial** 🤖
-**Status:** 💡 Ideia  
+**Status:** 💡 Ideia
 **Tempo estimado:** 1 mês
 
 **Funcionalidades:**
@@ -283,11 +285,11 @@ Roadmap e planejamento de funcionalidades futuras do Gestor Financeiro.
 
 ## 🎯 Meta de Curto Prazo (Próximos 30 dias)
 
-1. ✅ **Deploy em produção** - Permitir feedback de usuários
+1. ⏸️ **Deploy em produção** - Adiado até validação PostgreSQL real, CI/CD e clientes estabilizados
 2. ✅ **Rate limiting** - Segurança contra ataques
-3. ✅ **Skeleton loaders** - Melhorar UX
-4. ✅ **Filtros no dashboard** - Análises mais detalhadas
-5. ✅ **Exportar CSV** - Permitir análise externa
+3. ⏳ **Skeleton loaders** - Melhorar UX
+4. ⏳ **Filtros no dashboard** - Análises mais detalhadas
+5. ⏳ **Exportar CSV** - Permitir análise externa
 
 ---
 
@@ -328,5 +330,5 @@ Tem alguma sugestão de funcionalidade?
 
 ---
 
-**Última atualização:** 30/11/2025  
+**Última atualização:** 30/11/2025
 **Mantido por:** Zero (Allan Carvalho)
