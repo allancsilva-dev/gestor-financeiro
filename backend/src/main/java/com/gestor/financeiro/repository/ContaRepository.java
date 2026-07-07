@@ -21,4 +21,6 @@ public interface ContaRepository extends JpaRepository<Conta, Long> {
     List<Conta> findByUsuarioId(Long usuarioId);
 
     Optional<Conta> findByIdAndUsuarioId(Long id, Long usuarioId);
+
+    long countByUsuarioId(Long usuarioId);
 }

@@ -21,4 +21,8 @@ public interface CategoriaRepository extends JpaRepository<Categoria, Long> {
     List<Categoria> findByUsuarioId(Long usuarioId);
 
     Optional<Categoria> findByIdAndUsuarioId(Long id, Long usuarioId);
+
+    long countByUsuarioIdAndAtivoTrue(Long usuarioId);
+
+    Optional<Categoria> findByUsuarioIdAndNomeIgnoreCase(Long usuarioId, String nome);
 }

@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query; // Importar
 import org.springframework.data.repository.query.Param; // Importar
 import org.springframework.stereotype.Repository;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -53,4 +54,32 @@ public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
             @Param("inicio") LocalDate inicio, 
             @Param("fim") LocalDate fim);
     // --- FIM DA ADIÇÃO ---
+
+    @Query("SELECT COALESCE(SUM(t.valorTotal), 0) FROM Transacao t " +
+           "WHERE t.usuario.id = :usuarioId AND t.tipo = :tipo " +
+           "AND t.data BETWEEN :inicio AND :fim")
+    BigDecimal sumValorTotalByUsuarioIdAndTipoAndDataBetween(
+            @Param("usuarioId") Long usuarioId,
+            @Param("tipo") TipoTransacao tipo,
+            @Param("inicio") LocalDate inicio,
+            @Param("fim") LocalDate fim);
+
+    @Query("SELECT COALESCE(SUM(CASE WHEN t.parcelado = true AND t.valorParcela IS NOT NULL THEN t.valorParcela ELSE t.valorTotal END), 0) " +
+           "FROM Transacao t WHERE t.usuario.id = :usuarioId AND t.tipo = :tipo " +
+           "AND t.data BETWEEN :inicio AND :fim")
+    BigDecimal sumValorEfetivoByUsuarioIdAndTipoAndDataBetween(
+            @Param("usuarioId") Long usuarioId,
+            @Param("tipo") TipoTransacao tipo,
+            @Param("inicio") LocalDate inicio,
+            @Param("fim") LocalDate fim);
+
+    @Query("SELECT t.categoria.nome, COALESCE(SUM(CASE WHEN t.parcelado = true AND t.valorParcela IS NOT NULL THEN t.valorParcela ELSE t.valorTotal END), 0), t.categoria.cor " +
+           "FROM Transacao t WHERE t.usuario.id = :usuarioId AND t.tipo = :tipo " +
+           "AND t.data BETWEEN :inicio AND :fim AND t.categoria IS NOT NULL " +
+           "GROUP BY t.categoria.nome, t.categoria.cor")
+    List<Object[]> sumValorEfetivoAgrupadoPorCategoria(
+            @Param("usuarioId") Long usuarioId,
+            @Param("tipo") TipoTransacao tipo,
+            @Param("inicio") LocalDate inicio,
+            @Param("fim") LocalDate fim);
 }

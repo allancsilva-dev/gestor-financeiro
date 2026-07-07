@@ -64,30 +64,28 @@ public class TransacaoService {
 
         transacao.setUsuario(usuario);
         
-        // ✅ BUSCA A CATEGORIA DO BANCO (com dados completos)
+        // Busca categoria validando ownership
         if (transacao.getCategoria() != null && transacao.getCategoria().getId() != null) {
-            Categoria categoria = categoriaRepository.findById(transacao.getCategoria().getId())
+            Categoria categoria = categoriaRepository.findByIdAndUsuarioId(
+                    transacao.getCategoria().getId(), usuarioId)
                 .orElseThrow(() -> new ResourceNotFoundException("Categoria não encontrada"));
             
-            // Atualiza o valorGasto da categoria
             categoria.setValorGasto(
                 categoria.getValorGasto().add(transacao.getValorTotal())
             );
             categoriaRepository.save(categoria);
             
-            // Associa a categoria completa à transação
             transacao.setCategoria(categoria);
         }
         
-        // ✅ BUSCA A CONTA DO BANCO (com dados completos)
+        // Busca conta validando ownership
         if (transacao.getConta() != null && transacao.getConta().getId() != null) {
-            Conta conta = contaRepository.findById(transacao.getConta().getId())
+            Conta conta = contaRepository.findByIdAndUsuarioId(
+                    transacao.getConta().getId(), usuarioId)
                 .orElseThrow(() -> new ResourceNotFoundException("Conta não encontrada"));
             
-            // Adiciona gasto na conta
-            contaService.adicionarGasto(conta.getId(), transacao.getValorTotal());
+            contaService.adicionarGasto(conta.getId(), transacao.getValorTotal(), usuarioId);
             
-            // Associa a conta completa à transação
             transacao.setConta(conta);
         }
         
@@ -149,13 +147,15 @@ public class TransacaoService {
         if (transacao.getConta() != null) {
             contaService.removerGasto(
                 transacao.getConta().getId(), 
-                transacao.getValorTotal()
+                transacao.getValorTotal(),
+                usuarioId
             );
         }
         
-        // Remove gasto da categoria
+        // Remove gasto da categoria (validando ownership)
         if (transacao.getCategoria() != null) {
-            Categoria categoria = categoriaRepository.findById(transacao.getCategoria().getId())
+            Categoria categoria = categoriaRepository.findByIdAndUsuarioId(
+                    transacao.getCategoria().getId(), usuarioId)
                 .orElseThrow(() -> new ResourceNotFoundException("Categoria não encontrada"));
             
             categoria.setValorGasto(

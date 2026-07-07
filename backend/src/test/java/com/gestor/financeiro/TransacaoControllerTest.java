@@ -2,9 +2,12 @@ package com.gestor.financeiro;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gestor.financeiro.model.Categoria;
+import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.model.Usuario;
+import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.repository.CategoriaRepository;
+import com.gestor.financeiro.repository.ContaRepository;
 import com.gestor.financeiro.repository.TransacaoRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,6 +52,9 @@ class TransacaoControllerTest {
     private CategoriaRepository categoriaRepository;
 
     @Autowired
+    private ContaRepository contaRepository;
+
+    @Autowired
     private TransacaoRepository transacaoRepository;
 
     @Autowired
@@ -58,11 +64,13 @@ class TransacaoControllerTest {
     private Usuario usuarioB;
     private Categoria categoriaA;
     private Categoria categoriaB;
+    private Conta contaB;
 
     @BeforeEach
     void setup() {
         transacaoRepository.deleteAll();
         categoriaRepository.deleteAll();
+        contaRepository.deleteAll();
         usuarioRepository.deleteAll();
 
         usuarioA = usuarioRepository.save(TestDataFactory.usuario("Alice", "alice@teste.com", passwordEncoder.encode("123456")));
@@ -70,6 +78,8 @@ class TransacaoControllerTest {
 
         categoriaA = categoriaRepository.save(TestDataFactory.categoria(usuarioA, "Mercado"));
         categoriaB = categoriaRepository.save(TestDataFactory.categoria(usuarioB, "Lazer"));
+
+        contaB = contaRepository.save(TestDataFactory.conta(usuarioB, "Cartão Bob", TipoConta.CREDITO));
     }
 
     @Test
@@ -182,5 +192,38 @@ class TransacaoControllerTest {
         mockMvc.perform(delete("/api/v1/transacoes/{id}", alheia.getId()))
             .andExpect(status().isForbidden())
             .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+    }
+
+    @Test
+    @WithMockUser(username = "alice@teste.com")
+    void criar_deveFalharQuandoCategoriaEhDeOutroUsuario() throws Exception {
+        mockMvc.perform(post("/api/v1/transacoes")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "descricao", "Tentativa IDOR",
+                        "valor", 50.00,
+                        "data", "2026-03-10",
+                        "tipo", "SAIDA",
+                        "categoriaId", categoriaB.getId()
+                ))))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+    }
+
+    @Test
+    @WithMockUser(username = "alice@teste.com")
+    void criar_deveFalharQuandoContaEhDeOutroUsuario() throws Exception {
+        mockMvc.perform(post("/api/v1/transacoes")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "descricao", "Tentativa IDOR conta",
+                        "valor", 100.00,
+                        "data", "2026-03-10",
+                        "tipo", "SAIDA",
+                        "categoriaId", categoriaA.getId(),
+                        "contaId", contaB.getId()
+                ))))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     }
 }

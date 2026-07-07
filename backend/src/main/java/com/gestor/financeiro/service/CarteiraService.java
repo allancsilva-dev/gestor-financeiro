@@ -20,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.List;
 
 @Service
 public class CarteiraService {
@@ -61,6 +60,7 @@ public class CarteiraService {
     }
     
     // Cria nova carteira
+    @Transactional
     public Carteira criar(Carteira carteira, Long usuarioId) {
         // O usuário vem do token para evitar IDOR via payload.
         Usuario usuario = usuarioRepository.findById(usuarioId)
@@ -77,6 +77,7 @@ public class CarteiraService {
     }
     
     // Atualiza carteira
+    @Transactional
     public Carteira atualizar(Long id, Carteira carteiraAtualizada, Long usuarioId) {
         Carteira carteira = buscarPorIdDoUsuario(id, usuarioId);
         
@@ -154,41 +155,24 @@ public class CarteiraService {
     
     // Busca ou cria a categoria "Transferência"
     private Categoria buscarOuCriarCategoriaTransferencia(Usuario usuario) {
-        List<Categoria> categorias = categoriaRepository.findByUsuarioId(usuario.getId());
-        
-        // Procura categoria existente
-        for (Categoria cat : categorias) {
-            if ("Transferência".equalsIgnoreCase(cat.getNome()) || 
-                "Depósito".equalsIgnoreCase(cat.getNome())) {
-                return cat;
-            }
-        }
-        
-        // Se não existir, cria uma nova
-        Categoria novaCategoria = new Categoria();
-        novaCategoria.setUsuario(usuario);
-        novaCategoria.setNome("Transferência");
-        novaCategoria.setCor("#00BCD4"); // Azul ciano
-        novaCategoria.setIcone("💱");
-        novaCategoria.setValorEsperado(BigDecimal.ZERO);
-        
-        return categoriaRepository.save(novaCategoria);
+        return categoriaRepository.findByUsuarioIdAndNomeIgnoreCase(usuario.getId(), "Transferência")
+                .orElseGet(() -> {
+                    Categoria novaCategoria = new Categoria();
+                    novaCategoria.setUsuario(usuario);
+                    novaCategoria.setNome("Transferência");
+                    novaCategoria.setCor("#00BCD4");
+                    novaCategoria.setIcone("💱");
+                    novaCategoria.setValorEsperado(BigDecimal.ZERO);
+                    return categoriaRepository.save(novaCategoria);
+                });
     }
     
     // Calcula saldo total de todas as carteiras do usuário
     public BigDecimal calcularSaldoTotal(Long usuarioId) {
-        return carteiraRepository.findByUsuarioId(usuarioId)
-            .stream()
-            .map(Carteira::getSaldo)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return carteiraRepository.sumSaldoByUsuarioId(usuarioId);
     }
     
-    // Deleta carteira
-    public void deletar(Long id) {
-        Carteira carteira = buscarPorId(id);
-        carteiraRepository.delete(carteira);
-    }
-
+    @Transactional
     public void deletar(Long id, Long usuarioId) {
         Carteira carteira = buscarPorIdDoUsuario(id, usuarioId);
         carteiraRepository.delete(carteira);

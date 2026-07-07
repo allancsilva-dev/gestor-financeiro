@@ -19,4 +19,6 @@ public interface MetaRepository extends JpaRepository<Meta, Long> {
     Page<Meta> findByUsuarioIdAndAtivaTrue(Long usuarioId, Pageable pageable);
 
     Optional<Meta> findByIdAndUsuarioId(Long id, Long usuarioId);
+
+    long countByUsuarioIdAndAtivaTrue(Long usuarioId);
 }

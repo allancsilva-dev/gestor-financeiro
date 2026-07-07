@@ -11,6 +11,7 @@ import org.springframework.data.domain.Pageable;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 @Service
@@ -29,6 +30,7 @@ public class CategoriaService {
     }
     
     // ✅ CORRIGIDO - Pega usuário do TOKEN
+    @Transactional
     public Categoria criar(Categoria categoria) {
         // Pega o usuário autenticado do token
         Usuario usuario = authenticatedUserService.getAuthenticatedUser();
@@ -45,6 +47,7 @@ public class CategoriaService {
     }
     
     // Atualiza categoria existente
+    @Transactional
     public Categoria atualizar(Long id, Categoria categoriaAtualizada) {
         Usuario usuario = authenticatedUserService.getAuthenticatedUser();
         
@@ -65,6 +68,7 @@ public class CategoriaService {
     }
     
     // "Deleta" categoria (só marca como inativa)
+    @Transactional
     public void deletar(Long id) {
         Usuario usuario = authenticatedUserService.getAuthenticatedUser();
         

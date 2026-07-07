@@ -3,11 +3,13 @@ package com.gestor.financeiro.service;
 import com.gestor.financeiro.exception.BusinessException;
 import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.exception.UnauthorizedAccessException;
+import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.model.ContaFixa;
 import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.StatusPagamento;
 import com.gestor.financeiro.model.enums.TipoTransacao;
+import com.gestor.financeiro.repository.CategoriaRepository;
 import com.gestor.financeiro.repository.ContaFixaRepository;
 import com.gestor.financeiro.repository.TransacaoRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
@@ -31,6 +33,9 @@ public class ContaFixaService {
 
     @Autowired
     private UsuarioRepository usuarioRepository;
+
+    @Autowired
+    private CategoriaRepository categoriaRepository;
     
     // Lista contas fixas ativas do usuário
     public Page<ContaFixa> listarPorUsuario(Long usuarioId, Pageable pageable) {
@@ -38,11 +43,20 @@ public class ContaFixaService {
     }
     
     // Cria nova conta fixa
+    @Transactional
     public ContaFixa criar(ContaFixa contaFixa, Long usuarioId) {
         Usuario usuario = usuarioRepository.findById(usuarioId)
             .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
         contaFixa.setUsuario(usuario);
+
+        // Valida ownership da categoria, se informada
+        if (contaFixa.getCategoria() != null && contaFixa.getCategoria().getId() != null) {
+            Categoria categoria = categoriaRepository.findByIdAndUsuarioId(
+                    contaFixa.getCategoria().getId(), usuarioId)
+                .orElseThrow(() -> new ResourceNotFoundException("Categoria não encontrada"));
+            contaFixa.setCategoria(categoria);
+        }
 
         // Valores padrão
         if (contaFixa.getAtivo() == null) contaFixa.setAtivo(true);
@@ -120,13 +134,21 @@ public class ContaFixaService {
     }
     
     // Atualiza conta fixa
+    @Transactional
     public ContaFixa atualizar(Long id, ContaFixa contaAtualizada, Long usuarioId) {
         ContaFixa conta = buscarPorIdDoUsuario(id, usuarioId);
         
         conta.setNome(contaAtualizada.getNome());
         conta.setValorPlanejado(contaAtualizada.getValorPlanejado());
         conta.setDiaVencimento(contaAtualizada.getDiaVencimento());
-        conta.setCategoria(contaAtualizada.getCategoria());
+        
+        if (contaAtualizada.getCategoria() != null && contaAtualizada.getCategoria().getId() != null) {
+            Categoria categoria = categoriaRepository.findByIdAndUsuarioId(
+                    contaAtualizada.getCategoria().getId(), usuarioId)
+                .orElseThrow(() -> new ResourceNotFoundException("Categoria não encontrada"));
+            conta.setCategoria(categoria);
+        }
+        
         conta.setObservacoes(contaAtualizada.getObservacoes());
         
         // Recalcula próximo vencimento
@@ -136,6 +158,7 @@ public class ContaFixaService {
     }
     
     // Desativa conta fixa
+    @Transactional
     public void deletar(Long id, Long usuarioId) {
         ContaFixa conta = buscarPorIdDoUsuario(id, usuarioId);
         
@@ -161,25 +184,10 @@ public class ContaFixaService {
         return conta;
     }
     
-    // ✅ NOVO: Reseta contas pagas quando passa o vencimento
+    @Transactional
     public void atualizarContasAtrasadas() {
-        List<ContaFixa> todasContas = contaFixaRepository.findAll();
         LocalDate hoje = LocalDate.now();
-        
-        for (ContaFixa conta : todasContas) {
-            // Se a conta está PAGA e o vencimento já passou, volta para PENDENTE
-            if (conta.getStatus() == StatusPagamento.PAGO 
-                && conta.getDataProximoVencimento().isBefore(hoje)) {
-                conta.setStatus(StatusPagamento.PENDENTE);
-                conta.setValorReal(null);
-                contaFixaRepository.save(conta);
-            }
-            // Se está PENDENTE e atrasou
-            else if (conta.getDataProximoVencimento().isBefore(hoje) 
-                && conta.getStatus() == StatusPagamento.PENDENTE) {
-                conta.setStatus(StatusPagamento.ATRASADO);
-                contaFixaRepository.save(conta);
-            }
-        }
+        contaFixaRepository.resetarContasPagasVencidas(StatusPagamento.PAGO, StatusPagamento.PENDENTE, hoje);
+        contaFixaRepository.atualizarStatusContasAtrasadas(StatusPagamento.PENDENTE, StatusPagamento.ATRASADO, hoje);
     }
 }

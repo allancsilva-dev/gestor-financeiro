@@ -9,6 +9,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -24,6 +25,7 @@ public class ParcelaService {
     }
     
     // Marca parcela como PAGA
+    @Transactional
     public Parcela marcarComoPaga(Long parcelaId, Long usuarioId) {
         Parcela parcela = buscarPorIdDoUsuario(parcelaId, usuarioId);
         
@@ -34,6 +36,7 @@ public class ParcelaService {
     }
     
     // Marca parcela como PENDENTE (desfazer pagamento)
+    @Transactional
     public Parcela marcarComoPendente(Long parcelaId, Long usuarioId) {
         Parcela parcela = buscarPorIdDoUsuario(parcelaId, usuarioId);
         
@@ -61,17 +64,9 @@ public class ParcelaService {
     }
     
     // Atualiza status de parcelas atrasadas (executa todo dia)
+    @Transactional
     public void atualizarParcelasAtrasadas() {
-        List<Parcela> todasParcelas = parcelaRepository.findAll();
-        LocalDate hoje = LocalDate.now();
-        
-        for (Parcela parcela : todasParcelas) {
-            // Se passou da data de vencimento e ainda está PENDENTE
-            if (parcela.getDataVencimento().isBefore(hoje) 
-                && parcela.getStatus() == StatusPagamento.PENDENTE) {
-                parcela.setStatus(StatusPagamento.ATRASADO);
-                parcelaRepository.save(parcela);
-            }
-        }
+        parcelaRepository.atualizarStatusParcelasAtrasadas(
+            StatusPagamento.PENDENTE, StatusPagamento.ATRASADO, LocalDate.now());
     }
 }

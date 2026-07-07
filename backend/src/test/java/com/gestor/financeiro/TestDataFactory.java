@@ -1,8 +1,10 @@
 package com.gestor.financeiro;
 
 import com.gestor.financeiro.model.Categoria;
+import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.model.Usuario;
+import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 
 import java.math.BigDecimal;
@@ -31,6 +33,18 @@ public final class TestDataFactory {
         categoria.setValorGasto(BigDecimal.ZERO);
         categoria.setAtivo(true);
         return categoria;
+    }
+
+    public static Conta conta(Usuario usuario, String nome, TipoConta tipo) {
+        Conta conta = new Conta();
+        conta.setUsuario(usuario);
+        conta.setNome(nome);
+        conta.setTipo(tipo);
+        conta.setLimiteTotal(BigDecimal.valueOf(5000));
+        conta.setValorGasto(BigDecimal.ZERO);
+        conta.setSaldoAtual(BigDecimal.ZERO);
+        conta.setAtivo(true);
+        return conta;
     }
 
     public static Transacao transacao(Usuario usuario, Categoria categoria, String descricao, BigDecimal valor) {

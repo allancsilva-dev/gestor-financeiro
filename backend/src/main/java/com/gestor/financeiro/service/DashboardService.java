@@ -9,7 +9,6 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.format.TextStyle;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 public class DashboardService {
@@ -38,18 +37,20 @@ public class DashboardService {
         LocalDate inicioMes = LocalDate.now().withDayOfMonth(1);
         LocalDate fimMes = LocalDate.now().withDayOfMonth(LocalDate.now().lengthOfMonth());
         
-        BigDecimal totalEntradas = calcularTotalPorTipo(usuarioId, TipoTransacao.ENTRADA, inicioMes, fimMes);
-        BigDecimal totalSaidas = calcularTotalSaidasComParcelas(usuarioId, inicioMes, fimMes);
+        BigDecimal totalEntradas = transacaoRepository.sumValorTotalByUsuarioIdAndTipoAndDataBetween(
+                usuarioId, TipoTransacao.ENTRADA, inicioMes, fimMes);
+        BigDecimal totalSaidas = transacaoRepository.sumValorEfetivoByUsuarioIdAndTipoAndDataBetween(
+                usuarioId, TipoTransacao.SAIDA, inicioMes, fimMes);
         BigDecimal saldo = totalEntradas.subtract(totalSaidas);
-        BigDecimal saldoCarteiras = calcularSaldoCarteiras(usuarioId);
+        BigDecimal saldoCarteiras = carteiraRepository.sumSaldoByUsuarioId(usuarioId);
         
         resumo.put("totalEntradas", totalEntradas);
         resumo.put("totalSaidas", totalSaidas);
         resumo.put("saldo", saldo);
-        resumo.put("totalCategorias", categoriaRepository.findByUsuarioId(usuarioId).size());
-        resumo.put("totalContas", contaRepository.findByUsuarioId(usuarioId).size());
-        resumo.put("totalMetas", metaRepository.findByUsuarioIdAndAtivaTrue(usuarioId).size());
-        resumo.put("totalContasFixas", contaFixaRepository.findByUsuarioIdAndAtivoTrue(usuarioId).size());
+        resumo.put("totalCategorias", categoriaRepository.countByUsuarioIdAndAtivoTrue(usuarioId));
+        resumo.put("totalContas", contaRepository.countByUsuarioId(usuarioId));
+        resumo.put("totalMetas", metaRepository.countByUsuarioIdAndAtivaTrue(usuarioId));
+        resumo.put("totalContasFixas", contaFixaRepository.countByUsuarioIdAndAtivoTrue(usuarioId));
         resumo.put("saldoCarteiras", saldoCarteiras);
         
         return resumo;
@@ -59,39 +60,25 @@ public class DashboardService {
         LocalDate inicioMes = LocalDate.now().withDayOfMonth(1);
         LocalDate fimMes = LocalDate.now().withDayOfMonth(LocalDate.now().lengthOfMonth());
         
-        // Usa a query otimizada com JOIN FETCH para garantir que a categoria venha preenchida
-        var transacoes = transacaoRepository.findByUsuarioIdAndDataBetweenWithCategoria(usuarioId, inicioMes, fimMes) 
-            .stream()
-            .filter(t -> t.getTipo() == TipoTransacao.SAIDA)
-            .collect(Collectors.toList());
-        
-        Map<String, BigDecimal> gastosPorCategoria = new HashMap<>();
-        Map<String, String> coresCategorias = new HashMap<>();
-        
-        for (var transacao : transacoes) {
-            if (transacao.getCategoria() != null) { 
-                String nomeCategoria = transacao.getCategoria().getNome();
-                BigDecimal valor = transacao.getParcelado() != null && transacao.getParcelado() 
-                    ? transacao.getValorParcela() 
-                    : transacao.getValorTotal();
-                
-                gastosPorCategoria.merge(nomeCategoria, valor, BigDecimal::add);
-                coresCategorias.put(nomeCategoria, transacao.getCategoria().getCor());
-            }
-        }
-        
-        BigDecimal totalGastos = gastosPorCategoria.values().stream()
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        List<Object[]> rows = transacaoRepository.sumValorEfetivoAgrupadoPorCategoria(
+                usuarioId, TipoTransacao.SAIDA, inicioMes, fimMes);
+
+        BigDecimal totalGastos = rows.stream()
+                .map(r -> (BigDecimal) r[1])
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
         
         List<Map<String, Object>> resultado = new ArrayList<>();
-        for (Map.Entry<String, BigDecimal> entry : gastosPorCategoria.entrySet()) {
+        for (Object[] row : rows) {
             Map<String, Object> item = new HashMap<>();
-            item.put("categoria", entry.getKey());
-            item.put("valor", entry.getValue());
-            item.put("cor", coresCategorias.get(entry.getKey()));
+            String nomeCategoria = (String) row[0];
+            BigDecimal valor = (BigDecimal) row[1];
+            String cor = (String) row[2];
+            item.put("categoria", nomeCategoria);
+            item.put("valor", valor);
+            item.put("cor", cor);
             
             if (totalGastos.compareTo(BigDecimal.ZERO) > 0) {
-                BigDecimal percentual = entry.getValue()
+                BigDecimal percentual = valor
                     .divide(totalGastos, 4, RoundingMode.HALF_UP)
                     .multiply(new BigDecimal("100"))
                     .setScale(1, RoundingMode.HALF_UP);
@@ -118,8 +105,10 @@ public class DashboardService {
             LocalDate inicioMes = data.withDayOfMonth(1);
             LocalDate fimMes = data.withDayOfMonth(data.lengthOfMonth());
             
-            BigDecimal entradas = calcularTotalPorTipo(usuarioId, TipoTransacao.ENTRADA, inicioMes, fimMes);
-            BigDecimal saidas = calcularTotalSaidasComParcelas(usuarioId, inicioMes, fimMes);
+            BigDecimal entradas = transacaoRepository.sumValorTotalByUsuarioIdAndTipoAndDataBetween(
+                    usuarioId, TipoTransacao.ENTRADA, inicioMes, fimMes);
+            BigDecimal saidas = transacaoRepository.sumValorEfetivoByUsuarioIdAndTipoAndDataBetween(
+                    usuarioId, TipoTransacao.SAIDA, inicioMes, fimMes);
             BigDecimal saldo = entradas.subtract(saidas);
             
             Map<String, Object> mes = new HashMap<>();
@@ -143,8 +132,10 @@ public class DashboardService {
         
         Map<String, Object> anterior = new HashMap<>();
         anterior.put("periodo", "Mês Anterior");
-        anterior.put("entradas", calcularTotalPorTipo(usuarioId, TipoTransacao.ENTRADA, inicioMesAnterior, fimMesAnterior));
-        anterior.put("saidas", calcularTotalSaidasComParcelas(usuarioId, inicioMesAnterior, fimMesAnterior));
+        anterior.put("entradas", transacaoRepository.sumValorTotalByUsuarioIdAndTipoAndDataBetween(
+                usuarioId, TipoTransacao.ENTRADA, inicioMesAnterior, fimMesAnterior));
+        anterior.put("saidas", transacaoRepository.sumValorEfetivoByUsuarioIdAndTipoAndDataBetween(
+                usuarioId, TipoTransacao.SAIDA, inicioMesAnterior, fimMesAnterior));
         resultado.add(anterior);
         
         LocalDate inicioMesAtual = LocalDate.now().withDayOfMonth(1);
@@ -152,40 +143,12 @@ public class DashboardService {
         
         Map<String, Object> atual = new HashMap<>();
         atual.put("periodo", "Mês Atual");
-        atual.put("entradas", calcularTotalPorTipo(usuarioId, TipoTransacao.ENTRADA, inicioMesAtual, fimMesAtual));
-        atual.put("saidas", calcularTotalSaidasComParcelas(usuarioId, inicioMesAtual, fimMesAtual));
+        atual.put("entradas", transacaoRepository.sumValorTotalByUsuarioIdAndTipoAndDataBetween(
+                usuarioId, TipoTransacao.ENTRADA, inicioMesAtual, fimMesAtual));
+        atual.put("saidas", transacaoRepository.sumValorEfetivoByUsuarioIdAndTipoAndDataBetween(
+                usuarioId, TipoTransacao.SAIDA, inicioMesAtual, fimMesAtual));
         resultado.add(atual);
         
         return resultado;
-    }
-    
-    private BigDecimal calcularTotalPorTipo(Long usuarioId, TipoTransacao tipo, LocalDate inicio, LocalDate fim) {
-        return transacaoRepository
-            .findByUsuarioIdAndDataBetween(usuarioId, inicio, fim) 
-            .stream()
-            .filter(t -> t.getTipo() == tipo)
-            .map(t -> t.getValorTotal())
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-    
-    private BigDecimal calcularTotalSaidasComParcelas(Long usuarioId, LocalDate inicio, LocalDate fim) {
-        return transacaoRepository
-            .findByUsuarioIdAndDataBetween(usuarioId, inicio, fim) 
-            .stream()
-            .filter(t -> t.getTipo() == TipoTransacao.SAIDA)
-            .map(t -> {
-                if (t.getParcelado() != null && t.getParcelado() && t.getValorParcela() != null) {
-                    return t.getValorParcela();
-                }
-                return t.getValorTotal();
-            })
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-    
-    private BigDecimal calcularSaldoCarteiras(Long usuarioId) {
-        return carteiraRepository.findByUsuarioId(usuarioId)
-            .stream()
-            .map(c -> c.getSaldo())
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }

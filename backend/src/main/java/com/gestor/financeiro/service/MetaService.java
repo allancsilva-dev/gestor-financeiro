@@ -10,6 +10,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode; // ✅ ADICIONAR ESTE IMPORT
 import java.time.LocalDate;
@@ -30,6 +31,7 @@ public class MetaService {
     }
     
     // Cria nova meta
+    @Transactional
     public Meta criar(Meta meta, Long usuarioId) {
         Usuario usuario = usuarioRepository.findById(usuarioId)
             .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
@@ -45,6 +47,7 @@ public class MetaService {
     }
     
     // Adiciona valor à meta (quando o usuário guarda dinheiro)
+    @Transactional
     public Meta adicionarValor(Long metaId, BigDecimal valor, Long usuarioId) {
         Meta meta = buscarPorIdDoUsuario(metaId, usuarioId);
         
@@ -61,6 +64,7 @@ public class MetaService {
     }
     
     // Remove valor da meta (caso retire dinheiro)
+    @Transactional
     public Meta removerValor(Long metaId, BigDecimal valor, Long usuarioId) {
         Meta meta = buscarPorIdDoUsuario(metaId, usuarioId);
         
@@ -76,6 +80,7 @@ public class MetaService {
     }
     
     // Atualiza meta
+    @Transactional
     public Meta atualizar(Long id, Meta metaAtualizada, Long usuarioId) {
         Meta meta = buscarPorIdDoUsuario(id, usuarioId);
         
@@ -91,6 +96,7 @@ public class MetaService {
     }
     
     // Desativa meta
+    @Transactional
     public void deletar(Long id, Long usuarioId) {
         Meta meta = buscarPorIdDoUsuario(id, usuarioId);
         

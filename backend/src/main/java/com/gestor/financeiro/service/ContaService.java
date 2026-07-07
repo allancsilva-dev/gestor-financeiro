@@ -10,6 +10,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.List;
 
@@ -28,6 +29,7 @@ public class ContaService {
     }
     
     // Cria nova conta
+    @Transactional
     public Conta criar(Conta conta, Long usuarioId) {
         Usuario usuario = usuarioRepository.findById(usuarioId)
             .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
@@ -44,6 +46,7 @@ public class ContaService {
     }
     
     // Atualiza conta
+    @Transactional
     public Conta atualizar(Long id, Conta contaAtualizada, Long usuarioId) {
         Conta conta = buscarPorIdDoUsuario(id, usuarioId);
         
@@ -57,27 +60,28 @@ public class ContaService {
         return contaRepository.save(conta);
     }
     
-    // Adiciona gasto na conta (quando faz uma compra)
-    public void adicionarGasto(Long contaId, BigDecimal valor) {
-        Conta conta = contaRepository.findById(contaId)
+    // Adiciona gasto na conta validando ownership
+    @Transactional
+    public void adicionarGasto(Long contaId, BigDecimal valor, Long usuarioId) {
+        Conta conta = contaRepository.findByIdAndUsuarioId(contaId, usuarioId)
             .orElseThrow(() -> new ResourceNotFoundException("Conta não encontrada"));
         
-        // Soma o valor ao gasto atual
         conta.setValorGasto(conta.getValorGasto().add(valor));
         contaRepository.save(conta);
     }
     
-    // Remove gasto da conta (quando cancela uma compra)
-    public void removerGasto(Long contaId, BigDecimal valor) {
-        Conta conta = contaRepository.findById(contaId)
+    // Remove gasto da conta validando ownership
+    @Transactional
+    public void removerGasto(Long contaId, BigDecimal valor, Long usuarioId) {
+        Conta conta = contaRepository.findByIdAndUsuarioId(contaId, usuarioId)
             .orElseThrow(() -> new ResourceNotFoundException("Conta não encontrada"));
         
-        // Subtrai o valor do gasto atual
         conta.setValorGasto(conta.getValorGasto().subtract(valor));
         contaRepository.save(conta);
     }
     
     // Desativa conta
+    @Transactional
     public void deletar(Long id, Long usuarioId) {
         Conta conta = buscarPorIdDoUsuario(id, usuarioId);
         
