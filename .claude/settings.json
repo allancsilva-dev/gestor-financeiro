@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status)",
+      "Bash(git diff)",
+      "Bash(git log *)",
+      "Bash(git branch *)",
+      "Bash(git stash *)",
+      "Bash(./mvnw *)",
+      "Bash(npm *)",
+      "Bash(npx *)",
+      "Bash(curl *)",
+      "Bash(ls *)",
+      "Bash(head *)",
+      "Bash(wc *)",
+      "Bash(cat *)",
+      "Bash(env)"
+    ],
+    "deny": [
+      "Bash(git commit)",
+      "Bash(git push)",
+      "Bash(git reset --hard)",
+      "Bash(git checkout -- *)",
+      "Bash(git clean)",
+      "Bash(git rebase)",
+      "Bash(rm -rf *)",
+      "Bash(npm publish)",
+      "Bash(docker push)",
+      "Bash(heroku *)",
+      "Bash(aws *)",
+      "Bash(dd *)",
+      "Edit(docs/CHANGELOG.md)",
+      "Edit(docs/DEPLOY.md)",
+      "Edit(docs/PROXIMOS_PASSOS.md)",
+      "Edit(backend/API.md)",
+      "Write(docs/CHANGELOG.md)",
+      "Write(docs/DEPLOY.md)",
+      "Write(docs/PROXIMOS_PASSOS.md)",
+      "Write(backend/API.md)"
+    ]
+  }
+}
