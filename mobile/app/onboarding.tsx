@@ -18,6 +18,7 @@ import { contaService } from '../src/services/contaService';
 import { categoriaService } from '../src/services/categoriaService';
 import { contaFixaService } from '../src/services/contaFixaService';
 import { metaService } from '../src/services/metaService';
+import { TipoCarteira, TipoConta } from '../src/types';
 
 const PASSOS = ['Carteira', 'Conta', 'Categorias', 'Renda', 'Meta', 'Confirmar'];
 
@@ -41,11 +42,12 @@ export default function OnboardingScreen() {
   const [passo, setPasso] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  const [carteira, setCarteira] = useState({ nome: 'Carteira Principal', tipo: 'CONTA_BANCARIA', saldo: '' });
-  const [conta, setConta] = useState({ nome: 'Cartão Principal', tipo: 'CREDITO', limiteTotal: '' });
+  const [carteira, setCarteira] = useState({ nome: 'Carteira Principal', tipo: 'CONTA_BANCARIA' as TipoCarteira, saldo: '' });
+  const [conta, setConta] = useState({ nome: 'Cartão Principal', tipo: 'CREDITO' as TipoConta, limiteTotal: '' });
   const [categoriasSelecionadas, setCategoriasSelecionadas] = useState<string[]>(CATEGORIAS_SUGERIDAS.map((c) => c.nome));
   const [renda, setRenda] = useState({ nome: 'Salário', valor: '', diaVencimento: '1' });
   const [pularRenda, setPularRenda] = useState(false);
+  const [categoriaIds, setCategoriaIds] = useState<number[]>([]);
   const [meta, setMeta] = useState({ nome: '', valorTotal: '', valorMensal: '', dataPrevista: '' });
   const [pularMeta, setPularMeta] = useState(false);
 
@@ -69,10 +71,13 @@ export default function OnboardingScreen() {
     if (passo === 2) {
       setLoading(true);
       try {
+        const ids: number[] = [];
         for (const nome of categoriasSelecionadas) {
           const s = CATEGORIAS_SUGERIDAS.find((c) => c.nome === nome);
-          await categoriaService.criar({ nome, cor: s?.cor || '#6B7280', icone: s?.icone || '📌' });
+          const criada = await categoriaService.criar({ nome, cor: s?.cor || '#6B7280', icone: s?.icone || '📌' });
+          ids.push(criada.id);
         }
+        setCategoriaIds(ids);
         setPasso(3);
       } catch { } finally { setLoading(false); }
       return;
@@ -81,7 +86,13 @@ export default function OnboardingScreen() {
       if (pularRenda) { setPasso(4); return; }
       setLoading(true);
       try {
-        await contaFixaService.criar({ nome: renda.nome, valorPlanejado: parseFloat(renda.valor || '0'), diaVencimento: parseInt(renda.diaVencimento || '1'), recorrente: true });
+        let categoriaId = categoriaIds[0];
+        if (!categoriaId) {
+          const cats = await categoriaService.listar();
+          categoriaId = cats[0]?.id;
+        }
+        if (!categoriaId) { setPasso(4); return; }
+        await contaFixaService.criar({ descricao: renda.nome, valor: parseFloat(renda.valor || '0'), diaVencimento: parseInt(renda.diaVencimento || '1'), categoriaId, recorrente: true });
         setPasso(4);
       } catch { } finally { setLoading(false); }
       return;
@@ -90,7 +101,7 @@ export default function OnboardingScreen() {
       if (pularMeta) { setPasso(5); return; }
       setLoading(true);
       try {
-        await metaService.criar({ nome: meta.nome, valorTotal: parseFloat(meta.valorTotal || '0'), valorMensal: parseFloat(meta.valorMensal || '0'), dataPrevista: meta.dataPrevista || undefined });
+        await metaService.criar({ nome: meta.nome, valorTotal: parseFloat(meta.valorTotal || '0'), valorMensal: parseFloat(meta.valorMensal || '0'), dataLimite: meta.dataPrevista || undefined });
         setPasso(5);
       } catch { } finally { setLoading(false); }
       return;
@@ -141,7 +152,7 @@ export default function OnboardingScreen() {
           />
           <Text style={[styles.label, { color: colors.textSecondary, marginTop: 12 }]}>TIPO</Text>
           <View style={styles.chipRow}>
-            {['CONTA_BANCARIA', 'DINHEIRO', 'POUPANCA'].map((t) => (
+            {(['CONTA_BANCARIA', 'DINHEIRO', 'POUPANCA'] as TipoCarteira[]).map((t) => (
               <TouchableOpacity
                 key={t}
                 onPress={() => setCarteira((c) => ({ ...c, tipo: t }))}
@@ -177,7 +188,7 @@ export default function OnboardingScreen() {
           />
           <Text style={[styles.label, { color: colors.textSecondary, marginTop: 12 }]}>TIPO</Text>
           <View style={styles.chipRow}>
-            {['CREDITO', 'DEBITO', 'DINHEIRO'].map((t) => (
+            {(['CREDITO', 'DEBITO', 'DINHEIRO'] as TipoConta[]).map((t) => (
               <TouchableOpacity
                 key={t}
                 onPress={() => setConta((c) => ({ ...c, tipo: t }))}

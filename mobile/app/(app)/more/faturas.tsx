@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTheme } from '../../src/theme';
-import faturaService from '../../src/services/faturaService';
-import contaService from '../../src/services/contaService';
-import { FaturaResponse, FaturaLancamento, Conta } from '../../src/types';
-import { formatCurrency, formatDate } from '../../src/utils/format';
+import { useTheme } from '../../../src/theme';
+import faturaService from '../../../src/services/faturaService';
+import contaService from '../../../src/services/contaService';
+import { FaturaResponse, FaturaLancamento, Conta } from '../../../src/types';
+import { formatCurrency, formatDate } from '../../../src/utils/format';
 
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
@@ -24,7 +24,7 @@ export default function FaturasScreen() {
     queryKey: ['contas-fatura'],
     queryFn: () => contaService.listar(),
   });
-  const contasCredito = (contasData?.content || contasData || []).filter((c: Conta) => c.tipo === 'CREDITO');
+  const contasCredito = (contasData?.content ?? []).filter((c: Conta) => c.tipo === 'CREDITO');
   const contaSelecionada = contasCredito[contaIdx];
 
   const { data: fatura, isLoading, refetch } = useQuery<FaturaResponse | null>({
@@ -61,8 +61,8 @@ export default function FaturasScreen() {
       {contasCredito.length > 1 && (
         <View style={{ flexDirection: 'row', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
           {contasCredito.map((c: Conta, i: number) => (
-            <TouchableOpacity key={c.id} onPress={() => setContaIdx(i)} style={[styles.chip, { backgroundColor: i === contaIdex ? colors.brand : colors.card, borderColor: i === contaIdex ? colors.brand : colors.border }]}>
-              <Text style={{ color: i === contaIdex ? colors.brandText : colors.textSecondary, fontSize: 13, fontWeight: '500' }}>{c.nome}</Text>
+            <TouchableOpacity key={c.id} onPress={() => setContaIdx(i)} style={[styles.chip, { backgroundColor: i === contaIdx ? colors.brand : colors.card, borderColor: i === contaIdx ? colors.brand : colors.border }]}>
+              <Text style={{ color: i === contaIdx ? colors.brandText : colors.textSecondary, fontSize: 13, fontWeight: '500' }}>{c.nome}</Text>
             </TouchableOpacity>
           ))}
         </View>

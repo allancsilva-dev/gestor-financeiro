@@ -11,8 +11,8 @@ const api = axios.create({
 });
 
 // Adiciona token em toda request autenticada
-api.interceptors.request.use((config) => {
-  const token = getAccessToken();
+api.interceptors.request.use(async (config) => {
+  const token = await getAccessToken();
   if (token && config.headers) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });

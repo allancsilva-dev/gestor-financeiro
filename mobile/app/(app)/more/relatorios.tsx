@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTheme } from '../../src/theme';
-import relatorioService from '../../src/services/relatorioService';
-import { RelatorioResponse } from '../../src/types';
-import { formatCurrency } from '../../src/utils/format';
+import { useTheme } from '../../../src/theme';
+import relatorioService from '../../../src/services/relatorioService';
+import { RelatorioResponse } from '../../../src/types';
+import { formatCurrency } from '../../../src/utils/format';
 
 export default function RelatorioScreen() {
   const colors = useTheme();
@@ -21,7 +21,7 @@ export default function RelatorioScreen() {
   };
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.bg }]} contentContainerStyle={{ paddingTop: insets.top + 8, paddingHorizontal: 16, paddingBottom: 40 }}>
+    <ScrollView style={[s.container, { backgroundColor: colors.bg }]} contentContainerStyle={{ paddingTop: insets.top + 8, paddingHorizontal: 16, paddingBottom: 40 }}>
       <Text style={{ color: colors.textPrimary, fontSize: 18, fontWeight: '700', marginBottom: 12 }}>Relatórios</Text>
 
       <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16, alignItems: 'flex-end' }}>

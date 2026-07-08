@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTheme } from '../../src/theme';
-import { orcamentoService } from '../../src/services/orcamentoService';
-import { categoriaService } from '../../src/services/categoriaService';
-import { OrcamentoResponse, OrcamentoCategoriaItem } from '../../src/types';
-import { formatCurrency } from '../../src/utils/format';
+import { useTheme } from '../../../src/theme';
+import { orcamentoService } from '../../../src/services/orcamentoService';
+import { categoriaService } from '../../../src/services/categoriaService';
+import { OrcamentoResponse, OrcamentoCategoriaItem } from '../../../src/types';
+import { formatCurrency } from '../../../src/utils/format';
 
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
