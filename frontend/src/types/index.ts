@@ -3,6 +3,7 @@ export interface Usuario {
   nome: string;
   email: string;
   senha?: string;
+  onboardingCompleto: boolean;
 }
 
 export interface LoginRequest {
@@ -15,6 +16,7 @@ export interface RegisterRequest {
   nome: string;
   email: string;
   password: string;
+  confirmPassword: string;
 }
 
 export interface LoginResponse {
@@ -29,8 +31,10 @@ export interface AuthContextType {
   usuario: Usuario | null;
   login: (email: string, senha: string) => Promise<void>;
   logout: () => void;
+  refreshUser: () => Promise<void>;
   isAuthenticated: boolean;
   isLoading: boolean;
+  needsOnboarding: boolean;
 }
 
 export interface PagedResponse<T> {

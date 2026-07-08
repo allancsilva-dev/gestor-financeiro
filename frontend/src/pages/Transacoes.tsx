@@ -8,12 +8,18 @@ import Layout from '../components/Layout';
 import CategoriaDropdown from '../components/CategoriaDropdown';
 import CurrencyInput from '../components/CurrencyInput';
 import { formatCurrency } from '../utils/currency';
+import { importService, ImportResult } from '../services/importService';
+import { anexoService, Anexo } from '../services/anexoService';
 
 export default function Transacoes() {
   const { usuario } = useAuth(); // ← ADICIONADO
   const [transacoes, setTransacoes] = useState<any[]>([]);
   const [contas, setContas] = useState<Conta[]>([]);
   const [mostrarForm, setMostrarForm] = useState(false);
+  const [mostrarImport, setMostrarImport] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [anexos, setAnexos] = useState<Anexo[]>([]);
   const [loading, setLoading] = useState(false);
   const [editando, setEditando] = useState<any | null>(null);
   const [paginaAtual, setPaginaAtual] = useState(0);
@@ -54,7 +60,6 @@ export default function Transacoes() {
       setContas(contasData);
     } catch (error: any) {
       toast.error('Erro ao carregar dados');
-      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -64,6 +69,8 @@ export default function Transacoes() {
     if (transacao) {
       // Modo edição
       setEditando(transacao);
+      setAnexos([]);
+      carregarAnexos(transacao.id);
       setFormData({
         descricao: transacao.descricao,
         valorTotal: transacao.valorTotal?.toString() || '',
@@ -148,7 +155,6 @@ export default function Transacoes() {
           toast.success('Nova categoria criada!');
         }
       } catch (error) {
-        console.error('Erro ao buscar/criar categoria:', error);
         toast.error('Erro ao processar categoria');
         return;
       }
@@ -179,13 +185,57 @@ export default function Transacoes() {
       carregarDados();
     } catch (error: any) {
       toast.error(editando ? 'Erro ao atualizar transação' : 'Erro ao criar transação');
-      console.error(error);
     } finally {
       setLoading(false);
     }
   };
 
   const handleDeletar = async (id: number) => {
+
+  const handleImportar = async () => {
+    if (!importFile) return;
+    setLoading(true);
+    try {
+      const result = await importService.importarCsv(importFile);
+      setImportResult(result);
+      if (result.importadas > 0) {
+        carregarDados();
+        toast.success(`${result.importadas} transações importadas`);
+      }
+    } catch (error) {
+      toast.error('Erro ao importar arquivo');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const carregarAnexos = async (transacaoId: number) => {
+    try {
+      const data = await anexoService.listar(transacaoId);
+      setAnexos(data);
+    } catch {
+      setAnexos([]);
+    }
+  };
+
+  const handleUploadAnexo = async (transacaoId: number, file: File) => {
+    try {
+      await anexoService.upload(transacaoId, file);
+      await carregarAnexos(transacaoId);
+      toast.success('Anexo enviado');
+    } catch {
+      toast.error('Erro ao enviar anexo');
+    }
+  };
+
+  const handleDeletarAnexo = async (anexoId: number, transacaoId: number) => {
+    try {
+      await anexoService.deletar(anexoId);
+      await carregarAnexos(transacaoId);
+    } catch {
+      toast.error('Erro ao excluir anexo');
+    }
+  };
     if (!window.confirm('Tem certeza que deseja deletar?')) return;
     
     try {
@@ -194,7 +244,6 @@ export default function Transacoes() {
       carregarDados();
     } catch (error: any) {
       toast.error('Erro ao deletar transação');
-      console.error(error);
     }
   };
 
@@ -214,15 +263,27 @@ export default function Transacoes() {
           
           <div className="flex justify-between items-center mb-8">
             <h1 className="text-3xl font-bold text-gray-800">Transações</h1>
-            <button
-              onClick={() => {
-                resetarFormulario();
-                setMostrarForm(!mostrarForm);
-              }}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
-            >
-              {mostrarForm ? 'Cancelar' : '+ Nova Transação'}
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setMostrarImport(!mostrarImport);
+                  setImportResult(null);
+                  setImportFile(null);
+                }}
+                className="border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition"
+              >
+                {mostrarImport ? 'Fechar' : 'Importar CSV'}
+              </button>
+              <button
+                onClick={() => {
+                  resetarFormulario();
+                  setMostrarForm(!mostrarForm);
+                }}
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition"
+              >
+                {mostrarForm ? 'Cancelar' : '+ Nova Transação'}
+              </button>
+            </div>
           </div>
 
           {mostrarForm && (
@@ -372,6 +433,50 @@ export default function Transacoes() {
                   </div>
                 )}
 
+                {editando && (
+                  <div className="border-t pt-4">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-2">Anexos</h3>
+                    <div className="flex items-center gap-3 mb-3">
+                      <label className="cursor-pointer bg-gray-100 px-3 py-1.5 rounded text-sm hover:bg-gray-200 transition">
+                        + Adicionar
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept="image/*,.pdf"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleUploadAnexo(editando.id, file);
+                          }}
+                        />
+                      </label>
+                    </div>
+                    {anexos.length > 0 ? (
+                      <ul className="space-y-1">
+                        {anexos.map((a) => (
+                          <li key={a.id} className="flex items-center justify-between text-sm bg-gray-50 px-3 py-1.5 rounded">
+                            <a
+                              href={anexoService.downloadUrl(a.id)}
+                              className="text-blue-600 hover:underline truncate flex-1"
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              {a.nome} ({(a.tamanho / 1024).toFixed(1)} KB)
+                            </a>
+                            <button
+                              onClick={() => handleDeletarAnexo(a.id, editando.id)}
+                              className="text-red-500 hover:text-red-700 ml-2"
+                            >
+                              x
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-xs text-gray-400">Nenhum anexo</p>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex gap-3">
                   <button
                     type="button"
@@ -392,6 +497,43 @@ export default function Transacoes() {
                   </button>
                 </div>
               </form>
+            </div>
+          )}
+
+          {mostrarImport && (
+            <div className="bg-white p-6 rounded-lg shadow-md mb-8">
+              <h2 className="text-xl font-bold mb-4">Importar Transações (CSV)</h2>
+              <p className="text-sm text-gray-600 mb-4">
+                Formato esperado: <code className="bg-gray-100 px-1 rounded">data,descricao,valor,tipo,categoria,conta,status,observacoes</code>
+              </p>
+              <div className="flex gap-3 items-end">
+                <div className="flex-1">
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={(e) => {
+                      setImportFile(e.target.files?.[0] || null);
+                      setImportResult(null);
+                    }}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2"
+                  />
+                </div>
+                <button
+                  onClick={handleImportar}
+                  disabled={!importFile || loading}
+                  className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+                >
+                  {loading ? 'Importando...' : 'Importar'}
+                </button>
+              </div>
+              {importResult && (
+                <div className="mt-4 p-4 bg-gray-50 rounded-lg text-sm">
+                  <p>Total de linhas: <strong>{importResult.total}</strong></p>
+                  <p className="text-green-600">Importadas: <strong>{importResult.importadas}</strong></p>
+                  <p className="text-yellow-600">Ignoradas: <strong>{importResult.ignoradas}</strong></p>
+                  <p className="text-red-600">Erros: <strong>{importResult.erros}</strong></p>
+                </div>
+              )}
             </div>
           )}
 

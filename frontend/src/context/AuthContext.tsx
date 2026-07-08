@@ -37,6 +37,9 @@ useEffect(() => {
   checkAuthStatus();
 }, []);
 
+  const isAuthenticated = !!token;
+  const needsOnboarding = !!usuario && !usuario.onboardingCompleto;
+
   const login = async (email: string, senha: string) => {
     try {
       const response = await authService.login({ 
@@ -74,6 +77,15 @@ useEffect(() => {
     }
   };
 
+  const refreshUser = async () => {
+    try {
+      const user = await authService.getMe();
+      setUsuario(user);
+    } catch (error) {
+      console.error('Erro ao atualizar usuário:', error);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -81,8 +93,10 @@ useEffect(() => {
         usuario,
         login,
         logout,
+        refreshUser,
         isAuthenticated: !!token,
         isLoading,
+        needsOnboarding,
       }}
     >
       {!isLoading && children}

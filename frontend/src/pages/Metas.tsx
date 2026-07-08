@@ -74,7 +74,6 @@ export default function Metas() {
       const erroApi = erroLista as any;
       const mensagem = erroApi?.userMessage || erroApi?.response?.data?.message || 'Erro ao carregar metas';
       toast.error(mensagem);
-      console.error(erroLista);
     }
   }, [erroLista]);
 
@@ -157,7 +156,6 @@ export default function Metas() {
       carregarMetas();
     } catch (error: any) {
       toast.error(editando ? 'Erro ao atualizar meta' : 'Erro ao criar meta');
-      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -174,7 +172,6 @@ export default function Metas() {
       carregarMetas();
     } catch (error: any) {
       toast.error('Erro ao adicionar valor');
-      console.error(error);
     }
   };
 
@@ -187,7 +184,6 @@ export default function Metas() {
       carregarMetas();
     } catch (error: any) {
       toast.error('Erro ao deletar meta');
-      console.error(error);
     }
   };
 

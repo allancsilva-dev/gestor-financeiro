@@ -35,13 +35,13 @@ const carteiraService = {
   },
 
   // Criar nova carteira
-  criar: async (carteira: any): Promise<Carteira> => {
+  criar: async (carteira: Omit<Carteira, 'id'>): Promise<Carteira> => {
     const response = await api.post('/carteiras', carteira);
     return response.data;
   },
 
   // Atualizar carteira
-  atualizar: async (id: number, carteira: any): Promise<Carteira> => {
+  atualizar: async (id: number, carteira: Partial<Carteira>): Promise<Carteira> => {
     const response = await api.put(`/carteiras/${id}`, carteira);
     return response.data;
   },

@@ -32,12 +32,12 @@ export const metaService = {
     return response.data;
   },
 
-  criar: async (meta: any) => {
+  criar: async (meta: Omit<Meta, 'id'>) => {
     const response = await api.post('/metas', meta);
     return response.data;
   },
 
-  atualizar: async (id: number, meta: any) => {
+  atualizar: async (id: number, meta: Partial<Meta>) => {
     const response = await api.put(`/metas/${id}`, meta);
     return response.data;
   },

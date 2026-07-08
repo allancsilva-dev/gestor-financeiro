@@ -44,7 +44,6 @@ export default function Categorias() {
       const mensagem = erroApi?.userMessage || erroApi?.response?.data?.message || erroApi?.message || 'Erro ao carregar categorias';
       setErro(mensagem);
       toast.error(mensagem);
-      console.error('Erro completo:', erroLista);
     }
   }, [erroLista]);
 
@@ -74,7 +73,6 @@ export default function Categorias() {
     } catch (error: any) {
       const mensagem = error.response?.data?.message || error.message || 'Erro ao criar categoria';
       toast.error(mensagem);
-      console.error('Erro completo:', error);
     } finally {
       setLoading(false);
     }
@@ -90,7 +88,6 @@ export default function Categorias() {
     } catch (error: any) {
       const mensagem = error.response?.data?.message || error.message || 'Erro ao deletar categoria';
       toast.error(mensagem);
-      console.error('Erro completo:', error);
     }
   };
 

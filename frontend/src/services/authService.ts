@@ -14,11 +14,12 @@ export const authService = {
     return response.data;
   },
 
-  async register(data: { nome: string; email: string; senha: string }): Promise<Usuario> {
+  async register(data: { nome: string; email: string; senha: string; confirmPassword: string }): Promise<Usuario> {
     const registerData: RegisterRequest = {
       nome: data.nome,
       email: data.email,
       password: data.senha,
+      confirmPassword: data.confirmPassword,
     };
 
     const response = await api.post<Usuario>('/auth/register', registerData);
@@ -43,7 +44,7 @@ export const authService = {
 
       return novoAccessToken;
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erro ao renovar token:', error.response?.data || error.message);
 
       clearAccessToken();

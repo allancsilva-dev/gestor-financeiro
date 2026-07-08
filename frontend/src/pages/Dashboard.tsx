@@ -3,15 +3,18 @@ import Layout from '../components/Layout';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 // --- 1. IMPORTAMOS O TIPO DO SERVICE ---
-import dashboardService, { EvolucaoMensal } from '../services/dashboardService';
+import dashboardService, { EvolucaoMensal, ProjecaoMensal } from '../services/dashboardService';
 import { useApi } from '../hooks/useApi';
 
 import GraficoGastosPorCategoria from '../components/GraficoGastosPorCategoria';
 import GraficoEvolucaoMensal from '../components/GraficoEvolucaoMensal';
 import { formatCurrency } from '../utils/currency';
+import { insightsService, InsightsResponse } from '../services/insightsService';
+import { useState } from 'react';
 
 export default function Dashboard() {
   const { usuario } = useAuth();
+  const [insights, setInsights] = useState<InsightsResponse | null>(null);
 
   const { data, loading, error, refetch } = useApi(
     async (signal) => {
@@ -19,16 +22,18 @@ export default function Dashboard() {
         return null;
       }
 
-      const [resumoData, gastosData, evolucaoData] = await Promise.all([
+      const [resumoData, gastosData, evolucaoData, projecaoData] = await Promise.all([
         dashboardService.resumo(signal),
         dashboardService.gastosPorCategoria(signal),
         dashboardService.evolucaoMensal(signal),
+        dashboardService.projecao(signal),
       ]);
 
       return {
         resumo: resumoData,
         gastosPorCategoria: gastosData,
         evolucaoMensal: evolucaoData,
+        projecao: projecaoData,
       };
     },
     {
@@ -40,13 +45,19 @@ export default function Dashboard() {
   const resumo = data?.resumo;
   const gastosPorCategoria = (data?.gastosPorCategoria || []) as any[];
   const evolucaoMensal = (data?.evolucaoMensal || []) as EvolucaoMensal[];
+  const projecao = data?.projecao;
 
   useEffect(() => {
     if (error) {
       toast.error('Erro ao carregar dashboard');
-      console.error('ERRO AO CARREGAR DADOS:', error);
     }
   }, [error]);
+
+  useEffect(() => {
+    if (usuario?.id) {
+      insightsService.gerar().then(setInsights).catch(() => {});
+    }
+  }, [usuario?.id]);
 
   const formatarMoedaComSinal = (valor: number) => {
     const valorNumerico = typeof valor === 'number' ? valor : 0;
@@ -201,6 +212,71 @@ export default function Dashboard() {
               <GraficoEvolucaoMensal chartData={evolucaoMensal} />
             </div>
           </div>
+
+          {/* Seção de Projeção de Caixa */}
+          {projecao && projecao.meses && projecao.meses.length > 0 && (
+            <div className="mt-6">
+              <h2 className="text-xl font-bold text-white mb-4">Projeção de Caixa</h2>
+              <div className="overflow-x-auto">
+                <table className="w-full bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden">
+                  <thead>
+                    <tr className="border-b border-slate-700">
+                      <th className="text-left p-3 text-xs text-slate-400 uppercase">Mês</th>
+                      <th className="text-right p-3 text-xs text-slate-400 uppercase">Contas Fixas</th>
+                      <th className="text-right p-3 text-xs text-slate-400 uppercase">Parcelas</th>
+                      <th className="text-right p-3 text-xs text-slate-400 uppercase">Total Saídas</th>
+                      <th className="text-right p-3 text-xs text-slate-400 uppercase">Saldo Final</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {projecao.meses.map((m: ProjecaoMensal, i: number) => (
+                      <tr key={i} className={`border-b border-slate-700/50 ${i === 0 ? 'bg-slate-700/30' : ''}`}>
+                        <td className="p-3 text-sm text-white font-medium">{m.periodo}</td>
+                        <td className="p-3 text-sm text-right text-red-400">{formatCurrency(m.totalContasFixas)}</td>
+                        <td className="p-3 text-sm text-right text-red-400">{formatCurrency(m.totalParcelas)}</td>
+                        <td className="p-3 text-sm text-right text-red-400 font-semibold">{formatCurrency(m.totalSaidas)}</td>
+                        <td className={`p-3 text-sm text-right font-bold ${m.saldoFinal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          {formatCurrency(m.saldoFinal)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {insights && (
+            <div className="mt-6 bg-gradient-to-r from-slate-700 to-slate-800 border border-slate-600 rounded-2xl p-6">
+              <h2 className="text-xl font-bold text-white mb-4">Insights Financeiros</h2>
+              <p className="text-slate-300 mb-4">{insights.resumo}</p>
+              {insights.categoriasAlerta.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="text-sm font-semibold text-amber-400 mb-2">Categorias com gasto elevado</h3>
+                  <div className="space-y-1">
+                    {insights.categoriasAlerta.map((a, i) => (
+                      <div key={i} className="flex justify-between text-sm">
+                        <span className="text-slate-300">{a.categoriaNome}</span>
+                        <span className={a.acimaMedia ? 'text-red-400' : 'text-yellow-400'}>
+                          {formatCurrency(a.gastoAtual)} ({a.variacaoPercentual >= 0 ? '+' : ''}{a.variacaoPercentual?.toFixed(0)}%)
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div>
+                <h3 className="text-sm font-semibold text-green-400 mb-2">Recomendações</h3>
+                <ul className="space-y-1">
+                  {insights.recomendacoes.map((r, i) => (
+                    <li key={i} className="text-sm text-slate-300 flex gap-2">
+                      <span className="text-green-400">~</span> {r}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
 
         </div>
       </div>

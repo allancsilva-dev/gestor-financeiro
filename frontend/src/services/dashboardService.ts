@@ -20,8 +20,35 @@ export interface ResumoComparado {
   saidas: number;
 }
 
+export interface ProjecaoMensal {
+  periodo: string;
+  mes: number;
+  ano: number;
+  saldoInicial: number;
+  totalContasFixas: number;
+  totalParcelas: number;
+  totalSaidas: number;
+  saldoFinal: number;
+}
+
+export interface ProjecaoResponse {
+  saldoAtual: number;
+  meses: ProjecaoMensal[];
+}
+
+export interface DashboardResumo {
+  totalEntradas: number;
+  totalSaidas: number;
+  saldo: number;
+  totalCategorias: number;
+  totalContas: number;
+  totalMetas: number;
+  totalContasFixas: number;
+  saldoCarteiras: number;
+}
+
 const dashboardService = {
-  resumo: async (signal?: AbortSignal): Promise<any> => {
+  resumo: async (signal?: AbortSignal): Promise<DashboardResumo> => {
     const response = await api.get('/dashboard/resumo', { signal });
     return response.data;
   },
@@ -41,6 +68,11 @@ const dashboardService = {
   // Buscar comparação mês atual vs anterior
   comparacaoMensal: async (signal?: AbortSignal): Promise<ResumoComparado[]> => {
     const response = await api.get('/dashboard/comparacao-mensal', { signal });
+    return response.data;
+  },
+
+  projecao: async (signal?: AbortSignal): Promise<ProjecaoResponse> => {
+    const response = await api.get('/dashboard/projecao', { signal });
     return response.data;
   }
 };

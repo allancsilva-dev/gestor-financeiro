@@ -14,11 +14,7 @@ interface Props {
 
 // --- CORREÇÃO (V8) ---
 export default function GraficoEvolucaoMensal({ chartData }: Props) {
-  
-  // --- CORREÇÃO (V8) ---
-  console.log("--- DENTRO DO GRÁFICO LINHA (Componente):", chartData);
 
-  // --- CORREÇÃO (V8) ---
   if (!chartData || chartData.length === 0) {
     return (
       <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700">

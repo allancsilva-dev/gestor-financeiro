@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -15,6 +15,12 @@ const Transacoes = lazy(() => import('./pages/Transacoes'));
 const Metas = lazy(() => import('./pages/Metas'));
 const CarteiraPage = lazy(() => import('./pages/Carteira'));
 const ContasFixas = lazy(() => import('./pages/ContasFixas'));
+const Onboarding = lazy(() => import('./pages/Onboarding'));
+const Orcamentos = lazy(() => import('./pages/Orcamentos'));
+const Faturas = lazy(() => import('./pages/Faturas'));
+const Relatorios = lazy(() => import('./pages/Relatorios'));
+const Investimentos = lazy(() => import('./pages/Investimentos'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 
 function RouteFallback() {
   return (
@@ -32,6 +38,25 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
 }
 
+function OnboardingGuard({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, needsOnboarding } = useAuth();
+  const location = useLocation();
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" />;
+  }
+
+  if (needsOnboarding && location.pathname !== '/onboarding') {
+    return <Navigate to="/onboarding" replace />;
+  }
+
+  if (!needsOnboarding && location.pathname === '/onboarding') {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <>{children}</>;
+}
+
 function AppRoutes() {
   return (
     <Routes>
@@ -40,71 +65,25 @@ function AppRoutes() {
       <Route path="/login" element={<Login />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/" element={<Navigate to="/login" />} />
-      
-      {/* Rotas Privadas */}
-      <Route
-        path="/dashboard"
-        element={
-          <PrivateRoute>
-            <Dashboard />
-          </PrivateRoute>
-        }
-      />
-      
-      <Route
-        path="/categorias"
-        element={
-          <PrivateRoute>
-            <Categorias />
-          </PrivateRoute>
-        }
-      />
-      
-      <Route
-        path="/contas"
-        element={
-          <PrivateRoute>
-            <Contas />
-          </PrivateRoute>
-        }
-      />
-      
-      <Route
-        path="/transacoes"
-        element={
-          <PrivateRoute>
-            <Transacoes />
-          </PrivateRoute>
-        }
-      />
-      
-      <Route
-        path="/metas"
-        element={
-          <PrivateRoute>
-            <Metas />
-          </PrivateRoute>
-        }
-      />
-      
-      <Route
-        path="/carteira"
-        element={
-          <PrivateRoute>
-            <CarteiraPage />
-          </PrivateRoute>
-        }
-      />
-      
-      <Route
-        path="/contas-fixas"
-        element={
-          <PrivateRoute>
-            <ContasFixas />
-          </PrivateRoute>
-        }
-      />
+
+      {/* Onboarding — acessível apenas durante fluxo de onboarding */}
+      <Route path="/onboarding" element={<OnboardingGuard><Onboarding /></OnboardingGuard>} />
+
+      {/* Rotas Privadas com Guard de Onboarding */}
+      <Route path="/dashboard" element={<OnboardingGuard><Dashboard /></OnboardingGuard>} />
+      <Route path="/categorias" element={<OnboardingGuard><Categorias /></OnboardingGuard>} />
+      <Route path="/contas" element={<OnboardingGuard><Contas /></OnboardingGuard>} />
+      <Route path="/transacoes" element={<OnboardingGuard><Transacoes /></OnboardingGuard>} />
+      <Route path="/metas" element={<OnboardingGuard><Metas /></OnboardingGuard>} />
+      <Route path="/carteira" element={<OnboardingGuard><CarteiraPage /></OnboardingGuard>} />
+      <Route path="/contas-fixas" element={<OnboardingGuard><ContasFixas /></OnboardingGuard>} />
+      <Route path="/orcamentos" element={<OnboardingGuard><Orcamentos /></OnboardingGuard>} />
+      <Route path="/faturas" element={<OnboardingGuard><Faturas /></OnboardingGuard>} />
+      <Route path="/relatorios" element={<OnboardingGuard><Relatorios /></OnboardingGuard>} />
+      <Route path="/investimentos" element={<OnboardingGuard><Investimentos /></OnboardingGuard>} />
+
+      <Route path="/" element={<Navigate to="/dashboard" />} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }

@@ -18,7 +18,7 @@ export default function Login() {
       await login(email, senha);
       navigate('/dashboard');
     } catch (error) {
-      console.log('Erro no login:', error);
+      toast.error('Email ou senha incorretos');
     } finally {
       setLoading(false);
     }
@@ -56,6 +56,7 @@ export default function Login() {
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-12 pr-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
                   placeholder="seu@email.com"
+                  aria-label="Email"
                   required
                 />
               </div>
@@ -74,6 +75,7 @@ export default function Login() {
                   onChange={(e) => setSenha(e.target.value)}
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-12 pr-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
                   placeholder="••••••••"
+                  aria-label="Senha"
                   required
                 />
               </div>
@@ -83,6 +85,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
+              aria-label="Entrar"
               className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-orange-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Entrando...' : 'Entrar'}

@@ -72,7 +72,6 @@ const CarteiraPage = () => {
       setCarteiras(carteirasData);
       setSaldoTotal(saldoData);
     } catch (error) {
-      console.error('Erro ao carregar carteiras:', error);
       toast.error('Erro ao carregar carteiras');
     } finally {
       setLoading(false);
@@ -129,7 +128,6 @@ const CarteiraPage = () => {
       resetarFormulario();
       carregarCarteiras();
     } catch (error) {
-      console.error('Erro ao salvar carteira:', error);
       toast.error('Erro ao salvar carteira');
     }
   };
@@ -141,7 +139,6 @@ const CarteiraPage = () => {
         toast.success('Carteira deletada com sucesso!');
         carregarCarteiras();
       } catch (error) {
-        console.error('Erro ao deletar carteira:', error);
         toast.error('Erro ao deletar carteira');
       }
     }
@@ -170,7 +167,6 @@ const CarteiraPage = () => {
       setValorMovimentacao('');
       carregarCarteiras();
     } catch (error) {
-      console.error('Erro ao movimentar dinheiro:', error);
       toast.error('Erro ao movimentar dinheiro');
     }
   };

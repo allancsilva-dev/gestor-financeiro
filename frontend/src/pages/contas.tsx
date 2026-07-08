@@ -38,8 +38,7 @@ export default function Contas() {
       const cartoes = data.filter((c: Conta) => c.tipo === 'CREDITO');
       setContas(cartoes);
     } catch (error: any) {
-      toast.error('Erro ao carregar cartões');
-      console.error(error);
+      toast.error('Erro ao carregar cartoes');
     } finally {
       setLoading(false);
     }
@@ -111,8 +110,7 @@ export default function Contas() {
       setMostrarForm(false);
       carregarContas();
     } catch (error: any) {
-      toast.error(editando ? 'Erro ao atualizar cartão' : 'Erro ao criar cartão');
-      console.error(error);
+      toast.error(editando ? 'Erro ao atualizar cartao' : 'Erro ao criar cartao');
     } finally {
       setLoading(false);
     }
@@ -126,8 +124,7 @@ export default function Contas() {
       toast.success('Cartão deletado!');
       carregarContas();
     } catch (error: any) {
-      toast.error('Erro ao deletar cartão');
-      console.error(error);
+      toast.error('Erro ao deletar cartao');
     }
   };
 

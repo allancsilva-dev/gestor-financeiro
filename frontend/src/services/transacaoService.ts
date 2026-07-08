@@ -32,12 +32,12 @@ export const transacaoService = {
     return response.data;
   },
 
-  criar: async (transacao: any) => {
+  criar: async (transacao: Omit<Transacao, 'id'>) => {
     const response = await api.post('/transacoes', transacao);
     return response.data;
   },
 
-  atualizar: async (id: number, transacao: any) => {
+  atualizar: async (id: number, transacao: Partial<Transacao>) => {
     const response = await api.put(`/transacoes/${id}`, transacao);
     return response.data;
   },

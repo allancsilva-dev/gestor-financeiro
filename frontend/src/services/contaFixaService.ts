@@ -45,13 +45,13 @@ const contaFixaService = {
   },
 
   // Criar nova conta fixa
-  criar: async (contaFixa: any): Promise<ContaFixa> => {
+  criar: async (contaFixa: Omit<ContaFixa, 'id'>): Promise<ContaFixa> => {
     const response = await api.post('/contas-fixas', contaFixa);
     return response.data;
   },
 
   // Atualizar conta fixa
-  atualizar: async (id: number, contaFixa: any): Promise<ContaFixa> => {
+  atualizar: async (id: number, contaFixa: Partial<ContaFixa>): Promise<ContaFixa> => {
     const response = await api.put(`/contas-fixas/${id}`, contaFixa);
     return response.data;
   },
@@ -66,6 +66,16 @@ const contaFixaService = {
     const response = await api.put(`/contas-fixas/${id}/pagar`, {
       valor: valorPago
     });
+    return response.data;
+  },
+
+  pularMes: async (id: number): Promise<ContaFixa> => {
+    const response = await api.put(`/contas-fixas/${id}/pular`);
+    return response.data;
+  },
+
+  reativar: async (id: number): Promise<ContaFixa> => {
+    const response = await api.put(`/contas-fixas/${id}/reativar`);
     return response.data;
   }
 };

@@ -28,7 +28,7 @@ export default function Register() {
     setLoading(true);
 
     try {
-      await authService.register({ nome, email, senha });
+      await authService.register({ nome, email, senha, confirmPassword: confirmarSenha });
       toast.success('Cadastro realizado com sucesso! Faça login.');
       navigate('/login');
     } catch (error: any) {

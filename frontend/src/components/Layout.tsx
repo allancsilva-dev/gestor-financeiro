@@ -1,6 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Wallet, LayoutDashboard, CreditCard, ArrowLeftRight, Target, LogOut, FileText } from 'lucide-react';
+import { Wallet, LayoutDashboard, CreditCard, ArrowLeftRight, Target, LogOut, FileText, BarChart3, ReceiptText, FileSearch, TrendingUp } from 'lucide-react';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -23,6 +23,10 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/transacoes', label: 'Transações', icon: <ArrowLeftRight className="w-5 h-5" />, color: 'text-purple-500' },
     { path: '/metas', label: 'Metas', icon: <Target className="w-5 h-5" />, color: 'text-pink-500' },
     { path: '/contas-fixas', label: 'Contas Fixas', icon: <FileText className="w-5 h-5" />, color: 'text-amber-500' },
+    { path: '/orcamentos', label: 'Orçamentos', icon: <BarChart3 className="w-5 h-5" />, color: 'text-cyan-500' },
+    { path: '/faturas', label: 'Faturas', icon: <ReceiptText className="w-5 h-5" />, color: 'text-rose-500' },
+    { path: '/relatorios', label: 'Relatórios', icon: <FileSearch className="w-5 h-5" />, color: 'text-indigo-500' },
+    { path: '/investimentos', label: 'Investimentos', icon: <TrendingUp className="w-5 h-5" />, color: 'text-emerald-500' },
   ];
 
   const getInitials = (name?: string) => {
@@ -55,6 +59,7 @@ export default function Layout({ children }: LayoutProps) {
               <Link
                 key={item.path}
                 to={item.path}
+                aria-label={item.label}
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
                   isActive
                     ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-500/20'

@@ -4,7 +4,7 @@ import contaFixaService, { ContaFixa } from '../services/contaFixaService';
 import { categoriaService } from '../services/categoriaService';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
-import { Plus, Edit2, Trash2, Check, X, Calendar, DollarSign, Tag } from 'lucide-react';
+import { Plus, Edit2, Trash2, Check, X, Calendar, DollarSign, Tag, SkipForward } from 'lucide-react';
 import CurrencyInput from '../components/CurrencyInput';
 import { formatCurrency } from '../utils/currency';
 
@@ -45,7 +45,6 @@ export default function ContasFixas() {
       setCategorias(categoriasData);
     } catch (error: any) {
       toast.error('Erro ao carregar dados');
-      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -111,7 +110,6 @@ export default function ContasFixas() {
       carregarDados();
     } catch (error: any) {
       toast.error('Erro ao salvar conta fixa');
-      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -126,7 +124,6 @@ export default function ContasFixas() {
       carregarDados();
     } catch (error: any) {
       toast.error('Erro ao deletar conta fixa');
-      console.error(error);
     }
   };
 
@@ -144,7 +141,16 @@ export default function ContasFixas() {
       carregarDados();
     } catch (error: any) {
       toast.error('Erro ao marcar como paga');
-      console.error(error);
+    }
+  };
+
+  const handlePularMes = async (id: number) => {
+    try {
+      await contaFixaService.pularMes(id);
+      toast.success('Mês pulado!');
+      carregarDados();
+    } catch (error: any) {
+      toast.error('Erro ao pular mês');
     }
   };
 
@@ -428,7 +434,7 @@ export default function ContasFixas() {
                     </div>
                   ) : null}
                   
-                  {conta.status !== 'PAGO' && (
+                   {conta.status !== 'PAGO' && (
                     pagandoConta === conta.id ? (
                       <div className="space-y-2">
                         <CurrencyInput
@@ -457,15 +463,26 @@ export default function ContasFixas() {
                         </div>
                       </div>
                     ) : (
-                      <button
-                        onClick={() => {
-                          setPagandoConta(conta.id);
-                          setValorPagamento(conta.valorPlanejado.toString());
-                        }}
-                        className="w-full bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 py-3 rounded-xl transition border border-orange-500/30 font-medium"
-                      >
-                        Marcar como Paga
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            setPagandoConta(conta.id);
+                            setValorPagamento(conta.valorPlanejado.toString());
+                          }}
+                          className="flex-1 bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 py-3 rounded-xl transition border border-orange-500/30 font-medium"
+                        >
+                          Marcar como Paga
+                        </button>
+                        {conta.recorrente !== false && (
+                          <button
+                            onClick={() => handlePularMes(conta.id)}
+                            className="px-4 py-3 bg-slate-700/50 hover:bg-slate-600/50 text-slate-400 hover:text-slate-300 rounded-xl transition border border-slate-600/30 flex items-center gap-1"
+                            title="Pular este mês"
+                          >
+                            <SkipForward className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     )
                   )}
                 </div>

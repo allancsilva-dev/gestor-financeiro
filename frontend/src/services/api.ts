@@ -63,7 +63,7 @@ const isCsrfProtectedAuthMutation = (url: string, method?: string): boolean => {
   return url.includes('/auth/refresh-token') || url.includes('/auth/logout');
 };
 
-const applyCsrfHeader = (headers: any) => {
+const applyCsrfHeader = <T extends Record<string, string>>(headers: T): T => {
   const csrfToken = getCookieValue(CSRF_COOKIE_NAME);
   if (!csrfToken) {
     return headers;
@@ -150,7 +150,7 @@ api.interceptors.response.use(
 
         return api(originalRequest);
 
-      } catch (refreshError: any) {
+      } catch (refreshError: unknown) {
         processQueue(refreshError, null);
         clearAccessToken();
         window.location.href = '/login';

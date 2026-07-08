@@ -19,7 +19,6 @@ export default function ForgotPassword() {
       toast.success('Email de recuperação enviado!');
     } catch (error: any) {
       toast.error('Erro ao solicitar recuperação de senha');
-      console.error(error);
     } finally {
       setLoading(false);
     }
