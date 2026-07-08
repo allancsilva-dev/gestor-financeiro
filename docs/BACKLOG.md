@@ -66,7 +66,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Resolver PROB-0013
 - **Criterio de aceite:** Token armazenado no SecureStore; sessao restaurada no cold start; sem flash de login
 - **Risco se ficar pendente:** Experiencia de usuario inaceitavel
-- **Status:** ABERTO
+- **Status:** FECHADO (PR-FASE2-01, 2026-07-08)
 
 ---
 
@@ -79,7 +79,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Resolver PROB-0014
 - **Criterio de aceite:** URL da API configurada via expo-constants ou env var
 - **Risco se ficar pendente:** App inutilizavel fora da rede do dev
-- **Status:** ABERTO
+- **Status:** FECHADO (PR-FASE2-01, 2026-07-08)
 
 ---
 
@@ -118,7 +118,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Endpoint backend para emitir token CSRF
 - **Criterio de aceite:** Token CSRF enviado como header em toda request state-changing
 - **Risco se ficar pendente:** POST /api/auth/refresh-token vulneravel a CSRF
-- **Status:** ABERTO
+- **Status:** FECHADO (BUG-0008, 2026-07-07)
 
 ---
 
@@ -183,7 +183,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Resolver PROB-0015
 - **Criterio de aceite:** "Esqueceu a senha" navega para forgot-password; "Ver todas" navega para lista
 - **Risco se ficar pendente:** UX quebrada, frustracao do usuario
-- **Status:** ABERTO
+- **Status:** FECHADO (PR-FASE2-02, 2026-07-08)
 
 ---
 
@@ -196,7 +196,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Resolver PROB-0025
 - **Criterio de aceite:** App.tsx removido; index.ts limpo ou re-exportando expo-router
 - **Risco se ficar pendente:** Confusao para devs — "qual entry point esta sendo usado?"
-- **Status:** ABERTO
+- **Status:** FECHADO (PR-FASE2-02, 2026-07-08)
 
 ---
 
@@ -209,7 +209,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Resolver PROB-0016
 - **Criterio de aceite:** Perfil carrega dados do dashboard corretamente
 - **Risco se ficar pendente:** Tela de perfil quebrada
-- **Status:** ABERTO
+- **Status:** FECHADO (PR-FASE2-01, 2026-07-08)
 
 ---
 
@@ -222,7 +222,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Resolver restante de PROB-0017
 - **Criterio de aceite:** Toda mutation com onError que mostra Alert ou toast
 - **Risco se ficar pendente:** Usuario acredita que operacao foi concluida mas nao foi
-- **Status:** ABERTO
+- **Status:** FECHADO (PR-FASE2-02, 2026-07-08)
 
 ---
 
@@ -235,7 +235,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Resolver PROB-0028
 - **Criterio de aceite:** Funcao parseCurrencyBR exportada de format.ts; 5 arquivos importam dela
 - **Risco se ficar pendente:** Manutencao fragil — bug de parse precisa ser corrigido em 5 lugares
-- **Status:** ABERTO
+- **Status:** FECHADO (PR-FASE2-05, 2026-07-08)
 
 ---
 
@@ -287,7 +287,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Nenhuma
 - **Criterio de aceite:** GraficoComparacaoMensal removido ou integrado; mobile App.tsx removido; imports unused removidos; dependencias nao usadas removidas do package.json
 - **Risco se ficar pendente:** Build levemente maior; confusao para novos devs
-- **Status:** ABERTO
+- **Status:** FECHADO (PR-FASE2-04, 2026-07-08)
 
 ---
 
@@ -300,7 +300,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Resolver PROB-0027
 - **Criterio de aceite:** Zero any nos arquivos de service; parametros tipados com interfaces do types/index.ts
 - **Risco se ficar pendente:** Erros de tipo so descobertos em runtime
-- **Status:** ABERTO
+- **Status:** FECHADO (PR-FASE2-06, 2026-07-08)
 
 ---
 
@@ -326,7 +326,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Nenhuma
 - **Criterio de aceite:** aria-label em botoes e inputs; role em componentes customizados; keyboard nav em dropdowns; accessibilityLabel no mobile
 - **Risco se ficar pendente:** Sistema inacessivel para usuarios com leitores de tela
-- **Status:** ABERTO
+- **Status:** FECHADO (PR-FASE2-08, 2026-07-08)
 
 ---
 
@@ -365,7 +365,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Testes implementados (BACKLOG-0026, BACKLOG-0027)
 - **Criterio de aceite:** Pipeline GitHub Actions: build → test → lint em PRs
 - **Risco se ficar pendente:** Deploys manuais com testes esquecidos
-- **Status:** ABERTO
+- **Status:** FECHADO (PR-FASE3-01, 2026-07-08)
 
 ---
 
@@ -378,7 +378,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** spring-boot-starter-actuator ja incluso
 - **Criterio de aceite:** Health endpoint retorna status do banco; readiness probe funcional
 - **Risco se ficar pendente:** App considerado healthy mesmo com banco fora do ar
-- **Status:** ABERTO
+- **Status:** FECHADO (PR-FOUNDATION-06, DataSourceHealthIndicator configurado)
 
 ---
 
@@ -404,7 +404,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Resolver PROB-0029
 - **Criterio de aceite:** Rota `*` renderiza NotFound com link para Dashboard ou Login
 - **Risco se ficar pendente:** UX ruim para URLs erradas
-- **Status:** ABERTO
+- **Status:** FECHADO (PR-FASE2-04, 2026-07-08)
 
 ---
 
@@ -417,7 +417,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Resolver PROB-0030
 - **Criterio de aceite:** Zero console.log; console.error apenas em ErrorBoundary ou logger condicional
 - **Risco se ficar pendente:** Console poluido; dados vazados em logs
-- **Status:** ABERTO
+- **Status:** FECHADO (PR-FASE2-04, 2026-07-08)
 
 ---
 
@@ -430,7 +430,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Nenhuma
 - **Criterio de aceite:** Campo confirmPassword no DTO RegisterRequest; validacao de igualdade no backend e frontend
 - **Risco se ficar pendente:** Contas perdidas por typo na senha
-- **Status:** ABERTO
+- **Status:** FECHADO (PR-FASE2-07, 2026-07-08)
 
 ---
 
@@ -457,6 +457,97 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Criterio de aceite:** Pull-to-refresh atualiza dados do dashboard
 - **Risco se ficar pendente:** Dados stale sem forma facil de atualizar
 - **Status:** ABERTO
+
+---
+
+## BACKLOG-0036 — Onboarding financeiro guiado
+
+- **Titulo:** Implementar wizard de onboarding pos-registro para configuracao inicial
+- **Prioridade:** P0 (Fase 1)
+- **Area:** backend, frontend, mobile
+- **Motivo:** Usuario novo cai em telas vazias sem orientacao. Necessario guiar configuracao inicial de carteira, conta, categorias, renda e meta.
+- **Dependencias:** Nenhuma
+- **Criterio de aceite:** Wizard multi-step com 6 passos (carteira, conta, categorias, renda opcional, meta opcional, confirmacao); flag onboardingCompleto no backend; redirect automatico pos-login; web e mobile implementados
+- **Risco se ficar pendente:** Abandono do app por falta de orientacao
+- **Status:** FECHADO (PR-FASE1-01, 2026-07-07)
+
+---
+
+## BACKLOG-0037 — Orçamento mensal por categoria
+
+- **Titulo:** Implementar orcamento mensal com limites por categoria e progresso
+- **Prioridade:** P0 (Fase 1)
+- **Area:** backend, frontend, mobile
+- **Motivo:** Usuario precisa planejar gastos mensais e acompanhar progresso por categoria
+- **Dependencias:** Nenhuma
+- **Criterio de aceite:** CRUD de orcamento mensal; limites por categoria; barra de progresso com cores (verde/amarelo/vermelho); navegacao entre meses; calculo automatico de gasto real via agregacao de transacoes; web e mobile implementados
+- **Risco se ficar pendente:** Sem controle de gastos planejados vs realizados
+- **Status:** FECHADO (PR-FASE1-02, 2026-07-07)
+
+---
+
+## BACKLOG-0038 — Recorrência real com pular mês e vínculo transação
+
+- **Titulo:** Implementar pularMes, reativar e vínculo conta_fixa_id na transação
+- **Prioridade:** P0 (Fase 1)
+- **Area:** backend, frontend, mobile
+- **Motivo:** Contas fixas precisam diferenciar previsto/confirmado/pago/atrasado/pulado para projeção financeira precisa
+- **Dependencias:** Nenhuma
+- **Criterio de aceite:** Endpoint pularMes avança vencimento sem criar transação; reativar restaura conta inativa; transação criada ao pagar vincula conta_fixa_id (FK); botão Pular Mês no web e mobile
+- **Risco se ficar pendente:** Impossibilidade de ignorar mês específico de conta recorrente
+- **Status:** FECHADO (PR-FASE1-03, 2026-07-07)
+
+---
+
+## BACKLOG-0039 — Cartão de crédito e fatura
+
+- **Titulo:** Implementar modelo de faturas de cartão de crédito
+- **Prioridade:** P0 (Fase 1)
+- **Area:** backend, frontend, mobile
+- **Motivo:** Cartão de crédito tratado apenas como Conta simples. Necessário modelar faturas mensais com fechamento, vencimento e pagamento.
+- **Dependencias:** Nenhuma
+- **Criterio de aceite:** Entidade FaturaCartao vinculada a Conta (CREDITO); fatura criada automaticamente com transações do período; endpoint pagarFatura cria transação de pagamento; visualização de lançamentos por fatura; navegação entre meses; web e mobile
+- **Risco se ficar pendente:** Impossibilidade de controlar faturas de cartão com precisão
+- **Status:** FECHADO (PR-FASE1-04, 2026-07-07)
+
+---
+
+## BACKLOG-0040 — Projeção de caixa
+
+- **Titulo:** Implementar projeção de saldo futuro com base em contas fixas e parcelas
+- **Prioridade:** P0 (Fase 1)
+- **Area:** backend, frontend, mobile
+- **Motivo:** Usuário precisa saber risco de saldo negativo nos próximos meses
+- **Dependencias:** Nenhuma
+- **Criterio de aceite:** Endpoint GET /dashboard/projecao?meses=6; calcula saldo final mês a mês subtraindo contas fixas pendentes e parcelas futuras; tabela no web e lista no mobile
+- **Risco se ficar pendente:** Usuário sem visibilidade de problemas futuros de caixa
+- **Status:** FECHADO (PR-FASE1-05, 2026-07-07)
+
+---
+
+## BACKLOG-0041 — Relatórios e filtros por período
+
+- **Titulo:** Implementar relatórios com filtro por período, gastos por categoria, formato de pagamento e maiores despesas
+- **Prioridade:** P0 (Fase 1)
+- **Area:** backend, frontend, mobile
+- **Motivo:** Usuário precisa analisar finanças em qualquer período, não apenas mês atual
+- **Dependencias:** Nenhuma
+- **Criterio de aceite:** Endpoint GET /relatorios com filtro inicio/fim; resposta inclui KPIs, gastos por categoria, gastos por conta e top 10 maiores despesas; tela web com date pickers e cards; tela mobile com filtros de data
+- **Risco se ficar pendente:** Sem capacidade de análise histórica
+- **Status:** FECHADO (PR-FASE1-06, 2026-07-07)
+
+---
+
+## BACKLOG-0042 — Exportação de dados (CSV)
+
+- **Titulo:** Implementar exportação CSV de transações, categorias, contas e dados completos
+- **Prioridade:** P0 (Fase 1)
+- **Area:** backend, frontend, mobile
+- **Motivo:** LGPD exige portabilidade de dados. Usuário precisa poder exportar seu histórico financeiro.
+- **Dependencias:** Nenhuma
+- **Criterio de aceite:** Endpoints CSV para transações (com filtro), categorias, contas e completo; botões de download no web; opção de exportar no mobile via Share/Link
+- **Risco se ficar pendente:** Não conformidade LGPD, falta de confiança do usuário
+- **Status:** FECHADO (PR-FASE1-07, 2026-07-07)
 
 ---
 

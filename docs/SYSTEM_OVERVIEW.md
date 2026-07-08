@@ -27,8 +27,11 @@ Documentacao de alto nivel sobre como o sistema funciona. Mantido pelo `docs-rep
 | Estado mobile | TanStack React Query | 5.96.2 |
 | Auth store mobile | Expo Secure Store (instalado, nao utilizado) | 15.0.8 |
 | Documentacao API | SpringDoc OpenAPI (Swagger UI) | — |
-| Monitoramento | Spring Boot Actuator | — |
+| Monitoramento | Spring Boot Actuator + health-check script | — |
 | Logging | SLF4J + Logback + Logstash encoder | — |
+| CI/CD | GitHub Actions | — |
+| Backup | Scripts pg_dump + Neon PITR | — |
+| Deploy | Railway (backend), Vercel (frontend), Neon (DB) | — |
 
 ## Arquitetura geral
 
@@ -70,23 +73,23 @@ Page (renderizacao, eventos)
 | Pacote | Responsabilidade | Itens |
 |---|---|---|
 | `config/` | Seguranca, JWT, CORS, rate limit | SecurityConfig, JwtUtil, JwtAuthenticationFilter, LoginRateLimitFilter, CustomUserDetailsService, OpenApiConfig |
-| `controller/` | Endpoints REST | 10 controllers: Auth, Transacao, Categoria, Carteira, Conta, ContaFixa, Meta, Parcela, Dashboard, Usuario |
-| `dto/` | Transferencia de dados | 25 DTOs entre requests e responses |
+| `controller/` | Endpoints REST | 15 controllers: Auth, Transacao, Categoria, Carteira, Conta, ContaFixa, Meta, Parcela, Dashboard, Usuario, Onboarding, Orcamento, Fatura, Relatorio, Export |
+| `dto/` | Transferencia de dados | 35+ DTOs entre requests e responses |
 | `exception/` | Tratamento de erros | GlobalExceptionHandler + 4 excecoes customizadas |
-| `model/` | Entidades JPA | 11 entidades + enums |
-| `repository/` | Acesso a dados | 10 repositorios Spring Data JPA |
+| `model/` | Entidades JPA | 13 entidades + enums |
+| `repository/` | Acesso a dados | 13 repositorios Spring Data JPA |
 | `security/` | Contexto de autenticacao | AuthenticatedUserService |
-| `service/` | Regras de negocio | 10 services |
+| `service/` | Regras de negocio | 15 services |
 | `util/` | Utilitarios | PaginationUtils |
 
 ### Frontend web (`frontend/src/`)
 
 | Diretorio | Responsabilidade |
 |---|---|
-| `pages/` | 11 paginas (Dashboard, Login, Transacoes, Categorias, etc.) |
+| `pages/` | 15 paginas (Dashboard, Login, Transacoes, Categorias, etc.) |
 | `components/` | Componentes reutilizaveis (ErrorBoundary, Chart*, UI) |
 | `context/` | AuthContext (login, logout, refresh, getMe) |
-| `services/` | api.ts (axios + interceptors) + 9 domain services |
+| `services/` | api.ts (axios + interceptors) + 13 domain services |
 | `hooks/` | Hooks customizados |
 | `types/` | Tipos TypeScript compartilhados |
 
@@ -97,7 +100,7 @@ Page (renderizacao, eventos)
 | `app/` | Expo Router file-based routing: (auth) e (app) |
 | `src/components/ui/` | Componentes reutilizaveis |
 | `src/context/` | AuthContext |
-| `src/services/` | api.ts + 8 domain services |
+| `src/services/` | api.ts + 12 domain services |
 | `src/theme/` | Tema dark/light |
 
 ## Fluxo de autenticacao
@@ -129,15 +132,16 @@ O sistema e **single-tenant** — nao ha multi-tenancy corporativa. Cada usuario
 
 1. Usuario se cadastra (`/register`).
 2. Usuario faz login (`/login`).
-3. Dashboard exibe resumo financeiro (saldo, entradas, saidas, graficos).
-4. Usuario cria categorias personalizadas.
-5. Usuario cria contas (credito, debito, dinheiro).
-6. Usuario cria carteiras (dinheiro, conta bancaria, poupanca).
-7. Usuario registra transacoes (entrada/saida, com ou sem parcelamento).
-8. Usuario gerencia parcelas (pagar/despagar).
-9. Usuario cria contas fixas mensais.
-10. Usuario cria metas financeiras e acompanha progresso.
-11. Usuario gerencia carteiras (adicionar/remover saldo).
+3. Onboarding financeiro guiado — configuracao de carteira, conta, categorias, renda e meta inicial.
+4. Dashboard exibe resumo financeiro (saldo, entradas, saidas, graficos).
+5. Usuario cria categorias personalizadas.
+6. Usuario cria contas (credito, debito, dinheiro).
+7. Usuario cria carteiras (dinheiro, conta bancaria, poupanca).
+8. Usuario registra transacoes (entrada/saida, com ou sem parcelamento).
+9. Usuario gerencia parcelas (pagar/despagar).
+10. Usuario cria contas fixas mensais.
+11. Usuario cria metas financeiras e acompanha progresso.
+12. Usuario gerencia carteiras (adicionar/remover saldo).
 
 ## Integracoes
 
@@ -209,4 +213,4 @@ O sistema e **single-tenant** — nao ha multi-tenancy corporativa. Cada usuario
 - **Relatorio:** `docs/REVIEW_REPORTS/2026-07-06_full-system_security-and-bug-audit.md`
 - **Problem Ledger:** 30 problemas registrados (PROB-0001 a PROB-0030)
 - **Backlog:** 35 itens registrados (BACKLOG-0001 a BACKLOG-0035)
-- **Atualizacao pos-auditoria:** Fase 0 backend concluida em 2026-07-07 com ressalvas; backend passou 34/34 testes. Pendencias atuais concentram-se em validacao PostgreSQL real, mobile P0/P1, CSRF frontend, limpeza frontend/mobile, CI/CD e deploy.
+- **Atualizacao pos-auditoria:** Fase 0 backend concluida em 2026-07-07 com ressalvas (7 PRs). Fase 1 concluida (7 PRs). Fase 2 concluida (8 PRs). Fase 3 concluida em 2026-07-08 (5 PRs: CI/CD, deploy, backup, monitoramento, docs). Fase 4 concluida em 2026-07-08 (4 PRs: importacao CSV, anexos, investimentos, insights). Backend: 36/36 testes PASS.

@@ -2,8 +2,8 @@
 
 Guia completo para deploy em produção do sistema Gestor Financeiro.
 
-**Versão:** 1.4.0  
-**Última atualização:** 30/11/2025
+**Versão:** 1.5.0
+**Última atualização:** 2026-07-08
 
 ---
 
@@ -49,7 +49,8 @@ Guia completo para deploy em produção do sistema Gestor Financeiro.
 - [ ] Conta no Vercel (criar em vercel.com)
 - [ ] Conta no Neon (criar em neon.tech)
 - [ ] Código commitado no GitHub
-- [ ] Variáveis de ambiente configuradas
+- [ ] CI/CD pipeline configurado (`.github/workflows/ci.yml`)
+- [ ] Variáveis de ambiente configuradas (usar `.env.example` como template)
 
 ---
 
@@ -172,11 +173,14 @@ ENTRYPOINT ["java", "-jar", "app.jar"]
 
 ```bash
 cd frontend
+npm ci
 npm run build
 
 # Testar build localmente
 npm run preview
 ```
+
+O frontend inclui `vercel.json` com rewrites SPA configurados — todas as rotas redirecionam para `index.html`.
 
 ### **3. Atualizar CORS no Backend**
 
@@ -268,7 +272,7 @@ psql -U postgres -c "CREATE DATABASE gestor_financeiro"
 
 #### **2. Configurar build:**
 - Root Directory: `/backend`
-- Build: Automático (Maven)
+- Build: Automático (Maven) com `Procfile` incluso no repositório
 
 #### **3. Variáveis de ambiente:**
 ```env
@@ -336,11 +340,13 @@ FRONTEND_URL=https://gestor-financeiro.vercel.app
 ### **2. Testar fluxo completo:**
 
 - [ ] Login funciona
+- [ ] Health check: `GET /actuator/health` retorna `{"status":"UP"}`
 - [ ] Criar transação
 - [ ] Dashboard carrega
 - [ ] Gráficos aparecem
 - [ ] Refresh token funciona
 - [ ] Logout funciona
+- [ ] CSRF: refresh/logout incluem header `X-CSRF-Token`
 
 ### **3. Criar usuário de teste:**
 
@@ -358,7 +364,31 @@ Use o próprio frontend em produção!
 
 ## 📊 Monitoramento
 
-### **Métricas importantes:**
+### Health Check
+
+Backend expoe endpoint de health check via Spring Boot Actuator:
+
+```bash
+# Verificar status
+curl https://seu-backend.railway.app/actuator/health
+
+# Resposta (200 OK):
+# {"status":"UP"}
+
+# Script incluso no projeto:
+./scripts/health-check.sh https://seu-backend.railway.app
+
+# Se retornar DOWN, verificar banco de dados e logs
+```
+
+**Endpoint publico em producao:** `GET /actuator/health` (sem detalhes — `show-details=never`).
+**Em dev:** `GET /actuator/health` + `GET /actuator/info` com detalhes completos.
+
+O health check verifica:
+- Conectividade com banco PostgreSQL (DataSourceHealthIndicator)
+- Status da aplicacao (disk space, etc.)
+
+### Metricas importantes
 
 #### **Railway (Backend):**
 - CPU Usage
@@ -383,6 +413,42 @@ Configure alertas para:
 - ⚠️ CPU > 80%
 - ⚠️ Memória > 80%
 - ⚠️ Erros 500
+
+---
+
+## 💾 Backup e Restore
+
+### Backup do banco Neon
+
+Neon oferece **Point-in-Time Recovery (PITR)** gratuito no plano Free — restore automatizado para qualquer ponto nas ultimas 24h.
+
+### Backup manual (qualquer PostgreSQL)
+
+```bash
+# Usando script do projeto
+./scripts/backup-db.sh postgresql://user:pass@host:5432/db
+
+# Ou via DATABASE_URL no ambiente
+export DATABASE_URL="postgresql://..."
+./scripts/backup-db.sh
+```
+
+Backups salvos em `backups/`. Mantidos ultimos 7.
+
+### Restore manual
+
+```bash
+./scripts/restore-db.sh backups/gestor_financeiro_20260101.sql.gz postgresql://user:pass@host:5432/db
+```
+
+Apos restore, validar schema com Flyway:
+```bash
+cd backend && ./mvnw flyway:validate
+```
+
+### Backup via GitHub Actions
+
+Workflow de CI pode ser estendido com job agendado (`schedule`). Configurar secret `DATABASE_URL` no GitHub para habilitar.
 
 ---
 
@@ -470,11 +536,10 @@ Criar `vercel.json`:
 ## 🎯 Próximos Passos Após Deploy
 
 1. ✅ Coletar feedback de usuários
-2. ✅ Monitorar erros (Sentry)
+2. ✅ Monitorar erros via logs do Railway/Vercel
 3. ✅ Otimizar performance
-4. ✅ Adicionar analytics (Google Analytics)
-5. ✅ Configurar backup automático
-6. ✅ Implementar CI/CD
+4. ✅ Configurar backup automático do banco Neon
+5. ✅ CI/CD ativo via GitHub Actions (`.github/workflows/ci.yml`)
 
 ---
 

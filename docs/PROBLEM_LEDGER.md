@@ -364,16 +364,16 @@ Registro central de problemas encontrados no sistema. Mantido pelo `docs-reporte
 - **Data:** 2026-07-06
 - **Origem:** auditoria completa do sistema
 - **Severidade:** HIGH
-- **Status:** ABERTO
+- **Status:** FECHADO (BUG-0008, 2026-07-07)
 - **Area:** frontend, seguranca
 - **Sintoma:** Axios configurado com `withCredentials: true` (envia cookies) mas sem enviar token CSRF. Refresh token cookie pode ser explorado em ataques cross-site.
 - **Causa raiz:** Sem header X-CSRF-TOKEN ou double-submit cookie pattern
 - **Impacto tecnico:** POST /api/auth/refresh-token vulneravel a CSRF (embora SameSite=Lax mitigue parcialmente)
 - **Arquivos relacionados:** `frontend/src/services/api.ts:20`
 - **Solucao proposta:** Backend emitir CSRF token via endpoint dedicado; frontend envia-lo como header
-- **Solucao aplicada:** pendente
+- **Solucao aplicada:** BUG-0008: Backend criou RefreshTokenCsrfFilter validando X-CSRF-Token em refresh-token e logout. Frontend envia header automaticamente. AuthController emite/rotaciona cookie csrfToken.
 - **Evidencias:** axiosInstance com withCredentials:true sem header CSRF
-- **Riscos residuais:** Necessario endpoint backend para emitir token
+- **Riscos residuais:** Nenhum. CSRF resolvido para endpoints que usam cookie (refresh-token, logout). Demais endpoints usam JWT Bearer — nao suscetiveis a CSRF.
 - **Proximo passo:** Coordenar implementacao backend + frontend
 
 ---

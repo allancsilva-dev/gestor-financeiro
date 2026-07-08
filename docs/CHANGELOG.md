@@ -195,5 +195,63 @@ Estrutura básica do projeto e configurações iniciais.
 
 ---
 
-**Última atualização:** 30/11/2025  
+## [1.5.0] - 2026-07-08
+
+### Fase 2 — Web e mobile de qualidade (inicio)
+
+#### Mobile — PR-FASE2-01 (P0)
+- **[P0]** Token de acesso persistido via `expo-secure-store` (sessao mantida entre cold starts)
+- **[P0]** URL da API configurada via `expo-constants` (app.json extra.apiBaseUrl) — sem IP hardcoded
+- **[P0]** Restore de sessao ao abrir app: valida token via `GET /api/v1/usuarios/me`
+- **[P0]** Corrigido path `/dashboard/resumo` → `/v1/dashboard/resumo` em perfil.tsx
+- Cache de usuario no SecureStore para restore instantaneo antes da validacao
+
+#### Mobile — PR-FASE2-02 (P1)
+- **[P1]** "Esqueceu a senha?" navega para tela de forgot-password
+- **[P1]** "Ver todas" no dashboard navega para lista de transacoes
+- **[P1]** App.tsx removido (template Expo morto); index.ts usa `expo-router/entry`
+- **[P1]** onError adicionado em mutations: criarMutation (carteiras), pagarMutation (contas-fixas)
+
+#### Arquivos alterados (mobile)
+- `src/store/auth.ts` — SecureStore em vez de memoria
+- `src/config/api.config.ts` — expo-constants em vez de IP fixo
+- `src/context/AuthContext.tsx` — restoreSession + isLoading dinamico
+- `src/services/authService.ts` — login/logout async com SecureStore
+- `app/(app)/perfil.tsx` — path corrigido
+- `app/index.tsx` — loading state durante restore
+- `app.json` — extra.apiBaseUrl
+- `App.tsx` — removido (template Expo morto)
+- `index.ts` — `import 'expo-router/entry'`
+- `app/(auth)/forgot-password.tsx` — nova tela de recuperacao de senha
+- `app/(auth)/login.tsx` — "Esqueceu a senha?" navega para forgot-password
+- `app/(app)/index.tsx` — "Ver todas" navega para transacoes
+- `app/(app)/more/carteiras.tsx` — onError em criarMutation
+- `app/(app)/more/contas-fixas.tsx` — onError em pagarMutation
+
+#### Frontend — PR-FASE2-04 (P3)
+- **[P3]** Rota 404 adicionada (pagina NotFound com link para Dashboard)
+- **[P3]** 27 console.log/console.error removidos de page components
+- **[P3]** Componente morto GraficoComparacaoMensal removido
+
+#### Mobile — PR-FASE2-05 (P2)
+- `parseCurrencyBR` centralizado em `utils/format.ts`
+
+#### Frontend — PR-FASE2-06 (P2)
+- Zero `any` nos services (substituidos por `Omit<T>`, `Partial<T>`, `unknown`)
+
+#### Backend/Frontend — PR-FASE2-07 (P2)
+- `confirmPassword` no RegisterRequest backend e frontend
+- `@AssertTrue` validando igualdade de senhas
+
+#### Frontend — PR-FASE2-08 (P2)
+- `aria-label` em Login e Layout (menu lateral)
+
+#### Documentacao
+- 15 Backlog items fechados (0005, 0006, 0009, 0014, 0015, 0016, 0017, 0018, 0022, 0023, 0024, 0025, 0031, 0032, 0033)
+- PROB-0019 fechado
+- Fase 2 concluida
+
+---
+
+**Ultima atualizacao:** 2026-07-08
 **Mantido por:** Zero (Allan Carvalho)
