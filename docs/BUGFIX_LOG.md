@@ -21,7 +21,7 @@ Registro de bugs corrigidos. Mantido pelo `docs-reporter`.
 - **Arquivos alterados:** `pom.xml`, `application.properties`, `application-prod.properties`, `application-test.properties`, `V1__baseline_schema.sql`, `DEPLOY.md`
 - **Testes/validacoes executadas:** `mvn test` — 13/13 passaram.
 - **Resultado:** PASS
-- **Ressalvas:** Sem Docker Compose — validação de startup com PostgreSQL limpo não executada localmente. Risco baixo: migration gerada a partir das entidades JPA existentes.
+- **Ressalvas:** Na execução original, validação PostgreSQL real não rodou localmente. Fechada posteriormente em 2026-07-08 com smoke VPS: Flyway 14 migrations + schema JPA OK.
 - **Commit:** pendente
 
 ---
@@ -139,7 +139,7 @@ Registro de bugs corrigidos. Mantido pelo `docs-reporter`.
 - **Arquivos alterados:** 18 arquivos (ver relatorio PR-FOUNDATION-07).
 - **Testes/validacoes executadas:** mvn test → 34/34 PASS, BUILD SUCCESS
 - **Resultado:** PASS
-- **Ressalvas:** PostgreSQL validation com Docker nao executada neste ambiente (requer Docker runtime). Flyway validado apenas via entidades JPA + H2.
+- **Ressalvas:** Na execução original, PostgreSQL validation com Docker nao executou neste ambiente. Fechada posteriormente em 2026-07-08 com smoke VPS.
 - **Commit:** pendente
 
 ---
@@ -165,6 +165,43 @@ Registro de bugs corrigidos. Mantido pelo `docs-reporter`.
 - **Testes/validacoes executadas:** `./mvnw -q -Dtest=AuthControllerTest test` -> 17/17 PASS; `./mvnw -q test` -> 36/36 PASS; `npm run build` no frontend -> PASS; `nc -vz -w 5 187.77.61.191 5433` -> PASS.
 - **Resultado:** PASS_COM_RESSALVA
 - **Ressalvas:** Smoke Flyway/schema no PostgreSQL VPS nao executou porque a credencial de `admin_nexos` foi rejeitada.
+- **Commit:** pendente
+
+---
+
+## BUG-0009 — Validação PostgreSQL real automatizada para Ledger
+
+- **Problema relacionado:** PEND-001, PR-LEDGER-01
+- **Data:** 2026-07-08
+- **Area:** backend, banco, testes, CI
+- **Sintoma:** Evolução Ledger ainda dependia de validação H2/local manual. Não havia suíte automatizada que subisse PostgreSQL real, aplicasse Flyway em banco limpo e validasse schema com Hibernate `ddl-auto=validate`.
+- **Correcao aplicada:**
+  1. Adicionadas dependências Testcontainers (`junit-jupiter` e `postgresql`).
+  2. Criado profile Maven `integration-test` com Failsafe para testes `*IT.java`.
+  3. Criado `PostgresMigrationIT` usando `postgres:16-alpine`.
+  4. Criado `application-postgres-it.properties` com Flyway ativo e `baseline-on-migrate=false`.
+  5. Configurado Mockito como `javaagent` no Surefire/Failsafe para evitar falha de self-attach no JDK 21.
+  6. CI passou a executar `mvn verify -Pintegration-test --batch-mode`.
+- **Arquivos alterados:** `.github/workflows/ci.yml`, `backend/pom.xml`, `backend/src/test/java/com/gestor/financeiro/PostgresMigrationIT.java`, `backend/src/test/resources/application-postgres-it.properties`, `LOCAL_POSTGRES_VALIDATION.md`, `LEDGER_ROADMAP_GESTOR_FINANCEIRO.md`, `CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md`
+- **Testes/validacoes executadas:** `cd backend && ./mvnw -q test` -> 36/36 PASS; `docker info --format '{{.ServerVersion}}'` -> FAIL_AMBIENTE; smoke VPS em 2026-07-08 com `dbnexos_gestor` -> PostgreSQL 17.10, Flyway validou 14 migrations e schema JPA inicializou.
+- **Resultado:** PASS_COM_RESSALVA
+- **Ressalvas:** Testcontainers não executou localmente porque Docker daemon estava desligado (`Cannot connect to the Docker daemon`). Validação equivalente em PostgreSQL VPS real passou com usuario `dbnexos_gestor`.
+- **Commit:** pendente
+
+---
+
+## BUG-0010 — Mapeamento `moeda` do Ledger incompatível com PostgreSQL real
+
+- **Data:** 2026-07-08
+- **Problema relacionado:** PR-LEDGER-02, PEND-001, PEND-004
+- **Severidade:** MEDIA
+- **Sintoma:** Smoke VPS autenticado conectou no PostgreSQL e validou Flyway, mas Hibernate `ddl-auto=validate` falhou em `movimentos_carteira.moeda`: banco tinha `CHAR(3)`/`bpchar`, enquanto o mapeamento JPA era tratado como `VARCHAR(3)`.
+- **Causa raiz:** `columnDefinition = "char(3)"` documentava o DDL, mas Hibernate 6 ainda validava o atributo Java como `VARCHAR` sem tipo JDBC explícito.
+- **Correção aplicada:** Adicionado `@JdbcTypeCode(SqlTypes.CHAR)` no campo `MovimentoCarteira.moeda`, alinhando JPA com a migration `V11__movimento_carteira.sql`.
+- **Arquivos alterados:** `backend/src/main/java/com/gestor/financeiro/model/MovimentoCarteira.java`, `docs/BUGFIX_LOG.md`, `docs/CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md`, `docs/LOCAL_POSTGRES_VALIDATION.md`, `docs/GESTOR_FINANCEIRO_ALTO_NIVEL_PROXIMOS_PASSOS.md`, `docs/SYSTEM_OVERVIEW.md`, `docs/LEDGER_ROADMAP_GESTOR_FINANCEIRO.md`
+- **Testes/validacoes executadas:** `./mvnw -q test` -> PASS; smoke VPS com `dbnexos_gestor` -> PASS; Flyway validou 14 migrations; schema JPA inicializou com PostgreSQL 17.10.
+- **Resultado:** PASS
+- **Ressalvas:** Nenhuma para validação VPS. Testcontainers local continua dependente de Docker ativo.
 - **Commit:** pendente
 
 ---

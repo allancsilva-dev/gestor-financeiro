@@ -40,10 +40,10 @@
                 <mxCell id="db-zone" value="Dados" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F0FF;strokeColor=#9673A6;fontSize=16;fontStyle=1;align=left;verticalAlign=top;spacingLeft=14;spacingTop=8;" parent="1" vertex="1">
                     <mxGeometry x="620" y="650" width="520" height="210" as="geometry"/>
                 </mxCell>
-                <mxCell id="postgres" value="PostgreSQL&lt;br&gt;Banco dev: gestor_financeiro&lt;br&gt;Hibernate ddl-auto=update&lt;br&gt;Sem Flyway/Liquibase&lt;br&gt;&lt;br&gt;Tabelas principais:&lt;br&gt;usuarios, categorias, contas, carteiras, transacoes, parcelas, contas_fixas, metas, refresh_tokens, password_reset_tokens" style="shape=cylinder3d;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#FFFFFF;strokeColor=#9673A6;fontSize=12;align=center;verticalAlign=middle;spacing=8;" parent="1" vertex="1">
+                <mxCell id="postgres" value="PostgreSQL&lt;br&gt;Banco dev: gestor_financeiro&lt;br&gt;Hibernate ddl-auto=validate&lt;br&gt;Flyway migrations&lt;br&gt;Testcontainers PR-LEDGER-01&lt;br&gt;&lt;br&gt;Tabelas principais:&lt;br&gt;usuarios, categorias, contas, carteiras, transacoes, parcelas, contas_fixas, metas, refresh_tokens, password_reset_tokens" style="shape=cylinder3d;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#FFFFFF;strokeColor=#9673A6;fontSize=12;align=center;verticalAlign=middle;spacing=8;" parent="1" vertex="1">
                     <mxGeometry x="680" y="700" width="210" height="120" as="geometry"/>
                 </mxCell>
-                <mxCell id="h2" value="H2&lt;br&gt;Somente testes" style="shape=cylinder3d;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#FFFFFF;strokeColor=#9673A6;fontSize=12;align=center;verticalAlign=middle;spacing=8;" parent="1" vertex="1">
+                <mxCell id="h2" value="H2&lt;br&gt;Testes unitários" style="shape=cylinder3d;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#FFFFFF;strokeColor=#9673A6;fontSize=12;align=center;verticalAlign=middle;spacing=8;" parent="1" vertex="1">
                     <mxGeometry x="930" y="720" width="120" height="80" as="geometry"/>
                 </mxCell>
                 <mxCell id="external-zone" value="Integracoes / operacao" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF7E6;strokeColor=#D79B00;fontSize=16;fontStyle=1;align=left;verticalAlign=top;spacingLeft=14;spacingTop=8;" parent="1" vertex="1">

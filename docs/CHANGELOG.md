@@ -246,12 +246,83 @@ Estrutura básica do projeto e configurações iniciais.
 #### Frontend — PR-FASE2-08 (P2)
 - `aria-label` em Login e Layout (menu lateral)
 
+#### Backend — PR-LEDGER-01
+- Testcontainers PostgreSQL adicionado para validar Flyway em banco limpo
+- Profile Maven `integration-test` com Failsafe para testes `*IT.java`
+- `PostgresMigrationIT` valida startup Spring, migrations Flyway e Hibernate `ddl-auto=validate`
+- CI passou a rodar `mvn verify -Pintegration-test --batch-mode`
+- Mockito configurado como `javaagent` no Surefire/Failsafe para JDK 21
+- Validação equivalente em PostgreSQL VPS real concluída em 2026-07-08 com usuário `dbnexos_gestor`
+
+#### Backend — PR-LEDGER-02
+- Migration `V11__movimento_carteira.sql` criada para schema inicial do Ledger
+- Entidade `MovimentoCarteira` criada com `usuario`, `carteira`, tipo, origem, valor absoluto, valor assinado, saldo resultante, moeda e idempotency key
+- Enums `TipoMovimentoCarteira` e `OrigemMovimentoCarteira` adicionados
+- `MovimentoCarteiraRepository` adicionado com consultas por ownership, carteira e idempotência
+- `PostgresMigrationIT` ampliado para validar `V11`, constraints e FK em PostgreSQL real quando Docker estiver ativo
+- Testes backend: `./mvnw -q test` -> 38/38 PASS
+- BUG-0010 corrigiu `MovimentoCarteira.moeda`: migration usa `CHAR(3)` e JPA agora usa `@JdbcTypeCode(SqlTypes.CHAR)`
+- Smoke VPS PostgreSQL: Flyway validou 14 migrations, schema `ddl-auto=validate` PASS
+
+#### Backend — PR-LEDGER-03
+- `LedgerService` criado para registrar movimento e atualizar `Carteira.saldo` na mesma transação
+- `RegistrarMovimentoCommand` criado como command interno
+- `CarteiraRepository.findByIdAndUsuarioIdForUpdate` adicionado com `PESSIMISTIC_WRITE`
+- `CarteiraService` passou a usar Ledger para criar saldo inicial, ajustar saldo, adicionar e remover dinheiro
+- Conflitos financeiros/locks retornam 409 (`FINANCIAL_CONFLICT`)
+- `LedgerServiceTest` cobre entrada, saída, saldo insuficiente, ownership e concorrência
+- Testes backend: `./mvnw -q test` -> 43/43 PASS
+- Smoke VPS PostgreSQL validou Flyway/schema real
+
+#### Backend — PR-LEDGER-04
+- Reconciliação de saldo adicionada para comparar `Carteira.saldo` com soma de `MovimentoCarteira.valorAssinado`
+- `LedgerReconciliationService` criado com status `OK` ou `DIVERGENTE`
+- Endpoints adicionados: `GET /api/v1/carteiras/{id}/reconciliacao` e `GET /api/v1/carteiras/minhas/reconciliacao`
+- Logs de divergência usam apenas `usuarioId`, `carteiraId` e `diferenca`
+- `PostgresMigrationIT` ampliado com query real de reconciliação para PostgreSQL quando Docker estiver ativo
+- Testes backend: 47/47 unitários PASS
+- Smoke VPS PostgreSQL validou Flyway/schema real
+
+#### Backend — PR-LEDGER-05
+- Migration `V12__ledger_backfill_carteiras.sql` criada para backfill inicial idempotente de carteiras
+- Backfill calcula `saldo_materializado - saldo_ledger`, evitando duplicar carteiras que já possuem movimentos
+- Unique parcial adicionada para impedir mais de um `BACKFILL` por carteira
+- `LedgerBackfillService` e `LedgerBackfillResult` criados para rotina interna por usuário ou todas as carteiras
+- Diferença negativa bloqueia backfill e exige auditoria manual
+- `LedgerBackfillServiceTest` cobre abertura, idempotência, reconciliação, isolamento por usuário, diferença parcial e bloqueio
+- Testes backend: 53/53 unitários PASS
+- Smoke VPS PostgreSQL validou Flyway/schema real
+
+#### Backend — PR-LEDGER-06
+- Endpoint `POST /api/v1/carteiras/{id}/ajustes` — ajuste manual explícito via Ledger com payload `{tipo, valor, descricao}`
+- Endpoint `GET /api/v1/carteiras/{id}/movimentos` — extrato paginado de movimentos do Ledger por carteira
+- Endpoints `POST /{id}/adicionar` e `POST /{id}/remover` marcados `@Deprecated(since = "PR-LEDGER-06")` — continuam funcionais
+- DTO `AjusteCarteiraRequest` e `MovimentoCarteiraResponse` criados
+- `CarteiraService.ajustarSaldo` e `CarteiraService.listarMovimentos` delegam para `LedgerService`
+- `CarteiraControllerTest` com 10 testes: ajuste entrada/saída, tipo inválido, ownership cruzado, listagem, reconciliação, deprecated
+- Testes backend: 63/63 unitários PASS
+- Smoke VPS PostgreSQL validou Flyway/schema real
+
+#### Backend — PR-LEDGER-07
+- Migration `V13__transacao_carteira.sql`: coluna `carteira_id` FK opcional e `ativa` (default true) em transacoes
+- Transacao ganha campos `carteira` e `ativa`; TransacaoRequest ganha `carteiraId`
+- `TransacaoService.criar()`: cria movimento Ledger (ENTRADA/SAIDA) quando carteiraId presente
+- `TransacaoService.atualizar()`: computa delta de valor e registra ajuste com direcao correta (SAIDA/ENTRADA)
+- `TransacaoService.deletar()`: soft-delete (`ativa = false`) + estorno via Ledger; `cancelar()` alias
+- `TransacaoServiceLedgerTest` com 6 testes: criar com/sem carteira, atualizar, cancelar entrada/saida
+- Testes backend: 69/69 unitários PASS
+
 #### Documentacao
 - 15 Backlog items fechados (0005, 0006, 0009, 0014, 0015, 0016, 0017, 0018, 0022, 0023, 0024, 0025, 0031, 0032, 0033)
 - PROB-0019 fechado
+- PR-LEDGER-00 a PR-LEDGER-20 registrados no checklist
+- Fase Ledger registrada com 20/20 PRs em status aceito (`PASS` ou `PASS_COM_RESSALVA`)
+- PostgreSQL VPS real validado: PostgreSQL 17.10, Flyway 14 migrations, schema JPA OK
+- BUG-0010 registrado e corrigido (`moeda CHAR(3)` vs mapeamento JPA)
+- Fundação contábil estabelecida: Ledger, reconciliação, backfill, idempotência
 - Fase 2 concluida
 
 ---
 
-**Ultima atualizacao:** 2026-07-08
+**Ultima atualizacao:** 2026-07-08 (BUG-0010, validacao PostgreSQL VPS)
 **Mantido por:** Zero (Allan Carvalho)

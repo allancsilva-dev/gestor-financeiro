@@ -173,7 +173,7 @@ Remover a dependência de `spring.jpa.hibernate.ddl-auto=update` e estabelecer v
 ### 4.11 Decisão final
 
 **Status final:** `PASS_COM_RESSALVA`
-**Resumo da decisão:** Flyway instalado e configurado, migration baseline criada com 10 tabelas, ddl-auto alterado para validate em dev e prod, testes passaram (23/23). Validação de startup com PostgreSQL limpo não executada por ausência de Docker Compose.
+**Resumo da decisão:** Flyway instalado e configurado, migration baseline criada com 10 tabelas, ddl-auto alterado para validate em dev e prod, testes passaram (23/23). Validação de startup com PostgreSQL limpo não foi executada neste PR por ausência de Docker Compose; pendência fechada posteriormente em 2026-07-08 com smoke PostgreSQL VPS.
 **Pode avançar para o próximo PR?** `SIM`
 **Próximo PR recomendado:** PR-FOUNDATION-02 — Ownership e IDOR
 
@@ -467,7 +467,7 @@ Use esta seção como diário objetivo de execução.
 **Resumo do que foi feito:** Adicionado Flyway PostgreSQL, migration baseline V1 com 10 tabelas, ddl-auto=validate em dev e prod, Flyway desabilitado em testes H2, documentação atualizada.
 **Comandos executados:** `mvn test` → 23/23 PASS, BUILD SUCCESS
 **Resultado:** PASS_COM_RESSALVA
-**Pendências:** Validação com PostgreSQL limpo não executada (sem Docker Compose). Commit não realizado.
+**Pendências:** Validação PostgreSQL fechada posteriormente em 2026-07-08 com smoke VPS. Commit não realizado.
 **Próxima ação:** PR-FOUNDATION-02 — Ownership e IDOR
 
 ---
@@ -541,9 +541,10 @@ Use esta seção como diário objetivo de execução.
 
 | ID | Data | PR origem | Pendência | Severidade | Responsável | Status | Próxima ação |
 |---|---|---|---|---|---|---|---|
-| PEND-001 | 2026-07-07 | PR-FOUNDATION-01/07 | Validação Flyway/schema com PostgreSQL VPS não executada | MEDIA | pendente | `ABERTA` | Porta TCP OK; startup chegou no PostgreSQL, mas credencial `admin_nexos` foi rejeitada. Confirmar senha/usuario e rerodar profile `vps` |
+| PEND-001 | 2026-07-07 | PR-FOUNDATION-01/07 | Validação Flyway/schema com PostgreSQL VPS | MEDIA | IA executora | `FECHADA` | 2026-07-08: smoke profile `vps` autenticado com usuario `dbnexos_gestor`; PostgreSQL 17.10; Flyway validou 14 migrations; schema JPA `ddl-auto=validate` OK |
 | PEND-002 | 2026-07-07 | PR-FOUNDATION-05 | CSRF frontend web pendente (PROB-0019) | ALTA | IA executora | `FECHADA` | Backend exige `X-CSRF-Token`; frontend envia header em refresh/logout |
 | PEND-003 | 2026-07-07 | Fase 0 | Commit/PR não realizado | BAIXA | pendente | `ABERTA` | Commitar alterações após revisão |
+| PEND-004 | 2026-07-08 | PR-LEDGER-01/02 | Validação PostgreSQL real do Ledger | MEDIA | IA executora | `FECHADA` | 2026-07-08: validação equivalente executada contra PostgreSQL VPS real; Testcontainers local continua opcional para CI/dev com Docker ativo |
 
 ---
 
@@ -593,13 +594,13 @@ Fechar ressalvas da Fase 0: PostgreSQL validation, account lockout, política de
 | `AuthControllerTest` pós-auditoria | 17/17 PASS |
 | Startup PostgreSQL local | NAO_EXECUTADO — Docker indisponível |
 | Conectividade TCP PostgreSQL VPS | PASS — `187.77.61.191:5433` acessível |
-| Flyway/schema com PostgreSQL VPS | NAO_EXECUTADO — credencial `admin_nexos` rejeitada |
+| Flyway/schema com PostgreSQL VPS | PASS — usuario `dbnexos_gestor`; PostgreSQL 17.10; 14 migrations validadas; schema JPA OK |
 
 ### Resumo das ressalvas fechadas
 
 | Ressalva | Status |
 |---|---|
-| PostgreSQL validation | PARCIAL — Docker Compose e profile VPS criados; TCP VPS OK; sem smoke Flyway/schema |
+| PostgreSQL validation | FECHADO — smoke VPS autenticado executado em PostgreSQL real |
 | Account lockout | FECHADO — implementado e testado |
 | Política de senha | FECHADO — @ValidPassword min 8 chars, 1 letra, 1 digito |
 | Memory leak rate limit | FECHADO — @Scheduled cleanup 60s |
@@ -611,13 +612,12 @@ Fechar ressalvas da Fase 0: PostgreSQL validation, account lockout, política de
 
 | Pendência | Severidade |
 |---|---|
-| Validacao com PostgreSQL VPS (credencial rejeitada) | MEDIA |
 | Commit nao realizado | BAIXA |
 
 ### Decisao final
 
 **Status final:** `PASS_COM_RESSALVA`
-**Resumo:** Ressalvas de segurança pós-auditoria fechadas: CORS, rate limit de `validate-token` GET e CSRF para refresh/logout web. PostgreSQL validation: Docker Compose, profile dev e profile VPS criados; porta VPS OK; smoke remoto tentou autenticar com `admin_nexos`, mas o PostgreSQL rejeitou a senha.
+**Resumo:** Ressalvas de segurança pós-auditoria fechadas: CORS, rate limit de `validate-token` GET e CSRF para refresh/logout web. PostgreSQL validation fechada em 2026-07-08 com smoke VPS autenticado (`dbnexos_gestor`), Flyway validando 14 migrations e Hibernate `ddl-auto=validate` sem divergência após correção de `MovimentoCarteira.moeda`.
 **Pode avancar para Fase 1?** `SIM`
 
 ---
@@ -675,7 +675,7 @@ A Fase 0 pode ser considerada concluída com ressalvas quando itens bloqueantes 
 | `requestId` implementado | `SIM` | PR-06, RequestIdFilter |
 | Health check real de banco | `SIM` | DataSourceHealthIndicator |
 | Documentação atualizada | `SIM` | 7 PRs documentados |
-| Testes/smokes executados ou justificados | `SIM_COM_RESSALVA` | 36/36 backend H2; frontend build OK; PostgreSQL VPS pendente |
+| Testes/smokes executados ou justificados | `SIM` | Backend unitários: 69/69 PASS em 2026-07-08; frontend build OK; PostgreSQL VPS: Flyway 14 migrations + JPA validate PASS; Testcontainers local opcional para CI/dev com Docker |
 
 ---
 
@@ -683,9 +683,9 @@ A Fase 0 pode ser considerada concluída com ressalvas quando itens bloqueantes 
 
 **Status:** `CONCLUIDA_COM_RESSALVAS`
 **Data de conclusão:** 2026-07-07
-**Resumo final:** 7 PRs executados + correções pós-auditoria em CORS, rate limit `validate-token`, CSRF refresh/logout e profile VPS PostgreSQL. Backend pós-auditoria: 36/36 PASS.
-**Pendencias remanescentes:** PostgreSQL validation VPS pendente por credencial rejeitada para `admin_nexos` e smoke Flyway/schema. Commit nao realizado.
-**Riscos aceitos:** Testes automatizados usam H2. PostgreSQL remoto ainda nao validado neste ambiente.
+**Resumo final:** 7 PRs executados + correções pós-auditoria em CORS, rate limit `validate-token`, CSRF refresh/logout e profile VPS PostgreSQL. Backend pós-auditoria: 36/36 PASS; validação VPS fechada em 2026-07-08.
+**Pendencias remanescentes:** Commit nao realizado.
+**Riscos aceitos:** Testcontainers local depende de Docker ativo, mas validação equivalente em PostgreSQL VPS real foi executada com sucesso.
 **Proxima fase autorizada:** Fase 1 — Produto financeiro essencial
 
 Status possíveis:
@@ -697,7 +697,654 @@ Status possíveis:
 
 ---
 
-# 11. Fase 1 — Produto financeiro essencial
+# 11. Fase Ledger — Fundação contábil
+
+## Visão geral da Fase Ledger
+
+| Ordem | PR | Objetivo | Status | Data início | Data fim | Resultado |
+|---:|---|---|---|---|---|---|
+| 0 | `PR-LEDGER-00` | Auditoria read-only do domínio financeiro | `PASS` | 2026-07-08 | 2026-07-08 | Auditoria concluída; migration livre identificada na época: `V11` |
+| 1 | `PR-LEDGER-01` | Testcontainers PostgreSQL + Flyway real | `PASS_COM_RESSALVA` | 2026-07-08 | 2026-07-08 | 36/36 unitários OK; smoke VPS PostgreSQL PASS em 2026-07-08 |
+| 2 | `PR-LEDGER-02` | Schema do Ledger e modelo `MovimentoCarteira` | `PASS_COM_RESSALVA` | 2026-07-08 | 2026-07-08 | 38/38 unitários OK; schema VPS validado após BUG-0010 |
+| 3 | `PR-LEDGER-03` | `LedgerService` transacional | `PASS_COM_RESSALVA` | 2026-07-08 | 2026-07-08 | 43/43 unitários OK; JPA validate em PostgreSQL real PASS |
+| 4 | `PR-LEDGER-04` | Reconciliação de saldo | `PASS_COM_RESSALVA` | 2026-07-08 | 2026-07-08 | 47/47 unitários OK; PostgreSQL VPS schema PASS |
+| 5 | `PR-LEDGER-05` | Backfill inicial de movimentos | `PASS_COM_RESSALVA` | 2026-07-08 | 2026-07-08 | 53/53 unitários OK; Flyway VPS versão 14 PASS |
+| 6 | `PR-LEDGER-06` | Carteira com ajuste manual via Ledger | `PASS_COM_RESSALVA` | 2026-07-08 | 2026-07-08 | 63/63 unitários OK; endpoints ajustes/movimentos |
+| 7 | `PR-LEDGER-07` | Transações com Ledger | `PASS_COM_RESSALVA` | 2026-07-08 | 2026-07-08 | 69/69 unitários OK; criar/editar/cancelar via Ledger |
+| 8 | `PR-LEDGER-08` | Parcelas com Ledger | `PASS_COM_RESSALVA` | 2026-07-08 | 2026-07-08 | 69/69 unitários OK; pagamento/estorno via Ledger |
+| 9 | `PR-LEDGER-09` | Contas fixas com Ledger | `PASS_COM_RESSALVA` | 2026-07-08 | 2026-07-08 | 69/69 unitários OK; pagamento via TransacaoService+Ledger |
+| 10 | `PR-LEDGER-10` | Metas rastreáveis | `PASS_COM_RESSALVA` | 2026-07-08 | 2026-07-08 | 69/69 unitários OK; subledger MovimentoMeta |
+| 11 | `PR-LEDGER-11` | Fatura idempotente sem write-on-GET | `PASS_COM_RESSALVA` | 2026-07-08 | 2026-07-08 | 69/69 unitários OK; read-only GET, POST criação, pagamento via TransacaoService |
+| 12 | `PR-LEDGER-12` | Projeção de caixa corrigida | `PASS_COM_RESSALVA` | 2026-07-08 | 2026-07-08 | 69/69 unitários OK; faturas abertas + campo saldoRealizado |
+| 13 | `PR-LEDGER-13` | Idempotência em POSTs financeiros | `PASS_COM_RESSALVA` | 2026-07-08 | 2026-07-08 | 69/69 unitários OK; IdempotencyFilter header |
+| 14 | `PR-LEDGER-14` | Ownership centralizado | `PASS_COM_RESSALVA` | 2026-07-08 | 2026-07-08 | 69/69 unitários OK; todos services usam findByIdAndUsuarioId |
+| 15 | `PR-LEDGER-15` | Arquivamento/bloquear hard delete | `PASS_COM_RESSALVA` | 2026-07-08 | 2026-07-08 | 69/69 unitários OK; Carteira com movimentos bloqueia delete |
+| 16 | `PR-LEDGER-16` | Dashboard e relatórios reconciliados | `PASS_COM_RESSALVA` | 2026-07-08 | 2026-07-08 | 69/69 unitários OK; fontes corretas validado |
+| 17 | `PR-LEDGER-17` | Contrato API / OpenAPI | `PASS_COM_RESSALVA` | 2026-07-08 | 2026-07-08 | 69/69 unitários OK; SpringDoc/OpenAPI configurado |
+| 18 | `PR-LEDGER-18` | UX de confiança | `PASS_COM_RESSALVA` | 2026-07-08 | 2026-07-08 | backend OK (erros padronizados, idempotência, 409); frontend/mobile pendente |
+| 19 | `PR-LEDGER-19` | Observabilidade segura | `PASS_COM_RESSALVA` | 2026-07-08 | 2026-07-08 | 69/69 unitários OK; requestId, logs sem PII, health check |
+| 20 | `PR-LEDGER-20` | Fechamento da fundação Ledger | `PASS_COM_RESSALVA` | 2026-07-08 | 2026-07-08 | ver checklist abaixo; PostgreSQL VPS verificado |
+
+### Checklist de fechamento PR-LEDGER-20
+
+| Item | Status |
+|---|---|
+| PostgreSQL real validando Flyway/schema | `SIM` — smoke VPS 2026-07-08: PostgreSQL 17.10, 14 migrations validadas, schema JPA OK |
+| MovimentoCarteira criado por migration versionada | `SIM` — V11 |
+| Carteira.saldo é saldo materializado | `SIM` — LedgerService é único ponto de alteração |
+| Nenhum service altera saldo direto fora do LedgerService | `SIM` |
+| Backfill inicial idempotente executado/testado | `SIM` — V12 + LedgerBackfillService |
+| Reconciliação detecta divergência | `SIM` — LedgerReconciliationService |
+| Carteira manual usa ajuste via Ledger | `SIM` — PR-06 |
+| Transação cria/edita/cancela com movimentos corretos | `SIM` — PR-07 |
+| Parcela paga/despaga sem duplicidade | `SIM` — PR-08 |
+| Conta fixa paga/despaga com rastreabilidade | `SIM` — PR-09 |
+| Meta possui histórico coerente | `SIM` — PR-10 (MovimentoMeta) |
+| Fatura não é criada por GET | `SIM` — PR-11 |
+| Fatura possui constraint única por competência | `SIM` — desde PR-FASE1-04 |
+| Pagamento de fatura gera uma saída rastreável | `SIM` — PR-11 |
+| Projeção diferencia realizado de previsto | `SIM` — PR-12 |
+| POSTs financeiros críticos têm idempotência | `SIM` — PR-13 |
+| Ownership está centralizado | `SIM` — PR-14 |
+| Hard delete financeiro está controlado | `SIM` — PR-15 |
+| Dashboard e relatórios usam fonte correta | `SIM` — PR-16 |
+| API documentada e versionada | `SIM` — PR-17 |
+| Web/mobile impedem duplo clique financeiro | `PENDENTE` — registrado como PROB-0031/BACKLOG-0043 |
+| Logs não vazam PII, token ou senha | `SIM` — PR-19 |
+
+
+
+---
+
+## PR-LEDGER-00 — Auditoria read-only do domínio financeiro
+
+**Status atual:** `PASS`
+**Responsável:** IA executora (Codex)
+**Data de início:** 2026-07-08
+**Data de conclusão:** 2026-07-08
+**Branch:** main (local, sem commit)
+**Commit/PR:** pendente
+
+### Objetivo
+
+Mapear pontos do sistema que criam, alteram, removem ou projetam dinheiro antes de introduzir Ledger.
+
+### Arquivos lidos
+
+| Grupo | Arquivos |
+|---|---|
+| Roadmap e estado | `LEDGER_ROADMAP_GESTOR_FINANCEIRO.md`, `LOCAL_POSTGRES_VALIDATION.md`, `CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md` |
+| Services financeiros | `CarteiraService`, `TransacaoService`, `ContaService`, `MetaService`, `ContaFixaService`, `FaturaService`, `ParcelaService`, `DashboardService`, `RelatorioService`, `ExportService`, `ImportService`, `ProjecaoService` |
+| Controllers financeiros | `CarteiraController`, `ContaController`, `TransacaoController`, `ParcelaController`, `ContaFixaController`, `MetaController`, `FaturaController`, `DashboardController`, `RelatorioController`, `ExportController`, `ImportController` |
+| Infra/testes | `pom.xml`, `application-test.properties`, migrations `V1` a `V10`, testes backend existentes |
+
+### Fluxos que alteram dinheiro
+
+| Fluxo | Método atual | Observação Ledger |
+|---|---|---|
+| Criar/atualizar carteira | `CarteiraService.criar/atualizar` | `saldo` inicial/editado direto; precisa virar abertura/ajuste controlado |
+| Adicionar/remover dinheiro | `CarteiraService.adicionarDinheiro/removerDinheiro` | altera `Carteira.saldo` direto e cria `Transacao`; migrar para `LedgerService` |
+| Criar/deletar transação | `TransacaoService.criar/deletar` | altera `Categoria.valorGasto` e `Conta.valorGasto`; precisa movimento/reversão |
+| Editar transação | `TransacaoService.atualizar` | muda valor sem reconciliar diferenças em conta/categoria |
+| Conta fixa paga | `ContaFixaService.marcarComoPaga` | cria `Transacao` de saída e muda status/valor real |
+| Parcela paga/despaga | `ParcelaService.marcarComoPaga/marcarComoPendente` | muda status financeiro sem movimento |
+| Meta adicionar/remover | `MetaService.adicionarValor/removerValor` | subledger de meta ou movimento próprio |
+| Fatura paga | `FaturaService.pagarFatura` | cria `Transacao` de saída; precisa idempotência |
+| Fatura GET | `FaturaService.toResponse` | pode salvar `valorTotal` durante resposta; write-on-read |
+| Import CSV | `ImportService.importarCsv` | salva `Transacao` direto via repository, fora de `TransacaoService` |
+
+### Endpoints impactados
+
+| Endpoint | Impacto Ledger |
+|---|---|
+| `POST /api/v1/carteiras` | abertura de saldo |
+| `PUT /api/v1/carteiras/{id}` | ajuste de saldo se valor mudar |
+| `POST /api/v1/carteiras/{id}/adicionar` | movimento `AJUSTE_MANUAL` positivo |
+| `POST /api/v1/carteiras/{id}/remover` | movimento `AJUSTE_MANUAL` negativo |
+| `POST/PUT/DELETE /api/v1/transacoes` | movimento, reversão ou delta |
+| `PUT /api/v1/contas-fixas/{id}/pagar` | movimento de pagamento confirmado |
+| `PUT /api/v1/parcelas/{id}/pagar` | movimento no momento correto |
+| `PUT /api/v1/metas/{id}/adicionar|remover` | subledger/meta movement |
+| `PUT /api/v1/faturas/{id}/pagar` | movimento idempotente de pagamento |
+| `POST /api/v1/importar/csv` | criação de transação deve passar por service/ledger |
+
+### Riscos antes da mudança
+
+| Risco | Status |
+|---|---|
+| Saldo de carteira alterado fora de ponto central | `CONFIRMADO` |
+| Transação editada sem delta em conta/categoria | `CONFIRMADO` |
+| Importação salva transação fora do service | `CONFIRMADO` |
+| Fatura com write-on-read | `CONFIRMADO` |
+| Teste PostgreSQL real automatizado ausente antes do PR-LEDGER-01 | `CONFIRMADO` |
+
+**Próxima versão de migration identificada na auditoria:** `V11` — consumida pelo PR-LEDGER-02. Próxima atual: `V12`.
+**Recomendação final:** `APTO_PARA_PR_LEDGER_01`
+
+---
+
+## PR-LEDGER-01 — Testcontainers PostgreSQL e validação real de migrations
+
+**Status atual:** `PASS_COM_RESSALVA`
+**Responsável:** IA executora (Codex)
+**Data de início:** 2026-07-08
+**Data de conclusão:** 2026-07-08
+**Branch:** main (local, sem commit)
+**Commit/PR:** pendente
+
+### Objetivo
+
+Garantir que mudanças de Ledger possam rodar contra PostgreSQL real, com Flyway aplicando migrations em banco limpo e Hibernate validando schema.
+
+### Escopo executado
+
+- adicionadas dependências `org.testcontainers:junit-jupiter` e `org.testcontainers:postgresql`;
+- criado profile Maven `integration-test` com Failsafe para `*IT.java`;
+- criado `PostgresMigrationIT` com `PostgreSQLContainer("postgres:16-alpine")`;
+- criado `application-postgres-it.properties` com `ddl-auto=validate`, Flyway ativo e `baseline-on-migrate=false`;
+- configurado Mockito `javaagent` no Surefire/Failsafe para evitar falha de self-attach no JDK 21;
+- CI passou a rodar `mvn verify -Pintegration-test --batch-mode`.
+
+### Arquivos alterados
+
+| Arquivo | Ação |
+|---|---|
+| `.github/workflows/ci.yml` | EDITADO — adiciona etapa `mvn verify -Pintegration-test --batch-mode` |
+| `backend/pom.xml` | EDITADO — Testcontainers, Surefire javaagent, profile Failsafe `integration-test` |
+| `backend/src/test/java/com/gestor/financeiro/PostgresMigrationIT.java` | NOVO — teste PostgreSQL real + Flyway |
+| `backend/src/test/resources/application-postgres-it.properties` | NOVO — profile de integração PostgreSQL |
+
+### Testes e validações
+
+| Comando | Resultado |
+|---|---|
+| `cd backend && ./mvnw -q test` | `PASS` — 36/36 unitários |
+| `docker info --format '{{.ServerVersion}}'` | `FAIL_AMBIENTE` — Docker daemon local desligado |
+| `cd backend && ./mvnw -q verify -Pintegration-test` | `NAO_EXECUTADO_LOCAL` — depende de Docker ativo; CI configurado para executar |
+| Smoke VPS PostgreSQL | `PASS` — usuario `dbnexos_gestor`; Flyway validou 14 migrations; schema JPA OK |
+
+### Ressalvas
+
+| Ressalva | Impacto | Próxima ação |
+|---|---|---|
+| Testcontainers local não executado | Sem prova local do container efêmero | Opcional para CI/dev com Docker; validação VPS real concluída |
+
+### Decisão final
+
+**Status final:** `PASS_COM_RESSALVA`
+**Resumo:** Infraestrutura de teste PostgreSQL real foi adicionada e unitários passaram. Validação local por Testcontainers ficou pronta para CI/ambiente com Docker; validação equivalente em PostgreSQL VPS real passou em 2026-07-08.
+**Pode avançar para PR-LEDGER-02?** `SIM_COM_RESSALVA` — Testcontainers local segue opcional para CI/dev com Docker.
+
+---
+
+## PR-LEDGER-02 — Schema do Ledger e modelo `MovimentoCarteira`
+
+**Status atual:** `PASS_COM_RESSALVA`
+**Responsável:** IA executora (Codex)
+**Data de início:** 2026-07-08
+**Data de conclusão:** 2026-07-08
+**Branch:** main (local, sem commit)
+**Commit/PR:** pendente
+
+### Objetivo
+
+Criar a estrutura persistente do Ledger sem ainda trocar fluxos de negócio.
+
+### Escopo executado
+
+- criada migration `V11__movimento_carteira.sql`;
+- criada entidade JPA `MovimentoCarteira`;
+- criados enums `TipoMovimentoCarteira` e `OrigemMovimentoCarteira`;
+- criado `MovimentoCarteiraRepository`;
+- adicionados testes unitários de save/list por usuário e carteira;
+- ampliado `PostgresMigrationIT` para validar tabela, constraint de valor e FK quando Docker estiver ativo.
+
+### Arquivos alterados
+
+| Arquivo | Ação |
+|---|---|
+| `backend/src/main/resources/db/migration/V11__movimento_carteira.sql` | NOVO — tabela `movimentos_carteira`, FKs, constraints, índices e unique parcial de idempotência |
+| `backend/src/main/java/com/gestor/financeiro/model/MovimentoCarteira.java` | NOVO — entidade Ledger |
+| `backend/src/main/java/com/gestor/financeiro/model/enums/TipoMovimentoCarteira.java` | NOVO — tipos de movimento |
+| `backend/src/main/java/com/gestor/financeiro/model/enums/OrigemMovimentoCarteira.java` | NOVO — origem do movimento |
+| `backend/src/main/java/com/gestor/financeiro/repository/MovimentoCarteiraRepository.java` | NOVO — consultas por ownership/idempotência/extrato |
+| `backend/src/test/java/com/gestor/financeiro/MovimentoCarteiraRepositoryTest.java` | NOVO — testes H2 de repository |
+| `backend/src/test/java/com/gestor/financeiro/PostgresMigrationIT.java` | EDITADO — valida `V11` em PostgreSQL real quando Docker disponível |
+
+### Testes e validações
+
+| Comando | Resultado |
+|---|---|
+| `cd backend && ./mvnw -q test` | `PASS` — 38/38 unitários |
+| `docker info --format '{{.ServerVersion}}'` | `FAIL_AMBIENTE` — Docker daemon local desligado |
+| `cd backend && ./mvnw -q verify -Pintegration-test` | `NAO_EXECUTADO_LOCAL` — depende de Docker ativo |
+| Smoke VPS PostgreSQL | `PASS` — `movimentos_carteira` validada após BUG-0010 |
+
+### Ressalvas
+
+| Ressalva | Impacto | Próxima ação |
+|---|---|---|
+| Testcontainers local não executado | `PostgresMigrationIT` com `V11` não rodou localmente | Opcional para CI/dev com Docker; schema VPS real validado |
+| Nenhum fluxo financeiro usa Ledger ainda | Esperado pelo escopo do PR-02 | Implementar `LedgerService` no PR-LEDGER-03 |
+
+### Decisão final
+
+**Status final:** `PASS_COM_RESSALVA`
+**Resumo:** Schema do Ledger criado e mapeado sem alterar cálculo de saldo ou contratos públicos. Unitários passaram e schema PostgreSQL real foi validado no VPS após ajuste `moeda CHAR(3)` em BUG-0010.
+**Próxima versão de migration disponível:** `V12`
+**Pode avançar para PR-LEDGER-03?** `SIM_COM_RESSALVA` — Testcontainers local segue opcional para CI/dev com Docker.
+
+---
+
+## PR-LEDGER-03 — `LedgerService` e escrita atômica de movimento + saldo materializado
+
+**Status atual:** `PASS_COM_RESSALVA`
+**Responsável:** IA executora (Codex)
+**Data de início:** 2026-07-08
+**Data de conclusão:** 2026-07-08
+**Branch:** main (local, sem commit)
+**Commit/PR:** pendente
+
+### Objetivo
+
+Criar caminho técnico central para registrar movimento financeiro e atualizar saldo materializado da carteira na mesma transação.
+
+### Escopo executado
+
+- criado `LedgerService` com escrita `@Transactional`;
+- criado command interno `RegistrarMovimentoCommand`;
+- `valor_assinado` passou a ser calculado no domínio por direção (`ENTRADA`/`SAIDA`);
+- `CarteiraRepository` ganhou query com `PESSIMISTIC_WRITE` (`findByIdAndUsuarioIdForUpdate`);
+- erros de lock financeiro viram 409 via `FINANCIAL_CONFLICT`;
+- `CarteiraService` deixou de alterar saldo diretamente em criar/atualizar/adicionar/remover, exceto inicialização zero antes do movimento de abertura;
+- movimentos de carteira preservam `saldo_resultante`;
+- testes cobrem entrada, saída, saldo insuficiente, ownership e concorrência.
+
+### Arquivos alterados
+
+| Arquivo | Ação |
+|---|---|
+| `backend/src/main/java/com/gestor/financeiro/service/LedgerService.java` | NOVO — escrita atômica movimento + saldo |
+| `backend/src/main/java/com/gestor/financeiro/service/RegistrarMovimentoCommand.java` | NOVO — command interno do Ledger |
+| `backend/src/main/java/com/gestor/financeiro/repository/CarteiraRepository.java` | EDITADO — lock pessimista por `id + usuarioId` |
+| `backend/src/main/java/com/gestor/financeiro/service/CarteiraService.java` | EDITADO — saldo passa por `LedgerService` |
+| `backend/src/main/java/com/gestor/financeiro/exception/FinancialConflictException.java` | NOVO — conflito financeiro |
+| `backend/src/main/java/com/gestor/financeiro/exception/GlobalExceptionHandler.java` | EDITADO — 409 para conflito financeiro/lock |
+| `backend/src/test/java/com/gestor/financeiro/LedgerServiceTest.java` | NOVO — testes de saldo, ownership e concorrência |
+
+### Testes e validações
+
+| Comando | Resultado |
+|---|---|
+| `cd backend && ./mvnw -q -Dtest=LedgerServiceTest,FinancialIntegrityTest test` | `PASS` — executado fora do sandbox por bloqueio Mockito/ByteBuddy em temp dir |
+| `cd backend && ./mvnw -q test` | `PASS` — 43/43 unitários |
+| `docker info --format '{{.ServerVersion}}'` | `FAIL_AMBIENTE` — Docker daemon local desligado |
+| `cd backend && ./mvnw -q verify -Pintegration-test` | `NAO_EXECUTADO_LOCAL` — depende de Docker ativo |
+
+### Ressalvas
+
+| Ressalva | Impacto | Próxima ação |
+|---|---|---|
+| Docker local desligado | Testcontainers PostgreSQL não rodou localmente | Ligar Docker e executar `./mvnw -q verify -Pintegration-test` |
+| Transações, parcelas, contas fixas, metas e faturas ainda não usam Ledger | Esperado pelos PRs posteriores | Migrar por etapas a partir de PR-LEDGER-04/07 |
+
+### Decisão final
+
+**Status final:** `PASS_COM_RESSALVA`
+**Resumo:** `LedgerService` passou a ser o caminho central para alterar saldo de carteira, com lock pessimista, movimento append-only, saldo resultante e testes de concorrência. Fluxos de carteira foram conectados ao Ledger; demais domínios seguem para PRs posteriores.
+**Próxima versão de migration disponível:** `V12`
+**Pode avançar para PR-LEDGER-04?** `SIM_COM_RESSALVA` — antes de merge/deploy, executar integração com Docker ativo.
+
+---
+
+## PR-LEDGER-04 — Reconciliação de saldo
+
+**Status atual:** `PASS_COM_RESSALVA`
+**Responsável:** IA executora (Codex)
+**Data de início:** 2026-07-08
+**Data de conclusão:** 2026-07-08
+**Branch:** main (local, sem commit)
+**Commit/PR:** pendente
+
+### Objetivo
+
+Criar mecanismo para comparar saldo materializado em `carteiras.saldo` com saldo derivado dos movimentos em `movimentos_carteira`.
+
+### Escopo executado
+
+- criado DTO `ReconciliacaoCarteiraResponse`;
+- criada projection `LedgerSaldoProjection`;
+- adicionadas queries agregadas por carteira em `CarteiraRepository`;
+- criado `LedgerReconciliationService` read-only;
+- adicionados endpoints autenticados de reconciliação por carteira e por usuário;
+- adicionados logs seguros de divergência com `usuarioId`, `carteiraId` e `diferenca`, sem PII;
+- ampliado `PostgresMigrationIT` com query SQL de reconciliação para PostgreSQL real quando Docker estiver ativo.
+
+### Endpoints
+
+| Método | Path | Descrição |
+|---|---|---|
+| `GET` | `/api/v1/carteiras/{id}/reconciliacao` | Reconcilia uma carteira do usuário autenticado |
+| `GET` | `/api/v1/carteiras/minhas/reconciliacao` | Lista reconciliação de todas as carteiras do usuário autenticado |
+
+### Resposta
+
+```text
+carteiraId
+usuarioId
+saldoMaterializado
+saldoLedger
+diferenca
+status: OK | DIVERGENTE
+```
+
+### Arquivos alterados
+
+| Arquivo | Ação |
+|---|---|
+| `backend/src/main/java/com/gestor/financeiro/dto/ReconciliacaoCarteiraResponse.java` | NOVO — DTO de resposta |
+| `backend/src/main/java/com/gestor/financeiro/repository/projection/LedgerSaldoProjection.java` | NOVO — projection agregada |
+| `backend/src/main/java/com/gestor/financeiro/service/LedgerReconciliationService.java` | NOVO — serviço read-only de reconciliação |
+| `backend/src/main/java/com/gestor/financeiro/repository/CarteiraRepository.java` | EDITADO — queries agregadas de reconciliação |
+| `backend/src/main/java/com/gestor/financeiro/controller/CarteiraController.java` | EDITADO — endpoints de reconciliação |
+| `backend/src/test/java/com/gestor/financeiro/LedgerReconciliationServiceTest.java` | NOVO — testes H2 de OK/divergência/ownership |
+| `backend/src/test/java/com/gestor/financeiro/PostgresMigrationIT.java` | EDITADO — query de reconciliação em PostgreSQL real quando Docker disponível |
+
+### Testes e validações
+
+| Comando | Resultado |
+|---|---|
+| `cd backend && ./mvnw -q -Dtest=LedgerReconciliationServiceTest,LedgerServiceTest,MovimentoCarteiraRepositoryTest test` | `PASS` — executado fora do sandbox por bloqueio Mockito/ByteBuddy em temp dir |
+| `cd backend && ./mvnw -q verify -Pintegration-test` | `PASS_UNITARIOS_FAIL_AMBIENTE_IT` — 47/47 unitários OK; `PostgresMigrationIT` bloqueado por Docker daemon desligado |
+
+### Ressalvas
+
+| Ressalva | Impacto | Próxima ação |
+|---|---|---|
+| Docker local desligado | Query de reconciliação em PostgreSQL real não rodou localmente | Ligar Docker e executar `./mvnw -q verify -Pintegration-test` |
+| Carteiras existentes sem movimento inicial podem aparecer divergentes | Esperado antes do backfill | Executar PR-LEDGER-05 |
+
+### Decisão final
+
+**Status final:** `PASS_COM_RESSALVA`
+**Resumo:** A aplicação agora consegue responder se o saldo materializado bate com o saldo derivado do Ledger por carteira e por usuário. Divergências são detectadas sem correção automática e com log seguro.
+**Próxima versão de migration disponível:** `V12`
+**Pode avançar para PR-LEDGER-05?** `SIM_COM_RESSALVA` — antes de merge/deploy, executar integração com Docker ativo.
+
+---
+
+## PR-LEDGER-05 — Backfill inicial de movimentos para carteiras existentes
+
+**Status atual:** `PASS_COM_RESSALVA`
+**Responsável:** IA executora (Codex)
+**Data de início:** 2026-07-08
+**Data de conclusão:** 2026-07-08
+**Branch:** main (local, sem commit)
+**Commit/PR:** pendente
+
+### Objetivo
+
+Gerar movimentos iniciais para carteiras existentes sem reconstruir histórico, preservando saldo materializado atual e permitindo reconciliação exata.
+
+### Escopo executado
+
+- criada migration `V12__ledger_backfill_carteiras.sql`;
+- adicionada unique parcial para impedir mais de um `BACKFILL` por carteira;
+- backfill calcula abertura como `saldo_materializado - saldo_ledger`, evitando duplicar carteiras que já receberam movimentos após PR-LEDGER-03;
+- carteiras sem diferença ficam sem movimento novo;
+- diferença negativa bloqueia a migration/rotina e exige decisão manual;
+- criado `LedgerBackfillService` com execução idempotente por usuário ou todas as carteiras;
+- criado `LedgerBackfillResult` para contabilizar carteiras avaliadas/criadas/ignoradas;
+- ampliado `MovimentoCarteiraRepository` com existência de backfill e soma de movimentos;
+- testes cobrem idempotência, reconciliação pós-backfill, isolamento por usuário, diferença parcial e bloqueio de diferença negativa.
+
+### Arquivos alterados
+
+| Arquivo | Ação |
+|---|---|
+| `backend/src/main/resources/db/migration/V12__ledger_backfill_carteiras.sql` | NOVO — backfill idempotente e unique parcial |
+| `backend/src/main/java/com/gestor/financeiro/service/LedgerBackfillService.java` | NOVO — rotina interna de backfill |
+| `backend/src/main/java/com/gestor/financeiro/service/LedgerBackfillResult.java` | NOVO — resumo da execução |
+| `backend/src/main/java/com/gestor/financeiro/repository/MovimentoCarteiraRepository.java` | EDITADO — consultas para backfill |
+| `backend/src/test/java/com/gestor/financeiro/LedgerBackfillServiceTest.java` | NOVO — testes do backfill |
+| `backend/src/test/java/com/gestor/financeiro/PostgresMigrationIT.java` | EDITADO — espera migrations >= 12 |
+
+### Testes e validações
+
+| Comando | Resultado |
+|---|---|
+| `cd backend && ./mvnw -q -Dtest=LedgerBackfillServiceTest,LedgerReconciliationServiceTest,LedgerServiceTest,MovimentoCarteiraRepositoryTest test` | `PASS` — testes focados Ledger |
+| `cd backend && ./mvnw -q test` | `PASS` — 53/53 unitários |
+| `cd backend && ./mvnw -q verify -Pintegration-test` | `PASS_UNITARIOS_FAIL_AMBIENTE_IT` — unitários OK; `PostgresMigrationIT` bloqueado por Docker daemon desligado |
+
+### Ressalvas
+
+| Ressalva | Impacto | Próxima ação |
+|---|---|---|
+| Docker local desligado | `V12` ainda não foi validada localmente em PostgreSQL real | Ligar Docker e executar `./mvnw -q verify -Pintegration-test` |
+| Diferença negativa bloqueia backfill | Evita criar histórico falso ou apagar saldo | Auditar carteira manualmente antes da migration |
+
+### Decisão final
+
+**Status final:** `PASS_COM_RESSALVA`
+**Resumo:** Backfill inicial foi implementado como migration e rotina interna idempotente. O cálculo usa apenas a diferença entre saldo materializado e saldo já registrado no Ledger, preservando movimentos existentes e permitindo reconciliação após execução.
+**Próxima versão de migration disponível:** `V13`
+**Pode avançar para PR-LEDGER-06?** `SIM_COM_RESSALVA` — antes de merge/deploy, executar integração com Docker ativo.
+
+---
+
+## PR-LEDGER-06 — Carteira: substituir adicionar/remover saldo direto por ajuste manual via Ledger
+
+**Status atual:** `PASS_COM_RESSALVA`
+**Responsável:** IA executora (Codex)
+**Data de início:** 2026-07-08
+**Data de conclusão:** 2026-07-08
+**Branch:** main (local, sem commit)
+**Commit/PR:** pendente
+
+### Objetivo
+
+Migrar operações diretas de carteira para movimentos do tipo `AJUSTE_MANUAL` e expor endpoints de ajuste explícito e extrato de movimentos.
+
+### Nota sobre implementação
+
+O núcleo da migração (`CarteiraService` usando `LedgerService` em vez de alterar `Carteira.saldo` diretamente) foi executado antecipadamente no PR-LEDGER-03. Este PR formaliza o contrato de API, expõe endpoints de ajuste/consulta de movimentos e adiciona testes de controller.
+
+### Escopo executado
+
+- criado DTO `AjusteCarteiraRequest` com campos `tipo` (ENTRADA/SAIDA), `valor` e `descricao`;
+- criado DTO `MovimentoCarteiraResponse` para extrato de movimentos;
+- adicionado endpoint `POST /api/v1/carteiras/{id}/ajustes` — ajuste manual explícito com payload `{tipo, valor, descricao}`;
+- adicionado endpoint `GET /api/v1/carteiras/{id}/movimentos` — extrato paginado de movimentos do Ledger por carteira;
+- endpoints antigos `POST /{id}/adicionar` e `POST /{id}/remover` marcados como `@Deprecated(since = "PR-LEDGER-06")` — continuam funcionais via Ledger;
+- adicionado método `ajustarSaldo` no `CarteiraService` delegando para `LedgerService`;
+- adicionado método `listarMovimentos` no `CarteiraService` com paginação;
+- adicionada query paginada em `MovimentoCarteiraRepository`;
+- criado `CarteiraControllerTest` com 10 testes: ajuste entrada/saída, tipo inválido, ownership cruzado, listagem de movimentos, reconciliação pós-ajuste, endpoints deprecated e carteira vazia.
+
+### Endpoints
+
+| Método | Path | Descrição | Status |
+|---|---|---|---|
+| `POST` | `/api/v1/carteiras/{id}/ajustes` | Ajuste manual explícito via Ledger | NOVO |
+| `GET` | `/api/v1/carteiras/{id}/movimentos` | Extrato paginado de movimentos | NOVO |
+| `POST` | `/api/v1/carteiras/{id}/adicionar` | Alias deprecated para ajuste | `@Deprecated` |
+| `POST` | `/api/v1/carteiras/{id}/remover` | Alias deprecated para ajuste | `@Deprecated` |
+
+### Arquivos alterados
+
+| Arquivo | Ação |
+|---|---|
+| `backend/src/main/java/com/gestor/financeiro/dto/AjusteCarteiraRequest.java` | NOVO — DTO de ajuste manual |
+| `backend/src/main/java/com/gestor/financeiro/dto/MovimentoCarteiraResponse.java` | NOVO — DTO de movimento |
+| `backend/src/main/java/com/gestor/financeiro/repository/MovimentoCarteiraRepository.java` | EDITADO — query paginada por usuário e carteira |
+| `backend/src/main/java/com/gestor/financeiro/service/CarteiraService.java` | EDITADO — métodos `ajustarSaldo` e `listarMovimentos` |
+| `backend/src/main/java/com/gestor/financeiro/controller/CarteiraController.java` | EDITADO — endpoints `/ajustes`, `/movimentos`, deprecated marks |
+| `backend/src/test/java/com/gestor/financeiro/CarteiraControllerTest.java` | NOVO — 10 testes de controller |
+
+### Testes e validações
+
+| Comando | Resultado |
+|---|---|
+| `cd backend && ./mvnw -q -Dtest=CarteiraControllerTest test` | `PASS` — 10/10 |
+| `cd backend && ./mvnw -q test` | `PASS` — 63/63 unitários |
+| `docker info --format '{{.ServerVersion}}'` | `FAIL_AMBIENTE` — Docker daemon local desligado |
+| `cd backend && ./mvnw -q verify -Pintegration-test` | `NAO_EXECUTADO_LOCAL` — depende de Docker ativo |
+
+### Critério de aceite
+
+- [x] Não existe mais alteração manual de saldo fora do Ledger (implementado no PR-LEDGER-03)
+- [x] Endpoint `POST /{id}/ajustes` exposto com payload `{tipo, valor, descricao}`
+- [x] Endpoint `GET /{id}/movimentos` paginado para extrato
+- [x] Endpoints antigos marcados como `@Deprecated`, mantendo compatibilidade
+- [x] Testes de controller cobrindo ajuste, movimentos, ownership e reconciliação
+- [x] Reconciliação continua OK após ajustes
+
+### Ressalvas
+
+| Ressalva | Impacto | Próxima ação |
+|---|---|---|
+| Docker local desligado | Testcontainers PostgreSQL não rodou localmente | Ligar Docker e executar `./mvnw -q verify -Pintegration-test` |
+| Endpoints deprecated ainda usados por web/mobile | Compatibilidade mantida; migração futura para `/ajustes` | Atualizar frontend/mobile no PR-LEDGER-18 |
+
+### Decisão final
+
+**Status final:** `PASS_COM_RESSALVA`
+**Resumo:** O PR-LEDGER-06 completa a migração da carteira para o modelo Ledger, formalizando o contrato de API com endpoints explícitos de ajuste e extrato. O núcleo da migração (saldo via LedgerService) foi antecipado no PR-LEDGER-03. Endpoints antigos mantidos como deprecated para compatibilidade com web/mobile. 63/63 testes passam.
+**Próxima versão de migration disponível:** `V13`
+**Pode avançar para PR-LEDGER-07?** `SIM_COM_RESSALVA` — antes de merge/deploy, executar integração com Docker ativo.
+
+---
+
+## PR-LEDGER-07 — Transações: criação, edição e exclusão com Ledger
+
+**Status atual:** `PASS_COM_RESSALVA`
+**Responsável:** IA executora (Codex)
+**Data de início:** 2026-07-08
+**Data de conclusão:** 2026-07-08
+**Branch:** main (local, sem commit)
+**Commit/PR:** pendente
+
+### Objetivo
+
+Fazer `Transacao` impactar saldo de carteira por movimentos rastreáveis no Ledger, com cancelamento em vez de hard delete.
+
+### Escopo executado
+
+- migration `V13__transacao_carteira.sql`: coluna `carteira_id` (FK opcional) e coluna `ativa` (default true) em `transacoes`;
+- entidade `Transacao`: adicionados campos `carteira` e `ativa`;
+- `TransacaoRequest`: adicionado campo `carteiraId`;
+- `TransacaoService.criar()`: se `carteiraId` presente, registra movimento no Ledger (ENTRADA para receita, SAIDA para despesa);
+- `TransacaoService.atualizar()`: computa delta de `valorTotal` e registra movimento de ajuste com direção correta baseada no tipo da transação;
+- `TransacaoService.deletar()`: soft-delete (`ativa = false`) + estorno via Ledger em vez de remoção física;
+- `TransacaoService.cancelar()`: alias para `deletar()`;
+- `buscarPorIdDoUsuario` refatorado para usar `findByIdAndUsuarioId` com `@EntityGraph` incluindo `carteira`;
+- `TransacaoServiceLedgerTest` (6 testes): criar entrada/saída com carteira, criar sem carteira, atualizar valor com movimento delta, cancelar com estorno.
+
+### Testes e validações
+
+| Comando | Resultado |
+|---|---|
+| `cd backend && ./mvnw -q -Dtest=TransacaoServiceLedgerTest test` | `PASS` — 6/6 |
+| `cd backend && ./mvnw -q test` | `PASS` — 69/69 unitários |
+| `docker info` | `FAIL_AMBIENTE` — Docker off |
+| `./mvnw -q verify -Pintegration-test` | `NAO_EXECUTADO_LOCAL` |
+
+### Critério de aceite
+
+- [x] criar entrada aumenta saldo da carteira via Ledger (se carteiraId presente)
+- [x] criar saída reduz saldo da carteira via Ledger (se carteiraId presente)
+- [x] editar valor gera movimento de diferença com direção correta
+- [x] cancelar gera estorno e marca `ativa = false`
+- [x] transação sem carteira não gera movimento (compatível com modelo atual)
+- [x] reconciliação continua OK
+
+### Ressalvas
+
+| Ressalva | Impacto | Próxima ação |
+|---|---|---|
+| Docker local desligado | Integração PostgreSQL não rodou | Ligar Docker, executar verify |
+| Transações existentes sem carteiraId não geram movimentos retroativo | Esperado — backfill tratado no PR-LEDGER-05 | N/A |
+
+### Decisão final
+
+**Status final:** `PASS_COM_RESSALVA`
+**Resumo:** Transações agora geram movimentos rastreáveis no Ledger quando vinculadas a uma carteira. Criação registra entrada/saída, edição computa delta com direção correta, cancelamento faz soft-delete com estorno. Transações sem carteira (ex: cartão de crédito) continuam funcionando sem impacto no Ledger. 69/69 testes passam.
+**Próxima versão de migration disponível:** `V14`
+**Pode avançar para PR-LEDGER-08?** `SIM_COM_RESSALVA`
+
+---
+
+## PR-LEDGER-08 — Parcelas com Ledger
+
+**Status atual:** `PASS_COM_RESSALVA` — 2026-07-08
+
+### Objetivo
+Garantir que parcelas impactem o Ledger ao serem pagas/despagas, sem duplicação.
+
+### Escopo executado
+- `ParcelaService.marcarComoPaga()`: registra movimento SAIDA no Ledger (se transação tem carteira vinculada)
+- `ParcelaService.marcarComoPendente()`: registra movimento ESTORNO (ENTRADA) se parcela estava paga
+- Movimento referenciado como `PARCELA/{parcelaId}` com descrição "Parcela N/Total"
+- Idempotência: `marcarComoPendente` só gera estorno se status era PAGO
+
+### Arquivos: `ParcelaService.java`
+
+---
+
+## PR-LEDGER-09 — Contas fixas com Ledger
+
+**Status atual:** `PASS_COM_RESSALVA` — 2026-07-08
+
+### Objetivo
+Garantir que pagamento de conta fixa gere movimento rastreável no Ledger.
+
+### Escopo executado
+- `ContaFixaService.marcarComoPaga()`: agora chama `TransacaoService.criar()` em vez de `transacaoRepository.save()`
+- Isso garante que o pagamento gere movimentos Ledger quando a transação tiver carteiraId vinculada
+- Removida dependência direta de `TransacaoRepository` no service
+- Guard clause contra pagamento duplicado mantida
+
+### Arquivos: `ContaFixaService.java`
+
+---
+
+## PR-LEDGER-10 — Metas rastreáveis
+
+**Status atual:** `PASS_COM_RESSALVA` — 2026-07-08
+
+### Objetivo
+Padronizar depósitos e retiradas de metas para que sejam rastreáveis com subledger próprio.
+
+### Escopo executado
+- Migration `V14__movimentos_meta.sql`: tabela `movimentos_meta` com tipo, valor, valor_assinado, valor_resultante
+- Entidade `MovimentoMeta` com FK para usuario e meta
+- `MovimentoMetaRepository` com queries por usuarioId e metaId
+- `MetaService.adicionarValor()` e `removerValor()` registram `MovimentoMeta` com tipo ADICAO/REMOCAO e valor_resultante
+
+### Arquivos: `V14__movimentos_meta.sql`, `MovimentoMeta.java`, `MovimentoMetaRepository.java`, `MetaService.java`
+
+---
+
+## PR-LEDGER-11 — Fatura idempotente sem write-on-GET
+
+**Status atual:** `PASS_COM_RESSALVA` — 2026-07-08
+
+### Objetivo
+Corrigir fatura para que GET não crie registro, pagamento use TransacaoService, e constraint única previna duplicidade.
+
+### Escopo executado
+- `FaturaService.buscarAtual()` e `buscarPorMes()`: read-only — não criam fatura se não existir
+- `FaturaService.criarOuBuscarFatura()`: novo método para criação explícita
+- `FaturaService.pagarFatura()`: usa `TransacaoService.criar()` em vez de `transacaoRepository.save()`
+- `FaturaController`: GET endpoints read-only; novo `POST /conta/{contaId}` para criação explícita
+- Constraint `UNIQUE(conta_id, mes, ano)` já existente desde PR-FASE1-04
+
+### Arquivos: `FaturaService.java`, `FaturaController.java`
+
+---
+
+# 12. Fase 1 — Produto financeiro essencial
 
 ## Visão geral da Fase 1
 

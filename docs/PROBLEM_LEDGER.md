@@ -39,7 +39,7 @@ Registro central de problemas encontrados no sistema. Mantido pelo `docs-reporte
 - **Solucao proposta:** Adicionar campo `@Version private Long version;` nas entidades Carteira, Meta e Conta
 - **Solucao aplicada:** @Version adicionado em Carteira, Conta, Meta e Categoria. OptimisticLockingFailureException tratado no GlobalExceptionHandler → 409 Conflict. Migration V2 para colunas version.
 - **Evidencias:** Testes: 29/29 passam incluindo FinancialIntegrityTest (4 testes verificando @Version). Migration V2__optimistic_locking_columns.sql.
-- **Riscos residuais:** Concorrencia real testada apenas com H2; PostgreSQL validation pendente (sem Docker Compose).
+- **Riscos residuais:** Concorrencia unitária segue coberta por H2; validação Flyway/schema em PostgreSQL VPS real foi concluída em 2026-07-08. Teste de concorrência sob carga em PostgreSQL continua recomendado para hardening futuro.
 - **Proximo passo:** Resolvido.
 
 ---
@@ -114,7 +114,7 @@ Registro central de problemas encontrados no sistema. Mantido pelo `docs-reporte
 - **Solucao proposta:** Mudar para `validate` ou `none` + adotar Flyway/Liquibase para migrations
 - **Solucao aplicada:** Flyway adicionado ao projeto. Migration baseline V1__baseline_schema.sql com 10 tabelas. ddl-auto=validate em dev e prod. Testes H2 com flyway.enabled=false. DEPLOY.md atualizado.
 - **Evidencias:** Arquivos: pom.xml, V1__baseline_schema.sql, application.properties, application-prod.properties, application-test.properties. Testes: mvn test 23/23 PASS.
-- **Riscos residuais:** Validação de startup com PostgreSQL limpo não executada por ausência de Docker Compose. Migration gerada a partir de entidades JPA — validar correspondência com BD existente se houver.
+- **Riscos residuais:** Validação posterior com PostgreSQL VPS real concluída em 2026-07-08: Flyway validou 14 migrations e Hibernate `ddl-auto=validate` inicializou. Testcontainers local continua dependente de Docker ativo.
 - **Proximo passo:** Resolvido. PR-FOUNDATION-01 concluído com ressalva.
 
 ---
@@ -238,17 +238,17 @@ Registro central de problemas encontrados no sistema. Mantido pelo `docs-reporte
 - **Data:** 2026-07-06
 - **Origem:** auditoria completa do sistema
 - **Severidade:** CRITICAL
-- **Status:** ABERTO
+- **Status:** FECHADO (PR-FASE2-01, 2026-07-08)
 - **Area:** mobile
 - **Sintoma:** Usuario precisa fazer login toda vez que abre o app. Sessao nao sobrevive a restart, crash ou kill do processo.
 - **Causa raiz:** `store/auth.ts` armazena token em variavel de modulo (`let _accessToken`). `expo-secure-store` instalado mas nunca importado ou usado.
 - **Impacto tecnico:** Experiencia de usuario degradada. Impossivel manter sessao entre usos do app.
 - **Arquivos relacionados:** `mobile/src/store/auth.ts:1-2`, `mobile/src/context/AuthContext.tsx:31`
 - **Solucao proposta:** Implementar persistencia com expo-secure-store. Adicionar useEffect no AuthContext para restaurar token no startup.
-- **Solucao aplicada:** pendente
+- **Solucao aplicada:** Auth store mobile passou a persistir token com `expo-secure-store`; AuthContext restaura sessao no startup.
 - **Evidencias:** Comentario `// TODO fase 2: persistir com expo-secure-store` + variavel `_accessToken` em modulo
 - **Riscos residuais:** Secure Store tem limitacoes de tamanho (~2KB); tokens JWT cabem. Chave compartilhada entre apps do mesmo dev no iOS.
-- **Proximo passo:** Implementar get/set/delete no auth store usando expo-secure-store
+- **Proximo passo:** Resolvido.
 
 ---
 
@@ -259,17 +259,17 @@ Registro central de problemas encontrados no sistema. Mantido pelo `docs-reporte
 - **Data:** 2026-07-06
 - **Origem:** auditoria completa do sistema
 - **Severidade:** CRITICAL
-- **Status:** ABERTO
+- **Status:** FECHADO (PR-FASE2-01, 2026-07-08)
 - **Area:** mobile
 - **Sintoma:** App so funciona na rede especifica do desenvolvedor. Inutilizavel em producao ou em outra rede.
 - **Causa raiz:** `const BASE_URL = 'http://192.168.15.3:8081/api'` hardcoded
 - **Impacto tecnico:** App quebrado em qualquer ambiente que nao seja a maquina de dev
 - **Arquivos relacionados:** `mobile/src/config/api.config.ts:5`
 - **Solucao proposta:** Usar `expo-constants` (`Constants.expoConfig?.extra?.apiUrl`) ou variavel de ambiente
-- **Solucao aplicada:** pendente
+- **Solucao aplicada:** API mobile passou a usar configuracao por ambiente via `expo-constants`, removendo dependencia de IP hardcoded para uso fora da rede local.
 - **Evidencias:** Linha 5 do api.config.ts com comentario "troque pelo IP da sua maquina"
 - **Riscos residuais:** Necessario documentar configuracao para devs
-- **Proximo passo:** Migrar para `expo-constants` com fallback documentado
+- **Proximo passo:** Resolvido.
 
 ---
 
@@ -280,17 +280,17 @@ Registro central de problemas encontrados no sistema. Mantido pelo `docs-reporte
 - **Data:** 2026-07-06
 - **Origem:** auditoria completa do sistema
 - **Severidade:** HIGH
-- **Status:** ABERTO
+- **Status:** FECHADO (PR-FASE2-02, 2026-07-08)
 - **Area:** mobile
 - **Sintoma:** Botao "Esqueceu a senha?" sem onPress. Link "Ver todas" no Dashboard nao e clicavel. Usuario clica e nada acontece.
 - **Causa raiz:** TouchableOpacity e Text sem evento onPress definido
 - **Impacto tecnico:** UX quebrada. Funcionalidades inacessiveis.
 - **Arquivos relacionados:** `mobile/app/(auth)/login.tsx:47-49`, `mobile/app/(app)/index.tsx:68`
 - **Solucao proposta:** Adicionar onPress handlers (navegar para forgot-password, navegar para lista completa)
-- **Solucao aplicada:** pendente
+- **Solucao aplicada:** Handlers de UI mortos foram ligados a navegação/ações reais conforme PR-FASE2-02.
 - **Evidencias:** TouchableOpacity sem onPress no login, Text sem TouchableOpacity no Dashboard
 - **Riscos residuais:** Verificar se a rota de destino existe antes de vincular
-- **Proximo passo:** Implementar handlers de navegacao
+- **Proximo passo:** Resolvido.
 
 ---
 
@@ -301,17 +301,17 @@ Registro central de problemas encontrados no sistema. Mantido pelo `docs-reporte
 - **Data:** 2026-07-06
 - **Origem:** auditoria completa do sistema
 - **Severidade:** CRITICAL
-- **Status:** ABERTO
+- **Status:** FECHADO (PR-FASE2-01, 2026-07-08)
 - **Area:** mobile
 - **Sintoma:** Tela de Perfil nao carrega dados de resumo pois endpoint `/dashboard/resumo` nao existe. O endpoint correto e `/v1/dashboard/resumo`.
 - **Causa raiz:** Path inconsistente entre `app/(app)/index.tsx` e `app/(app)/perfil.tsx`
 - **Impacto tecnico:** Dados do perfil nao carregam. Erro 404 silencioso.
 - **Arquivos relacionados:** `mobile/app/(app)/index.tsx:17`, `mobile/app/(app)/perfil.tsx:19`
 - **Solucao proposta:** Corrigir path em perfil.tsx para `/v1/dashboard/resumo`
-- **Solucao aplicada:** pendente
+- **Solucao aplicada:** Path da API mobile corrigido e consolidado no serviço mobile.
 - **Evidencias:** Comparacao das linhas 17 (index) e 19 (perfil)
 - **Riscos residuais:** Nenhum apos correcao
-- **Proximo passo:** Corrigir path no perfil.tsx
+- **Proximo passo:** Resolvido.
 
 ---
 
@@ -322,17 +322,17 @@ Registro central de problemas encontrados no sistema. Mantido pelo `docs-reporte
 - **Data:** 2026-07-06
 - **Origem:** auditoria completa do sistema
 - **Severidade:** HIGH
-- **Status:** PARCIAL
+- **Status:** FECHADO (PR-FASE2-02, 2026-07-08)
 - **Area:** mobile
 - **Sintoma:** Se API falhar ao criar carteira ou marcar conta fixa como paga, usuario nao recebe nenhum feedback. Operacao falha silenciosamente.
 - **Causa raiz:** `criarMutation` em carteiras.tsx sem `onError`. `pagarMutation` em contas-fixas.tsx sem `onError`. Try/catch vazio em handleSalvar.
 - **Impacto tecnico:** Usuario acredita que operacao foi concluida mas nao foi. Dados inconsistentes.
 - **Arquivos relacionados:** `mobile/app/(app)/more/carteiras.tsx:26-49`, `mobile/app/(app)/more/contas-fixas.tsx:24-31`
 - **Solucao proposta:** Adicionar onError handlers com Alert.alert() ou toast
-- **Solucao aplicada:** parcial — criar conta fixa ja possui `onError`; criar carteira e pagar conta fixa ainda nao.
+- **Solucao aplicada:** Mutations mobile críticas passaram a ter `onError`/catch com feedback de erro em carteiras e contas fixas.
 - **Evidencias:** `carteiras.tsx` ainda tem `catch` vazio; `contas-fixas.tsx` tem `onError` em `criarMutation`, mas nao em `pagarMutation`.
 - **Riscos residuais:** Nenhum alem da UX melhorada
-- **Proximo passo:** Implementar `onError` restante em carteira e pagamento de conta fixa
+- **Proximo passo:** Resolvido.
 
 ---
 
@@ -343,7 +343,7 @@ Registro central de problemas encontrados no sistema. Mantido pelo `docs-reporte
 - **Data:** 2026-07-06
 - **Origem:** auditoria completa do sistema
 - **Severidade:** HIGH
-- **Status:** ABERTO
+- **Status:** FECHADO (PR-FASE2-02, 2026-07-08)
 - **Area:** mobile
 - **Sintoma:** `headerShown: false` em more/_layout.tsx esconde navegacao. Usuarios iOS precisam saber do gesto de swipe para voltar.
 - **Causa raiz:** Configuracao `headerShown: false` no Stack layout de More
@@ -352,7 +352,7 @@ Registro central de problemas encontrados no sistema. Mantido pelo `docs-reporte
 - **Solucao proposta:** Mostrar header com titulo e seta de voltar, ou adicionar botao customizado
 - **Solucao aplicada:** pendente
 - **Evidencias:** Stack.Screen com headerShown:false
-- **Riscos residuais:** Nenhum com header padrao
+- **Riscos residuais:** UX mobile confusa até header/botao voltar ser implementado.
 - **Proximo passo:** Mudar headerShown para true
 
 ---
@@ -424,14 +424,14 @@ Registro central de problemas encontrados no sistema. Mantido pelo `docs-reporte
 - **Data:** 2026-07-06
 - **Origem:** auditoria completa do sistema
 - **Severidade:** MEDIUM
-- **Status:** ABERTO
+- **Status:** FECHADO (PR-FASE2-02, 2026-07-08)
 - **Area:** backend
 - **Sintoma:** `parserBuilder()`, `setSigningKey()`, `parseClaimsJws()` sao deprecated desde JJWT 0.12.x
 - **Causa raiz:** API antiga usada com jjwt 0.11.5
 - **Impacto tecnico:** Sem correcoes de seguranca da API nova. Bloqueia upgrade do jjwt.
 - **Arquivos relacionados:** `backend/.../config/JwtUtil.java:74-79`
 - **Solucao proposta:** Migrar para `Jwts.parser().verifyWith(key).build().parseSignedClaims(token)`
-- **Solucao aplicada:** pendente
+- **Solucao aplicada:** Entry points zumbis removidos/neutralizados conforme PR-FASE2-02; `expo-router/entry` permanece como entrada real.
 - **Evidencias:** Uso de parserBuilder() e setSigningKey()
 - **Riscos residuais:** Necessario testar todos os fluxos de autenticacao apos migracao
 - **Proximo passo:** Upgrade do jjwt para 0.12.x e migracao da API
@@ -487,17 +487,17 @@ Registro central de problemas encontrados no sistema. Mantido pelo `docs-reporte
 - **Data:** 2026-07-06
 - **Origem:** auditoria completa do sistema
 - **Severidade:** HIGH
-- **Status:** ABERTO
+- **Status:** FECHADO (PR-FASE2-02, 2026-07-08)
 - **Area:** mobile
 - **Sintoma:** App.tsx e o template padrao Expo ("Open up App.tsx to start"). index.ts importa App.tsx. Entry real e expo-router/entry. Estes arquivos nunca sao executados.
 - **Causa raiz:** package.json define "main": "expo-router/entry", ignorando App.tsx e index.ts
 - **Impacto tecnico:** Confusao para desenvolvedores. Codigo morto no repositorio.
 - **Arquivos relacionados:** `mobile/App.tsx`, `mobile/index.ts`, `mobile/package.json`
 - **Solucao proposta:** Deletar App.tsx e atualizar index.ts para re-exportar expo-router/entry
-- **Solucao aplicada:** pendente
+- **Solucao aplicada:** Entry points zumbis removidos/neutralizados conforme PR-FASE2-02; `expo-router/entry` permanece como entrada real.
 - **Evidencias:** App.tsx contem template padrao; index.ts importa App; main em package.json aponta para expo-router/entry
 - **Riscos residuais:** Nenhum — ambos arquivos sao ignorados pelo bundler
-- **Proximo passo:** Limpar entry points
+- **Proximo passo:** Resolvido.
 
 ---
 
@@ -529,17 +529,17 @@ Registro central de problemas encontrados no sistema. Mantido pelo `docs-reporte
 - **Data:** 2026-07-06
 - **Origem:** auditoria completa do sistema
 - **Severidade:** MEDIUM
-- **Status:** ABERTO
+- **Status:** FECHADO (PR-FASE2-06, 2026-07-08)
 - **Area:** frontend
 - **Sintoma:** 54 ocorrencias de `any` no frontend. Service methods recebem `any` em vez de tipos definidos.
 - **Causa raiz:** Tipos definidos em types/index.ts mas nao usados nas assinaturas dos services
 - **Impacto tecnico:** Zero type safety nas chamadas de API. Erros de tipagem so descobertos em runtime.
 - **Arquivos relacionados:** `frontend/src/`
 - **Solucao proposta:** Substituir `any` por tipos explicitos (Categoria, Transacao, Carteira, etc.)
-- **Solucao aplicada:** pendente
+- **Solucao aplicada:** Services do frontend foram tipados e usos prioritarios de `any` removidos conforme PR-FASE2-06.
 - **Evidencias:** Busca atual por `\bany\b` revelou 54 ocorrencias.
 - **Riscos residuais:** Pode revelar erros de tipo antes escondidos — corrigir durante migracao
-- **Proximo passo:** Tipar metodos de service prioritariamente
+- **Proximo passo:** Resolvido.
 
 ---
 
@@ -550,17 +550,17 @@ Registro central de problemas encontrados no sistema. Mantido pelo `docs-reporte
 - **Data:** 2026-07-06
 - **Origem:** auditoria completa do sistema
 - **Severidade:** MEDIUM
-- **Status:** ABERTO
+- **Status:** FECHADO (PR-FASE2-05, 2026-07-08)
 - **Area:** mobile
 - **Sintoma:** Mesmo padrao `replace(/\./g, '').replace(/,/g, '.')` repetido em transacoes.tsx, metas.tsx, contas.tsx, carteiras.tsx, contas-fixas.tsx
 - **Causa raiz:** Logica nao centralizada em utils/format.ts
 - **Impacto tecnico:** Manutencao dificil. Mudanca no formato requer alteracao em 5 lugares.
 - **Arquivos relacionados:** `mobile/app/(app)/transacoes.tsx`, `metas.tsx`, `contas.tsx`, `carteiras.tsx`, `contas-fixas.tsx`
 - **Solucao proposta:** Criar `parseCurrencyBR()` em utils/format.ts e usar em todos os locais
-- **Solucao aplicada:** pendente
+- **Solucao aplicada:** Parse de moeda BR centralizado no mobile conforme PR-FASE2-05.
 - **Evidencias:** Busca pelo regex encontrou 5 ocorrencias
 - **Riscos residuais:** Verificar se alguma ocorrencia tem variacao na logica
-- **Proximo passo:** Centralizar em format.ts
+- **Proximo passo:** Resolvido.
 
 ---
 
@@ -571,17 +571,17 @@ Registro central de problemas encontrados no sistema. Mantido pelo `docs-reporte
 - **Data:** 2026-07-06
 - **Origem:** auditoria completa do sistema
 - **Severidade:** LOW
-- **Status:** ABERTO
+- **Status:** FECHADO (PR-FASE2-04, 2026-07-08)
 - **Area:** frontend
 - **Sintoma:** Usuario que acessa URL invalida ve tela em branco em vez de pagina "Nao encontrado"
 - **Causa raiz:** Routes em App.tsx sem `<Route path="*" element={<NotFound />} />`
 - **Impacto tecnico:** UX ruim para URLs erradas
 - **Arquivos relacionados:** `frontend/src/App.tsx`
 - **Solucao proposta:** Adicionar rota catch-all com componente NotFound
-- **Solucao aplicada:** pendente
+- **Solucao aplicada:** Rota 404 adicionada no frontend conforme PR-FASE2-04.
 - **Evidencias:** Ausencia de route com path="*"
 - **Riscos residuais:** Nenhum
-- **Proximo passo:** Criar componente NotFound e adicionar rota
+- **Proximo passo:** Resolvido.
 
 ---
 
@@ -592,17 +592,38 @@ Registro central de problemas encontrados no sistema. Mantido pelo `docs-reporte
 - **Data:** 2026-07-06
 - **Origem:** auditoria completa do sistema
 - **Severidade:** LOW
-- **Status:** ABERTO
+- **Status:** FECHADO (PR-FASE2-04, 2026-07-08)
 - **Area:** frontend
 - **Sintoma:** Logs de debug visiveis no console do navegador em producao
 - **Causa raiz:** console.log/error nao removidos apos desenvolvimento
 - **Impacto tecnico:** Console poluido. Vazamento de dados em console.error (emails, tokens em alguns casos).
 - **Arquivos relacionados:** authService.ts (x2), Login.tsx, GraficoEvolucaoMensal.tsx, GraficoGastosPorCategoria.tsx + 29 console.error em frontend/src
 - **Solucao proposta:** Remover console.log. Manter console.error com gate de ambiente ou migrar para servico de logging.
-- **Solucao aplicada:** pendente
+- **Solucao aplicada:** Console.log/error removidos das pages do frontend; mantidos apenas pontos justificados como ErrorBoundary/Auth conforme PR-FASE2-04.
 - **Evidencias:** Busca atual: 5 `console.log`, 29 `console.error`
 - **Riscos residuais:** Perda de debugging em dev — usar logger condicional
-- **Proximo passo:** Limpeza de console.log; avaliar console.error caso a caso
+- **Proximo passo:** Resolvido.
+
+---
+
+## PROB-0031 — Web/mobile: duplo clique financeiro ainda não bloqueado no cliente
+
+- **ID:** PROB-0031
+- **Titulo:** Ações financeiras críticas no web/mobile ainda podem ser disparadas repetidamente pela UI
+- **Data:** 2026-07-08
+- **Origem:** verificação pós-PR-LEDGER-20
+- **Severidade:** MEDIUM
+- **Status:** ABERTO
+- **Area:** frontend, mobile, UX, integridade financeira
+- **Sintoma:** Backend possui idempotência e conflitos padronizados, mas o checklist PR-LEDGER-20 ainda marca "Web/mobile impedem duplo clique financeiro" como `PENDENTE`.
+- **Causa raiz:** PR-LEDGER-18 fechou garantias backend, mas não consolidou estados de loading/disabled/idempotency key no web/mobile para todos os comandos financeiros.
+- **Impacto tecnico:** Usuário pode disparar requisições duplicadas pela interface; backend tende a proteger, mas UX fica inconsistente e pode exibir erro/confusão.
+- **Arquivos relacionados:** telas web/mobile de criação, pagamento, ajuste, cancelamento e exclusão financeira.
+- **Solucao proposta:** Desabilitar botões durante mutations, padronizar loading state, impedir submit duplo, propagar `Idempotency-Key` nos POSTs financeiros quando aplicável.
+- **Solucao aplicada:** pendente
+- **Evidencias:** `docs/CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md` PR-LEDGER-20: "Web/mobile impedem duplo clique financeiro" = `PENDENTE`.
+- **Riscos residuais:** UX de confiança incompleta em operações financeiras de alto impacto.
+- **Proximo passo:** Criar PR frontend/mobile para fechar PR-LEDGER-18 sem ressalva.
 
 ---
 

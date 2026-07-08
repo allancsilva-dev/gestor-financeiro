@@ -2,7 +2,7 @@
 
 Documentacao de alto nivel sobre como o sistema funciona. Mantido pelo `docs-reporter`.
 
-**Ultima atualizacao:** 2026-07-07
+**Ultima atualizacao:** 2026-07-08
 
 ---
 
@@ -45,7 +45,7 @@ gestor-financeiro/
 ```
 
 O backend e o centro da arquitetura. Tanto frontend web quanto mobile consomem a mesma API REST.
-O banco e PostgreSQL gerenciado via JPA/Hibernate com Flyway para migrations versionadas e `ddl-auto=validate` em dev e prod. O projeto e single-tenant: cada usuario acessa apenas seus dados,
+O banco e PostgreSQL gerenciado via JPA/Hibernate com Flyway para migrations versionadas e `ddl-auto=validate` em dev e prod. O PR-LEDGER-01 adicionou validação automatizada com Testcontainers PostgreSQL para Flyway em banco limpo; o PR-LEDGER-02 adicionou o schema inicial do Ledger (`movimentos_carteira`) na migration `V11`; o PR-LEDGER-03 adicionou `LedgerService` para escrita atômica de movimento + saldo; o PR-LEDGER-04 adicionou reconciliação entre saldo materializado e saldo derivado do Ledger; o PR-LEDGER-05 adicionou backfill inicial idempotente na migration `V12`. Em 2026-07-08, o PostgreSQL VPS foi validado com Flyway 14 migrations, PostgreSQL 17.10 e Hibernate `ddl-auto=validate`; BUG-0010 corrigiu o mapeamento `moeda CHAR(3)`. Execução local da integração Testcontainers ainda requer Docker ativo. O projeto e single-tenant: cada usuario acessa apenas seus dados,
 com validacao de ownership em todo endpoint que acessa recurso por ID.
 
 ### Diagrama de camadas (backend)
@@ -75,11 +75,11 @@ Page (renderizacao, eventos)
 | `config/` | Seguranca, JWT, CORS, rate limit | SecurityConfig, JwtUtil, JwtAuthenticationFilter, LoginRateLimitFilter, CustomUserDetailsService, OpenApiConfig |
 | `controller/` | Endpoints REST | 15 controllers: Auth, Transacao, Categoria, Carteira, Conta, ContaFixa, Meta, Parcela, Dashboard, Usuario, Onboarding, Orcamento, Fatura, Relatorio, Export |
 | `dto/` | Transferencia de dados | 35+ DTOs entre requests e responses |
-| `exception/` | Tratamento de erros | GlobalExceptionHandler + 4 excecoes customizadas |
-| `model/` | Entidades JPA | 13 entidades + enums |
-| `repository/` | Acesso a dados | 13 repositorios Spring Data JPA |
+| `exception/` | Tratamento de erros | GlobalExceptionHandler + 6 excecoes customizadas |
+| `model/` | Entidades JPA | 14 entidades + enums |
+| `repository/` | Acesso a dados | 14 repositorios Spring Data JPA |
 | `security/` | Contexto de autenticacao | AuthenticatedUserService |
-| `service/` | Regras de negocio | 15 services |
+| `service/` | Regras de negocio | 21 services |
 | `util/` | Utilitarios | PaginationUtils |
 
 ### Frontend web (`frontend/src/`)
@@ -157,7 +157,7 @@ O sistema e **single-tenant** — nao ha multi-tenancy corporativa. Cada usuario
 1. **Spring Boot + JPA:** ecossistema maduro, facilidade de configuracao, ampla documentacao.
 2. **JWT em vez de sessao:** API stateless, compatibilidade mobile, sem sticky sessions.
 3. **Refresh token com rotacao e deteccao de reuse:** seguranca contra token theft sem sacrificar UX.
-4. **Flyway migrations (antes era ddl-auto=update):** schema versionado, previsível e reproduzível entre ambientes. PROB-0006 resolvido.
+4. **Flyway migrations (antes era ddl-auto=update):** schema versionado, previsível e reproduzível entre ambientes. PROB-0006 resolvido. Teste PostgreSQL real automatizado via `mvn verify -Pintegration-test`.
 5. **React Context API em vez de Redux/Zustand:** simplicidade para estado global limitado (apenas auth).
 6. **Tailwind CSS em vez de CSS-in-JS:** produtividade, consistencia visual, baixo bundle size.
 7. **Expo em vez de React Native puro:** build e deploy simplificados, OTA updates.
@@ -166,9 +166,9 @@ O sistema e **single-tenant** — nao ha multi-tenancy corporativa. Cada usuario
 
 ## Limitacoes conhecidas
 
-1. **Migrations versionadas implementadas (Flyway):** `V1__baseline_schema.sql` com 10 tabelas. `ddl-auto=validate` em dev e prod. PROB-0006 resolvido.
+1. **Migrations versionadas implementadas (Flyway):** `V1__baseline_schema.sql` com 10 tabelas e migrations até `V11__movimento_carteira.sql`. `ddl-auto=validate` em dev e prod. PROB-0006 resolvido.
 2. **Sem testes no mobile:** nao ha scripts de test/lint configurados no `mobile/package.json`.
-3. **Cobertura de testes backend limitada:** suite atual passa com 34 testes, mas cobre poucos fluxos comparado ao tamanho do domínio.
+3. **Cobertura de testes backend limitada:** suite atual passa com 43 testes, mas cobre poucos fluxos comparado ao tamanho do domínio.
 4. **Cobertura de testes frontend limitada:** poucos testes Vitest configurados.
 5. **Sem politica de privacidade documentada:** relevante para conformidade LGPD.
 6. **Sem exportacao de dados do usuario:** nao ha endpoint de portabilidade (LGPD).
@@ -213,4 +213,4 @@ O sistema e **single-tenant** — nao ha multi-tenancy corporativa. Cada usuario
 - **Relatorio:** `docs/REVIEW_REPORTS/2026-07-06_full-system_security-and-bug-audit.md`
 - **Problem Ledger:** 30 problemas registrados (PROB-0001 a PROB-0030)
 - **Backlog:** 35 itens registrados (BACKLOG-0001 a BACKLOG-0035)
-- **Atualizacao pos-auditoria:** Fase 0 backend concluida em 2026-07-07 com ressalvas (7 PRs). Fase 1 concluida (7 PRs). Fase 2 concluida (8 PRs). Fase 3 concluida em 2026-07-08 (5 PRs: CI/CD, deploy, backup, monitoramento, docs). Fase 4 concluida em 2026-07-08 (4 PRs: importacao CSV, anexos, investimentos, insights). Backend: 36/36 testes PASS.
+- **Atualizacao pos-auditoria:** Fase 0 backend concluida em 2026-07-07 com ressalvas (7 PRs). Fase 1 concluida (7 PRs). Fase 2 concluida (8 PRs). Fase 3 concluida em 2026-07-08 (5 PRs: CI/CD, deploy, backup, monitoramento, docs). Fase 4 concluida em 2026-07-08 (4 PRs: importacao CSV, anexos, investimentos, insights). Fase Ledger registrada em 2026-07-08: PR-LEDGER-00 `PASS`, PR-LEDGER-01..20 `PASS_COM_RESSALVA`. Backend: 69/69 testes PASS; smoke VPS PostgreSQL PASS.

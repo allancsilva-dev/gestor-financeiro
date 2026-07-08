@@ -109,6 +109,11 @@ A sequência abaixo evita refatoração profunda depois. Não pule etapas.
 
 # PR-LEDGER-00 — Auditoria read-only do domínio financeiro
 
+**Status de execução:** `PASS` em 2026-07-08.
+**Evidência:** auditoria registrada em `CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md`.
+**Resultado:** `APTO_PARA_PR_LEDGER_01`.
+**Próxima migration livre identificada na auditoria:** `V11` — consumida pelo PR-LEDGER-02. Próxima atual: `V12`.
+
 ## Objetivo
 
 Mapear todos os pontos do sistema que criam, alteram, removem ou projetam dinheiro antes de introduzir o Ledger.
@@ -160,6 +165,11 @@ O PR só passa se ficar claro onde o saldo é alterado hoje e quais fluxos serã
 ---
 
 # PR-LEDGER-01 — Testcontainers PostgreSQL e validação real de migrations
+
+**Status de execução:** `PASS_COM_RESSALVA` em 2026-07-08.
+**Evidência:** `backend/pom.xml`, `PostgresMigrationIT`, `application-postgres-it.properties` e CI com `mvn verify -Pintegration-test`.
+**Validação VPS:** concluída em 2026-07-08 com usuário `dbnexos_gestor`; PostgreSQL 17.10; Flyway validou 14 migrations; Hibernate `ddl-auto=validate` inicializou.
+**Ressalva:** execução local do Testcontainers não foi concluída porque o Docker daemon estava desligado (`Cannot connect to the Docker daemon`). Unitários passaram: `./mvnw -q test` -> PASS. Testcontainers local segue opcional para CI/dev com Docker.
 
 ## Objetivo
 
@@ -220,6 +230,12 @@ Integration tests → PostgreSQL real + Flyway
 ---
 
 # PR-LEDGER-02 — Schema do Ledger e modelo `MovimentoCarteira`
+
+**Status de execução:** `PASS_COM_RESSALVA` em 2026-07-08.
+**Evidência:** `V11__movimento_carteira.sql`, entidade `MovimentoCarteira`, repository e testes registrados em `CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md`.
+**Validação VPS:** concluída em 2026-07-08. BUG-0010 corrigiu divergência `movimentos_carteira.moeda` (`CHAR(3)` no PostgreSQL, mapeamento JPA antes validando como `VARCHAR(3)`).
+**Ressalva:** Testcontainers local não rodou porque Docker daemon estava desligado. Validação PostgreSQL real foi coberta pelo smoke VPS.
+**Próxima migration livre atual:** `V12`.
 
 ## Objetivo
 
@@ -323,11 +339,16 @@ Adicionar `moeda CHAR(3) DEFAULT 'BRL'` é recomendado neste PR ou no PR imediat
 
 ## Critério de aceite
 
-O schema do Ledger existe, está versionado por Flyway, validado em PostgreSQL real e ainda não quebrou nenhum fluxo atual.
+O schema do Ledger existe, está versionado por Flyway e não quebrou nenhum fluxo atual. Para fechamento sem ressalva, `PostgresMigrationIT` precisa passar em ambiente com Docker ativo.
 
 ---
 
 # PR-LEDGER-03 — `LedgerService` e escrita atômica de movimento + saldo materializado
+
+**Status de execução:** `PASS_COM_RESSALVA` em 2026-07-08.
+**Pré-condição:** `PR-LEDGER-02` concluído e validado contra PostgreSQL VPS real em 2026-07-08.
+**Evidência:** `LedgerService`, `RegistrarMovimentoCommand`, lock pessimista em `CarteiraRepository`, `CarteiraService` usando Ledger para saldo e `LedgerServiceTest`.
+**Ressalva:** Testcontainers PostgreSQL não rodou localmente porque Docker daemon estava desligado; smoke VPS validou Flyway/schema real.
 
 ## Objetivo
 
@@ -1327,7 +1348,7 @@ O projeto só pode sair da fase Ledger se todos os itens abaixo estiverem verdad
 
 ```text
 [ ] PostgreSQL real validando Flyway nos testes de integração
-[ ] MovimentoCarteira criado por migration versionada
+[x] MovimentoCarteira criado por migration versionada
 [ ] Carteira.saldo é saldo materializado
 [ ] Nenhum service altera saldo direto fora do LedgerService
 [ ] Backfill inicial idempotente executado/testado

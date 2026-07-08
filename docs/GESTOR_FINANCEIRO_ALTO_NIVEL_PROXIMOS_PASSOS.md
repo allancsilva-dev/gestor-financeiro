@@ -148,8 +148,8 @@ Portanto, a prioridade antiga de deploy deve ser lida como obsoleta. A prioridad
 ### 5.1 `ddl-auto=update`
 
 **Estado atual:** corrigido na Fase 0. O backend usa Flyway e `ddl-auto=validate`.
-**Risco residual:** validação de startup com PostgreSQL real ainda pendente.
-**Próximo passo:** executar validação com Docker/PostgreSQL ou ambiente equivalente.
+**Risco residual:** validação automatizada com PostgreSQL real foi adicionada no PR-LEDGER-01. A execução local via Testcontainers ainda depende de Docker ativo, mas a validação equivalente no PostgreSQL VPS passou em 2026-07-08 com Flyway, schema JPA e PostgreSQL 17.10.
+**Próximo passo:** manter Testcontainers no CI/dev com Docker e usar smoke VPS como validação operacional.
 
 ### 5.2 Ownership manual espalhado
 
@@ -634,7 +634,7 @@ Uma entrega só deve ser aceita quando cumprir todos os pontos aplicáveis:
 
 Fechar pendências pós-Fase 0:
 
-1. validar Flyway/startup com PostgreSQL real;
+1. executar `mvn verify -Pintegration-test` com Docker ativo e validar Flyway/startup com PostgreSQL real automatizado;
 2. corrigir mobile P0: token persistente, URL por ambiente, path `/v1/dashboard/resumo`;
 3. corrigir mobile P1: handlers mortos, erros silenciosos restantes, entry points zumbis;
 4. decidir e implementar estratégia CSRF do frontend web ou documentar dispensa técnica completa;
@@ -687,10 +687,10 @@ Executar Fase 4:
 
 O projeto não deve ser colocado em “OK” apenas porque o backend passa nos testes locais. O caminho correto é tratar o sistema como produto financeiro completo: backend, frontend, mobile, banco real e operação.
 
-A fundação backend foi executada. A próxima entrega deve fechar as pendências de cliente e validação operacional. O marco de qualidade atual deve ser: **backend validado em PostgreSQL real, mobile utilizável fora da rede local, frontend sem lacunas básicas de segurança/UX e pipeline de build confiável.**
+A fundação backend foi executada, PR-LEDGER-01 adicionou validação PostgreSQL real automatizada via Testcontainers, PR-LEDGER-02 criou o schema inicial do Ledger (`V11__movimento_carteira.sql`), PR-LEDGER-03 criou o `LedgerService` transacional, PR-LEDGER-04 adicionou reconciliação de saldo e PR-LEDGER-05 criou backfill inicial idempotente (`V12__ledger_backfill_carteiras.sql`). Em 2026-07-08, o PostgreSQL VPS foi validado com usuário `dbnexos_gestor`: Flyway validou 14 migrations, schema `ddl-auto=validate` inicializou e o BUG-0010 (`moeda CHAR(3)` vs mapeamento JPA) foi corrigido. O marco de qualidade atual deve ser: **backend validado em PostgreSQL real, mobile utilizável fora da rede local, frontend sem lacunas básicas de segurança/UX e pipeline de build confiável.**
 
 Depois que essa base estiver fechada, a análise deve ser refeita. Somente então vale decidir os próximos incrementos de produto, como orçamento, faturas, projeções, relatórios, exportação e deploy público.
 
 **Status recomendado atual:** `NAO_APTO_PARA_DEPLOY`
-**Status recomendado para desenvolvimento:** `FASE_4_CONCLUIDA`
-**Prioridade real:** Fase 4 concluida (4 PRs, 2026-07-08). Proximo: deploy real, validacao PostgreSQL VPS, commit do codigo.
+**Status recomendado para desenvolvimento:** `FASE_LEDGER_EM_ANDAMENTO`
+**Prioridade real:** fechar ressalvas restantes de UX frontend/mobile, manter validação Testcontainers no CI/dev com Docker e commitar o codigo.

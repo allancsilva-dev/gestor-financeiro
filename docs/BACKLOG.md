@@ -551,4 +551,17 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 
 ---
 
+## BACKLOG-0043 — Impedir duplo clique em ações financeiras no web/mobile
+
+- **Titulo:** Padronizar loading/disabled/idempotency key nos comandos financeiros do cliente
+- **Prioridade:** P1
+- **Area:** frontend, mobile, UX, integridade financeira
+- **Motivo:** PR-LEDGER-18 deixou backend protegido, mas web/mobile ainda não bloqueiam duplo clique financeiro de forma uniforme.
+- **Dependencias:** Resolver PROB-0031
+- **Criterio de aceite:** Botões de criar/pagar/estornar/ajustar/cancelar/excluir ficam disabled durante mutation; usuário recebe feedback visual; POSTs financeiros críticos enviam `Idempotency-Key` quando aplicável; testes ou validação manual documentada.
+- **Risco se ficar pendente:** Requisições duplicadas, mensagens de erro confusas e menor confiança em operações financeiras.
+- **Status:** ABERTO
+
+---
+
 > Mantido pelo `docs-reporter`. Ultima atualizacao: 2026-07-06 (auditoria completa do sistema).
