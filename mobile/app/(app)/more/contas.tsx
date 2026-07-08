@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, FlatList, Modal, ScrollView, TextInput } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { contaService } from '../../../src/services/contaService';
-import { TIPO_CONTA_LABEL, formatCurrency } from '../../../src/utils/format';
+import { TIPO_CONTA_LABEL, formatCurrency, parseCurrencyBR } from '../../../src/utils/format';
 import { Conta, ContaRequest, TipoConta } from '../../../src/types';
 import { useTheme } from '../../../src/theme';
 import SkeletonBox from '../../../src/components/ui/SkeletonBox';
@@ -97,11 +97,11 @@ export default function ContasScreen() {
               if (!nome.trim()) { setNomeError('Nome obrigatório.'); hasErr = true; }
               if (!tipo) { setTipoError('Tipo obrigatório.'); hasErr = true; }
               if (tipo === 'CREDITO') {
-                const v = parseFloat(limite.replace(/\./g, '').replace(/,/g, '.'));
+                const v = parseCurrencyBR(limite);
                 if (isNaN(v) || v <= 0) { setLimiteError('Limite total obrigatório e positivo.'); hasErr = true; }
               }
               if (hasErr) return;
-              criarMutation.mutate({ nome: nome.trim(), tipo, limiteTotal: tipo === 'CREDITO' ? Number(parseFloat(limite.replace(/\./g, '').replace(/,/g, '.'))) : undefined });
+              criarMutation.mutate({ nome: nome.trim(), tipo, limiteTotal: tipo === 'CREDITO' ? parseCurrencyBR(limite) : undefined });
             }}>
               <Text style={{ color: criarMutation.status === 'pending' ? colors.textMuted : colors.brand, fontSize: 15, fontWeight: '600' }}>Salvar</Text>
             </TouchableOpacity>

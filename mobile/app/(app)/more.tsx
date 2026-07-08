@@ -1,21 +1,43 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, Linking, Share, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../../src/theme';
+import { API_BASE_URL } from '../../src/config/api.config';
 
 const itens = [
   { label: 'Carteiras',    rota: '/more/carteiras',    icone: '₿' },
   { label: 'Contas Fixas', rota: '/more/contas-fixas', icone: '📅' },
+  { label: 'Orçamentos',   rota: '/more/orcamentos',   icone: '📊' },
+  { label: 'Faturas',      rota: '/more/faturas',      icone: '💳' },
+  { label: 'Relatórios',   rota: '/more/relatorios',   icone: '📋' },
   { label: 'Categorias',   rota: '/more/categorias',   icone: '🏷' },
   { label: 'Contas',       rota: '/more/contas',       icone: '🏦' },
   { label: 'Entrada por IA (em breve)', rota: null, icone: '🤖', desabilitado: true },
+  { label: 'Exportar Dados (CSV)', rota: null, icone: '📥', acao: 'exportar' },
 ];
+
+const handleExport = async () => {
+  const url = `${API_BASE_URL}/v1/exportar/completo`;
+  if (Platform.OS === 'web') {
+    window.open(url, '_blank');
+    return;
+  }
+  try {
+    await Share.share({ message: `Exporte seus dados financeiros:\n${url}`, url });
+  } catch {
+    Alert.alert('Exportar Dados', `Acesse o link para baixar seus dados:\n${url}`, [
+      { text: 'Fechar', style: 'cancel' },
+      { text: 'Abrir', onPress: () => Linking.openURL(url) },
+    ]);
+  }
+};
 
 export default function MoreScreen() {
   const colors = useTheme();
   const router = useRouter();
 
-  const navegar = (rota: string | null) => {
+  const navegar = (rota: string | null, acao?: string) => {
+    if (acao === 'exportar') { handleExport(); return; }
     if (!rota) return;
     router.push(rota as any);
   };
@@ -25,7 +47,7 @@ export default function MoreScreen() {
       {itens.map((it, idx) => (
         <TouchableOpacity
           key={idx}
-          onPress={() => navegar(it.rota)}
+          onPress={() => navegar(it.rota, (it as any).acao)}
           activeOpacity={it.desabilitado ? 1 : 0.7}
           style={{ height: 60, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: colors.border, opacity: it.desabilitado ? 0.4 : 1 }}
         >

@@ -5,7 +5,7 @@ import { transacaoService } from '../../src/services/transacaoService';
 import { categoriaService } from '../../src/services/categoriaService';
 import { useTheme } from '../../src/theme';
 import { useAuth } from '../../src/context/AuthContext';
-import { formatCurrency, formatDate, parseDateBR, isValidDateBR, getInitials } from '../../src/utils/format';
+import { formatCurrency, formatDate, parseDateBR, isValidDateBR, getInitials, parseCurrencyBR } from '../../src/utils/format';
 import { Transacao, TransacaoRequest, TipoTransacao } from '../../src/types';
 import SkeletonBox from '../../src/components/ui/SkeletonBox';
 
@@ -47,12 +47,6 @@ export default function Transacoes() {
     return lista;
   }, [paginatedData, filtro]);
 
-  const parseBRCurrency = (v: string) => {
-    const cleaned = v.replace(/\./g, '').replace(/,/g, '.').trim();
-    const n = parseFloat(cleaned);
-    return isNaN(n) ? NaN : n;
-  };
-
   const resetErrors = () => {
     setDescricaoError(null); setValorError(null); setDataError(null); setCategoriaError(null); setErroForm(null);
   };
@@ -61,7 +55,7 @@ export default function Transacoes() {
     resetErrors();
     let hasError = false;
     if (!descricao.trim() || descricao.trim().length < 3) { setDescricaoError('Descrição deve ter entre 3 e 255 caracteres.'); hasError = true; }
-    const valorNum = parseBRCurrency(valor);
+    const valorNum = parseCurrencyBR(valor);
     if (!valor || isNaN(valorNum) || valorNum <= 0) { setValorError('Valor deve ser positivo.'); hasError = true; }
     if (!isValidDateBR(data)) { setDataError('Data inválida. Use o formato DD/MM/AAAA.'); hasError = true; }
     if (!categoriaId) { setCategoriaError('Selecione uma categoria.'); hasError = true; }

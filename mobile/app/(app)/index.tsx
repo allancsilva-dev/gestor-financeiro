@@ -1,9 +1,10 @@
 import React from 'react';
-import { ScrollView, View, Text, StyleSheet } from 'react-native';
+import { ScrollView, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 import api from '../../src/services/api';
-import { DashboardResumo, Transacao, PagedResponse } from '../../src/types';
+import { DashboardResumo, Transacao, PagedResponse, ProjecaoResponse } from '../../src/types';
 import { useTheme } from '../../src/theme';
 import { useAuth } from '../../src/context/AuthContext';
 import SkeletonBox from '../../src/components/ui/SkeletonBox';
@@ -11,6 +12,7 @@ import { formatCurrency, getGreeting, getInitials } from '../../src/utils/format
 
 export default function Dashboard() {
   const colors = useTheme();
+  const router = useRouter();
 
   const resumoQuery = useQuery<DashboardResumo>({
     queryKey: ['dashboard-resumo'],
@@ -20,6 +22,11 @@ export default function Dashboard() {
   const transacoesQuery = useQuery<PagedResponse<Transacao>>({
     queryKey: ['transacoes-recentes'],
     queryFn: () => api.get<PagedResponse<Transacao>>('/v1/transacoes/minhas?page=0&size=5&sort=data,desc').then(r => r.data),
+  });
+
+  const projecaoQuery = useQuery<ProjecaoResponse>({
+    queryKey: ['dashboard-projecao'],
+    queryFn: () => api.get<ProjecaoResponse>('/v1/dashboard/projecao?meses=6').then(r => r.data),
   });
   
   const { usuario } = useAuth();
@@ -65,7 +72,9 @@ export default function Dashboard() {
       <View style={{ marginTop: 8 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
           <Text style={{ color: colors.textSecondary, fontSize: 9, letterSpacing: 0.8 }}>ÚLTIMAS TRANSAÇÕES</Text>
-          <Text style={{ color: colors.brand, fontSize: 11 }}>Ver todas</Text>
+          <TouchableOpacity onPress={() => router.push('/(app)/transacoes')}>
+            <Text style={{ color: colors.brand, fontSize: 11 }}>Ver todas</Text>
+          </TouchableOpacity>
         </View>
 
         {transacoesQuery.isLoading ? (
@@ -98,6 +107,29 @@ export default function Dashboard() {
               <Text style={{ color: t.tipo === 'ENTRADA' ? colors.success : colors.danger, fontSize: 13, fontWeight: '600' }}>{formatCurrency(Number(t.valorTotal ?? 0))}</Text>
             </View>
           ))
+        )}
+
+        {projecaoQuery.data && projecaoQuery.data.meses && projecaoQuery.data.meses.length > 0 && (
+          <View style={{ marginTop: 16 }}>
+            <Text style={{ color: colors.textSecondary, fontSize: 9, letterSpacing: 0.8, marginBottom: 10 }}>PROJEÇÃO DE CAIXA</Text>
+            {projecaoQuery.data.meses.map((m, i) => (
+              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: i === 0 ? colors.card : 'transparent', paddingHorizontal: 8, borderRadius: 6 }}>
+                <Text style={{ color: i === 0 ? colors.brand : colors.textSecondary, fontSize: 13, fontWeight: '600', width: 42 }}>{m.periodo}</Text>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ color: colors.textSecondary, fontSize: 10 }}>Saídas</Text>
+                    <Text style={{ color: colors.danger, fontSize: 11, fontWeight: '600' }}>{formatCurrency(m.totalSaidas)}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}>
+                    <Text style={{ color: colors.textSecondary, fontSize: 10 }}>Saldo final</Text>
+                    <Text style={{ color: m.saldoFinal >= 0 ? colors.success : colors.danger, fontSize: 11, fontWeight: '700' }}>
+                      {formatCurrency(m.saldoFinal)}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            ))}
+          </View>
         )}
       </View>
     </ScrollView>

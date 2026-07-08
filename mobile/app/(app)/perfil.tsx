@@ -16,7 +16,7 @@ export default function Perfil() {
   const queryClient = useQueryClient();
   const router = useRouter();
 
-  const { data: resumo } = useQuery({ queryKey: ['dashboard-resumo'], queryFn: () => api.get<DashboardResumo>('/dashboard/resumo').then(r => r.data) });
+  const { data: resumo } = useQuery({ queryKey: ['dashboard-resumo'], queryFn: () => api.get<DashboardResumo>('/v1/dashboard/resumo').then(r => r.data) });
 
   const handleLogout = () => {
     authService.logout();

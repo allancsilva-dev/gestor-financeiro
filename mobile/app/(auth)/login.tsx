@@ -19,8 +19,12 @@ export default function Login() {
     if (!email || !password) return setError('Preencha e-mail e senha.');
     try {
       setLoading(true);
-      await login(email, password);
-      router.replace('/(app)/');
+      const user = await login(email, password);
+      if (!user.onboardingCompleto) {
+        router.replace('/onboarding');
+      } else {
+        router.replace('/(app)/');
+      }
     } catch (err) {
       const e = err as ApiErrorWithMessage;
       setError(e.userMessage ?? 'Erro inesperado. Tente novamente.');
@@ -44,7 +48,7 @@ export default function Login() {
         <Text style={[styles.label, { color: colors.textSecondary, marginTop: 14 }]}>SENHA</Text>
         <TextInput value={password} onChangeText={setPassword} placeholder="••••••••" placeholderTextColor={colors.textMuted} secureTextEntry style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]} />
 
-        <TouchableOpacity style={{ alignSelf: 'flex-end', marginTop: 8 }}>
+        <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')} style={{ alignSelf: 'flex-end', marginTop: 8 }}>
           <Text style={{ color: colors.brand, fontSize: 12 }}>Esqueceu a senha?</Text>
         </TouchableOpacity>
 

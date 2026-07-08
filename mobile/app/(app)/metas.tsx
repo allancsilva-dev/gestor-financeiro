@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, Modal, ScrollView, TextInput } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { metaService } from '../../src/services/metaService';
-import { formatCurrency, formatPercent, formatDate, parseDateBR, isValidDateBR } from '../../src/utils/format';
+import { formatCurrency, formatPercent, formatDate, parseDateBR, isValidDateBR, parseCurrencyBR } from '../../src/utils/format';
 import { Meta, MetaRequest } from '../../src/types';
 import { useTheme } from '../../src/theme';
 import SkeletonBox from '../../src/components/ui/SkeletonBox';
@@ -115,7 +115,7 @@ export default function Metas() {
             <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600' }}>Adicionar Valor</Text>
             <TouchableOpacity disabled={adicionarMutation.status === 'pending'} onPress={() => {
               setErroAdicionar(null);
-              const v = parseFloat(valorAdicionar.replace(/\./g, '').replace(/,/g, '.'));
+              const v = parseCurrencyBR(valorAdicionar);
               if (isNaN(v) || v <= 0) { setErroAdicionar('Valor deve ser positivo.'); return; }
               adicionarMutation.mutateAsync({ id: metaSelecionada!.id, valor: v });
             }}><Text style={{ color: adicionarMutation.status === 'pending' ? colors.textMuted : colors.brand }}>Adicionar</Text></TouchableOpacity>
@@ -138,7 +138,7 @@ export default function Metas() {
               setNomeError(null); setValorTotalError(null); setDataLimiteError(null); setErroCriar(null);
               let hasErr = false;
               if (!nomeCriar.trim() || nomeCriar.trim().length < 3) { setNomeError('Nome obrigatório (mínimo 3 caracteres).'); hasErr = true; }
-              const v = parseFloat(valorTotalCriar.replace(/\./g, '').replace(/,/g, '.'));
+              const v = parseCurrencyBR(valorTotalCriar);
               if (isNaN(v) || v <= 0) { setValorTotalError('Valor total obrigatório e positivo.'); hasErr = true; }
               if (dataLimiteCriar && !isValidDateBR(dataLimiteCriar)) { setDataLimiteError('Data inválida. Use o formato DD/MM/AAAA.'); hasErr = true; }
               if (hasErr) return;

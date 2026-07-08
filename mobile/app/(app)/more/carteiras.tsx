@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, FlatList, Modal, ScrollView, TextInput, ActivityIndicator } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { carteiraService } from '../../../src/services/carteiraService';
-import { TIPO_CARTEIRA_LABEL, formatCurrency } from '../../../src/utils/format';
+import { TIPO_CARTEIRA_LABEL, formatCurrency, parseCurrencyBR } from '../../../src/utils/format';
 import { Carteira, CarteiraRequest, TipoCarteira } from '../../../src/types';
 import { useTheme } from '../../../src/theme';
 import SkeletonBox from '../../../src/components/ui/SkeletonBox';
@@ -31,6 +31,9 @@ export default function CarteirasScreen() {
       setModalVisible(false);
       setNome(''); setSaldo('0'); setTipo('DINHEIRO');
     },
+    onError: (err: any) => {
+      setNomeError(err?.userMessage ?? 'Erro ao criar carteira.');
+    },
   });
 
   const handleSalvar = async () => {
@@ -38,15 +41,14 @@ export default function CarteirasScreen() {
     let hasError = false;
     if (!nome.trim()) { setNomeError('Nome obrigatório.'); hasError = true; }
     if (!tipo) { setTipoError('Tipo obrigatório.'); hasError = true; }
-    const v = parseFloat(saldo.replace(/\./g, '').replace(/,/g, '.'));
+    const v = parseCurrencyBR(saldo);
     if (isNaN(v) || v < 0) { setSaldoError('Saldo deve ser >= 0.'); hasError = true; }
     if (hasError) return;
     const req: CarteiraRequest = { nome: nome.trim(), tipo: tipo as TipoCarteira, saldo: Number(v) };
     try {
       await criarMutation.mutateAsync(req);
-      // criarMutation.onSuccess already closes modal and clears fields
     } catch (err: any) {
-      // display error via mutation.onError
+      setNomeError(err?.userMessage ?? 'Erro ao criar carteira.');
     }
   };
 

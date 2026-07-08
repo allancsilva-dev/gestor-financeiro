@@ -17,6 +17,12 @@ export const contaFixaService = {
   marcarComoPaga: (id: number, valor: number) =>
     api.put<ContaFixa>(`/v1/contas-fixas/${id}/pagar`, { valor }).then(r => r.data),
 
+  pularMes: (id: number) =>
+    api.put<ContaFixa>(`/v1/contas-fixas/${id}/pular`).then(r => r.data),
+
+  reativar: (id: number) =>
+    api.put<ContaFixa>(`/v1/contas-fixas/${id}/reativar`).then(r => r.data),
+
   deletar: (id: number) =>
     api.delete(`/v1/contas-fixas/${id}`),
 };

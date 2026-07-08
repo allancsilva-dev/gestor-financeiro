@@ -6,6 +6,7 @@ import { categoriaService } from '../../../src/services/categoriaService';
 import Badge from '../../../src/components/ui/Badge';
 import { ContaFixa, ContaFixaRequest } from '../../../src/types';
 import { useTheme } from '../../../src/theme';
+import { parseCurrencyBR } from '../../../src/utils/format';
 import SkeletonBox from '../../../src/components/ui/SkeletonBox';
 
 export default function ContasFixasScreen() {
@@ -27,6 +28,9 @@ export default function ContasFixasScreen() {
       queryClient.invalidateQueries({ queryKey: ['contas-fixas'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-resumo'] });
       setModalPagarVisible(false);
+    },
+    onError: (err: any) => {
+      setValorPago('0');
     },
   });
 
@@ -85,9 +89,18 @@ export default function ContasFixasScreen() {
               <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Vence dia {cf.diaVencimento}</Text>
               <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700', marginTop: 8 }}>{cf.valorPlanejado ? `R$ ${Number(cf.valorPlanejado ?? 0).toFixed(2)}` : 'R$ 0,00'}</Text>
               {(cf.status === 'PENDENTE' || cf.status === 'ATRASADO') && (
-                <TouchableOpacity onPress={() => { setSelecionada(cf); setValorPago(String(cf.valorPlanejado ?? 0)); setModalPagarVisible(true); }} style={{ marginTop: 12, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, borderColor: colors.brand, alignSelf: 'flex-start' }}>
-                  <Text style={{ color: colors.brand, fontSize: 12, fontWeight: '600' }}>Pagar</Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                  <TouchableOpacity onPress={() => { setSelecionada(cf); setValorPago(String(cf.valorPlanejado ?? 0)); setModalPagarVisible(true); }} style={{ paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, borderColor: colors.brand }}>
+                    <Text style={{ color: colors.brand, fontSize: 12, fontWeight: '600' }}>Pagar</Text>
+                  </TouchableOpacity>
+                  {cf.recorrente !== false && (
+                    <TouchableOpacity onPress={() => {
+                      contaFixaService.pularMes(cf.id).then(() => refetch()).catch((err: any) => {});
+                    }} style={{ paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, borderColor: colors.textSecondary }}>
+                      <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Pular</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
               )}
             </View>
           )}
@@ -107,7 +120,7 @@ export default function ContasFixasScreen() {
             </TouchableOpacity>
             <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600' }}>Pagar</Text>
             <TouchableOpacity disabled={pagarMutation.status === 'pending'} onPress={() => {
-              const v = parseFloat(valorPago.replace(/\./g, '').replace(/,/g, '.'));
+              const v = parseCurrencyBR(valorPago);
               if (isNaN(v) || v <= 0) return; 
               pagarMutation.mutateAsync({ id: selecionada!.id, valor: v });
             }}>
@@ -131,7 +144,7 @@ export default function ContasFixasScreen() {
               setDescricaoError(null); setValorError(null); setDiaError(null); setCategoriaError(null);
               let hasErr = false;
               if (!descricaoCriar.trim()) { setDescricaoError('Descrição obrigatória.'); hasErr = true; }
-              const v = parseFloat(valorCriar.replace(/\./g, '').replace(/,/g, '.'));
+              const v = parseCurrencyBR(valorCriar);
               if (isNaN(v) || v <= 0) { setValorError('Valor deve ser positivo.'); hasErr = true; }
               const dia = Number(diaCriar);
               if (!Number.isInteger(dia) || dia < 1 || dia > 31) { setDiaError('Dia deve ser um número entre 1 e 31.'); hasErr = true; }

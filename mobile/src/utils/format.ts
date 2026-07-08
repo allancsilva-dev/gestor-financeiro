@@ -38,9 +38,15 @@ export const parseDateBR = (dataBR: string): string => {
   return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 };
 
-// Verifica se uma string está no formato DD/MM/AAAA
+// Verifica se uma string esta no formato DD/MM/AAAA
 export const isValidDateBR = (value: string): boolean =>
   /^\d{2}\/\d{2}\/\d{4}$/.test(value);
+
+// Converte string monetaria BR (1.234,56) para number (1234.56)
+export const parseCurrencyBR = (value: string): number => {
+  const cleaned = value.replace(/\./g, '').replace(/,/g, '.').trim();
+  return parseFloat(cleaned);
+};
 
 export const TIPO_CARTEIRA_LABEL: Record<TipoCarteira, string> = {
   DINHEIRO: 'Dinheiro',

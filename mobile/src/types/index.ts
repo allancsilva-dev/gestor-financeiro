@@ -31,6 +31,7 @@ export interface Usuario {
   id: number;
   nome: string;
   email: string;
+  onboardingCompleto: boolean;
 }
 
 export interface LoginResponse {
@@ -220,6 +221,112 @@ export interface MetaProgresso {
   valorReservado: number;
   valorRestante: number;
   progresso: number; // porcentagem 0-100
+}
+
+// ── Orçamento ─────────────────────────────────────────────────────
+export interface OrcamentoCategoriaItem {
+  id: number;
+  categoriaId: number;
+  categoriaNome: string;
+  categoriaCor: string;
+  categoriaIcone: string;
+  valorLimite: number;
+  valorGasto: number;
+  percentualGasto: number;
+}
+
+export interface OrcamentoResponse {
+  id: number;
+  mes: number;
+  ano: number;
+  valorTotalPlanejado: number;
+  valorTotalGasto: number;
+  categorias: OrcamentoCategoriaItem[];
+}
+
+// ── Fatura ────────────────────────────────────────────────────────
+export interface FaturaLancamento {
+  transacaoId: number;
+  descricao: string;
+  valor: number;
+  data: string;
+  categoriaId: number | null;
+  categoriaNome: string | null;
+  categoriaCor: string;
+  categoriaIcone: string;
+  parcelaAtual: number | null;
+  totalParcelas: number | null;
+}
+
+export interface FaturaResponse {
+  id: number;
+  contaId: number;
+  contaNome: string;
+  mes: number;
+  ano: number;
+  dataFechamento: string;
+  dataVencimento: string;
+  valorTotal: number;
+  valorPago: number;
+  status: string;
+  dataPagamento: string | null;
+  lancamentos: FaturaLancamento[];
+}
+
+// ── Projeção ──────────────────────────────────────────────────────
+export interface ProjecaoMensal {
+  periodo: string;
+  mes: number;
+  ano: number;
+  saldoInicial: number;
+  totalContasFixas: number;
+  totalParcelas: number;
+  totalSaidas: number;
+  saldoFinal: number;
+}
+
+export interface ProjecaoResponse {
+  saldoAtual: number;
+  meses: ProjecaoMensal[];
+}
+
+// ── Relatórios ────────────────────────────────────────────────────
+export interface RelatorioCategoriaItem {
+  categoriaId: number;
+  nome: string;
+  cor: string;
+  icone: string;
+  valorTotal: number;
+  porcentagem: number;
+}
+
+export interface RelatorioTransacaoItem {
+  id: number;
+  descricao: string;
+  valor: number;
+  data: string;
+  categoriaNome: string | null;
+  categoriaCor: string;
+}
+
+export interface RelatorioContaItem {
+  contaId: number;
+  nome: string;
+  tipo: string;
+  valorTotal: number;
+  porcentagem: number;
+}
+
+export interface RelatorioResponse {
+  inicio: string;
+  fim: string;
+  totalEntradas: number;
+  totalSaidas: number;
+  saldo: number;
+  totalTransacoes: number;
+  gastosPorCategoria: RelatorioCategoriaItem[];
+  maioresDespesas: RelatorioTransacaoItem[];
+  gastosPorConta: RelatorioContaItem[];
 }
 
 // ── Parcelas ───────────────────────────────────────────────────────
