@@ -34,4 +34,10 @@ public interface ParcelaRepository extends JpaRepository<Parcela, Long> {
     int atualizarStatusParcelasAtrasadas(@Param("status") StatusPagamento status,
                                           @Param("novoStatus") StatusPagamento novoStatus,
                                           @Param("data") LocalDate data);
+
+    @EntityGraph(attributePaths = {"transacao"})
+    @Query("SELECT p FROM Parcela p WHERE p.transacao.usuario.id = :usuarioId AND p.dataVencimento >= :inicio AND p.status <> :statusExcluido")
+    List<Parcela> findFuturasByUsuarioId(@Param("usuarioId") Long usuarioId,
+                                          @Param("inicio") LocalDate inicio,
+                                          @Param("statusExcluido") StatusPagamento statusExcluido);
 }

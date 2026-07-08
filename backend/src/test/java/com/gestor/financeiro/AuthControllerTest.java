@@ -60,7 +60,8 @@ class AuthControllerTest {
                 .content(objectMapper.writeValueAsString(Map.of(
                         "nome", "Alice",
                         "email", "alice@teste.com",
-                        "password", "Senha1234"
+                        "password", "Senha1234",
+                        "confirmPassword", "Senha1234"
                 ))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.id").exists())
@@ -74,7 +75,8 @@ class AuthControllerTest {
                 .content(objectMapper.writeValueAsString(Map.of(
                         "nome", "Alice",
                         "email", "alice2@teste.com",
-                        "password", "12345678"
+                        "password", "12345678",
+                        "confirmPassword", "12345678"
                 ))))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
@@ -87,7 +89,8 @@ class AuthControllerTest {
                 .content(objectMapper.writeValueAsString(Map.of(
                         "nome", "Alice",
                         "email", "alice3@teste.com",
-                        "password", "Ab1"
+                        "password", "Ab1",
+                        "confirmPassword", "Ab1"
                 ))))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
@@ -102,7 +105,8 @@ class AuthControllerTest {
                 .content(objectMapper.writeValueAsString(Map.of(
                         "nome", "Alice 2",
                         "email", "alice@teste.com",
-                        "password", "Senha1234"
+                        "password", "Senha1234",
+                        "confirmPassword", "Senha1234"
                 ))))
             .andExpect(status().isUnprocessableEntity())
             .andExpect(jsonPath("$.code").value("BUSINESS_ERROR"));
@@ -115,7 +119,8 @@ class AuthControllerTest {
                 .content(objectMapper.writeValueAsString(Map.of(
                         "nome", "",
                         "email", "email-invalido",
-                        "password", "12"
+                        "password", "12",
+                        "confirmPassword", "12"
                 ))))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));

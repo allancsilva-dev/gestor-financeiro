@@ -44,6 +44,9 @@ public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
     @EntityGraph(attributePaths = {"categoria", "conta"})
     Page<Transacao> findByUsuarioIdAndDataBetween(Long usuarioId, LocalDate inicio, LocalDate fim, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"categoria", "conta"})
+    List<Transacao> findByUsuarioIdAndContaIdAndDataBetween(Long usuarioId, Long contaId, LocalDate inicio, LocalDate fim);
+
     // --- ADIÇÃO NECESSÁRIA ---
     // Este novo método força o JPA a carregar a Categoria junto com a Transação
     @Query("SELECT t FROM Transacao t JOIN FETCH t.categoria " +
@@ -79,7 +82,24 @@ public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
            "GROUP BY t.categoria.nome, t.categoria.cor")
     List<Object[]> sumValorEfetivoAgrupadoPorCategoria(
             @Param("usuarioId") Long usuarioId,
-            @Param("tipo") TipoTransacao tipo,
+             @Param("tipo") TipoTransacao tipo,
+             @Param("inicio") LocalDate inicio,
+             @Param("fim") LocalDate fim);
+
+    @Query("SELECT COALESCE(SUM(t.valorTotal), 0) FROM Transacao t " +
+           "WHERE t.usuario.id = :usuarioId AND t.tipo = 'SAIDA' " +
+           "AND t.data BETWEEN :inicio AND :fim")
+    BigDecimal sumSaidasByUsuarioIdAndPeriodo(
+            @Param("usuarioId") Long usuarioId,
+            @Param("inicio") LocalDate inicio,
+            @Param("fim") LocalDate fim);
+
+    @Query("SELECT t.categoria.id, t.categoria.nome, COALESCE(SUM(t.valorTotal), 0) " +
+           "FROM Transacao t WHERE t.usuario.id = :usuarioId AND t.tipo = 'SAIDA' " +
+           "AND t.data BETWEEN :inicio AND :fim AND t.categoria IS NOT NULL " +
+           "GROUP BY t.categoria.id, t.categoria.nome ORDER BY SUM(t.valorTotal) DESC")
+    List<Object[]> sumSaidasByCategoria(
+            @Param("usuarioId") Long usuarioId,
             @Param("inicio") LocalDate inicio,
             @Param("fim") LocalDate fim);
 }

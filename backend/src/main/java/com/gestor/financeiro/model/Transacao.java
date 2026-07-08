@@ -30,6 +30,10 @@ public class Transacao {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "categoria_id")
     private Categoria categoria;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "conta_fixa_id")
+    private ContaFixa contaFixa;
     
     @Column(nullable = false)
     private String descricao;

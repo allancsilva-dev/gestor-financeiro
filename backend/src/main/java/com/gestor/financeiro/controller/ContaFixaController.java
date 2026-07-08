@@ -87,6 +87,20 @@ public class ContaFixaController {
         return ResponseEntity.ok(ContaFixaResponseDto.fromEntity(contaPaga));
     }
 
+    @PutMapping("/{id}/pular")
+    public ResponseEntity<ContaFixaResponseDto> pularMes(@PathVariable Long id) {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        ContaFixa contaAtualizada = contaFixaService.pularMes(id, usuarioId);
+        return ResponseEntity.ok(ContaFixaResponseDto.fromEntity(contaAtualizada));
+    }
+
+    @PutMapping("/{id}/reativar")
+    public ResponseEntity<ContaFixaResponseDto> reativar(@PathVariable Long id) {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        ContaFixa contaAtualizada = contaFixaService.reativar(id, usuarioId);
+        return ResponseEntity.ok(ContaFixaResponseDto.fromEntity(contaAtualizada));
+    }
+
     private ContaFixa toEntity(ContaFixaRequest request) {
         ContaFixa contaFixa = new ContaFixa();
         contaFixa.setNome(request.getDescricao());

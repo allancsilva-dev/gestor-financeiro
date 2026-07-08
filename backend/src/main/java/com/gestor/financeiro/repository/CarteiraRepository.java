@@ -20,6 +20,8 @@ public interface CarteiraRepository extends JpaRepository<Carteira, Long> {
 
     Optional<Carteira> findByIdAndUsuarioId(Long id, Long usuarioId);
 
+    Optional<Carteira> findByUsuarioIdAndNomeIgnoreCase(Long usuarioId, String nome);
+
     @Query("SELECT COALESCE(SUM(c.saldo), 0) FROM Carteira c WHERE c.usuario.id = :usuarioId")
     BigDecimal sumSaldoByUsuarioId(@Param("usuarioId") Long usuarioId);
 }

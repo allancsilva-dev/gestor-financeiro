@@ -111,6 +111,7 @@ public class ContaFixaService {
         transacao.setParcelado(false);
         transacao.setCategoria(conta.getCategoria());
         transacao.setUsuario(conta.getUsuario());
+        transacao.setContaFixa(conta);
         transacao.setObservacoes("Pagamento automático de conta fixa");
         
         // Salva a transação
@@ -130,6 +131,45 @@ public class ContaFixaService {
             // ✅ NÃO reseta o status aqui!
         }
         
+        return contaFixaRepository.save(conta);
+    }
+
+    @Transactional
+    public ContaFixa pularMes(Long id, Long usuarioId) {
+        ContaFixa conta = buscarPorIdDoUsuario(id, usuarioId);
+
+        if (!conta.getRecorrente()) {
+            throw new BusinessException("Apenas contas recorrentes podem pular mês");
+        }
+
+        if (conta.getAtivo() == null || !conta.getAtivo()) {
+            throw new BusinessException("Conta fixa está inativa");
+        }
+
+        LocalDate proximoVencimento = conta.getDataProximoVencimento().plusMonths(1);
+        proximoVencimento = proximoVencimento.withDayOfMonth(
+                Math.min(conta.getDiaVencimento(), proximoVencimento.lengthOfMonth()));
+        conta.setDataProximoVencimento(proximoVencimento);
+
+        if (conta.getStatus() == StatusPagamento.PAGO) {
+            conta.setStatus(StatusPagamento.PENDENTE);
+        }
+
+        return contaFixaRepository.save(conta);
+    }
+
+    @Transactional
+    public ContaFixa reativar(Long id, Long usuarioId) {
+        ContaFixa conta = buscarPorIdDoUsuario(id, usuarioId);
+
+        if (conta.getAtivo() != null && conta.getAtivo()) {
+            throw new BusinessException("Conta fixa já está ativa");
+        }
+
+        conta.setAtivo(true);
+        conta.setStatus(StatusPagamento.PENDENTE);
+        calcularProximoVencimento(conta);
+
         return contaFixaRepository.save(conta);
     }
     

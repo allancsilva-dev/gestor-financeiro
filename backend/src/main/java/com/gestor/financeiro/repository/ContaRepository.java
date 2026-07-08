@@ -22,5 +22,7 @@ public interface ContaRepository extends JpaRepository<Conta, Long> {
 
     Optional<Conta> findByIdAndUsuarioId(Long id, Long usuarioId);
 
+    Optional<Conta> findByUsuarioIdAndNomeIgnoreCase(Long usuarioId, String nome);
+
     long countByUsuarioId(Long usuarioId);
 }

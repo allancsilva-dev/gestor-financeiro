@@ -31,4 +31,7 @@ public class Usuario {
 
     @Column
     private LocalDateTime lockedUntil;
+
+    @Column(name = "onboarding_completo", nullable = false)
+    private boolean onboardingCompleto = false;
 }

@@ -1,23 +1,33 @@
 package com.gestor.financeiro.dto;
 
 import com.gestor.financeiro.validation.ValidPassword;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 public class RegisterRequest {
 
-    @NotBlank(message = "Campo obrigatório")
+    @NotBlank(message = "Campo obrigatorio")
     @Size(min = 2, max = 100, message = "Nome deve ter entre 2 e 100 caracteres")
     private String nome;
 
-    @NotBlank(message = "Campo obrigatório")
-    @Email(message = "Email inválido")
+    @NotBlank(message = "Campo obrigatorio")
+    @Email(message = "Email invalido")
     private String email;
 
-    @NotBlank(message = "Campo obrigatório")
+    @NotBlank(message = "Campo obrigatorio")
     @ValidPassword
     private String password;
+
+    @NotBlank(message = "Campo obrigatorio")
+    private String confirmPassword;
+
+    @AssertTrue(message = "Senhas nao coincidem")
+    public boolean isPasswordMatch() {
+        if (password == null || confirmPassword == null) return true;
+        return password.equals(confirmPassword);
+    }
 
     public RegisterRequest() {}
 
@@ -49,5 +59,13 @@ public class RegisterRequest {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public String getConfirmPassword() {
+        return confirmPassword;
+    }
+
+    public void setConfirmPassword(String confirmPassword) {
+        this.confirmPassword = confirmPassword;
     }
 }

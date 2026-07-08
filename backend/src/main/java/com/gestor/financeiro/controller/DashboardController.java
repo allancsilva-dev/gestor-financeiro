@@ -2,6 +2,7 @@ package com.gestor.financeiro.controller;
 
 import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.service.DashboardService;
+import com.gestor.financeiro.service.ProjecaoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +20,9 @@ public class DashboardController {
 
     @Autowired
     private DashboardService dashboardService;
+
+    @Autowired
+    private ProjecaoService projecaoService;
 
     @Autowired
     private UsuarioRepository usuarioRepository;
@@ -69,5 +73,17 @@ public class DashboardController {
         
         var dados = dashboardService.obterComparacaoMensal(usuario.getId());
         return ResponseEntity.ok(dados);
+    }
+
+    @GetMapping("/projecao")
+    @Operation(summary = "Projeção de caixa", description = "Projeta saldo futuro com base em contas fixas e parcelas")
+    public ResponseEntity<?> projecao(
+            Authentication authentication,
+            @RequestParam(defaultValue = "6") int meses) {
+        String email = authentication.getName();
+        Usuario usuario = usuarioRepository.findByEmail(email)
+            .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+
+        return ResponseEntity.ok(projecaoService.projetar(usuario.getId(), Math.min(meses, 12)));
     }
 }
