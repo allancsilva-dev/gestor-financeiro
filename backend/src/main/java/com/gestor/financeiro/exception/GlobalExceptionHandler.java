@@ -3,9 +3,11 @@ package com.gestor.financeiro.exception;
 import com.gestor.financeiro.config.RequestIdFilter;
 import com.gestor.financeiro.dto.ApiError;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.dao.CannotAcquireLockException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -90,6 +92,17 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(OptimisticLockingFailureException.class)
     public ResponseEntity<ApiError> handleOptimisticLock(OptimisticLockingFailureException ex, HttpServletRequest request) {
         ApiError apiError = buildError("CONFLICT", "Registro foi alterado por outra operação. Tente novamente.", null, request);
+
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(apiError);
+    }
+
+    @ExceptionHandler({
+            FinancialConflictException.class,
+            PessimisticLockingFailureException.class,
+            CannotAcquireLockException.class
+    })
+    public ResponseEntity<ApiError> handleFinancialConflict(Exception ex, HttpServletRequest request) {
+        ApiError apiError = buildError("FINANCIAL_CONFLICT", "Operação financeira concorrente. Tente novamente.", null, request);
 
         return ResponseEntity.status(HttpStatus.CONFLICT).body(apiError);
     }

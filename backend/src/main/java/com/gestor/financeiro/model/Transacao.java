@@ -34,6 +34,13 @@ public class Transacao {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "conta_fixa_id")
     private ContaFixa contaFixa;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "carteira_id")
+    private Carteira carteira;
+
+    @Column(nullable = false)
+    private Boolean ativa = true;
     
     @Column(nullable = false)
     private String descricao;

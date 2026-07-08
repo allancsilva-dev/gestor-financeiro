@@ -25,7 +25,7 @@ public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
     @EntityGraph(attributePaths = {"categoria", "conta"})
     Page<Transacao> findByUsuarioId(Long usuarioId, Pageable pageable);
 
-    @EntityGraph(attributePaths = {"categoria", "conta"})
+    @EntityGraph(attributePaths = {"categoria", "conta", "carteira"})
     Optional<Transacao> findByIdAndUsuarioId(Long id, Long usuarioId);
     
     // Busca transações de uma categoria específica

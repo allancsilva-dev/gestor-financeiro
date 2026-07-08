@@ -171,8 +171,8 @@ class TransacaoControllerTest {
                         "tipo", "SAIDA",
                         "categoriaId", categoriaA.getId()
                 ))))
-            .andExpect(status().isForbidden())
-            .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     }
 
     @Test
@@ -190,8 +190,8 @@ class TransacaoControllerTest {
         );
 
         mockMvc.perform(delete("/api/v1/transacoes/{id}", alheia.getId()))
-            .andExpect(status().isForbidden())
-            .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     }
 
     @Test

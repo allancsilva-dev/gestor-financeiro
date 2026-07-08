@@ -16,6 +16,7 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class FaturaService {
@@ -30,19 +31,39 @@ public class FaturaService {
     private TransacaoRepository transacaoRepository;
 
     @Autowired
+    private TransacaoService transacaoService;
+
+    @Autowired
     private UsuarioRepository usuarioRepository;
 
-    public FaturaResponse buscarOuCriarAtual(Long usuarioId, Long contaId) {
+    public FaturaResponse buscarAtual(Long usuarioId, Long contaId) {
         Conta conta = validarContaCredito(usuarioId, contaId);
         YearMonth ym = YearMonth.now();
 
-        FaturaCartao fatura = faturaRepository.findByContaIdAndMesAndAno(contaId, ym.getMonthValue(), ym.getYear())
-                .orElseGet(() -> criarFaturaVazia(usuarioId, conta, ym.getMonthValue(), ym.getYear()));
+        Optional<FaturaCartao> existente = faturaRepository.findByContaIdAndMesAndAno(
+                contaId, ym.getMonthValue(), ym.getYear());
 
-        return toResponse(fatura, usuarioId, conta);
+        if (existente.isPresent()) {
+            return toResponse(existente.get(), usuarioId, conta);
+        }
+
+        return toResponseVazia(usuarioId, conta, ym.getMonthValue(), ym.getYear());
     }
 
     public FaturaResponse buscarPorMes(Long usuarioId, Long contaId, Integer mes, Integer ano) {
+        Conta conta = validarContaCredito(usuarioId, contaId);
+
+        Optional<FaturaCartao> existente = faturaRepository.findByContaIdAndMesAndAno(contaId, mes, ano);
+
+        if (existente.isPresent()) {
+            return toResponse(existente.get(), usuarioId, conta);
+        }
+
+        return toResponseVazia(usuarioId, conta, mes, ano);
+    }
+
+    @Transactional
+    public FaturaResponse criarOuBuscarFatura(Long usuarioId, Long contaId, Integer mes, Integer ano) {
         Conta conta = validarContaCredito(usuarioId, contaId);
 
         FaturaCartao fatura = faturaRepository.findByContaIdAndMesAndAno(contaId, mes, ano)
@@ -68,12 +89,9 @@ public class FaturaService {
         pagamento.setTipo(TipoTransacao.SAIDA);
         pagamento.setValorTotal(valor);
         pagamento.setParcelado(false);
-        pagamento.setCategoria(null);
-        pagamento.setUsuario(fatura.getUsuario());
-        pagamento.setConta(conta);
         pagamento.setObservacoes("Pagamento de fatura");
 
-        transacaoRepository.save(pagamento);
+        transacaoService.criar(pagamento, usuarioId);
 
         fatura.setValorPago(valor);
         fatura.setDataPagamento(LocalDate.now());
@@ -107,6 +125,25 @@ public class FaturaService {
         return faturaRepository.save(fatura);
     }
 
+    private FaturaResponse toResponseVazia(Long usuarioId, Conta conta, Integer mes, Integer ano) {
+        YearMonth ym = YearMonth.of(ano, mes);
+
+        return new FaturaResponse(
+                null,
+                conta.getId(),
+                conta.getNome(),
+                mes,
+                ano,
+                ym.atDay(1),
+                ym.atEndOfMonth(),
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                FaturaStatus.ABERTA.name(),
+                null,
+                List.of()
+        );
+    }
+
     private FaturaResponse toResponse(FaturaCartao fatura, Long usuarioId, Conta conta) {
         YearMonth ym = YearMonth.of(fatura.getAno(), fatura.getMes());
         LocalDate inicio = ym.atDay(1);
@@ -137,12 +174,8 @@ public class FaturaService {
             ));
         }
 
-        if (fatura.getValorTotal().compareTo(BigDecimal.ZERO) == 0 && total.compareTo(BigDecimal.ZERO) > 0) {
-            fatura.setValorTotal(total);
-            faturaRepository.save(fatura);
-        }
-
-        BigDecimal valorTotal = fatura.getValorTotal().compareTo(BigDecimal.ZERO) > 0
+        BigDecimal valorTotal = fatura.getValorTotal() != null
+                && fatura.getValorTotal().compareTo(BigDecimal.ZERO) > 0
                 ? fatura.getValorTotal() : total;
 
         return new FaturaResponse(

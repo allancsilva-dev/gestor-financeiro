@@ -2,6 +2,7 @@ package com.gestor.financeiro.controller;
 
 import com.gestor.financeiro.dto.TransacaoRequest;
 import com.gestor.financeiro.dto.TransacaoResponseDto;
+import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.Transacao;
@@ -118,6 +119,12 @@ public class TransacaoController {
             Conta conta = new Conta();
             conta.setId(request.getContaIdNormalizada());
             transacao.setConta(conta);
+        }
+
+        if (request.getCarteiraId() != null) {
+            Carteira carteira = new Carteira();
+            carteira.setId(request.getCarteiraId());
+            transacao.setCarteira(carteira);
         }
 
         return transacao;

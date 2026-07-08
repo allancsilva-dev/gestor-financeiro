@@ -11,7 +11,6 @@ import com.gestor.financeiro.model.enums.StatusPagamento;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.CategoriaRepository;
 import com.gestor.financeiro.repository.ContaFixaRepository;
-import com.gestor.financeiro.repository.TransacaoRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -27,15 +26,15 @@ public class ContaFixaService {
     
     @Autowired
     private ContaFixaRepository contaFixaRepository;
-    
-    @Autowired
-    private TransacaoRepository transacaoRepository;
 
     @Autowired
     private UsuarioRepository usuarioRepository;
 
     @Autowired
     private CategoriaRepository categoriaRepository;
+
+    @Autowired
+    private TransacaoService transacaoService;
     
     // Lista contas fixas ativas do usuário
     public Page<ContaFixa> listarPorUsuario(Long usuarioId, Pageable pageable) {
@@ -113,9 +112,8 @@ public class ContaFixaService {
         transacao.setUsuario(conta.getUsuario());
         transacao.setContaFixa(conta);
         transacao.setObservacoes("Pagamento automático de conta fixa");
-        
-        // Salva a transação
-        transacaoRepository.save(transacao);
+
+        transacaoService.criar(transacao, conta.getUsuario().getId());
         
         // 2. Marca como PAGA
         conta.setStatus(StatusPagamento.PAGO);

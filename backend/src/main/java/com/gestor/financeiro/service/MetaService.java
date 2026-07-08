@@ -3,8 +3,10 @@ package com.gestor.financeiro.service;
 import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.exception.UnauthorizedAccessException;
 import com.gestor.financeiro.model.Meta;
+import com.gestor.financeiro.model.MovimentoMeta;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.repository.MetaRepository;
+import com.gestor.financeiro.repository.MovimentoMetaRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -24,6 +26,9 @@ public class MetaService {
 
     @Autowired
     private UsuarioRepository usuarioRepository;
+
+    @Autowired
+    private MovimentoMetaRepository movimentoMetaRepository;
     
     // Lista metas ativas do usuário
     public Page<Meta> listarPorUsuario(Long usuarioId, Pageable pageable) {
@@ -50,33 +55,41 @@ public class MetaService {
     @Transactional
     public Meta adicionarValor(Long metaId, BigDecimal valor, Long usuarioId) {
         Meta meta = buscarPorIdDoUsuario(metaId, usuarioId);
-        
-        // Soma ao valor reservado
-        meta.setValorReservado(meta.getValorReservado().add(valor));
-        
-        // Se alcançou a meta, marca data de conclusão
+
+        BigDecimal valorAnterior = meta.getValorReservado();
+        meta.setValorReservado(valorAnterior.add(valor));
+
         if (meta.getValorReservado().compareTo(meta.getValorTotal()) >= 0) {
             meta.setDataConclusao(LocalDate.now());
-            meta.setAtiva(false); // Meta concluída
+            meta.setAtiva(false);
         }
-        
-        return metaRepository.save(meta);
+
+        Meta salva = metaRepository.save(meta);
+
+        registroMovimento(salva, usuarioId, "ADICAO", valor, valorAnterior,
+                "Adição de valor na meta: " + salva.getNome());
+
+        return salva;
     }
-    
-    // Remove valor da meta (caso retire dinheiro)
+
     @Transactional
     public Meta removerValor(Long metaId, BigDecimal valor, Long usuarioId) {
         Meta meta = buscarPorIdDoUsuario(metaId, usuarioId);
-        
-        meta.setValorReservado(meta.getValorReservado().subtract(valor));
-        
-        // Se estava concluída, reativa
+
+        BigDecimal valorAnterior = meta.getValorReservado();
+        meta.setValorReservado(valorAnterior.subtract(valor));
+
         if (meta.getValorReservado().compareTo(meta.getValorTotal()) < 0) {
             meta.setDataConclusao(null);
             meta.setAtiva(true);
         }
-        
-        return metaRepository.save(meta);
+
+        Meta salva = metaRepository.save(meta);
+
+        registroMovimento(salva, usuarioId, "REMOCAO", valor, valorAnterior,
+                "Remoção de valor da meta: " + salva.getNome());
+
+        return salva;
     }
     
     // Atualiza meta
@@ -125,14 +138,29 @@ public class MetaService {
     // Calcula porcentagem de conclusão da meta
     public BigDecimal calcularProgresso(Long metaId, Long usuarioId) {
         Meta meta = buscarPorIdDoUsuario(metaId, usuarioId);
-        
+
         if (meta.getValorTotal().compareTo(BigDecimal.ZERO) == 0) {
             return BigDecimal.ZERO;
         }
-        
-        // (valorReservado / valorTotal) * 100
+
         return meta.getValorReservado()
-            .divide(meta.getValorTotal(), 4, RoundingMode.HALF_UP) // ✅ CORRIGIDO
+            .divide(meta.getValorTotal(), 4, RoundingMode.HALF_UP)
             .multiply(BigDecimal.valueOf(100));
+    }
+
+    private void registroMovimento(Meta meta, Long usuarioId, String tipo,
+                                   BigDecimal valor, BigDecimal valorAnterior, String descricao) {
+        BigDecimal valorAssinado = "ADICAO".equals(tipo) ? valor : valor.negate();
+
+        MovimentoMeta movimento = new MovimentoMeta();
+        movimento.setUsuario(meta.getUsuario());
+        movimento.setMeta(meta);
+        movimento.setTipo(tipo);
+        movimento.setValor(valor);
+        movimento.setValorAssinado(valorAssinado);
+        movimento.setValorResultante(meta.getValorReservado());
+        movimento.setDescricao(descricao);
+
+        movimentoMetaRepository.save(movimento);
     }
 }

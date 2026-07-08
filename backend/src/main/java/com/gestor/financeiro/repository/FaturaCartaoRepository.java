@@ -14,4 +14,6 @@ public interface FaturaCartaoRepository extends JpaRepository<FaturaCartao, Long
     Optional<FaturaCartao> findByIdAndUsuarioId(Long id, Long usuarioId);
 
     List<FaturaCartao> findByContaIdAndUsuarioIdOrderByAnoDescMesDesc(Long contaId, Long usuarioId);
+
+    List<FaturaCartao> findByUsuarioId(Long usuarioId);
 }

@@ -45,6 +45,8 @@ public class TransacaoRequest {
 
     private Boolean recorrente;
 
+    private Long carteiraId;
+
     public String getDescricao() {
         return descricao;
     }
@@ -139,6 +141,14 @@ public class TransacaoRequest {
 
     public void setRecorrente(Boolean recorrente) {
         this.recorrente = recorrente;
+    }
+
+    public Long getCarteiraId() {
+        return carteiraId;
+    }
+
+    public void setCarteiraId(Long carteiraId) {
+        this.carteiraId = carteiraId;
     }
 
     public Long getCategoriaIdNormalizada() {

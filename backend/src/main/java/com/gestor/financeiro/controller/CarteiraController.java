@@ -1,11 +1,16 @@
 package com.gestor.financeiro.controller;
 
+import com.gestor.financeiro.dto.AjusteCarteiraRequest;
 import com.gestor.financeiro.dto.CarteiraResponseDto;
 import com.gestor.financeiro.dto.CarteiraRequest;
+import com.gestor.financeiro.dto.MovimentoCarteiraResponse;
+import com.gestor.financeiro.dto.ReconciliacaoCarteiraResponse;
 import com.gestor.financeiro.dto.ValorRequest;
 import com.gestor.financeiro.model.Carteira;
+import com.gestor.financeiro.model.MovimentoCarteira;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.CarteiraService;
+import com.gestor.financeiro.service.LedgerReconciliationService;
 import com.gestor.financeiro.util.PaginationUtils;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -17,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/carteiras")
@@ -27,9 +33,11 @@ public class CarteiraController {
     private CarteiraService carteiraService;
 
     @Autowired
+    private LedgerReconciliationService ledgerReconciliationService;
+
+    @Autowired
     private AuthenticatedUserService authenticatedUserService;
     
-    // GET /api/carteiras/minhas - Lista carteiras do usuário autenticado
     @GetMapping("/minhas")
     public ResponseEntity<Page<CarteiraResponseDto>> listar(
         @PageableDefault(size = 20, sort = "nome", direction = Sort.Direction.ASC) Pageable pageable
@@ -40,15 +48,36 @@ public class CarteiraController {
         return ResponseEntity.ok(carteiras.map(CarteiraResponseDto::fromEntity));
     }
     
-    // GET /api/carteiras/{id} - Busca carteira por ID
     @GetMapping("/{id}")
     public ResponseEntity<CarteiraResponseDto> buscarPorId(@PathVariable Long id) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Carteira carteira = carteiraService.buscarPorIdDoUsuario(id, usuarioId);
         return ResponseEntity.ok(CarteiraResponseDto.fromEntity(carteira));
     }
+
+    @GetMapping("/minhas/reconciliacao")
+    public ResponseEntity<List<ReconciliacaoCarteiraResponse>> reconciliarMinhasCarteiras() {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        return ResponseEntity.ok(ledgerReconciliationService.reconciliarUsuario(usuarioId));
+    }
+
+    @GetMapping("/{id}/reconciliacao")
+    public ResponseEntity<ReconciliacaoCarteiraResponse> reconciliarCarteira(@PathVariable Long id) {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        return ResponseEntity.ok(ledgerReconciliationService.reconciliarCarteira(usuarioId, id));
+    }
+
+    @GetMapping("/{id}/movimentos")
+    public ResponseEntity<Page<MovimentoCarteiraResponse>> listarMovimentos(
+            @PathVariable Long id,
+            @PageableDefault(size = 20, sort = "dataMovimento", direction = Sort.Direction.DESC) Pageable pageable
+    ) {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        Pageable cappedPageable = PaginationUtils.enforceMaxSize(pageable, 100);
+        Page<MovimentoCarteira> movimentos = carteiraService.listarMovimentos(id, usuarioId, cappedPageable);
+        return ResponseEntity.ok(movimentos.map(MovimentoCarteiraResponse::fromEntity));
+    }
     
-    // POST /api/carteiras - Cria nova carteira
     @PostMapping
     public ResponseEntity<CarteiraResponseDto> criar(@Valid @RequestBody CarteiraRequest request) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
@@ -57,7 +86,6 @@ public class CarteiraController {
         return ResponseEntity.ok(CarteiraResponseDto.fromEntity(carteiraCriada));
     }
     
-    // PUT /api/carteiras/{id} - Atualiza carteira
     @PutMapping("/{id}")
     public ResponseEntity<CarteiraResponseDto> atualizar(
         @PathVariable Long id,
@@ -68,9 +96,20 @@ public class CarteiraController {
         Carteira carteiraAtualizada = carteiraService.atualizar(id, carteira, usuarioId);
         return ResponseEntity.ok(CarteiraResponseDto.fromEntity(carteiraAtualizada));
     }
-    
-    // POST /api/carteiras/{id}/adicionar - Adiciona dinheiro
+
+    @PostMapping("/{id}/ajustes")
+    public ResponseEntity<CarteiraResponseDto> ajustarSaldo(
+            @PathVariable Long id,
+            @Valid @RequestBody AjusteCarteiraRequest request
+    ) {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        Carteira carteira = carteiraService.ajustarSaldo(
+                id, request.getTipo(), request.getValor(), request.getDescricao(), usuarioId);
+        return ResponseEntity.ok(CarteiraResponseDto.fromEntity(carteira));
+    }
+
     @PostMapping("/{id}/adicionar")
+    @Deprecated(since = "PR-LEDGER-06", forRemoval = false)
     public ResponseEntity<CarteiraResponseDto> adicionarDinheiro(
         @PathVariable Long id,
         @Valid @RequestBody ValorRequest request
@@ -81,8 +120,8 @@ public class CarteiraController {
         return ResponseEntity.ok(CarteiraResponseDto.fromEntity(carteira));
     }
     
-    // POST /api/carteiras/{id}/remover - Remove dinheiro
     @PostMapping("/{id}/remover")
+    @Deprecated(since = "PR-LEDGER-06", forRemoval = false)
     public ResponseEntity<CarteiraResponseDto> removerDinheiro(
         @PathVariable Long id,
         @Valid @RequestBody ValorRequest request
@@ -93,7 +132,6 @@ public class CarteiraController {
         return ResponseEntity.ok(CarteiraResponseDto.fromEntity(carteira));
     }
     
-    // GET /api/carteiras/minhas/saldo-total - Calcula saldo total do usuário autenticado
     @GetMapping("/minhas/saldo-total")
     public ResponseEntity<BigDecimal> calcularSaldoTotal() {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
@@ -101,7 +139,6 @@ public class CarteiraController {
         return ResponseEntity.ok(saldoTotal);
     }
     
-    // DELETE /api/carteiras/{id} - Deleta carteira
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
