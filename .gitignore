@@ -20,6 +20,7 @@ backend/uploads/
 
 # Local agent/tooling state
 .opencode/
+.impeccable/
 
 # IDEs
 .idea/
