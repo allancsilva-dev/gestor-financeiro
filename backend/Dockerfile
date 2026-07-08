@@ -7,6 +7,7 @@ RUN mvn clean package -DskipTests
 
 # Etapa 2: Execução
 FROM eclipse-temurin:17-jre-alpine
+RUN apk add --no-cache wget
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 EXPOSE 8080

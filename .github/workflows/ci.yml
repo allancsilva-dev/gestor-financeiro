@@ -21,6 +21,7 @@ jobs:
           distribution: 'temurin'
           cache: maven
       - run: mvn test --batch-mode
+      - run: mvn verify -Pintegration-test --batch-mode
       - run: mvn compile --batch-mode --quiet
 
   frontend:
