@@ -59,11 +59,11 @@ public class TransacaoService {
     private CarteiraRepository carteiraRepository;
 
     public Page<Transacao> listarPorUsuario(Long usuarioId, Pageable pageable) {
-        return transacaoRepository.findByUsuarioId(usuarioId, pageable);
+        return transacaoRepository.findByUsuarioIdAndAtivaTrue(usuarioId, pageable);
     }
 
     public Page<Transacao> listarPorPeriodo(Long usuarioId, LocalDate inicio, LocalDate fim, Pageable pageable) {
-        return transacaoRepository.findByUsuarioIdAndDataBetween(usuarioId, inicio, fim, pageable);
+        return transacaoRepository.findByUsuarioIdAndDataBetweenAndAtivaTrue(usuarioId, inicio, fim, pageable);
     }
 
     @Transactional

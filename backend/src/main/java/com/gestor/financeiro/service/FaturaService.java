@@ -149,7 +149,7 @@ public class FaturaService {
         LocalDate inicio = ym.atDay(1);
         LocalDate fim = ym.atEndOfMonth();
 
-        List<Transacao> transacoes = transacaoRepository.findByUsuarioIdAndContaIdAndDataBetween(
+        List<Transacao> transacoes = transacaoRepository.findByUsuarioIdAndContaIdAndDataBetweenAndAtivaTrue(
                 usuarioId, conta.getId(), inicio, fim);
 
         BigDecimal total = BigDecimal.ZERO;

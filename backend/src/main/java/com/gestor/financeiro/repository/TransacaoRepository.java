@@ -25,6 +25,13 @@ public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
     @EntityGraph(attributePaths = {"categoria", "conta"})
     Page<Transacao> findByUsuarioId(Long usuarioId, Pageable pageable);
 
+    // Listagens visíveis ao usuário: somente transações ativas (não canceladas)
+    @EntityGraph(attributePaths = {"categoria", "conta"})
+    Page<Transacao> findByUsuarioIdAndAtivaTrue(Long usuarioId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"categoria", "conta"})
+    Page<Transacao> findByUsuarioIdAndDataBetweenAndAtivaTrue(Long usuarioId, LocalDate inicio, LocalDate fim, Pageable pageable);
+
     @EntityGraph(attributePaths = {"categoria", "conta", "carteira"})
     Optional<Transacao> findByIdAndUsuarioId(Long id, Long usuarioId);
     
@@ -45,12 +52,12 @@ public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
     Page<Transacao> findByUsuarioIdAndDataBetween(Long usuarioId, LocalDate inicio, LocalDate fim, Pageable pageable);
 
     @EntityGraph(attributePaths = {"categoria", "conta"})
-    List<Transacao> findByUsuarioIdAndContaIdAndDataBetween(Long usuarioId, Long contaId, LocalDate inicio, LocalDate fim);
+    List<Transacao> findByUsuarioIdAndContaIdAndDataBetweenAndAtivaTrue(Long usuarioId, Long contaId, LocalDate inicio, LocalDate fim);
 
     // --- ADIÇÃO NECESSÁRIA ---
     // Este novo método força o JPA a carregar a Categoria junto com a Transação
     @Query("SELECT t FROM Transacao t JOIN FETCH t.categoria " +
-           "WHERE t.usuario.id = :usuarioId " +
+           "WHERE t.usuario.id = :usuarioId AND t.ativa = true " +
            "AND t.data BETWEEN :inicio AND :fim")
     List<Transacao> findByUsuarioIdAndDataBetweenWithCategoria(
             @Param("usuarioId") Long usuarioId, 
@@ -59,7 +66,7 @@ public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
     // --- FIM DA ADIÇÃO ---
 
     @Query("SELECT COALESCE(SUM(t.valorTotal), 0) FROM Transacao t " +
-           "WHERE t.usuario.id = :usuarioId AND t.tipo = :tipo " +
+           "WHERE t.usuario.id = :usuarioId AND t.ativa = true AND t.tipo = :tipo " +
            "AND t.data BETWEEN :inicio AND :fim")
     BigDecimal sumValorTotalByUsuarioIdAndTipoAndDataBetween(
             @Param("usuarioId") Long usuarioId,
@@ -68,7 +75,7 @@ public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
             @Param("fim") LocalDate fim);
 
     @Query("SELECT COALESCE(SUM(CASE WHEN t.parcelado = true AND t.valorParcela IS NOT NULL THEN t.valorParcela ELSE t.valorTotal END), 0) " +
-           "FROM Transacao t WHERE t.usuario.id = :usuarioId AND t.tipo = :tipo " +
+           "FROM Transacao t WHERE t.usuario.id = :usuarioId AND t.ativa = true AND t.tipo = :tipo " +
            "AND t.data BETWEEN :inicio AND :fim")
     BigDecimal sumValorEfetivoByUsuarioIdAndTipoAndDataBetween(
             @Param("usuarioId") Long usuarioId,
@@ -77,7 +84,7 @@ public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
             @Param("fim") LocalDate fim);
 
     @Query("SELECT t.categoria.nome, COALESCE(SUM(CASE WHEN t.parcelado = true AND t.valorParcela IS NOT NULL THEN t.valorParcela ELSE t.valorTotal END), 0), t.categoria.cor " +
-           "FROM Transacao t WHERE t.usuario.id = :usuarioId AND t.tipo = :tipo " +
+           "FROM Transacao t WHERE t.usuario.id = :usuarioId AND t.ativa = true AND t.tipo = :tipo " +
            "AND t.data BETWEEN :inicio AND :fim AND t.categoria IS NOT NULL " +
            "GROUP BY t.categoria.nome, t.categoria.cor")
     List<Object[]> sumValorEfetivoAgrupadoPorCategoria(
@@ -87,7 +94,7 @@ public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
              @Param("fim") LocalDate fim);
 
     @Query("SELECT COALESCE(SUM(t.valorTotal), 0) FROM Transacao t " +
-           "WHERE t.usuario.id = :usuarioId AND t.tipo = 'SAIDA' " +
+           "WHERE t.usuario.id = :usuarioId AND t.ativa = true AND t.tipo = 'SAIDA' " +
            "AND t.data BETWEEN :inicio AND :fim")
     BigDecimal sumSaidasByUsuarioIdAndPeriodo(
             @Param("usuarioId") Long usuarioId,
@@ -95,7 +102,7 @@ public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
             @Param("fim") LocalDate fim);
 
     @Query("SELECT t.categoria.id, t.categoria.nome, COALESCE(SUM(t.valorTotal), 0) " +
-           "FROM Transacao t WHERE t.usuario.id = :usuarioId AND t.tipo = 'SAIDA' " +
+           "FROM Transacao t WHERE t.usuario.id = :usuarioId AND t.ativa = true AND t.tipo = 'SAIDA' " +
            "AND t.data BETWEEN :inicio AND :fim AND t.categoria IS NOT NULL " +
            "GROUP BY t.categoria.id, t.categoria.nome ORDER BY SUM(t.valorTotal) DESC")
     List<Object[]> sumSaidasByCategoria(
