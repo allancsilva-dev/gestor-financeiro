@@ -2,7 +2,7 @@
 
 Documentacao de alto nivel sobre como o sistema funciona. Mantido pelo `docs-reporter`.
 
-**Ultima atualizacao:** 2026-07-08
+**Ultima atualizacao:** 2026-07-09
 
 ---
 
@@ -109,9 +109,9 @@ Page (renderizacao, eventos)
 2. **Login:** `POST /api/auth/login` → valida credenciais, retorna `{ accessToken, usuario }` + cookie HttpOnly `refreshToken`.
    - Access token: JWT HS256, 15 min, Bearer header, subject = email.
    - Refresh token: UUID v4, 7 dias, cookie HttpOnly (`Path=/api/auth`, `SameSite=Lax`, `Secure` em prod).
-3. **Refresh:** `POST /api/auth/refresh-token` → rotaciona refresh token com deteccao de reuse (revoca todos os tokens do usuario se detectar reuso).
+3. **Refresh:** `POST /api/auth/refresh-token` → rotaciona refresh token com deteccao de reuse (revoca todos os tokens do usuario se detectar reuso). Resposta inclui `accessToken` e `csrfToken` (desde 2026-07-09, ver BUG-0013) — o cookie `refreshToken` (HttpOnly) segue sendo a fonte de verdade, o `csrfToken` tambem vai no corpo porque clientes nativos (React Native) nao leem cookies para o padrao double-submit.
 4. **Interceptor Axios (web):** detecta 401, tenta refresh automatico, enfileira requisicoes concorrentes durante refresh.
-5. **Interceptor Axios (mobile):** detecta erro, exibe mensagem amigavel em pt-BR.
+5. **Interceptor Axios (mobile):** desde 2026-07-09 (BUG-0013), detecta 401 fora de rotas `/auth/`, chama `refresh-token` com `withCredentials:true` + header `X-CSRF-Token` (lido do `SecureStore`), usa uma promise deduplicada entre requests concorrentes e repete a request original com o novo Bearer token. Antes disso, o mobile so exibia mensagem amigavel e exigia login manual apos os 15 min de expiracao do access token.
 6. **Logout:** `POST /api/auth/logout` → revoga refresh token, limpa cookie (Max-Age=0).
 7. **Forgot password:** `POST /api/auth/forgot-password` → envia token por email. `POST /api/auth/reset-password` → redefine senha.
 
@@ -137,7 +137,7 @@ O sistema e **single-tenant** — nao ha multi-tenancy corporativa. Cada usuario
 5. Usuario cria categorias personalizadas.
 6. Usuario cria contas (credito, debito, dinheiro).
 7. Usuario cria carteiras (dinheiro, conta bancaria, poupanca).
-8. Usuario registra transacoes (entrada/saida, com ou sem parcelamento).
+8. Usuario registra transacoes (entrada/saida, com ou sem parcelamento). Transacao so movimenta o saldo de uma carteira (Ledger) se `carteiraId` for enviado no payload — sem carteira, a transacao e contabilizada em relatorios/categorias mas nao gera `MovimentoCarteira` (ver BUG-0011/BUG-0012). Exclusao de transacao e soft-delete (`ativa=false`) com estorno automatico do movimento no Ledger; todas as leituras agregadas (dashboard, relatorios, listagens, fatura) filtram `ativa=true` desde 2026-07-09 (BUG-0014).
 9. Usuario gerencia parcelas (pagar/despagar).
 10. Usuario cria contas fixas mensais.
 11. Usuario cria metas financeiras e acompanha progresso.
@@ -163,6 +163,8 @@ O sistema e **single-tenant** — nao ha multi-tenancy corporativa. Cada usuario
 7. **Expo em vez de React Native puro:** build e deploy simplificados, OTA updates.
 8. **Axios com interceptor de refresh:** fila de requisicoes concorrentes evita multiplos refresh tokens simultaneos.
 9. **Rate limit custom (sem Bucket4j):** implementacao propria em `LoginRateLimitFilter`, janela movel, sem dependencia externa.
+10. **Categoria.valorGasto so reflete SAIDA:** desde 2026-07-09 (BUG-0015), criar/deletar transacao so ajusta `valorGasto` da categoria quando `tipo == SAIDA` — entradas nunca contam como gasto no indicador de orcamento por categoria.
+11. **Design mobile alinhado ao prototipo standalone:** componentes `Entrance` (`gf-rise`/`gf-pop`, respeita Reduce Motion) e `FloatEmoji` (`gf-float`) portados de `docs/Gestor Financeiro (standalone).html` para o app Expo; `Fab` com gradiente violeta `#7c5cfc`→`#8b2fff` e glow (BACKLOG-0048, 2026-07-09).
 
 ## Limitacoes conhecidas
 
@@ -202,6 +204,8 @@ O sistema e **single-tenant** — nao ha multi-tenancy corporativa. Cada usuario
 10. **TransacaoService com ownership corrigido:** categoriaId e contaId validados via `findByIdAndUsuarioId` (PROB-0001 resolvido).
 11. **Operacoes transacionais corrigidas:** todos os metodos de escrita com @Transactional (PROB-0012 resolvido).
 12. **@Autowired field injection em vez de constructor injection:** dificulta testes unitarios e immutability.
+13. **Ledger so movimenta com carteiraId explicito:** ausencia de `carteiraId` no payload de transacao e uma decisao de design (nao um bug), mas exige que todo client (web/mobile) sempre envie a carteira; o mobile so passou a fazer isso a partir de 2026-07-09 (BUG-0012). Transacoes antigas sem carteira nao tem movimento retroativo (BACKLOG-0045).
+14. **Interceptor de refresh agora simetrico entre web e mobile:** ambos os clientes renovam o access token automaticamente em 401 (BUG-0013, 2026-07-09). Antes disso, apenas o web tinha esse comportamento.
 
 ## Auditoria e estado atual
 
@@ -214,3 +218,4 @@ O sistema e **single-tenant** — nao ha multi-tenancy corporativa. Cada usuario
 - **Problem Ledger:** 30 problemas registrados (PROB-0001 a PROB-0030)
 - **Backlog:** 35 itens registrados (BACKLOG-0001 a BACKLOG-0035)
 - **Atualizacao pos-auditoria:** Fase 0 backend concluida em 2026-07-07 com ressalvas (7 PRs). Fase 1 concluida (7 PRs). Fase 2 concluida (8 PRs). Fase 3 concluida em 2026-07-08 (5 PRs: CI/CD, deploy, backup, monitoramento, docs). Fase 4 concluida em 2026-07-08 (4 PRs: importacao CSV, anexos, investimentos, insights). Fase Ledger registrada em 2026-07-08: PR-LEDGER-00 `PASS`, PR-LEDGER-01..20 `PASS_COM_RESSALVA`. Backend: 69/69 testes PASS; smoke VPS PostgreSQL PASS.
+- **Correcoes 2026-07-09 (diagnostico manual via replicacao de payloads mobile contra API local):** BUG-0011 a BUG-0016 corrigidos (PROB-0032 a PROB-0037) — detached entity Carteira ao criar transacao com `carteiraId` (500), saldo total congelado por ausencia de `carteiraId` no mobile, sessao mobile sem refresh automatico apos 15 min, agregacoes financeiras ignorando soft-delete (`ativa=true`), `categoria.valorGasto` somando ENTRADA indevidamente, vazamento de hash de senha no response de `/api/auth/register`. Todos com `mvn test` 69/69 PASS e validacao E2E manual via API. Efeitos visuais do prototipo standalone (`Entrance`, `FloatEmoji`, `Fab` com gradiente) portados para o mobile (BACKLOG-0048). Ver `docs/BUGFIX_LOG.md` (BUG-0011..BUG-0016) e `docs/PROBLEM_LEDGER.md` (PROB-0032..PROB-0037) para detalhes.

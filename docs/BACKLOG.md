@@ -564,4 +564,57 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 
 ---
 
-> Mantido pelo `docs-reporter`. Ultima atualizacao: 2026-07-06 (auditoria completa do sistema).
+## BACKLOG-0045 — Backfill retroativo do Ledger para transações antigas sem carteira
+
+- **Titulo:** Rodar/estender `LedgerBackfillService` para cobrir transações criadas antes da correção do BUG-0011/BUG-0012
+- **Prioridade:** P1
+- **Area:** backend, banco
+- **Motivo:** Antes de 2026-07-09, transações com `carteiraId` falhavam (BUG-0011) e o app mobile nem enviava `carteiraId` (BUG-0012). Transações criadas nesse período não têm `MovimentoCarteira` correspondente no Ledger, mesmo que a carteira exista — o saldo materializado da carteira pode não refletir o histórico real de transações antigas.
+- **Dependencias:** BUG-0011 e BUG-0012 corrigidos (concluído em 2026-07-09). `LedgerBackfillService` já existe (PR-LEDGER-05) mas foi desenhado para backfill inicial de carteiras sem movimento nenhum, não para reconciliar transações específicas sem carteira.
+- **Criterio de aceite:** Levantamento de quantas transações ativas existem sem `carteira_id` e sem movimento correspondente; decisão documentada (backfill automático vs. correção manual assistida); se aplicado, reconciliação (`LedgerReconciliationService`) retorna `OK` para todas as carteiras afetadas.
+- **Risco se ficar pendente:** Saldo de carteiras de usuários com uso anterior a 2026-07-09 pode ficar permanentemente divergente do histórico real de transações.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0046 — Remover arquivo de swap do vim commitável no repositório
+
+- **Titulo:** Excluir `mobile/src/services/.api.ts.swp` e garantir `.gitignore` cobre `*.swp`
+- **Prioridade:** P3
+- **Area:** mobile, documentacao
+- **Motivo:** Arquivo `mobile/src/services/.api.ts.swp` (swap de edição do vim) apareceu como untracked no repositório durante a sessão de 2026-07-09. Não deve ser versionado.
+- **Dependencias:** Nenhuma
+- **Criterio de aceite:** Arquivo removido do working tree; `*.swp` adicionado ao `.gitignore` se ainda não estiver coberto.
+- **Risco se ficar pendente:** Baixo — poluição do repositório, risco de commit acidental de arquivo temporário.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0047 — Auditar demais endpoints quanto a exposição de entidade JPA completa
+
+- **Titulo:** Verificar se outros controllers retornam entidade completa (`Usuario`, etc.) em vez de DTO
+- **Prioridade:** P2
+- **Area:** backend, seguranca
+- **Motivo:** BUG-0016 (PROB-0037) confirmou que `POST /api/auth/register` vazava hash bcrypt e campos de lockout por retornar a entidade `Usuario` diretamente. Não foi feita uma varredura sistemática nos demais endpoints (ex: `GET /usuarios/me`, endpoints de perfil) para confirmar que todos usam DTO/projeção.
+- **Dependencias:** Nenhuma
+- **Criterio de aceite:** Levantamento de todos os `ResponseEntity.ok(entidade)` no código de `controller/`; endpoints que retornam entidade JPA com campos sensíveis (senha, tokens, lockout) convertidos para DTO.
+- **Risco se ficar pendente:** Possível vazamento adicional de dados sensíveis (PII/segurança) em endpoints não revisados.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0048 — Efeitos visuais do protótipo aplicados ao mobile (Entrance, FloatEmoji, Fab gradiente)
+
+- **Titulo:** Portar efeitos de entrada (`gf-rise`/`gf-pop`) e emoji flutuante (`gf-float`) do protótipo standalone para o app mobile
+- **Prioridade:** P2
+- **Area:** mobile, documentacao
+- **Motivo:** Alinhar a experiência visual do app Expo com o protótipo de referência (`docs/Gestor Financeiro (standalone).html`), conforme direção de design registrada em `mobile-first-prototype-redesign` (memória do usuário).
+- **Dependencias:** Nenhuma
+- **Criterio de aceite:** Componentes `Entrance` (stagger de entrada, respeita `Reduce Motion`) e `FloatEmoji` criados e aplicados em home/metas/transações; `Fab` com gradiente violeta `#7c5cfc`→`#8b2fff` e glow.
+- **Risco se ficar pendente:** N/A — já implementado nesta sessão.
+- **Status:** FECHADO (2026-07-09)
+- **Evidencias:** `mobile/src/components/ui/Entrance.tsx` (novo), `mobile/src/components/ui/FloatEmoji.tsx` (novo), `mobile/src/components/ui/Fab.tsx`, aplicados em `mobile/app/(app)/index.tsx`, `mobile/app/(app)/metas.tsx`, `mobile/app/(app)/transacoes.tsx`. Não validado com teste automatizado (mobile sem suíte de testes configurada — ver limitação conhecida em `SYSTEM_OVERVIEW.md`).
+
+---
+
+> Mantido pelo `docs-reporter`. Ultima atualizacao: 2026-07-09 (correções pós-diagnóstico manual e efeitos visuais do protótipo — ver BUGFIX_LOG BUG-0011 a BUG-0016).

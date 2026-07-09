@@ -2,7 +2,7 @@
 
 Registro de diagramas do sistema. Mantido pelo `docs-reporter`.
 
-**Ultima atualizacao:** 2026-07-08
+**Ultima atualizacao:** 2026-07-09
 
 ---
 
@@ -122,6 +122,13 @@ Usuario ──► Login (email/senha)
          - Enfileira requisicoes concorrentes
 ```
 
+> **Pendencia (2026-07-09, BUG-0013):** o diagrama acima descreve apenas o fluxo web. Desde
+> 2026-07-09 o mobile tambem tem interceptor de refresh automatico simetrico ao do web (promise
+> deduplicada, retry da request original), e as respostas de login/refresh passaram a incluir
+> `csrfToken` no corpo (alem do cookie), pois clientes React Native nao leem cookies para o
+> double-submit. A pagina `02 Auth flow` do `.drawio` ainda nao foi atualizada para refletir isso —
+> atualizar quando o arquivo `.drawio` for revisado.
+
 ### 3. Fluxo single-tenant / ownership
 
 Representado em `docs/diagrams/sistema-completo.drawio`, pagina `03 Ownership`.
@@ -188,11 +195,15 @@ Usuario (1)
   │     └── id, nome, valorTotal, valorReservado, valorMensal, dataPrevista, ativa
   │
   ├── (1:N) Transacao
-  │     ├── id, descricao, valorTotal, tipo (ENTRADA|SAIDA), data, status, parcelado
+  │     ├── id, descricao, valorTotal, tipo (ENTRADA|SAIDA), data, status, parcelado, ativa (soft-delete, V13)
   │     ├── (N:1) Categoria
   │     ├── (N:1) Conta (opcional)
+  │     ├── (N:1) Carteira (opcional, V13 — so movimenta Ledger se presente, ver BUG-0011/BUG-0012)
   │     └── (1:N) Parcela
   │           └── id, numeroParcela, valor, dataVencimento, status (PAGO|PENDENTE|ATRASADO|CANCELADO)
+  │
+  ├── (1:N) MovimentoCarteira (Ledger, V11 — nao representado no diagrama .drawio atual)
+  │     └── id, carteira_id, tipo (ENTRADA|SAIDA|AJUSTE|BACKFILL), valorAssinado, moeda (CHAR(3)), criadoEm
   │
   ├── (1:N) RefreshToken
   │     └── id, token (UUID, unique), dataExpiracao, dataCriacao, revogado
@@ -200,6 +211,11 @@ Usuario (1)
   └── (1:N) PasswordResetToken
         └── id, token, dataExpiracao, usado
 ```
+
+> **Pendencia (ERD):** a pagina `04 ERD` do `.drawio` ainda nao inclui a tabela `movimentos_carteira`
+> (Ledger, introduzida em `V11__movimento_carteira.sql`) nem os campos `carteira_id`/`ativa` de
+> `Transacao` (introduzidos em `V13__transacao_carteira.sql`). Atualizar na proxima revisao do
+> arquivo `.drawio`.
 
 ### 5. Proximos passos opcionais
 

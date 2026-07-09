@@ -627,4 +627,130 @@ Registro central de problemas encontrados no sistema. Mantido pelo `docs-reporte
 
 ---
 
-> Mantido pelo `docs-reporter`. Ultima atualizacao: 2026-07-06 (auditoria completa do sistema).
+## PROB-0032 — 500 ao criar transação com carteiraId (detached entity)
+
+- **ID:** PROB-0032
+- **Titulo:** POST /api/v1/transacoes com carteiraId retorna 500 INTERNAL_ERROR — "Detached entity with generated id ... Carteira.version null"
+- **Data:** 2026-07-09
+- **Origem:** diagnóstico manual — replicação do payload exato do app mobile contra a API local (porta 8081)
+- **Severidade:** BLOCKER
+- **Status:** FECHADO (2026-07-09)
+- **Area:** backend
+- **Sintoma:** Toda transação criada com `carteiraId` no payload falhava com 500. Stack trace apontava para entidade `Carteira` detached ao tentar persistir a `Transacao` associada.
+- **Causa raiz:** `TransacaoController.toEntity()` monta um stub `new Carteira()` apenas com o `id` recebido no request (sem carregar do banco). `TransacaoService.criar()` não resolvia essa carteira via repository antes do `save()`, então o Hibernate tentava fazer cascade em uma entidade detached sem `version` — violando o optimistic locking (`@Version`).
+- **Impacto tecnico:** Toda transação vinculada a uma carteira específica falhava. Sem carteira resolvida, a transação também não movimentava saldo (ver PROB-0033).
+- **Arquivos relacionados:** `backend/src/main/java/com/gestor/financeiro/controller/TransacaoController.java`, `backend/src/main/java/com/gestor/financeiro/service/TransacaoService.java`
+- **Solucao proposta:** Resolver a carteira via `carteiraRepository.findByIdAndUsuarioId` (valida ownership) antes de associar à transação e salvar.
+- **Solucao aplicada:** `TransacaoService.criar()` agora busca a carteira gerenciada via `carteiraRepository.findByIdAndUsuarioId(id, usuarioId)` e substitui o stub detached antes do `save()`. Lança `ResourceNotFoundException` se a carteira não existir ou não pertencer ao usuário.
+- **Evidencias:** Reprodução via chamada direta a `POST /api/v1/transacoes` com payload `{ ..., "carteiraId": <id> }` contra API local (porta 8081) reproduzindo o stack trace "Detached entity with generated id ... Carteira.version null" antes da correção; após a correção, fluxo E2E validado (carteira 1000 + entrada 3000 − saída 200 = saldo 3800). `mvn test` 69/69 PASS.
+- **Riscos residuais:** Transações antigas criadas antes desta correção, sem carteira resolvida, não têm movimento retroativo no Ledger (ver BACKLOG-0045).
+- **Proximo passo:** Resolvido. Acompanhar BACKLOG-0045 para backfill retroativo.
+
+---
+
+## PROB-0033 — Saldo total da carteira congelado (mobile não enviava carteiraId)
+
+- **ID:** PROB-0033
+- **Titulo:** NovaTransacaoModal (mobile) não enviava carteiraId — transações não movimentavam saldo
+- **Data:** 2026-07-09
+- **Origem:** diagnóstico manual — replicação do payload exato do app mobile contra a API local
+- **Severidade:** HIGH
+- **Status:** FECHADO (2026-07-09)
+- **Area:** mobile, backend
+- **Sintoma:** Usuário criava transações (entrada/saída) e o saldo total das carteiras nunca mudava no dashboard/carteiras.
+- **Causa raiz:** `mobile/src/components/NovaTransacaoModal.tsx` montava o payload de `POST /api/v1/transacoes` sem o campo `carteiraId`. No backend, `TransacaoService.criar()` só registra movimento no Ledger (`MovimentoCarteira`) quando `carteira` está presente na transação — transação sem carteira é ignorada pelo Ledger por design.
+- **Impacto tecnico:** Saldo de carteiras e saldo total do dashboard ficavam permanentemente incorretos/congelados, apesar de as transações serem registradas e contabilizadas em relatórios/categorias.
+- **Arquivos relacionados:** `mobile/src/components/NovaTransacaoModal.tsx`, `mobile/src/types/index.ts` (`TransacaoRequest`), `backend/src/main/java/com/gestor/financeiro/service/TransacaoService.java`
+- **Solucao proposta:** Adicionar seletor de carteira (obrigatório) no modal mobile; incluir `carteiraId` em `TransacaoRequest`; invalidar caches de carteiras/dashboard após criar transação.
+- **Solucao aplicada:** Seletor de carteira via chips adicionado ao `NovaTransacaoModal`, pré-selecionando a primeira carteira do usuário. `carteiraId?: number` adicionado a `TransacaoRequest` em `mobile/src/types/index.ts`. Query invalidation ampliada para `carteiras` e `dashboard-projecao` após sucesso da mutation.
+- **Evidencias:** Payload do app antes da correção não incluía `carteiraId`; fluxo E2E pós-correção validado via API: carteira inicial 1000 + entrada 3000 − saída 200 = saldo 3800; delete com estorno → 4000.
+- **Riscos residuais:** Depende de PROB-0032 estar corrigido no backend (resolvido). Transações antigas sem carteira continuam sem movimento retroativo (BACKLOG-0045).
+- **Proximo passo:** Resolvido.
+
+---
+
+## PROB-0034 — Sessão mobile expira sem refresh automático
+
+- **ID:** PROB-0034
+- **Titulo:** App mobile passa a receber erros de API após ~15 minutos de uso (JWT expira sem refresh)
+- **Data:** 2026-07-09
+- **Origem:** diagnóstico manual — replicação de uso prolongado contra a API local
+- **Severidade:** HIGH
+- **Status:** FECHADO (2026-07-09)
+- **Area:** mobile, backend, seguranca
+- **Sintoma:** Após ~15 minutos, todas as chamadas autenticadas do app passavam a falhar (401), exigindo logout/login manual.
+- **Causa raiz:** Access token JWT expira em `900000ms` (15 min, ver `application.properties`/`JwtUtil`). O interceptor Axios do mobile (`mobile/src/services/api.ts`) apenas mapeava o 401 para mensagem amigável, sem tentar renovar a sessão via `POST /api/auth/refresh-token`, diferente do interceptor web que já fazia refresh automático.
+- **Impacto tecnico:** UX quebrada em qualquer sessão de uso contínuo acima de 15 minutos.
+- **Arquivos relacionados:** `mobile/src/services/api.ts`, `mobile/src/store/auth.ts`, `backend/src/main/java/com/gestor/financeiro/controller/AuthController.java`
+- **Solucao proposta:** Implementar interceptor de 401 no mobile que chame `refresh-token` (com cookie HttpOnly + header `X-CSRF-Token`), com dedupe de chamadas concorrentes e retry da request original.
+- **Solucao aplicada:** Interceptor de resposta em `api.ts` detecta 401 fora de rotas `/auth/`, chama `refreshAccessToken()` (promise compartilhada/deduplicada), grava novo `accessToken`/`csrfToken` via `store/auth.ts` (SecureStore) e repete a request original com o novo Bearer token. Backend (`AuthController`) passou a devolver `csrfToken` também no corpo da resposta de login/refresh (não apenas no cookie), pois clientes nativos React Native não leem cookies para o padrão double-submit; o double-submit continua válido porque o corpo cross-origin permanece ilegível pelo browser.
+- **Evidencias:** `mvn test` 69/69 PASS; fluxo manual: refresh-token rotaciona corretamente e o novo access token funciona nas chamadas seguintes.
+- **Riscos residuais:** Nenhum identificado para o fluxo mobile. Rotação de refresh token com detecção de reuse já existia no backend e não foi alterada.
+- **Proximo passo:** Resolvido.
+
+---
+
+## PROB-0035 — Transações soft-deletadas continuavam somando em dashboard/relatórios
+
+- **ID:** PROB-0035
+- **Titulo:** Queries de TransacaoRepository não filtravam ativa=true — soft-delete não era respeitado
+- **Data:** 2026-07-09
+- **Origem:** diagnóstico manual — replicação de fluxo de exclusão de transação contra a API local
+- **Severidade:** BLOCKER
+- **Status:** FECHADO (2026-07-09)
+- **Area:** backend, banco
+- **Sintoma:** Ao deletar uma transação (soft-delete via `ativa = false`, introduzido no Ledger em `V13__transacao_carteira.sql`), o valor dela continuava sendo somado em dashboard, relatórios, insights, orçamento e aparecia nas listagens paginadas e na fatura de cartão.
+- **Causa raiz:** As queries derivadas e `@Query` de `TransacaoRepository` (listagens, somatórios SUM, agrupamento por categoria, listagem de fatura) não incluíam `ativa = true`/`AndAtivaTrue` na cláusula `WHERE`. Apenas o soft-delete gravava a flag; nenhuma leitura a respeitava.
+- **Impacto tecnico:** Corrupção de dados financeiros exibidos — saldo/gastos "fantasma" de transações que o usuário já havia cancelado/excluído.
+- **Arquivos relacionados:** `backend/src/main/java/com/gestor/financeiro/repository/TransacaoRepository.java`, `backend/src/main/java/com/gestor/financeiro/service/TransacaoService.java`, `backend/src/main/java/com/gestor/financeiro/service/FaturaService.java`
+- **Solucao proposta:** Adicionar `ativa = true` em todas as queries de leitura de `TransacaoRepository`; criar variantes derivadas `AndAtivaTrue` para listagens paginadas e para consulta usada pela fatura.
+- **Solucao aplicada:** Adicionado `AND t.ativa = true` em `sumValorTotalByUsuarioIdAndTipoAndDataBetween`, `sumValorEfetivoByUsuarioIdAndTipoAndDataBetween`, `sumValorEfetivoAgrupadoPorCategoria`, `sumSaidasByUsuarioIdAndPeriodo`, `sumSaidasByCategoria` e `findByUsuarioIdAndDataBetweenWithCategoria`. Criados `findByUsuarioIdAndAtivaTrue` e `findByUsuarioIdAndDataBetweenAndAtivaTrue` (usados por `TransacaoService.listarPorUsuario`/`listarPorPeriodo`) e `findByUsuarioIdAndContaIdAndDataBetweenAndAtivaTrue` (usado por `FaturaService`, substituindo `findByUsuarioIdAndContaIdAndDataBetween`).
+- **Evidencias:** `mvn test` 69/69 PASS; fluxo E2E: delete de transação com estorno → saldo volta corretamente ao valor anterior (4000) e o valor não aparece mais nas somas de dashboard/relatório.
+- **Riscos residuais:** Método derivado antigo `findByUsuarioIdAndDataBetween` (sem `AndAtivaTrue`) permanece no repository e não é mais usado pelo service principal — verificar se algum outro caller ainda depende dele para não reintroduzir o bug.
+- **Proximo passo:** Auditar demais callers de `TransacaoRepository` (ex: exportação CSV, insights) para confirmar que também filtram `ativa=true`.
+
+---
+
+## PROB-0036 — categoria.valorGasto somava também transações de ENTRADA
+
+- **ID:** PROB-0036
+- **Titulo:** Criar/deletar transação de ENTRADA alterava valorGasto da categoria, inflando o indicador de gasto
+- **Data:** 2026-07-09
+- **Origem:** diagnóstico manual — replicação do payload exato do app mobile contra a API local
+- **Severidade:** HIGH
+- **Status:** FECHADO (2026-07-09)
+- **Area:** backend
+- **Sintoma:** Ao registrar uma transação do tipo ENTRADA vinculada a uma categoria, `Categoria.valorGasto` era incrementado — mesmo entrada de dinheiro não sendo gasto. Orçamento por categoria ficava incorreto.
+- **Causa raiz:** `TransacaoService.criar()` e `TransacaoService.deletar()` somavam/subtraiam `valorTotal` em `categoria.valorGasto` incondicionalmente, sem checar `transacao.getTipo()`.
+- **Impacto tecnico:** Indicadores de orçamento e "gasto por categoria" incorretos sempre que havia categoria em transações de ENTRADA.
+- **Arquivos relacionados:** `backend/src/main/java/com/gestor/financeiro/service/TransacaoService.java`
+- **Solucao proposta:** Restringir o ajuste de `valorGasto` a transações com `tipo == SAIDA`.
+- **Solucao aplicada:** `TransacaoService.criar()` só chama `categoria.setValorGasto(...)` quando `transacao.getTipo() == TipoTransacao.SAIDA`. `TransacaoService.deletar()` só reverte `valorGasto` quando `transacao.getTipo() == TipoTransacao.SAIDA`.
+- **Evidencias:** `mvn test` 69/69 PASS; fluxo E2E: orçamento de julho/2026 com gasto 150/500 correto após criar entrada e saída no mesmo mês/categoria.
+- **Riscos residuais:** Nenhum identificado.
+- **Proximo passo:** Resolvido.
+
+---
+
+## PROB-0037 — Vazamento de hash de senha no response de registro
+
+- **ID:** PROB-0037
+- **Titulo:** POST /api/auth/register retornava a entidade Usuario inteira, incluindo hash bcrypt e campos de lockout
+- **Data:** 2026-07-09
+- **Origem:** diagnóstico manual — inspeção do response de `POST /api/auth/register` contra a API local
+- **Severidade:** HIGH
+- **Status:** FECHADO (2026-07-09)
+- **Area:** backend, seguranca
+- **Sintoma:** Response de cadastro (`ResponseEntity.ok(usuarioSalvo)`) incluía o objeto `Usuario` completo — hash de senha (bcrypt), `failedAttempts`, `lockedUntil` e demais campos internos visíveis no corpo da resposta HTTP.
+- **Causa raiz:** `AuthController.register()` retornava a entidade JPA diretamente em vez de um DTO/projeção restrita.
+- **Impacto tecnico:** Vazamento de hash de senha (mesmo com bcrypt, reduz a superfície de ataque de brute-force offline) e de metadados internos de segurança (lockout) para qualquer chamador do endpoint de cadastro.
+- **Arquivos relacionados:** `backend/src/main/java/com/gestor/financeiro/controller/AuthController.java`
+- **Solucao proposta:** Retornar apenas campos não sensíveis (`id`, `nome`, `email`) no response de registro.
+- **Solucao aplicada:** `AuthController.register()` agora retorna `Map.of("id", ..., "nome", ..., "email", ...)` em vez da entidade `Usuario`.
+- **Evidencias:** Comparação do payload de resposta antes/depois via chamada direta a `POST /api/auth/register` contra a API local; `mvn test` 69/69 PASS.
+- **Riscos residuais:** Verificar se algum outro endpoint (ex: `GET /usuarios/me`) também retorna a entidade completa em vez de DTO — não verificado nesta sessão.
+- **Proximo passo:** Auditar demais endpoints de `UsuarioController`/`AuthController` quanto a exposição de entidade completa.
+
+---
+
+> Mantido pelo `docs-reporter`. Ultima atualizacao: 2026-07-09 (correções pós-diagnóstico manual via replicação de payloads mobile — ver BUGFIX_LOG BUG-0011 a BUG-0016).
