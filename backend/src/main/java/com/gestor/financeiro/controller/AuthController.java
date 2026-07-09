@@ -105,8 +105,13 @@ public class AuthController {
     usuario.setSenha(passwordEncoder.encode(request.getPassword()));
     
     Usuario usuarioSalvo = usuarioRepository.save(usuario);
-    
-    return ResponseEntity.ok(usuarioSalvo);
+
+    // Nunca expor a entidade (contém hash de senha e campos de lockout)
+    return ResponseEntity.ok(Map.of(
+        "id", usuarioSalvo.getId(),
+        "nome", usuarioSalvo.getNome(),
+        "email", usuarioSalvo.getEmail()
+    ));
 }
 
     @PostMapping("/login")
