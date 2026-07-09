@@ -101,6 +101,15 @@ public class TransacaoService {
             transacao.setConta(conta);
         }
 
+        if (transacao.getCarteira() != null && transacao.getCarteira().getId() != null) {
+            // Substitui o stub detached vindo do controller por entidade gerenciada (valida ownership)
+            Carteira carteira = carteiraRepository.findByIdAndUsuarioId(
+                    transacao.getCarteira().getId(), usuarioId)
+                .orElseThrow(() -> new ResourceNotFoundException("Carteira não encontrada"));
+
+            transacao.setCarteira(carteira);
+        }
+
         if (transacao.getParcelado() && transacao.getTotalParcelas() > 1) {
             criarParcelas(transacao);
         }

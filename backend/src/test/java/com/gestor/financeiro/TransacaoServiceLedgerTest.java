@@ -122,6 +122,20 @@ class TransacaoServiceLedgerTest {
     }
 
     @Test
+    void criarTransacaoComCarteiraStubSubstituiPorEntidadeGerenciada() {
+        Carteira carteiraStub = new Carteira();
+        carteiraStub.setId(carteira.getId());
+
+        Transacao transacao = transacaoSaida(usuario, categoria, carteiraStub, "Stub carteira", new BigDecimal("75.00"));
+
+        Transacao criada = transacaoService.criar(transacao, usuario.getId());
+
+        assertEquals(carteira.getId(), criada.getCarteira().getId());
+        Carteira atualizada = carteiraRepository.findById(carteira.getId()).orElseThrow();
+        assertEquals(0, new BigDecimal("425.00").compareTo(atualizada.getSaldo()));
+    }
+
+    @Test
     void atualizarValorGeraMovimentoDeDiferenca() {
         Transacao transacao = transacaoService.criar(
                 transacaoSaida(usuario, categoria, carteira, "Original", new BigDecimal("100.00")),
