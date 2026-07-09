@@ -1,5 +1,5 @@
 import api from './api';
-import { setAccessToken, clearAccessToken, setUsuarioCache, clearUsuarioCache } from '../store/auth';
+import { setAccessToken, clearAccessToken, setCsrfToken, clearCsrfToken, setUsuarioCache, clearUsuarioCache } from '../store/auth';
 import { LoginResponse, Usuario } from '../types';
 
 export const authService = {
@@ -8,6 +8,7 @@ export const authService = {
     const token = data.accessToken ?? data.token;
     if (!token) throw new Error('Token não recebido do servidor.');
     await setAccessToken(token);
+    if (data.csrfToken) await setCsrfToken(data.csrfToken);
     if (!data.usuario) throw new Error('Dados do usuário não retornados pelo servidor.');
     await setUsuarioCache(data.usuario);
     return data.usuario;
@@ -15,6 +16,7 @@ export const authService = {
 
   async logout(): Promise<void> {
     await clearAccessToken();
+    await clearCsrfToken();
     await clearUsuarioCache();
   },
 };

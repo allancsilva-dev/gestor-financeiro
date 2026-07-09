@@ -1,7 +1,20 @@
 import * as SecureStore from 'expo-secure-store';
 
 const ACCESS_TOKEN_KEY = 'accessToken';
+const CSRF_TOKEN_KEY = 'csrfToken';
 const USUARIO_KEY = 'usuario';
+
+export const setCsrfToken = async (token: string) => {
+  await SecureStore.setItemAsync(CSRF_TOKEN_KEY, token);
+};
+
+export const getCsrfToken = async (): Promise<string | null> => {
+  return SecureStore.getItemAsync(CSRF_TOKEN_KEY);
+};
+
+export const clearCsrfToken = async () => {
+  await SecureStore.deleteItemAsync(CSRF_TOKEN_KEY);
+};
 
 export const setAccessToken = async (token: string) => {
   await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, token);

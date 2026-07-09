@@ -149,9 +149,14 @@ public class AuthController {
                 "email", usuario.getEmail()
             ));
 
+            // csrfToken também no body: clientes nativos (React Native) não conseguem
+            // ler cookies para o double-submit; body cross-origin continua ilegível no browser
+            String csrfToken = createCsrfToken();
+            response.put("csrfToken", csrfToken);
+
             ResponseCookie refreshCookie = buildRefreshTokenCookie(refreshToken.getToken(), REFRESH_COOKIE_MAX_AGE_SECONDS);
-            ResponseCookie csrfCookie = buildCsrfCookie(createCsrfToken(), REFRESH_COOKIE_MAX_AGE_SECONDS);
-            
+            ResponseCookie csrfCookie = buildCsrfCookie(csrfToken, REFRESH_COOKIE_MAX_AGE_SECONDS);
+
             return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshCookie.toString(), csrfCookie.toString())
                 .body(response);
@@ -184,11 +189,13 @@ public class AuthController {
         String novoAccessToken = jwtUtil.generateToken(refreshToken.getUsuario().getEmail());
 
         // Resposta
+        String csrfToken = createCsrfToken();
         Map<String, Object> response = new HashMap<>();
         response.put("accessToken", novoAccessToken);
+        response.put("csrfToken", csrfToken);
 
         ResponseCookie refreshCookie = buildRefreshTokenCookie(refreshToken.getToken(), REFRESH_COOKIE_MAX_AGE_SECONDS);
-        ResponseCookie csrfCookie = buildCsrfCookie(createCsrfToken(), REFRESH_COOKIE_MAX_AGE_SECONDS);
+        ResponseCookie csrfCookie = buildCsrfCookie(csrfToken, REFRESH_COOKIE_MAX_AGE_SECONDS);
 
         return ResponseEntity.ok()
             .header(HttpHeaders.SET_COOKIE, refreshCookie.toString(), csrfCookie.toString())
