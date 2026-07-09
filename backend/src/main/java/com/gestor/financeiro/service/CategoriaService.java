@@ -37,12 +37,16 @@ public class CategoriaService {
         
         // Associa o usuário à categoria
         categoria.setUsuario(usuario);
-        
+
+        if (categoriaRepository.existsByUsuarioIdAndNomeIgnoreCaseAndAtivoTrue(usuario.getId(), categoria.getNome())) {
+            throw new BusinessException("Já existe uma categoria com esse nome.");
+        }
+
         // Inicializa valores padrão
         if (categoria.getAtivo() == null) {
             categoria.setAtivo(true);
         }
-        
+
         return categoriaRepository.save(categoria);
     }
     
@@ -59,6 +63,10 @@ public class CategoriaService {
             throw new BusinessException("Você não tem permissão para editar esta categoria");
         }
         
+        if (categoriaRepository.existsByUsuarioIdAndNomeIgnoreCaseAndAtivoTrueAndIdNot(usuario.getId(), categoriaAtualizada.getNome(), id)) {
+            throw new BusinessException("Já existe uma categoria com esse nome.");
+        }
+
         categoria.setNome(categoriaAtualizada.getNome());
         categoria.setCor(categoriaAtualizada.getCor());
         categoria.setIcone(categoriaAtualizada.getIcone());

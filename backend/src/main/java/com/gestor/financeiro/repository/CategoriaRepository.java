@@ -25,4 +25,8 @@ public interface CategoriaRepository extends JpaRepository<Categoria, Long> {
     long countByUsuarioIdAndAtivoTrue(Long usuarioId);
 
     Optional<Categoria> findByUsuarioIdAndNomeIgnoreCase(Long usuarioId, String nome);
+
+    boolean existsByUsuarioIdAndNomeIgnoreCaseAndAtivoTrue(Long usuarioId, String nome);
+
+    boolean existsByUsuarioIdAndNomeIgnoreCaseAndAtivoTrueAndIdNot(Long usuarioId, String nome, Long id);
 }
