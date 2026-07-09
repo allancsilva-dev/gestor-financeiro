@@ -80,10 +80,13 @@ public class TransacaoService {
                     transacao.getCategoria().getId(), usuarioId)
                 .orElseThrow(() -> new ResourceNotFoundException("Categoria não encontrada"));
 
-            categoria.setValorGasto(
-                categoria.getValorGasto().add(transacao.getValorTotal())
-            );
-            categoriaRepository.save(categoria);
+            // valorGasto acumula apenas dinheiro que sai; entradas não são gasto
+            if (transacao.getTipo() == TipoTransacao.SAIDA) {
+                categoria.setValorGasto(
+                    categoria.getValorGasto().add(transacao.getValorTotal())
+                );
+                categoriaRepository.save(categoria);
+            }
 
             transacao.setCategoria(categoria);
         }
@@ -172,7 +175,7 @@ public class TransacaoService {
             );
         }
 
-        if (transacao.getCategoria() != null) {
+        if (transacao.getCategoria() != null && transacao.getTipo() == TipoTransacao.SAIDA) {
             Categoria categoria = categoriaRepository.findByIdAndUsuarioId(
                     transacao.getCategoria().getId(), usuarioId)
                 .orElseThrow(() -> new ResourceNotFoundException("Categoria não encontrada"));
