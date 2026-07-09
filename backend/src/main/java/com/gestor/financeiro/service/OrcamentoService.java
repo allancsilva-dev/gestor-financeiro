@@ -65,25 +65,27 @@ public class OrcamentoService {
                     return novo;
                 });
 
+        List<OrcamentoCategoriaRequest> categoriasRequest = request.getCategorias() != null
+                ? request.getCategorias()
+                : Collections.emptyList();
+
+        orcamentoMensalRepository.save(orcamento);
+        orcamentoCategoriaRepository.deleteByOrcamentoId(orcamento.getId());
+        orcamentoCategoriaRepository.flush();
+
         BigDecimal totalPlanejado = BigDecimal.ZERO;
-        if (request.getCategorias() != null && !request.getCategorias().isEmpty()) {
-            orcamentoMensalRepository.save(orcamento);
+        for (OrcamentoCategoriaRequest catReq : categoriasRequest) {
+            Categoria categoria = categoriaRepository.findByIdAndUsuarioId(catReq.getCategoriaId(), usuarioId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Categoria não encontrada"));
 
-            orcamentoCategoriaRepository.deleteByOrcamentoId(orcamento.getId());
+            OrcamentoCategoria oc = new OrcamentoCategoria();
+            oc.setOrcamento(orcamento);
+            oc.setCategoria(categoria);
+            oc.setValorLimite(catReq.getValorLimite());
+            oc.setAtivo(true);
+            orcamentoCategoriaRepository.save(oc);
 
-            for (OrcamentoCategoriaRequest catReq : request.getCategorias()) {
-                Categoria categoria = categoriaRepository.findByIdAndUsuarioId(catReq.getCategoriaId(), usuarioId)
-                        .orElseThrow(() -> new ResourceNotFoundException("Categoria não encontrada"));
-
-                OrcamentoCategoria oc = new OrcamentoCategoria();
-                oc.setOrcamento(orcamento);
-                oc.setCategoria(categoria);
-                oc.setValorLimite(catReq.getValorLimite());
-                oc.setAtivo(true);
-                orcamentoCategoriaRepository.save(oc);
-
-                totalPlanejado = totalPlanejado.add(catReq.getValorLimite());
-            }
+            totalPlanejado = totalPlanejado.add(catReq.getValorLimite());
         }
 
         orcamento.setValorTotalPlanejado(totalPlanejado);
