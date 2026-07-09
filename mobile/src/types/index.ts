@@ -106,6 +106,7 @@ export interface TransacaoRequest {
   tipo: TipoTransacao;
   categoriaId: number; // obrigatório pelo backend
   contaId?: number;
+  carteiraId?: number; // sem carteira a transação não movimenta saldo
   parcelado?: boolean;
   totalParcelas?: number;
   observacoes?: string;
