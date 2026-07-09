@@ -6,7 +6,7 @@ import { useTheme } from '../../../src/theme';
 import { orcamentoService } from '../../../src/services/orcamentoService';
 import { categoriaService } from '../../../src/services/categoriaService';
 import { OrcamentoResponse, OrcamentoCategoriaItem } from '../../../src/types';
-import { formatCurrency } from '../../../src/utils/format';
+import { formatCurrency, formatNumber, parseCurrencyBR, maskCurrencyInput } from '../../../src/utils/format';
 
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
@@ -42,7 +42,7 @@ export default function OrcamentoScreen() {
 
   const iniciarEdicao = () => {
     const map = new Map<number, string>();
-    data?.categorias?.forEach((c) => map.set(c.categoriaId, String(c.valorLimite)));
+    data?.categorias?.forEach((c) => map.set(c.categoriaId, formatNumber(Number(c.valorLimite ?? 0))));
     categorias.forEach((c) => {
       if (c.id && !map.has(c.id)) map.set(c.id, '');
     });
@@ -52,8 +52,8 @@ export default function OrcamentoScreen() {
 
   const salvar = async () => {
     const cats = Array.from(limites.entries())
-      .filter(([_, v]) => parseFloat(v) > 0)
-      .map(([categoriaId, valorLimite]) => ({ categoriaId, valorLimite: parseFloat(valorLimite) }));
+      .filter(([_, v]) => parseCurrencyBR(v) > 0)
+      .map(([categoriaId, valorLimite]) => ({ categoriaId, valorLimite: parseCurrencyBR(valorLimite) }));
 
     if (cats.length === 0) return;
     setSaving(true);
@@ -87,8 +87,8 @@ export default function OrcamentoScreen() {
               <TextInput
                 style={[styles.editInput, { backgroundColor: colors.bg, borderColor: colors.border, color: colors.textPrimary }]}
                 value={limites.get(cat.id!) || ''}
-                onChangeText={(t) => { const n = new Map(limites); n.set(cat.id!, t.replace(',', '.')); setLimites(n); }}
-                keyboardType="decimal-pad"
+                onChangeText={(t) => { const n = new Map(limites); n.set(cat.id!, maskCurrencyInput(t)); setLimites(n); }}
+                keyboardType="number-pad"
                 placeholder="0,00"
                 placeholderTextColor={colors.textMuted}
               />

@@ -9,7 +9,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '../src/theme';
 import { onboardingService } from '../src/services/onboardingService';
@@ -19,6 +19,7 @@ import { categoriaService } from '../src/services/categoriaService';
 import { contaFixaService } from '../src/services/contaFixaService';
 import { metaService } from '../src/services/metaService';
 import { TipoCarteira, TipoConta } from '../src/types';
+import { maskCurrencyInput, parseCurrencyBR } from '../src/utils/format';
 
 const PASSOS = ['Carteira', 'Conta', 'Categorias', 'Renda', 'Meta', 'Confirmar'];
 
@@ -36,7 +37,7 @@ const CATEGORIAS_SUGERIDAS = [
 
 export default function OnboardingScreen() {
   const colors = useTheme();
-  const navigation = useNavigation();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const [passo, setPasso] = useState(0);
@@ -51,11 +52,18 @@ export default function OnboardingScreen() {
   const [meta, setMeta] = useState({ nome: '', valorTotal: '', valorMensal: '', dataPrevista: '' });
   const [pularMeta, setPularMeta] = useState(false);
 
+  // Onboarding pode reexecutar (app fechado antes de completar): cada passo
+  // verifica o que já existe por nome antes de criar, para não duplicar.
+  const mesmoNome = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
   const handleAvancar = async () => {
     if (passo === 0) {
       setLoading(true);
       try {
-        await carteiraService.criar({ nome: carteira.nome, tipo: carteira.tipo, saldo: parseFloat(carteira.saldo || '0') });
+        const existentes = await carteiraService.listar();
+        if (!existentes.content?.some((c) => mesmoNome(c.nome, carteira.nome))) {
+          await carteiraService.criar({ nome: carteira.nome, tipo: carteira.tipo, saldo: parseCurrencyBR(carteira.saldo || '0') });
+        }
         setPasso(1);
       } catch { } finally { setLoading(false); }
       return;
@@ -63,7 +71,10 @@ export default function OnboardingScreen() {
     if (passo === 1) {
       setLoading(true);
       try {
-        await contaService.criar({ nome: conta.nome, tipo: conta.tipo, limiteTotal: conta.tipo === 'CREDITO' ? parseFloat(conta.limiteTotal || '0') : undefined });
+        const existentes = await contaService.listar();
+        if (!existentes.content?.some((c) => mesmoNome(c.nome, conta.nome))) {
+          await contaService.criar({ nome: conta.nome, tipo: conta.tipo, limiteTotal: conta.tipo === 'CREDITO' ? parseCurrencyBR(conta.limiteTotal || '0') : undefined });
+        }
         setPasso(2);
       } catch { } finally { setLoading(false); }
       return;
@@ -71,8 +82,11 @@ export default function OnboardingScreen() {
     if (passo === 2) {
       setLoading(true);
       try {
+        const existentes = await categoriaService.listar();
         const ids: number[] = [];
         for (const nome of categoriasSelecionadas) {
+          const jaExiste = existentes.find((c) => mesmoNome(c.nome, nome));
+          if (jaExiste) { ids.push(jaExiste.id); continue; }
           const s = CATEGORIAS_SUGERIDAS.find((c) => c.nome === nome);
           const criada = await categoriaService.criar({ nome, cor: s?.cor || '#6B7280', icone: s?.icone || '📌' });
           ids.push(criada.id);
@@ -92,7 +106,10 @@ export default function OnboardingScreen() {
           categoriaId = cats[0]?.id;
         }
         if (!categoriaId) { setPasso(4); return; }
-        await contaFixaService.criar({ descricao: renda.nome, valor: parseFloat(renda.valor || '0'), diaVencimento: parseInt(renda.diaVencimento || '1'), categoriaId, recorrente: true });
+        const existentes = await contaFixaService.listar();
+        if (!existentes.content?.some((cf) => mesmoNome(cf.nome, renda.nome))) {
+          await contaFixaService.criar({ descricao: renda.nome, valor: parseCurrencyBR(renda.valor || '0'), diaVencimento: parseInt(renda.diaVencimento || '1'), categoriaId, recorrente: true });
+        }
         setPasso(4);
       } catch { } finally { setLoading(false); }
       return;
@@ -101,7 +118,10 @@ export default function OnboardingScreen() {
       if (pularMeta) { setPasso(5); return; }
       setLoading(true);
       try {
-        await metaService.criar({ nome: meta.nome, valorTotal: parseFloat(meta.valorTotal || '0'), valorMensal: parseFloat(meta.valorMensal || '0'), dataLimite: meta.dataPrevista || undefined });
+        const existentes = await metaService.listar();
+        if (!existentes.content?.some((m) => mesmoNome(m.nome, meta.nome))) {
+          await metaService.criar({ nome: meta.nome, valorTotal: parseCurrencyBR(meta.valorTotal || '0'), valorMensal: parseCurrencyBR(meta.valorMensal || '0'), dataLimite: meta.dataPrevista || undefined });
+        }
         setPasso(5);
       } catch { } finally { setLoading(false); }
       return;
@@ -113,7 +133,7 @@ export default function OnboardingScreen() {
     try {
       await onboardingService.completar();
       queryClient.invalidateQueries();
-      (navigation as any).replace('/(app)/');
+      router.replace('/(app)/');
     } catch { } finally { setLoading(false); }
   };
 
@@ -168,8 +188,8 @@ export default function OnboardingScreen() {
           <TextInput
             style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]}
             value={carteira.saldo}
-            onChangeText={(t) => setCarteira((c) => ({ ...c, saldo: t.replace(',', '.') }))}
-            keyboardType="decimal-pad"
+            onChangeText={(t) => setCarteira((c) => ({ ...c, saldo: maskCurrencyInput(t) }))}
+            keyboardType="number-pad"
             placeholder="0,00"
             placeholderTextColor={colors.textMuted}
           />
@@ -206,8 +226,8 @@ export default function OnboardingScreen() {
               <TextInput
                 style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]}
                 value={conta.limiteTotal}
-                onChangeText={(t) => setConta((c) => ({ ...c, limiteTotal: t.replace(',', '.') }))}
-                keyboardType="decimal-pad"
+                onChangeText={(t) => setConta((c) => ({ ...c, limiteTotal: maskCurrencyInput(t) }))}
+                keyboardType="number-pad"
                 placeholder="0,00"
                 placeholderTextColor={colors.textMuted}
               />
@@ -249,8 +269,8 @@ export default function OnboardingScreen() {
           <Text style={[styles.label, { color: colors.textSecondary, marginTop: 12 }]}>VALOR MENSAL (R$)</Text>
           <TextInput
             style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary, opacity: pularRenda ? 0.4 : 1 }]}
-            value={renda.valor} onChangeText={(t) => setRenda((r) => ({ ...r, valor: t.replace(',', '.') }))}
-            keyboardType="decimal-pad" placeholder="0,00" placeholderTextColor={colors.textMuted} editable={!pularRenda}
+            value={renda.valor} onChangeText={(t) => setRenda((r) => ({ ...r, valor: maskCurrencyInput(t) }))}
+            keyboardType="number-pad" placeholder="0,00" placeholderTextColor={colors.textMuted} editable={!pularRenda}
           />
           <Text style={[styles.label, { color: colors.textSecondary, marginTop: 12 }]}>DIA DO RECEBIMENTO</Text>
           <TextInput
@@ -279,8 +299,8 @@ export default function OnboardingScreen() {
           <Text style={[styles.label, { color: colors.textSecondary, marginTop: 12 }]}>VALOR TOTAL (R$)</Text>
           <TextInput
             style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary, opacity: pularMeta ? 0.4 : 1 }]}
-            value={meta.valorTotal} onChangeText={(t) => setMeta((m) => ({ ...m, valorTotal: t.replace(',', '.') }))}
-            keyboardType="decimal-pad" placeholder="0,00" placeholderTextColor={colors.textMuted} editable={!pularMeta}
+            value={meta.valorTotal} onChangeText={(t) => setMeta((m) => ({ ...m, valorTotal: maskCurrencyInput(t) }))}
+            keyboardType="number-pad" placeholder="0,00" placeholderTextColor={colors.textMuted} editable={!pularMeta}
           />
           <TouchableOpacity onPress={() => setPularMeta(!pularMeta)} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 16, gap: 8 }}>
             <View style={{ width: 20, height: 20, borderRadius: 4, borderWidth: 2, borderColor: pularMeta ? colors.brand : colors.textSecondary, backgroundColor: pularMeta ? colors.brand : 'transparent', alignItems: 'center', justifyContent: 'center' }}>

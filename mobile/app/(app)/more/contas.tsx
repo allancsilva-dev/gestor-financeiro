@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, FlatList, Modal, ScrollView, TextInput } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { contaService } from '../../../src/services/contaService';
-import { TIPO_CONTA_LABEL, formatCurrency, parseCurrencyBR } from '../../../src/utils/format';
+import { TIPO_CONTA_LABEL, formatCurrency, parseCurrencyBR, maskCurrencyInput } from '../../../src/utils/format';
 import { Conta, ContaRequest, TipoConta } from '../../../src/types';
 import { useTheme } from '../../../src/theme';
 import SkeletonBox from '../../../src/components/ui/SkeletonBox';
@@ -13,7 +13,7 @@ export default function ContasScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [nome, setNome] = useState('');
   const [tipo, setTipo] = useState<TipoConta>('DEBITO');
-  const [limite, setLimite] = useState('0');
+  const [limite, setLimite] = useState('');
   const [nomeError, setNomeError] = useState<string | null>(null);
   const [tipoError, setTipoError] = useState<string | null>(null);
   const [limiteError, setLimiteError] = useState<string | null>(null);
@@ -28,7 +28,7 @@ export default function ContasScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contas'] });
       setModalVisible(false);
-      setNome(''); setLimite('0'); setTipo('DEBITO'); setNomeError(null); setTipoError(null); setLimiteError(null);
+      setNome(''); setLimite(''); setTipo('DEBITO'); setNomeError(null); setTipoError(null); setLimiteError(null);
     },
     onError: (err: any) => {
       setNomeError(err?.userMessage ?? 'Erro ao criar conta.');
@@ -87,7 +87,7 @@ export default function ContasScreen() {
       <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet">
         <View style={{ flex: 1, backgroundColor: colors.bg }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-            <TouchableOpacity onPress={() => { setModalVisible(false); setNome(''); setLimite('0'); setTipo('DEBITO'); setNomeError(null); setTipoError(null); setLimiteError(null); }}>
+            <TouchableOpacity onPress={() => { setModalVisible(false); setNome(''); setLimite(''); setTipo('DEBITO'); setNomeError(null); setTipoError(null); setLimiteError(null); }}>
               <Text style={{ color: colors.brand, fontSize: 15 }}>Cancelar</Text>
             </TouchableOpacity>
             <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600' }}>Nova Conta</Text>
@@ -124,7 +124,7 @@ export default function ContasScreen() {
             {tipo === 'CREDITO' && (
               <>
                 <Text style={{ color: colors.textSecondary, fontSize: 9, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Limite total</Text>
-                <TextInput value={limite} onChangeText={setLimite} keyboardType="decimal-pad" placeholderTextColor={colors.textMuted} style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, color: colors.textPrimary, fontSize: 15, marginBottom: 8 }} />
+                <TextInput value={limite} onChangeText={(t) => setLimite(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" placeholderTextColor={colors.textMuted} style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, color: colors.textPrimary, fontSize: 15, marginBottom: 8 }} />
                 {limiteError && <Text style={{ color: colors.danger, marginBottom: 8 }}>{limiteError}</Text>}
               </>
             )}

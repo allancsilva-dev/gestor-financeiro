@@ -1,21 +1,24 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, FlatList, Modal, ScrollView, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, Modal, ScrollView, TextInput } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { contaFixaService } from '../../../src/services/contaFixaService';
 import { categoriaService } from '../../../src/services/categoriaService';
 import Badge from '../../../src/components/ui/Badge';
 import { ContaFixa, ContaFixaRequest } from '../../../src/types';
 import { useTheme } from '../../../src/theme';
-import { parseCurrencyBR } from '../../../src/utils/format';
+import { parseCurrencyBR, maskCurrencyInput, formatCurrency, formatNumber } from '../../../src/utils/format';
 import SkeletonBox from '../../../src/components/ui/SkeletonBox';
+import Fab from '../../../src/components/ui/Fab';
 
 export default function ContasFixasScreen() {
   const colors = useTheme();
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
   const [modalPagarVisible, setModalPagarVisible] = useState(false);
   const [modalCriarVisible, setModalCriarVisible] = useState(false);
   const [selecionada, setSelecionada] = useState<ContaFixa | null>(null);
-  const [valorPago, setValorPago] = useState('0');
+  const [valorPago, setValorPago] = useState('');
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['contas-fixas'],
@@ -30,7 +33,7 @@ export default function ContasFixasScreen() {
       setModalPagarVisible(false);
     },
     onError: (err: any) => {
-      setValorPago('0');
+      setValorPago('');
     },
   });
 
@@ -61,8 +64,9 @@ export default function ContasFixasScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <View style={{ padding: 16 }}>
-        <Text style={{ color: colors.textPrimary, fontSize: 18, fontWeight: '700' }}>Contas Fixas</Text>
+      <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 12 }}>
+        <Text style={{ color: colors.textPrimary, fontSize: 23, fontWeight: '800', letterSpacing: -0.4 }}>Contas Fixas</Text>
+        <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>Despesas mensais e vencimentos</Text>
       </View>
 
       {isLoading ? (
@@ -80,6 +84,7 @@ export default function ContasFixasScreen() {
         <FlatList
           data={data?.content ?? []}
           keyExtractor={item => item.id.toString()}
+          contentContainerStyle={{ paddingBottom: 96 }}
           renderItem={({ item: cf }) => (
             <View style={{ backgroundColor: colors.card, borderRadius: 12, borderWidth: 1, borderColor: colors.border, padding: 14, marginBottom: 8, marginHorizontal: 16 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
@@ -87,10 +92,10 @@ export default function ContasFixasScreen() {
                 <Badge status={cf.status} />
               </View>
               <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Vence dia {cf.diaVencimento}</Text>
-              <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700', marginTop: 8 }}>{cf.valorPlanejado ? `R$ ${Number(cf.valorPlanejado ?? 0).toFixed(2)}` : 'R$ 0,00'}</Text>
+              <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700', marginTop: 8 }}>{formatCurrency(Number(cf.valorPlanejado ?? 0))}</Text>
               {(cf.status === 'PENDENTE' || cf.status === 'ATRASADO') && (
                 <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-                  <TouchableOpacity onPress={() => { setSelecionada(cf); setValorPago(String(cf.valorPlanejado ?? 0)); setModalPagarVisible(true); }} style={{ paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, borderColor: colors.brand }}>
+                  <TouchableOpacity onPress={() => { setSelecionada(cf); setValorPago(formatNumber(Number(cf.valorPlanejado ?? 0))); setModalPagarVisible(true); }} style={{ paddingVertical: 6, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, borderColor: colors.brand }}>
                     <Text style={{ color: colors.brand, fontSize: 12, fontWeight: '600' }}>Pagar</Text>
                   </TouchableOpacity>
                   {cf.recorrente !== false && (
@@ -105,17 +110,20 @@ export default function ContasFixasScreen() {
             </View>
           )}
           ListEmptyComponent={() => (
-            <View style={{ alignItems: 'center', padding: 48 }}>
-              <Text style={{ color: colors.textSecondary }}>Nenhuma conta fixa encontrada</Text>
+            <View style={{ alignItems: 'center', paddingHorizontal: 32, paddingVertical: 48 }}>
+              <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600', textAlign: 'center' }}>Nenhuma conta fixa ainda</Text>
+              <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4, textAlign: 'center' }}>Toque no + para cadastrar aluguel, energia, internet ou outras contas mensais.</Text>
             </View>
           )}
         />
       )}
 
+      <Fab onPress={() => setModalCriarVisible(true)} accessibilityLabel="Criar conta fixa" />
+
       <Modal visible={modalPagarVisible} animationType="slide" presentationStyle="pageSheet">
         <View style={{ flex: 1, backgroundColor: colors.bg }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-            <TouchableOpacity onPress={() => { setModalPagarVisible(false); setValorPago('0'); }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+            <TouchableOpacity onPress={() => { setModalPagarVisible(false); setValorPago(''); }}>
               <Text style={{ color: colors.brand, fontSize: 15 }}>Cancelar</Text>
             </TouchableOpacity>
             <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600' }}>Pagar</Text>
@@ -129,7 +137,7 @@ export default function ContasFixasScreen() {
           </View>
           <ScrollView contentContainerStyle={{ padding: 16 }}>
             <Text style={{ color: colors.textSecondary, fontSize: 9, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Valor</Text>
-            <TextInput value={valorPago} onChangeText={setValorPago} keyboardType="decimal-pad" placeholderTextColor={colors.textMuted} style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, color: colors.textPrimary, fontSize: 15, marginBottom: 16 }} />
+            <TextInput value={valorPago} onChangeText={(t) => setValorPago(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" placeholderTextColor={colors.textMuted} style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, color: colors.textPrimary, fontSize: 15, marginBottom: 16 }} />
           </ScrollView>
         </View>
       </Modal>
@@ -137,7 +145,7 @@ export default function ContasFixasScreen() {
       {/* Modal criar conta fixa */}
       <Modal visible={modalCriarVisible} animationType="slide" presentationStyle="pageSheet">
         <View style={{ flex: 1, backgroundColor: colors.bg }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
             <TouchableOpacity onPress={() => { setModalCriarVisible(false); setDescricaoCriar(''); setValorCriar(''); setDiaCriar(''); setCategoriaCriarId(null); setRecorrenteCriar(false); setDescricaoError(null); setValorError(null); setDiaError(null); setCategoriaError(null); }}><Text style={{ color: colors.brand }}>Cancelar</Text></TouchableOpacity>
             <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600' }}>Nova Conta Fixa</Text>
             <TouchableOpacity disabled={criarMutation.status === 'pending'} onPress={() => {
@@ -166,7 +174,7 @@ export default function ContasFixasScreen() {
             {descricaoError && <Text style={{ color: colors.danger, marginBottom: 8 }}>{descricaoError}</Text>}
 
             <Text style={{ color: colors.textSecondary, fontSize: 9, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Valor</Text>
-            <TextInput value={valorCriar} onChangeText={setValorCriar} keyboardType="decimal-pad" placeholderTextColor={colors.textMuted} style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, color: colors.textPrimary, fontSize: 15, marginBottom: 8 }} />
+            <TextInput value={valorCriar} onChangeText={(t) => setValorCriar(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" placeholderTextColor={colors.textMuted} style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, color: colors.textPrimary, fontSize: 15, marginBottom: 8 }} />
             {valorError && <Text style={{ color: colors.danger, marginBottom: 8 }}>{valorError}</Text>}
 
             <Text style={{ color: colors.textSecondary, fontSize: 9, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Dia de vencimento</Text>

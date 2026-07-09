@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, FlatList, Modal, ScrollView, TextInput, ActivityIndicator } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { carteiraService } from '../../../src/services/carteiraService';
-import { TIPO_CARTEIRA_LABEL, formatCurrency, parseCurrencyBR } from '../../../src/utils/format';
+import { TIPO_CARTEIRA_LABEL, formatCurrency, parseCurrencyBR, maskCurrencyInput } from '../../../src/utils/format';
 import { Carteira, CarteiraRequest, TipoCarteira } from '../../../src/types';
 import { useTheme } from '../../../src/theme';
 import SkeletonBox from '../../../src/components/ui/SkeletonBox';
@@ -13,7 +13,7 @@ export default function CarteirasScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [nome, setNome] = useState('');
   const [tipo, setTipo] = useState<TipoCarteira | null>('DINHEIRO');
-  const [saldo, setSaldo] = useState('0');
+  const [saldo, setSaldo] = useState('');
   const [nomeError, setNomeError] = useState<string | null>(null);
   const [tipoError, setTipoError] = useState<string | null>(null);
   const [saldoError, setSaldoError] = useState<string | null>(null);
@@ -29,7 +29,7 @@ export default function CarteirasScreen() {
       queryClient.invalidateQueries({ queryKey: ['carteiras'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-resumo'] });
       setModalVisible(false);
-      setNome(''); setSaldo('0'); setTipo('DINHEIRO');
+      setNome(''); setSaldo(''); setTipo('DINHEIRO');
     },
     onError: (err: any) => {
       setNomeError(err?.userMessage ?? 'Erro ao criar carteira.');
@@ -41,7 +41,7 @@ export default function CarteirasScreen() {
     let hasError = false;
     if (!nome.trim()) { setNomeError('Nome obrigatório.'); hasError = true; }
     if (!tipo) { setTipoError('Tipo obrigatório.'); hasError = true; }
-    const v = parseCurrencyBR(saldo);
+    const v = parseCurrencyBR(saldo || '0');
     if (isNaN(v) || v < 0) { setSaldoError('Saldo deve ser >= 0.'); hasError = true; }
     if (hasError) return;
     const req: CarteiraRequest = { nome: nome.trim(), tipo: tipo as TipoCarteira, saldo: Number(v) };
@@ -99,7 +99,7 @@ export default function CarteirasScreen() {
       <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet">
         <View style={{ flex: 1, backgroundColor: colors.bg }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-            <TouchableOpacity onPress={() => { setModalVisible(false); setNome(''); setSaldo('0'); setTipo('DINHEIRO'); setNomeError(null); setTipoError(null); setSaldoError(null); }}>
+            <TouchableOpacity onPress={() => { setModalVisible(false); setNome(''); setSaldo(''); setTipo('DINHEIRO'); setNomeError(null); setTipoError(null); setSaldoError(null); }}>
               <Text style={{ color: colors.brand, fontSize: 15 }}>Cancelar</Text>
             </TouchableOpacity>
             <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600' }}>Nova Carteira</Text>
@@ -123,7 +123,7 @@ export default function CarteirasScreen() {
             {tipoError && <Text style={{ color: colors.danger, marginBottom: 8 }}>{tipoError}</Text>}
 
             <Text style={{ color: colors.textSecondary, fontSize: 9, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Saldo inicial</Text>
-            <TextInput value={saldo} onChangeText={setSaldo} keyboardType="decimal-pad" placeholderTextColor={colors.textMuted} style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, color: colors.textPrimary, fontSize: 15, marginBottom: 8 }} />
+            <TextInput value={saldo} onChangeText={(t) => setSaldo(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" placeholderTextColor={colors.textMuted} style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, color: colors.textPrimary, fontSize: 15, marginBottom: 8 }} />
             {saldoError && <Text style={{ color: colors.danger, marginBottom: 8 }}>{saldoError}</Text>}
           </ScrollView>
         </View>

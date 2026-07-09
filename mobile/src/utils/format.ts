@@ -48,6 +48,23 @@ export const parseCurrencyBR = (value: string): number => {
   return parseFloat(cleaned);
 };
 
+// Máscara de moeda para digitação, centavos primeiro: dígitos viram centavos (digitar 1500 → "15,00")
+export const maskCurrencyInput = (text: string): string => {
+  const digits = text.replace(/\D/g, '').slice(0, 12);
+  if (!digits) return '';
+  const cents = digits.padStart(3, '0');
+  const int = cents.slice(0, -2).replace(/^0+(?=\d)/, '');
+  return `${int.replace(/\B(?=(\d{3})+(?!\d))/g, '.')},${cents.slice(-2)}`;
+};
+
+// Máscara de data para digitação: insere as barras de DD/MM/AAAA automaticamente
+export const maskDateInput = (text: string): string => {
+  const digits = text.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+};
+
 export const TIPO_CARTEIRA_LABEL: Record<TipoCarteira, string> = {
   DINHEIRO: 'Dinheiro',
   CONTA_BANCARIA: 'Conta Bancária',
