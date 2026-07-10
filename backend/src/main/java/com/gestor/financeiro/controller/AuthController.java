@@ -55,6 +55,8 @@ public class AuthController {
 
     private static final String REFRESH_COOKIE_NAME = "refreshToken";
     private static final String CSRF_COOKIE_NAME = "csrfToken";
+    private static final String MOBILE_CLIENT_HEADER = "X-Client-Type";
+    private static final String MOBILE_CLIENT_VALUE = "mobile";
 
     private static final long REFRESH_COOKIE_MAX_AGE_SECONDS = 7L * 24 * 3600;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
@@ -116,7 +118,7 @@ public class AuthController {
 
     @PostMapping("/login")
     @Operation(summary = "Realizar login", description = "Autentica e retorna access token com refresh token em cookie HttpOnly")
-    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request, HttpServletRequest servletRequest) {
         Optional<Usuario> usuarioOpt = usuarioRepository.findByEmail(request.getEmail());
         
         if (usuarioOpt.isEmpty()) {
@@ -154,6 +156,9 @@ public class AuthController {
             // ler cookies para o double-submit; body cross-origin continua ilegível no browser
             String csrfToken = createCsrfToken();
             response.put("csrfToken", csrfToken);
+            if (isMobileClient(servletRequest)) {
+                response.put("refreshToken", refreshToken.getToken());
+            }
 
             ResponseCookie refreshCookie = buildRefreshTokenCookie(refreshToken.getToken(), REFRESH_COOKIE_MAX_AGE_SECONDS);
             ResponseCookie csrfCookie = buildCsrfCookie(csrfToken, REFRESH_COOKIE_MAX_AGE_SECONDS);
@@ -175,8 +180,14 @@ public class AuthController {
      */
     @PostMapping("/refresh-token")
     @Operation(summary = "Renovar access token", description = "Gera novo access token com rotação de refresh token")
-    public ResponseEntity<?> refreshToken(HttpServletRequest request) {
+    public ResponseEntity<?> refreshToken(
+            HttpServletRequest request,
+            @RequestBody(required = false) RefreshTokenRequest body
+    ) {
         String refreshTokenValue = extractRefreshTokenFromCookies(request);
+        if ((refreshTokenValue == null || refreshTokenValue.isEmpty()) && body != null) {
+            refreshTokenValue = body.refreshToken();
+        }
         String clientIp = extractClientIp(request);
 
         if (refreshTokenValue == null || refreshTokenValue.isEmpty()) {
@@ -194,6 +205,9 @@ public class AuthController {
         Map<String, Object> response = new HashMap<>();
         response.put("accessToken", novoAccessToken);
         response.put("csrfToken", csrfToken);
+        if (isMobileClient(request)) {
+            response.put("refreshToken", refreshToken.getToken());
+        }
 
         ResponseCookie refreshCookie = buildRefreshTokenCookie(refreshToken.getToken(), REFRESH_COOKIE_MAX_AGE_SECONDS);
         ResponseCookie csrfCookie = buildCsrfCookie(csrfToken, REFRESH_COOKIE_MAX_AGE_SECONDS);
@@ -211,8 +225,14 @@ public class AuthController {
      */
     @PostMapping("/logout")
     @Operation(summary = "Logout atual", description = "Revoga refresh token da sessão atual")
-    public ResponseEntity<?> logout(HttpServletRequest request) {
+    public ResponseEntity<?> logout(
+            HttpServletRequest request,
+            @RequestBody(required = false) RefreshTokenRequest body
+    ) {
         String refreshToken = extractRefreshTokenFromCookies(request);
+        if ((refreshToken == null || refreshToken.isEmpty()) && body != null) {
+            refreshToken = body.refreshToken();
+        }
 
         if (refreshToken != null && !refreshToken.isEmpty()) {
             refreshTokenService.revogarToken(refreshToken);
@@ -375,6 +395,10 @@ public class AuthController {
         byte[] bytes = new byte[32];
         SECURE_RANDOM.nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    private boolean isMobileClient(HttpServletRequest request) {
+        return MOBILE_CLIENT_VALUE.equalsIgnoreCase(request.getHeader(MOBILE_CLIENT_HEADER));
     }
 
     private String extractRefreshTokenFromCookies(HttpServletRequest request) {

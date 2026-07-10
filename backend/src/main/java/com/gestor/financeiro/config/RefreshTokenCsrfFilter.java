@@ -24,6 +24,8 @@ public class RefreshTokenCsrfFilter extends OncePerRequestFilter {
     private static final String REFRESH_COOKIE_NAME = "refreshToken";
     private static final String REFRESH_TOKEN_PATH = "/api/auth/refresh-token";
     private static final String LOGOUT_PATH = "/api/auth/logout";
+    private static final String MOBILE_CLIENT_HEADER = "X-Client-Type";
+    private static final String MOBILE_CLIENT_VALUE = "mobile";
 
     private final ObjectMapper objectMapper;
 
@@ -36,6 +38,11 @@ public class RefreshTokenCsrfFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         if (!requiresCsrf(request)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        if (isMobileClient(request)) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -64,6 +71,10 @@ public class RefreshTokenCsrfFilter extends OncePerRequestFilter {
 
         String path = request.getRequestURI();
         return REFRESH_TOKEN_PATH.equals(path) || LOGOUT_PATH.equals(path);
+    }
+
+    private boolean isMobileClient(HttpServletRequest request) {
+        return MOBILE_CLIENT_VALUE.equalsIgnoreCase(request.getHeader(MOBILE_CLIENT_HEADER));
     }
 
     private String extractCookie(HttpServletRequest request, String cookieName) {

@@ -10,15 +10,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '../src/theme';
-import { onboardingService } from '../src/services/onboardingService';
-import { carteiraService } from '../src/services/carteiraService';
-import { contaService } from '../src/services/contaService';
-import { categoriaService } from '../src/services/categoriaService';
-import { contaFixaService } from '../src/services/contaFixaService';
-import { metaService } from '../src/services/metaService';
-import { TipoCarteira, TipoConta } from '../src/types';
+import { onboardingService, OnboardingFinalizarRequest } from '../src/services/onboardingService';
+import { ApiErrorWithMessage, TipoCarteira, TipoConta } from '../src/types';
+import { useAuth } from '../src/context/AuthContext';
 import { maskCurrencyInput, parseCurrencyBR } from '../src/utils/format';
 
 const PASSOS = ['Conta', 'Cartão', 'Categorias', 'Renda', 'Meta', 'Confirmar'];
@@ -38,103 +33,108 @@ const CATEGORIAS_SUGERIDAS = [
 export default function OnboardingScreen() {
   const colors = useTheme();
   const router = useRouter();
-  const queryClient = useQueryClient();
+  const { updateUsuario } = useAuth();
   const insets = useSafeAreaInsets();
   const [passo, setPasso] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [carteira, setCarteira] = useState({ nome: 'Conta Principal', tipo: 'CONTA_BANCARIA' as TipoCarteira, saldo: '' });
   const [conta, setConta] = useState({ nome: 'Cartão Principal', tipo: 'CREDITO' as TipoConta, limiteTotal: '' });
   const [categoriasSelecionadas, setCategoriasSelecionadas] = useState<string[]>(CATEGORIAS_SUGERIDAS.map((c) => c.nome));
   const [renda, setRenda] = useState({ nome: 'Salário', valor: '', diaVencimento: '1' });
   const [pularRenda, setPularRenda] = useState(false);
-  const [categoriaIds, setCategoriaIds] = useState<number[]>([]);
   const [meta, setMeta] = useState({ nome: '', valorTotal: '', valorMensal: '', dataPrevista: '' });
   const [pularMeta, setPularMeta] = useState(false);
 
-  // Onboarding pode reexecutar (app fechado antes de completar): cada passo
-  // verifica o que já existe por nome antes de criar, para não duplicar.
-  const mesmoNome = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+  const diaValido = (valor: string) => {
+    const dia = parseInt(valor || '', 10);
+    return Number.isInteger(dia) && dia >= 1 && dia <= 31;
+  };
 
-  const handleAvancar = async () => {
+  const validarPasso = (): string | null => {
     if (passo === 0) {
-      setLoading(true);
-      try {
-        const existentes = await carteiraService.listar();
-        if (!existentes.content?.some((c) => mesmoNome(c.nome, carteira.nome))) {
-          await carteiraService.criar({ nome: carteira.nome, tipo: carteira.tipo, saldo: parseCurrencyBR(carteira.saldo || '0') });
-        }
-        setPasso(1);
-      } catch { } finally { setLoading(false); }
-      return;
+      if (carteira.nome.trim().length < 2) return 'Informe o nome da conta principal.';
+      if (parseCurrencyBR(carteira.saldo || '0') < 0) return 'Saldo inicial não pode ser negativo.';
     }
     if (passo === 1) {
-      setLoading(true);
-      try {
-        const existentes = await contaService.listar();
-        if (!existentes.content?.some((c) => mesmoNome(c.nome, conta.nome))) {
-          await contaService.criar({ nome: conta.nome, tipo: conta.tipo, limiteTotal: conta.tipo === 'CREDITO' ? parseCurrencyBR(conta.limiteTotal || '0') : undefined });
-        }
-        setPasso(2);
-      } catch { } finally { setLoading(false); }
+      if (conta.nome.trim().length < 2) return 'Informe o nome do cartão ou conta.';
+      if (conta.tipo === 'CREDITO' && parseCurrencyBR(conta.limiteTotal || '0') < 0) return 'Limite não pode ser negativo.';
+    }
+    if (passo === 2 && categoriasSelecionadas.length === 0) {
+      return 'Selecione ao menos uma categoria.';
+    }
+    if (passo === 3 && !pularRenda) {
+      if (renda.nome.trim().length < 2) return 'Informe o nome da renda ou marque para configurar depois.';
+      if (parseCurrencyBR(renda.valor || '0') <= 0) return 'Informe um valor mensal maior que zero ou marque para configurar depois.';
+      if (!diaValido(renda.diaVencimento)) return 'Dia de recebimento deve estar entre 1 e 31.';
+    }
+    if (passo === 4 && !pularMeta) {
+      if (meta.nome.trim().length < 2) return 'Informe o nome da meta ou marque para configurar depois.';
+      if (parseCurrencyBR(meta.valorTotal || '0') <= 0) return 'Informe um valor total maior que zero ou marque para configurar depois.';
+    }
+    return null;
+  };
+
+  const handleAvancar = () => {
+    const erro = validarPasso();
+    if (erro) {
+      setError(erro);
       return;
     }
-    if (passo === 2) {
-      setLoading(true);
-      try {
-        const existentes = await categoriaService.listar();
-        const ids: number[] = [];
-        for (const nome of categoriasSelecionadas) {
-          const jaExiste = existentes.find((c) => mesmoNome(c.nome, nome));
-          if (jaExiste) { ids.push(jaExiste.id); continue; }
-          const s = CATEGORIAS_SUGERIDAS.find((c) => c.nome === nome);
-          const criada = await categoriaService.criar({ nome, cor: s?.cor || '#6B7280', icone: s?.icone || '📌' });
-          ids.push(criada.id);
-        }
-        setCategoriaIds(ids);
-        setPasso(3);
-      } catch { } finally { setLoading(false); }
-      return;
-    }
-    if (passo === 3) {
-      if (pularRenda) { setPasso(4); return; }
-      setLoading(true);
-      try {
-        let categoriaId = categoriaIds[0];
-        if (!categoriaId) {
-          const cats = await categoriaService.listar();
-          categoriaId = cats[0]?.id;
-        }
-        if (!categoriaId) { setPasso(4); return; }
-        const existentes = await contaFixaService.listar();
-        if (!existentes.content?.some((cf) => mesmoNome(cf.nome, renda.nome))) {
-          await contaFixaService.criar({ descricao: renda.nome, valor: parseCurrencyBR(renda.valor || '0'), diaVencimento: parseInt(renda.diaVencimento || '1'), categoriaId, recorrente: true });
-        }
-        setPasso(4);
-      } catch { } finally { setLoading(false); }
-      return;
-    }
-    if (passo === 4) {
-      if (pularMeta) { setPasso(5); return; }
-      setLoading(true);
-      try {
-        const existentes = await metaService.listar();
-        if (!existentes.content?.some((m) => mesmoNome(m.nome, meta.nome))) {
-          await metaService.criar({ nome: meta.nome, valorTotal: parseCurrencyBR(meta.valorTotal || '0'), valorMensal: parseCurrencyBR(meta.valorMensal || '0'), dataLimite: meta.dataPrevista || undefined });
-        }
-        setPasso(5);
-      } catch { } finally { setLoading(false); }
-      return;
-    }
+    setError(null);
+    setPasso(passo + 1);
+  };
+
+  const montarRequest = (): OnboardingFinalizarRequest => {
+    const categorias = categoriasSelecionadas.map((nome) => {
+      const sugerida = CATEGORIAS_SUGERIDAS.find((c) => c.nome === nome);
+      return { nome, cor: sugerida?.cor ?? '#6B7280', icone: sugerida?.icone ?? '📌' };
+    });
+
+    return {
+      carteira: {
+        nome: carteira.nome.trim(),
+        tipo: carteira.tipo,
+        saldo: parseCurrencyBR(carteira.saldo || '0'),
+      },
+      conta: {
+        nome: conta.nome.trim(),
+        tipo: conta.tipo,
+        limiteTotal: conta.tipo === 'CREDITO' ? parseCurrencyBR(conta.limiteTotal || '0') : undefined,
+      },
+      categorias,
+      renda: pularRenda ? undefined : {
+        nome: renda.nome.trim(),
+        valor: parseCurrencyBR(renda.valor || '0'),
+        diaVencimento: parseInt(renda.diaVencimento || '1', 10),
+      },
+      meta: pularMeta ? undefined : {
+        nome: meta.nome.trim(),
+        valorTotal: parseCurrencyBR(meta.valorTotal || '0'),
+        valorMensal: meta.valorMensal ? parseCurrencyBR(meta.valorMensal) : undefined,
+        dataLimite: meta.dataPrevista || undefined,
+      },
+    };
   };
 
   const handleFinalizar = async () => {
+    const erro = validarPasso();
+    if (erro) {
+      setError(erro);
+      return;
+    }
+
     setLoading(true);
+    setError(null);
     try {
-      await onboardingService.completar();
-      queryClient.invalidateQueries();
+      const user = await onboardingService.finalizar(montarRequest());
+      await updateUsuario(user);
       router.replace('/(app)/');
-    } catch { } finally { setLoading(false); }
+    } catch (err) {
+      const e = err as ApiErrorWithMessage;
+      setError(e.userMessage ?? 'Não foi possível salvar sua configuração. Tente novamente.');
+    } finally { setLoading(false); }
   };
 
   return (
@@ -316,6 +316,8 @@ export default function OnboardingScreen() {
           <Text style={[styles.hint, { color: colors.textSecondary, textAlign: 'center' }]}>Tudo pronto! Clique abaixo para começar a usar o Gestor Financeiro.</Text>
         </View>
       )}
+
+      {error ? <Text style={{ color: colors.danger, marginTop: 16 }}>{error}</Text> : null}
 
       <View style={styles.buttons}>
         {passo > 0 && (

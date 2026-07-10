@@ -4,7 +4,7 @@ import { View, ActivityIndicator } from 'react-native';
 import { useAuth } from '../src/context/AuthContext';
 
 export default function Index() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, needsOnboarding } = useAuth();
 
   if (isLoading) {
     return (
@@ -14,6 +14,7 @@ export default function Index() {
     );
   }
 
+  if (isAuthenticated && needsOnboarding) return <Redirect href="/onboarding" />;
   if (isAuthenticated) return <Redirect href="/(app)/" />;
   return <Redirect href="/(auth)/login" />;
 }

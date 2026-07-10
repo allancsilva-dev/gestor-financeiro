@@ -39,6 +39,7 @@ export interface LoginResponse {
   success: boolean;
   accessToken?: string;
   token?: string;
+  refreshToken?: string;
   csrfToken?: string;
   usuario?: Usuario;
 }

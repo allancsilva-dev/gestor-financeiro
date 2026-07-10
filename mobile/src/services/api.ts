@@ -1,6 +1,16 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { API_BASE_URL } from '../config/api.config';
-import { getAccessToken, setAccessToken, clearAccessToken, getCsrfToken, setCsrfToken, clearCsrfToken } from '../store/auth';
+import {
+  getAccessToken,
+  setAccessToken,
+  clearAccessToken,
+  getRefreshToken,
+  setRefreshToken,
+  clearRefreshToken,
+  getCsrfToken,
+  setCsrfToken,
+  clearCsrfToken,
+} from '../store/auth';
 import { ApiErrorWithMessage } from '../types';
 
 const api = axios.create({
@@ -8,7 +18,7 @@ const api = axios.create({
   timeout: 15000,
   // Necessário para o cookie HttpOnly do refresh token ser gravado/enviado
   withCredentials: true,
-  headers: { 'Content-Type': 'application/json' },
+  headers: { 'Content-Type': 'application/json', 'X-Client-Type': 'mobile' },
 });
 
 // Adiciona token em toda request autenticada
@@ -27,22 +37,34 @@ const refreshAccessToken = (): Promise<string | null> => {
     refreshPromise = (async () => {
       try {
         const csrf = await getCsrfToken();
-        const { data } = await axios.post<{ accessToken?: string; csrfToken?: string }>(
+        const refreshToken = await getRefreshToken();
+        const { data } = await axios.post<{ accessToken?: string; csrfToken?: string; refreshToken?: string }>(
           `${API_BASE_URL}/auth/refresh-token`,
-          null,
+          refreshToken ? { refreshToken } : null,
           {
             withCredentials: true,
             timeout: 15000,
-            headers: csrf ? { 'X-CSRF-Token': csrf } : undefined,
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Client-Type': 'mobile',
+              ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
+            },
           }
         );
         const token = data.accessToken ?? null;
         if (token) await setAccessToken(token);
+        if (data.refreshToken) await setRefreshToken(data.refreshToken);
         if (data.csrfToken) await setCsrfToken(data.csrfToken);
         return token;
-      } catch {
-        await clearAccessToken();
-        await clearCsrfToken();
+      } catch (err) {
+        // Só descarta tokens quando o backend rejeitou o refresh (401/403).
+        // Falha de rede/timeout preserva os tokens para tentar de novo depois.
+        const status = (err as AxiosError).response?.status;
+        if (status === 401 || status === 403) {
+          await clearAccessToken();
+          await clearRefreshToken();
+          await clearCsrfToken();
+        }
         return null;
       } finally {
         refreshPromise = null;

@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Tabs, useRouter } from 'expo-router';
+import { Redirect, Tabs, useRouter } from 'expo-router';
 import { useTheme } from '../../src/theme';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import NovaTransacaoModal from '../../src/components/NovaTransacaoModal';
 import ScreenTransition from '../../src/components/ui/ScreenTransition';
+import { useAuth } from '../../src/context/AuthContext';
 
 // Ícones funcionais em Views — sem dependência externa de ícones
 const IconInicio = ({ color }: { color: string }) => (
@@ -67,7 +68,10 @@ export default function AppLayout() {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { needsOnboarding } = useAuth();
   const [novaTransacaoVisible, setNovaTransacaoVisible] = useState(false);
+
+  if (needsOnboarding) return <Redirect href="/onboarding" />;
 
   return (
     <>

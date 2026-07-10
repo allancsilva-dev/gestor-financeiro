@@ -1,12 +1,16 @@
 package com.gestor.financeiro.controller;
 
 import com.gestor.financeiro.dto.OnboardingStatusResponse;
+import com.gestor.financeiro.dto.OnboardingFinalizarRequest;
+import com.gestor.financeiro.dto.UsuarioResponseDto;
 import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.repository.UsuarioRepository;
 import com.gestor.financeiro.security.AuthenticatedUserService;
+import com.gestor.financeiro.service.OnboardingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +26,9 @@ public class OnboardingController {
 
     @Autowired
     private AuthenticatedUserService authenticatedUserService;
+
+    @Autowired
+    private OnboardingService onboardingService;
 
     @GetMapping("/status")
     @Operation(summary = "Verifica se onboarding está completo")
@@ -42,5 +49,11 @@ public class OnboardingController {
         usuarioAtualizado.setOnboardingCompleto(true);
         usuarioRepository.save(usuarioAtualizado);
         return ResponseEntity.ok(new OnboardingStatusResponse(true));
+    }
+
+    @PostMapping("/finalizar")
+    @Operation(summary = "Finaliza onboarding", description = "Cria a configuração inicial e marca onboarding como concluído em uma única transação")
+    public ResponseEntity<UsuarioResponseDto> finalizar(@Valid @RequestBody OnboardingFinalizarRequest request) {
+        return ResponseEntity.ok(onboardingService.finalizar(request));
     }
 }

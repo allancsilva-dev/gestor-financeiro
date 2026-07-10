@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '../../../src/theme';
 import { orcamentoService } from '../../../src/services/orcamentoService';
 import { categoriaService } from '../../../src/services/categoriaService';
-import { OrcamentoResponse, OrcamentoCategoriaItem } from '../../../src/types';
+import { ApiErrorWithMessage, OrcamentoResponse, OrcamentoCategoriaItem } from '../../../src/types';
 import { formatCurrency, formatNumber, parseCurrencyBR, maskCurrencyInput } from '../../../src/utils/format';
 
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -26,6 +26,7 @@ export default function OrcamentoScreen() {
   const [editando, setEditando] = useState(false);
   const [limites, setLimites] = useState<Map<number, string>>(new Map());
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery<OrcamentoResponse | null>({
     queryKey: ['orcamento', mes, ano],
@@ -57,11 +58,14 @@ export default function OrcamentoScreen() {
 
     if (cats.length === 0) return;
     setSaving(true);
+    setSaveError(null);
     try {
       await orcamentoService.criarOuAtualizar({ mes, ano, categorias: cats });
       queryClient.invalidateQueries({ queryKey: ['orcamento'] });
       setEditando(false);
-    } catch {} finally { setSaving(false); }
+    } catch (err) {
+      setSaveError((err as ApiErrorWithMessage).userMessage ?? 'Não foi possível salvar o orçamento. Tente novamente.');
+    } finally { setSaving(false); }
   };
 
   const mesAnterior = () => { if (mes === 1) { setMes(12); setAno(ano - 1); } else setMes(mes - 1); };
@@ -98,8 +102,9 @@ export default function OrcamentoScreen() {
               />
             </View>
           ))}
+          {saveError ? <Text style={{ color: colors.danger, fontSize: 13 }}>{saveError}</Text> : null}
           <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-            <TouchableOpacity onPress={() => setEditando(false)} style={[styles.btn, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <TouchableOpacity onPress={() => { setEditando(false); setSaveError(null); }} style={[styles.btn, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Text style={{ color: colors.textSecondary }}>Cancelar</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={salvar} disabled={saving} style={[styles.btn, { backgroundColor: colors.brand, flex: 1 }]}>

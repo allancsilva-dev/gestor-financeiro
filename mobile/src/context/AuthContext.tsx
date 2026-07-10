@@ -1,7 +1,16 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Usuario } from '../types';
 import { authService } from '../services/authService';
-import { getAccessToken, getUsuarioCache, clearAccessToken, clearUsuarioCache, setUsuarioCache } from '../store/auth';
+import {
+  getAccessToken,
+  getRefreshToken,
+  getUsuarioCache,
+  clearAccessToken,
+  clearRefreshToken,
+  clearCsrfToken,
+  clearUsuarioCache,
+  setUsuarioCache,
+} from '../store/auth';
 import api from '../services/api';
 
 interface AuthContextType {
@@ -34,10 +43,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const { data } = await api.get<Usuario>('/v1/usuarios/me');
       setUsuario(data);
-    } catch {
-      await clearAccessToken();
-      await clearUsuarioCache();
-      setUsuario(null);
+    } catch (err) {
+      // Erro de rede/timeout mantém a sessão local (usuário do cache já foi
+      // aplicado acima). Só encerra a sessão quando o backend rejeitou a auth
+      // e o refresh token também foi invalidado — se o refresh falhou por rede,
+      // api.ts preserva o token e a próxima abertura tenta de novo.
+      const status = (err as { response?: { status?: number } }).response?.status;
+      const refreshToken = await getRefreshToken();
+      if ((status === 401 || status === 403) && !refreshToken) {
+        await clearAccessToken();
+        await clearRefreshToken();
+        await clearCsrfToken();
+        await clearUsuarioCache();
+        setUsuario(null);
+      }
     } finally {
       setIsLoading(false);
     }
