@@ -1,37 +1,54 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Alert, Linking, Share, Platform, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, Platform, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import * as Sharing from 'expo-sharing';
+import { File, Paths } from 'expo-file-system';
 import { useTheme } from '../../../src/theme';
-import { API_BASE_URL } from '../../../src/config/api.config';
+import api from '../../../src/services/api';
 import Card from '../../../src/components/ui/Card';
 
 // Grid 2 colunas (DESIGN.md) — tile 44 com tint da cor do item, label + subtítulo
 const itens = [
-  { label: 'Carteiras',    sub: 'Contas e saldos',  rota: '/more/carteiras',    icone: '₿',  cor: '#7c5cfc' },
+  { label: 'Contas',       sub: 'Saldos e dinheiro', rota: '/more/carteiras',    icone: '₿',  cor: '#7c5cfc' },
   { label: 'Contas Fixas', sub: 'Mensais',          rota: '/more/contas-fixas', icone: '📅', cor: '#8b2fff' },
   { label: 'Orçamentos',   sub: 'Por categoria',    rota: '/more/orcamentos',   icone: '📊', cor: '#ffa502' },
-  { label: 'Faturas',      sub: 'Cartão',           rota: '/more/faturas',      icone: '💳', cor: '#ff4757' },
+  { label: 'Cartão',       sub: 'Faturas',          rota: '/more/faturas',      icone: '💳', cor: '#ff4757' },
   { label: 'Relatórios',   sub: 'Gráficos',         rota: '/more/relatorios',   icone: '📋', cor: '#2ed573' },
   { label: 'Categorias',   sub: 'Organizar',        rota: '/more/categorias',   icone: '🏷', cor: '#ff6b81' },
-  { label: 'Contas',       sub: 'Bancos',           rota: '/more/contas',       icone: '🏦', cor: '#1e90ff' },
+  { label: 'Cartões',      sub: 'Crédito e débito', rota: '/more/contas',       icone: '💳', cor: '#1e90ff' },
+  { label: 'Perfil',       sub: 'Nome e segurança', rota: '/(app)/perfil',      icone: '👤', cor: '#7c5cfc' },
   { label: 'Entrada por IA', sub: 'Em breve',       rota: null,                 icone: '🤖', cor: '#8b2fff', desabilitado: true },
   { label: 'Exportar Dados', sub: 'CSV',            rota: null,                 icone: '📥', cor: '#7c5cfc', acao: 'exportar' },
 ];
 
+// Baixa o CSV pela API autenticada e compartilha o arquivo — nunca expor URL da API
 const handleExport = async () => {
-  const url = `${API_BASE_URL}/v1/exportar/completo`;
-  if (Platform.OS === 'web') {
-    window.open(url, '_blank');
-    return;
-  }
   try {
-    await Share.share({ message: `Exporte seus dados financeiros:\n${url}`, url });
-  } catch {
-    Alert.alert('Exportar Dados', `Acesse o link para baixar seus dados:\n${url}`, [
-      { text: 'Fechar', style: 'cancel' },
-      { text: 'Abrir', onPress: () => Linking.openURL(url) },
-    ]);
+    const { data: csv } = await api.get<string>('/v1/exportar/completo', { responseType: 'text' });
+
+    if (Platform.OS === 'web') {
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'dados-completos.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    const file = new File(Paths.cache, 'dados-completos.csv');
+    file.create({ overwrite: true });
+    file.write(csv);
+
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(file.uri, { mimeType: 'text/csv', dialogTitle: 'Exportar dados' });
+    } else {
+      Alert.alert('Exportar Dados', `Arquivo salvo em:\n${file.uri}`);
+    }
+  } catch (err: any) {
+    Alert.alert('Exportar Dados', err?.userMessage ?? 'Não foi possível exportar. Tente novamente.');
   }
 };
 
