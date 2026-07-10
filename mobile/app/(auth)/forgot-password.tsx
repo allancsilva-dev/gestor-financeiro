@@ -34,8 +34,11 @@ export default function ForgotPassword() {
         <View style={styles.inner}>
           <Text style={[styles.title, { color: colors.textPrimary }]}>E-mail enviado</Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Se o e-mail estiver cadastrado, você receberá instruções para redefinir sua senha.</Text>
-          <TouchableOpacity onPress={() => router.back()} style={[styles.button, { backgroundColor: colors.brand }]}>
-            <Text style={{ color: colors.brandText, fontWeight: '700' }}>Voltar</Text>
+          <TouchableOpacity onPress={() => router.push('/(auth)/reset-password')} accessibilityRole="button" style={[styles.button, { backgroundColor: colors.brand }]}>
+            <Text style={{ color: colors.brandText, fontWeight: '700' }}>Já recebi o código</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.back()} accessibilityRole="button" style={{ alignSelf: 'center', marginTop: 16, minHeight: 44, justifyContent: 'center' }}>
+            <Text style={{ color: colors.textSecondary, fontSize: 13 }}>Voltar para o login</Text>
           </TouchableOpacity>
         </View>
       </View>

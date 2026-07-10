@@ -57,6 +57,10 @@ export default function Login() {
         <TouchableOpacity onPress={onSubmit} disabled={loading} style={[styles.button, { backgroundColor: colors.brand, opacity: loading ? 0.8 : 1 }] }>
           {loading ? <ActivityIndicator color={colors.brandText} /> : <Text style={{ color: colors.brandText, fontWeight: '700', letterSpacing: 1 }}>ENTRAR</Text>}
         </TouchableOpacity>
+
+        <TouchableOpacity onPress={() => router.push('/(auth)/register')} accessibilityRole="button" style={{ alignSelf: 'center', marginTop: 16, minHeight: 44, justifyContent: 'center' }}>
+          <Text style={{ color: colors.textSecondary, fontSize: 13 }}>Não tem conta? <Text style={{ color: colors.brand, fontWeight: '600' }}>Criar conta</Text></Text>
+        </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
