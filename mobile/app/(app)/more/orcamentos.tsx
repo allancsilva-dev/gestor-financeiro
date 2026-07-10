@@ -68,7 +68,11 @@ export default function OrcamentoScreen() {
   const mesProximo = () => { if (mes === 12) { setMes(1); setAno(ano + 1); } else setMes(mes + 1); };
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.bg }]} contentContainerStyle={{ paddingTop: insets.top + 8, paddingHorizontal: 16, paddingBottom: 40 }}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.bg }]} contentContainerStyle={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 40 }}>
+      <View style={{ paddingBottom: 12 }}>
+        <Text style={{ color: colors.textPrimary, fontSize: 23, fontWeight: '800', letterSpacing: -0.4 }}>Orçamentos</Text>
+        <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>Limites de gasto por categoria</Text>
+      </View>
       <View style={styles.nav}>
         <TouchableOpacity onPress={mesAnterior} style={{ padding: 8 }}><Text style={{ color: colors.textSecondary, fontSize: 18 }}>‹</Text></TouchableOpacity>
         <Text style={[styles.mesAno, { color: colors.textPrimary }]}>{MESES[mes - 1]} {ano}</Text>

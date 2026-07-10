@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, FlatList, Modal, ScrollView, TextInput } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { categoriaService } from '../../../src/services/categoriaService';
 import { CATEGORY_COLORS, formatCurrency } from '../../../src/utils/format';
@@ -9,6 +10,7 @@ import SkeletonBox from '../../../src/components/ui/SkeletonBox';
 
 export default function CategoriasScreen() {
   const colors = useTheme();
+  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [modalVisible, setModalVisible] = useState(false);
   const [nome, setNome] = useState('');
@@ -35,8 +37,9 @@ export default function CategoriasScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <View style={{ padding: 16 }}>
-        <Text style={{ color: colors.textPrimary, fontSize: 18, fontWeight: '700' }}>Categorias</Text>
+      <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 12 }}>
+        <Text style={{ color: colors.textPrimary, fontSize: 23, fontWeight: '800', letterSpacing: -0.4 }}>Categorias</Text>
+        <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>Organize seus gastos por tipo</Text>
       </View>
 
       {isLoading ? (

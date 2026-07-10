@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { ScrollView, View, Text, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import api from '../../src/services/api';
-import { DashboardResumo, Transacao, PagedResponse, ProjecaoResponse, TipoTransacao } from '../../src/types';
+import { DashboardResumo, Transacao, PagedResponse, ProjecaoResponse } from '../../src/types';
 import { useTheme } from '../../src/theme';
 import { useAuth } from '../../src/context/AuthContext';
 import SkeletonBox from '../../src/components/ui/SkeletonBox';
@@ -13,7 +13,6 @@ import Card from '../../src/components/ui/Card';
 import ListRow from '../../src/components/ui/ListRow';
 import Entrance from '../../src/components/ui/Entrance';
 import FloatEmoji from '../../src/components/ui/FloatEmoji';
-import NovaTransacaoModal from '../../src/components/NovaTransacaoModal';
 import { formatCurrency, getInitials } from '../../src/utils/format';
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -39,7 +38,6 @@ export default function Dashboard() {
 
   const { usuario } = useAuth();
   const insets = useSafeAreaInsets();
-  const [modalTipo, setModalTipo] = useState<TipoTransacao | null>(null);
 
   const primeiroNome = usuario?.nome?.split(' ')[0] ?? '';
   const mesAtual = capitalize(new Date().toLocaleDateString('pt-BR', { month: 'long' }));
@@ -47,8 +45,8 @@ export default function Dashboard() {
   const [saldoInt, saldoCents] = saldo.split(',');
 
   const atalhos: Array<{ label: string; glyph: string; bg: string; fg: string; onPress: () => void }> = [
-    { label: 'Adicionar\ndespesa', glyph: '+', bg: colors.brandBg, fg: colors.brandFg, onPress: () => setModalTipo('SAIDA') },
-    { label: 'Adicionar\nreceita', glyph: '+', bg: colors.successBg, fg: colors.success, onPress: () => setModalTipo('ENTRADA') },
+    { label: 'Contas\nfixas', glyph: '📅', bg: colors.brandBg, fg: colors.brandFg, onPress: () => router.push('/more/contas-fixas' as any) },
+    { label: 'Cartão', glyph: '💳', bg: colors.dangerBg, fg: colors.danger, onPress: () => router.push('/more/faturas' as any) },
     { label: 'Metas', glyph: '◎', bg: colors.brandBg, fg: colors.brandFg, onPress: () => router.push('/(app)/metas') },
     { label: 'Relatórios', glyph: '📊', bg: colors.infoBg, fg: colors.info, onPress: () => router.push('/more/relatorios' as any) },
   ];
@@ -125,7 +123,7 @@ export default function Dashboard() {
         ) : resumoQuery.data ? (
           <>
             <Text style={{ color: 'rgba(255,255,255,0.82)', fontSize: 14, fontWeight: '500' }}>
-              Saldo total · {mesAtual}
+              Saldo total
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 6 }}>
               <Text style={{ color: '#ffffff', fontSize: 40, fontWeight: '800', letterSpacing: -1, fontVariant: ['tabular-nums'] }}>
@@ -137,7 +135,7 @@ export default function Dashboard() {
                 </Text>
               )}
             </View>
-            <View style={{ flexDirection: 'row', marginTop: 12, gap: 10 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, gap: 10 }}>
               <View style={{ backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 999, paddingHorizontal: 11, paddingVertical: 5 }}>
                 <Text style={{ color: '#ffffff', fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
                   ↑ {formatCurrency(Number(resumoQuery.data.totalEntradas ?? 0))}
@@ -148,6 +146,9 @@ export default function Dashboard() {
                   ↓ {formatCurrency(Number(resumoQuery.data.totalSaidas ?? 0))}
                 </Text>
               </View>
+              <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: '500' }}>
+                em {mesAtual}
+              </Text>
             </View>
           </>
         ) : null}
@@ -159,9 +160,9 @@ export default function Dashboard() {
         <Entrance delay={150}>
         <Card padded={false} radius={20} style={{ flexDirection: 'row', alignItems: 'stretch', paddingVertical: 16, paddingHorizontal: 6, marginBottom: 16 }}>
           {([
-            { label: 'Receitas', valor: Number(resumoQuery.data.totalEntradas ?? 0), glyph: '↓', bg: colors.successBg, fg: colors.success },
-            { label: 'Despesas', valor: Number(resumoQuery.data.totalSaidas ?? 0), glyph: '↑', bg: colors.dangerBg, fg: colors.danger },
-            { label: 'Disponível', valor: Number(resumoQuery.data.saldoCarteiras ?? 0), glyph: '●', bg: colors.brandBg, fg: colors.brandFg },
+            { label: 'Receitas', valor: Number(resumoQuery.data.totalEntradas ?? 0), glyph: '↑', bg: colors.successBg, fg: colors.success },
+            { label: 'Despesas', valor: Number(resumoQuery.data.totalSaidas ?? 0), glyph: '↓', bg: colors.dangerBg, fg: colors.danger },
+            { label: 'Saldo do mês', valor: Number(resumoQuery.data.saldo ?? 0), glyph: '●', bg: colors.brandBg, fg: colors.brandFg },
           ]).map((kpi, i) => (
             <React.Fragment key={kpi.label}>
               {i > 0 && <View style={{ width: 1, backgroundColor: colors.border, marginVertical: 2 }} />}
@@ -293,11 +294,6 @@ export default function Dashboard() {
         </View>
       )}
 
-      <NovaTransacaoModal
-        visible={modalTipo != null}
-        onClose={() => setModalTipo(null)}
-        initialTipo={modalTipo ?? 'SAIDA'}
-      />
     </ScrollView>
   );
 }

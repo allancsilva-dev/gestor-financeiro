@@ -21,7 +21,7 @@ import { metaService } from '../src/services/metaService';
 import { TipoCarteira, TipoConta } from '../src/types';
 import { maskCurrencyInput, parseCurrencyBR } from '../src/utils/format';
 
-const PASSOS = ['Carteira', 'Conta', 'Categorias', 'Renda', 'Meta', 'Confirmar'];
+const PASSOS = ['Conta', 'Cartão', 'Categorias', 'Renda', 'Meta', 'Confirmar'];
 
 const CATEGORIAS_SUGERIDAS = [
   { nome: 'Alimentação', cor: '#EF4444', icone: '🍔' },
@@ -43,7 +43,7 @@ export default function OnboardingScreen() {
   const [passo, setPasso] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  const [carteira, setCarteira] = useState({ nome: 'Carteira Principal', tipo: 'CONTA_BANCARIA' as TipoCarteira, saldo: '' });
+  const [carteira, setCarteira] = useState({ nome: 'Conta Principal', tipo: 'CONTA_BANCARIA' as TipoCarteira, saldo: '' });
   const [conta, setConta] = useState({ nome: 'Cartão Principal', tipo: 'CREDITO' as TipoConta, limiteTotal: '' });
   const [categoriasSelecionadas, setCategoriasSelecionadas] = useState<string[]>(CATEGORIAS_SUGERIDAS.map((c) => c.nome));
   const [renda, setRenda] = useState({ nome: 'Salário', valor: '', diaVencimento: '1' });
