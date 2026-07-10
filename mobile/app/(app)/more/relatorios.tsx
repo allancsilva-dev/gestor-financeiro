@@ -1,102 +1,214 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet, TextInput } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQuery } from '@tanstack/react-query';
 import { useTheme } from '../../../src/theme';
 import relatorioService from '../../../src/services/relatorioService';
-import { RelatorioResponse } from '../../../src/types';
-import { formatCurrency } from '../../../src/utils/format';
+import { formatCurrency, formatDate } from '../../../src/utils/format';
+import Card from '../../../src/components/ui/Card';
+import Chip from '../../../src/components/ui/Chip';
+import IconTile from '../../../src/components/ui/IconTile';
+import SkeletonBox from '../../../src/components/ui/SkeletonBox';
+
+type Periodo = 'mes' | 'mesPassado' | 'tresMeses' | 'ano';
+
+const PERIODOS: { key: Periodo; label: string }[] = [
+  { key: 'mes', label: 'Este mês' },
+  { key: 'mesPassado', label: 'Mês passado' },
+  { key: 'tresMeses', label: '3 meses' },
+  { key: 'ano', label: 'Este ano' },
+];
+
+const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+function intervalo(periodo: Periodo): { inicio: string; fim: string } {
+  const hoje = new Date();
+  switch (periodo) {
+    case 'mes':
+      return { inicio: iso(new Date(hoje.getFullYear(), hoje.getMonth(), 1)), fim: iso(hoje) };
+    case 'mesPassado':
+      return {
+        inicio: iso(new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1)),
+        fim: iso(new Date(hoje.getFullYear(), hoje.getMonth(), 0)),
+      };
+    case 'tresMeses':
+      return { inicio: iso(new Date(hoje.getFullYear(), hoje.getMonth() - 2, 1)), fim: iso(hoje) };
+    case 'ano':
+      return { inicio: iso(new Date(hoje.getFullYear(), 0, 1)), fim: iso(hoje) };
+  }
+}
 
 export default function RelatorioScreen() {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
-  const now = new Date();
-  const [inicio, setInicio] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`);
-  const [fim, setFim] = useState(now.toISOString().split('T')[0]);
-  const [data, setData] = useState<RelatorioResponse | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [periodo, setPeriodo] = useState<Periodo>('mes');
+  const { inicio, fim } = intervalo(periodo);
 
-  const carregar = async () => {
-    setLoading(true);
-    try { const r = await relatorioService.gerar(inicio, fim); setData(r); } catch {} finally { setLoading(false); }
-  };
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['relatorio', inicio, fim],
+    queryFn: () => relatorioService.gerar(inicio, fim),
+  });
+
+  const evolucaoQuery = useQuery({
+    queryKey: ['dashboard-evolucao'],
+    queryFn: () => relatorioService.evolucaoMensal(),
+  });
+
+  const maiorGasto = data?.gastosPorCategoria[0]?.valorTotal ?? 0;
 
   return (
-    <ScrollView style={[s.container, { backgroundColor: colors.bg }]} contentContainerStyle={{ paddingTop: insets.top + 8, paddingHorizontal: 16, paddingBottom: 40 }}>
-      <Text style={{ color: colors.textPrimary, fontSize: 18, fontWeight: '700', marginBottom: 12 }}>Relatórios</Text>
-
-      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16, alignItems: 'flex-end' }}>
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: colors.textSecondary, fontSize: 10 }}>Início</Text>
-          <TextInput style={[s.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]} value={inicio} onChangeText={setInicio} placeholderTextColor={colors.textMuted} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: colors.textSecondary, fontSize: 10 }}>Fim</Text>
-          <TextInput style={[s.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]} value={fim} onChangeText={setFim} placeholderTextColor={colors.textMuted} />
-        </View>
-        <TouchableOpacity onPress={carregar} disabled={loading} style={[s.btn, { backgroundColor: colors.brand }]}>
-          {loading ? <ActivityIndicator color={colors.brandText} size="small" /> : <Text style={{ color: colors.brandText, fontWeight: '700', fontSize: 13 }}>Gerar</Text>}
-        </TouchableOpacity>
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 12 }}>
+        <Text style={{ color: colors.textPrimary, fontSize: 23, fontWeight: '800', letterSpacing: -0.4 }}>Relatórios</Text>
+        <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>
+          {formatDate(inicio + 'T00:00:00')} até {formatDate(fim + 'T00:00:00')}
+        </Text>
       </View>
 
-      {loading ? (
-        <ActivityIndicator color={colors.brand} style={{ marginTop: 20 }} />
-      ) : data ? (
-        <View style={{ gap: 16 }}>
+      <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 16 }}>
+        {PERIODOS.map(p => (
+          <Chip key={p.key} label={p.label} selected={periodo === p.key} onPress={() => setPeriodo(p.key)} />
+        ))}
+      </View>
+
+      {isLoading ? (
+        <View style={{ paddingHorizontal: 16, gap: 12 }}>
+          <SkeletonBox width="100%" height={84} borderRadius={18} />
+          <SkeletonBox width="100%" height={200} borderRadius={18} />
+          <SkeletonBox width="100%" height={160} borderRadius={18} />
+        </View>
+      ) : isError ? (
+        <View style={{ alignItems: 'center', padding: 48 }}>
+          <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600' }}>Erro ao gerar relatório</Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4, textAlign: 'center' }}>Verifique sua conexão e tente novamente.</Text>
+          <TouchableOpacity onPress={() => refetch()} style={{ marginTop: 12, minHeight: 44, justifyContent: 'center' }} accessibilityRole="button">
+            <Text style={{ color: colors.brandFg, fontWeight: '600' }}>Tentar novamente</Text>
+          </TouchableOpacity>
+        </View>
+      ) : !data || data.totalTransacoes === 0 ? (
+        <View style={{ alignItems: 'center', paddingHorizontal: 32, paddingVertical: 48 }}>
+          <Text style={{ fontSize: 40, marginBottom: 12 }}>📊</Text>
+          <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600', textAlign: 'center' }}>Nada por aqui neste período</Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4, textAlign: 'center' }}>
+            Lance transações ou escolha outro período para ver o resumo.
+          </Text>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 96, gap: 16 }}>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {[
               { l: 'Entradas', v: data.totalEntradas, c: colors.success },
               { l: 'Saídas', v: data.totalSaidas, c: colors.danger },
               { l: 'Saldo', v: data.saldo, c: data.saldo >= 0 ? colors.success : colors.danger },
-            ].map((k, i) => (
-              <View key={i} style={[s.kpi, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Text style={{ color: colors.textSecondary, fontSize: 10 }}>{k.l}</Text>
-                <Text style={{ color: k.c, fontSize: 13, fontWeight: '700' }}>{formatCurrency(k.v)}</Text>
-              </View>
+            ].map(k => (
+              <Card key={k.l} radius={16} style={{ flex: 1, paddingHorizontal: 10, paddingVertical: 12 }}>
+                <Text style={{ color: colors.textSecondary, fontSize: 11 }}>{k.l}</Text>
+                <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  style={{ color: k.c, fontSize: 16, fontWeight: '700', marginTop: 4, fontVariant: ['tabular-nums'] }}
+                >
+                  {formatCurrency(k.v)}
+                </Text>
+              </Card>
             ))}
           </View>
 
-          {data.gastosPorCategoria.length > 0 && (
-            <View>
-              <Text style={{ color: colors.textPrimary, fontWeight: '600', marginBottom: 8 }}>Gastos por Categoria</Text>
-              {data.gastosPorCategoria.map((c, i) => (
-                <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 }}>
-                  <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: c.cor }} />
-                  <Text style={{ flex: 1, color: colors.textPrimary, fontSize: 13 }}>{c.nome}</Text>
-                  <Text style={{ color: colors.danger, fontSize: 13 }}>{formatCurrency(c.valorTotal)}</Text>
-                  <Text style={{ color: colors.textSecondary, fontSize: 11, width: 32, textAlign: 'right' }}>{c.porcentagem}%</Text>
+          {evolucaoQuery.data && evolucaoQuery.data.some(m => m.entradas > 0 || m.saidas > 0) && (
+            <Card radius={20}>
+              <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '700' }}>Evolução mensal</Text>
+              <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 2, marginBottom: 14 }}>
+                Entradas e saídas · últimos 6 meses
+              </Text>
+              {(() => {
+                const meses = evolucaoQuery.data;
+                const maior = Math.max(...meses.map(m => Math.max(m.entradas, m.saidas)), 1);
+                const ALTURA = 96;
+                return (
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
+                    {meses.map((m, i) => (
+                      <View
+                        key={`${m.mes}-${i}`}
+                        accessible
+                        accessibilityLabel={`${m.mes}: entradas ${formatCurrency(m.entradas)}, saídas ${formatCurrency(m.saidas)}`}
+                        style={{ flex: 1, alignItems: 'center' }}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: ALTURA }}>
+                          <View style={{ width: 9, borderRadius: 4, backgroundColor: colors.success, height: Math.max((m.entradas / maior) * ALTURA, m.entradas > 0 ? 4 : 2), opacity: m.entradas > 0 ? 1 : 0.2 }} />
+                          <View style={{ width: 9, borderRadius: 4, backgroundColor: colors.danger, height: Math.max((m.saidas / maior) * ALTURA, m.saidas > 0 ? 4 : 2), opacity: m.saidas > 0 ? 1 : 0.2 }} />
+                        </View>
+                        <Text style={{ color: colors.textSecondary, fontSize: 10, marginTop: 6 }}>
+                          {m.mes.replace('.', '')}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                );
+              })()}
+              <View style={{ flexDirection: 'row', gap: 14, marginTop: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.success }} />
+                  <Text style={{ color: colors.textSecondary, fontSize: 11 }}>Entradas</Text>
                 </View>
-              ))}
-            </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.danger }} />
+                  <Text style={{ color: colors.textSecondary, fontSize: 11 }}>Saídas</Text>
+                </View>
+              </View>
+            </Card>
+          )}
+
+          {data.gastosPorCategoria.length > 0 && (
+            <Card radius={20}>
+              <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '700', marginBottom: 12 }}>Gastos por categoria</Text>
+              <View style={{ gap: 12 }}>
+                {data.gastosPorCategoria.map((c, i) => (
+                  <View key={c.categoriaId ?? `${c.nome}-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <IconTile size={36}>{c.icone || '🏷️'}</IconTile>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
+                        <Text style={{ color: colors.textPrimary, fontSize: 13, fontWeight: '600', flex: 1 }} numberOfLines={1}>{c.nome}</Text>
+                        <Text style={{ color: colors.textPrimary, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
+                          {formatCurrency(c.valorTotal)}
+                        </Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 5 }}>
+                        <View style={{ flex: 1, height: 5, borderRadius: 3, backgroundColor: colors.border, overflow: 'hidden' }}>
+                          <View style={{ width: `${maiorGasto > 0 ? Math.max((c.valorTotal / maiorGasto) * 100, 2) : 0}%`, height: '100%', borderRadius: 3, backgroundColor: c.cor }} />
+                        </View>
+                        <Text style={{ color: colors.textSecondary, fontSize: 11, width: 36, textAlign: 'right', fontVariant: ['tabular-nums'] }}>
+                          {Math.round(c.porcentagem)}%
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </Card>
           )}
 
           {data.maioresDespesas.length > 0 && (
-            <View>
-              <Text style={{ color: colors.textPrimary, fontWeight: '600', marginBottom: 8 }}>Maiores Despesas</Text>
-              {data.maioresDespesas.map((d, i) => (
-                <View key={i} style={[s.row, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: colors.textPrimary, fontSize: 13 }}>{d.descricao}</Text>
-                    <Text style={{ color: colors.textSecondary, fontSize: 11 }}>{d.categoriaNome || 'Sem categoria'} · {d.data}</Text>
+            <Card radius={20}>
+              <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '700', marginBottom: 12 }}>Maiores despesas</Text>
+              <View style={{ gap: 12 }}>
+                {data.maioresDespesas.map(d => (
+                  <View key={d.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={{ color: colors.textPrimary, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>{d.descricao}</Text>
+                      <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 2 }}>
+                        {d.categoriaNome || 'Sem categoria'} · {formatDate(d.data.length === 10 ? `${d.data}T00:00:00` : d.data)}
+                      </Text>
+                    </View>
+                    <Text style={{ color: colors.danger, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
+                      −{formatCurrency(d.valor)}
+                    </Text>
                   </View>
-                  <Text style={{ color: colors.danger, fontSize: 13, fontWeight: '600' }}>{formatCurrency(d.valor)}</Text>
-                </View>
-              ))}
-            </View>
+                ))}
+              </View>
+            </Card>
           )}
-        </View>
-      ) : (
-        <View style={{ alignItems: 'center', padding: 40 }}>
-          <Text style={{ color: colors.textSecondary }}>Selecione datas e gere o relatório</Text>
-        </View>
+        </ScrollView>
       )}
-    </ScrollView>
+    </View>
   );
 }
-
-const s = StyleSheet.create({
-  container: { flex: 1 },
-  input: { borderWidth: 1, borderRadius: 6, padding: 8, fontSize: 13, marginTop: 2 },
-  btn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 6, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
-  kpi: { flex: 1, borderRadius: 8, borderWidth: 1, padding: 10, alignItems: 'center' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, borderRadius: 8, borderWidth: 1, marginBottom: 6 },
-});

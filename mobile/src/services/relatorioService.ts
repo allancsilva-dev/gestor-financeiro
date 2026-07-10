@@ -1,5 +1,5 @@
 import api from './api';
-import { RelatorioResponse } from '../types';
+import { EvolucaoMensalItem, RelatorioResponse } from '../types';
 
 const relatorioService = {
   gerar: (inicio?: string, fim?: string) => {
@@ -8,6 +8,9 @@ const relatorioService = {
     if (fim) params.fim = fim;
     return api.get<RelatorioResponse>('/v1/relatorios', { params }).then((r) => r.data);
   },
+
+  evolucaoMensal: () =>
+    api.get<EvolucaoMensalItem[]>('/v1/dashboard/evolucao-mensal').then((r) => r.data),
 };
 
 export default relatorioService;

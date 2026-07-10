@@ -46,7 +46,7 @@ public class RelatorioService {
             int pct = BigDecimal.ZERO.compareTo(totalGastos) == 0 ? 0
                     : valor.multiply(BigDecimal.valueOf(100)).divide(totalGastos, 0, RoundingMode.HALF_UP).intValue();
             gastosPorCategoria.add(new RelatorioCategoriaDto(
-                    null, (String) row[0], (String) row[2], "", valor, BigDecimal.valueOf(pct)));
+                    (Long) row[3], (String) row[0], (String) row[2], (String) row[4], valor, BigDecimal.valueOf(pct)));
         }
 
         List<Transacao> despesas = transacaoRepository

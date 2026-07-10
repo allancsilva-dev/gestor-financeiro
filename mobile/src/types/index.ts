@@ -349,6 +349,14 @@ export interface RelatorioContaItem {
   porcentagem: number;
 }
 
+// GET /v1/dashboard/evolucao-mensal — últimos 6 meses
+export interface EvolucaoMensalItem {
+  mes: string; // abreviado pt-BR (ex.: "jul.")
+  entradas: number;
+  saidas: number;
+  saldo: number;
+}
+
 export interface RelatorioResponse {
   inicio: string;
   fim: string;
