@@ -48,4 +48,7 @@ public class Conta {
     
     @Column
     private String cor;
+
+    @Column(length = 60)
+    private String banco;
 }

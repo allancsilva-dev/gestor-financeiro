@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, FlatList, Modal, ScrollView, TextInput } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { contaService } from '../../../src/services/contaService';
 import { TIPO_CONTA_LABEL, formatCurrency, parseCurrencyBR, maskCurrencyInput } from '../../../src/utils/format';
@@ -9,11 +10,15 @@ import SkeletonBox from '../../../src/components/ui/SkeletonBox';
 
 export default function ContasScreen() {
   const colors = useTheme();
+  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [modalVisible, setModalVisible] = useState(false);
   const [nome, setNome] = useState('');
   const [tipo, setTipo] = useState<TipoConta>('DEBITO');
   const [limite, setLimite] = useState('');
+  const [banco, setBanco] = useState('');
+  const [diaFechamento, setDiaFechamento] = useState('');
+  const [diaVencimento, setDiaVencimento] = useState('');
   const [nomeError, setNomeError] = useState<string | null>(null);
   const [tipoError, setTipoError] = useState<string | null>(null);
   const [limiteError, setLimiteError] = useState<string | null>(null);
@@ -28,17 +33,18 @@ export default function ContasScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contas'] });
       setModalVisible(false);
-      setNome(''); setLimite(''); setTipo('DEBITO'); setNomeError(null); setTipoError(null); setLimiteError(null);
+      setNome(''); setLimite(''); setBanco(''); setDiaFechamento(''); setDiaVencimento(''); setTipo('DEBITO'); setNomeError(null); setTipoError(null); setLimiteError(null);
     },
     onError: (err: any) => {
-      setNomeError(err?.userMessage ?? 'Erro ao criar conta.');
+      setNomeError(err?.userMessage ?? 'Erro ao criar cartão.');
     }
   });
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <View style={{ padding: 16 }}>
-        <Text style={{ color: colors.textPrimary, fontSize: 18, fontWeight: '700' }}>Contas</Text>
+      <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 12 }}>
+        <Text style={{ color: colors.textPrimary, fontSize: 23, fontWeight: '800', letterSpacing: -0.4 }}>Cartões</Text>
+        <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>Crédito, débito e pagamento</Text>
       </View>
 
       {isLoading ? (
@@ -47,7 +53,7 @@ export default function ContasScreen() {
         </View>
       ) : isError ? (
         <View style={{ alignItems: 'center', padding: 48 }}>
-          <Text style={{ color: colors.textSecondary }}>Erro ao carregar contas</Text>
+          <Text style={{ color: colors.textSecondary }}>Erro ao carregar cartões</Text>
           <TouchableOpacity onPress={() => refetch()} style={{ marginTop: 8 }}>
             <Text style={{ color: colors.brand }}>Tentar novamente</Text>
           </TouchableOpacity>
@@ -65,13 +71,15 @@ export default function ContasScreen() {
                 </View>
               </View>
               {conta.tipo === 'CREDITO' && (
-                <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 8 }}>Limite: {formatCurrency(Number(conta.limiteTotal ?? 0))}</Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 8 }}>
+                  {conta.banco ? `${conta.banco} · ` : ''}Limite: {formatCurrency(Number(conta.limiteTotal ?? 0))}
+                </Text>
               )}
             </View>
           )}
           ListEmptyComponent={() => (
             <View style={{ alignItems: 'center', padding: 48 }}>
-              <Text style={{ color: colors.textSecondary }}>Nenhuma conta encontrada</Text>
+              <Text style={{ color: colors.textSecondary }}>Nenhum cartão encontrado</Text>
             </View>
           )}
         />
@@ -87,10 +95,10 @@ export default function ContasScreen() {
       <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet">
         <View style={{ flex: 1, backgroundColor: colors.bg }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-            <TouchableOpacity onPress={() => { setModalVisible(false); setNome(''); setLimite(''); setTipo('DEBITO'); setNomeError(null); setTipoError(null); setLimiteError(null); }}>
+            <TouchableOpacity onPress={() => { setModalVisible(false); setNome(''); setLimite(''); setBanco(''); setDiaFechamento(''); setDiaVencimento(''); setTipo('DEBITO'); setNomeError(null); setTipoError(null); setLimiteError(null); }}>
               <Text style={{ color: colors.brand, fontSize: 15 }}>Cancelar</Text>
             </TouchableOpacity>
-            <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600' }}>Nova Conta</Text>
+            <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600' }}>Novo Cartão</Text>
             <TouchableOpacity disabled={criarMutation.status === 'pending'} onPress={() => {
               setNomeError(null); setTipoError(null); setLimiteError(null);
               let hasErr = false;
@@ -101,7 +109,16 @@ export default function ContasScreen() {
                 if (isNaN(v) || v <= 0) { setLimiteError('Limite total obrigatório e positivo.'); hasErr = true; }
               }
               if (hasErr) return;
-              criarMutation.mutate({ nome: nome.trim(), tipo, limiteTotal: tipo === 'CREDITO' ? parseCurrencyBR(limite) : undefined });
+              const fech = parseInt(diaFechamento, 10);
+              const venc = parseInt(diaVencimento, 10);
+              criarMutation.mutate({
+                nome: nome.trim(),
+                tipo,
+                limiteTotal: tipo === 'CREDITO' ? parseCurrencyBR(limite) : undefined,
+                banco: tipo === 'CREDITO' && banco.trim() ? banco.trim() : undefined,
+                diaFechamento: tipo === 'CREDITO' && !isNaN(fech) && fech >= 1 && fech <= 31 ? fech : undefined,
+                diaVencimento: tipo === 'CREDITO' && !isNaN(venc) && venc >= 1 && venc <= 31 ? venc : undefined,
+              });
             }}>
               <Text style={{ color: criarMutation.status === 'pending' ? colors.textMuted : colors.brand, fontSize: 15, fontWeight: '600' }}>Salvar</Text>
             </TouchableOpacity>
@@ -126,6 +143,20 @@ export default function ContasScreen() {
                 <Text style={{ color: colors.textSecondary, fontSize: 9, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Limite total</Text>
                 <TextInput value={limite} onChangeText={(t) => setLimite(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" placeholderTextColor={colors.textMuted} style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, color: colors.textPrimary, fontSize: 15, marginBottom: 8 }} />
                 {limiteError && <Text style={{ color: colors.danger, marginBottom: 8 }}>{limiteError}</Text>}
+
+                <Text style={{ color: colors.textSecondary, fontSize: 9, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Banco</Text>
+                <TextInput value={banco} onChangeText={setBanco} placeholder="Ex.: Nubank, Itaú, Inter" placeholderTextColor={colors.textMuted} style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, color: colors.textPrimary, fontSize: 15, marginBottom: 8 }} />
+
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: colors.textSecondary, fontSize: 9, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Dia fechamento</Text>
+                    <TextInput value={diaFechamento} onChangeText={(t) => setDiaFechamento(t.replace(/\D/g, '').slice(0, 2))} keyboardType="number-pad" placeholder="Ex.: 28" placeholderTextColor={colors.textMuted} style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, color: colors.textPrimary, fontSize: 15, marginBottom: 8 }} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: colors.textSecondary, fontSize: 9, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Dia vencimento</Text>
+                    <TextInput value={diaVencimento} onChangeText={(t) => setDiaVencimento(t.replace(/\D/g, '').slice(0, 2))} keyboardType="number-pad" placeholder="Ex.: 5" placeholderTextColor={colors.textMuted} style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, color: colors.textPrimary, fontSize: 15, marginBottom: 8 }} />
+                  </View>
+                </View>
               </>
             )}
           </ScrollView>

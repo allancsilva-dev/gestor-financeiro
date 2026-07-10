@@ -83,6 +83,7 @@ public class ContaController {
         conta.setDiaFechamento(request.getDiaFechamento());
         conta.setDiaVencimento(request.getDiaVencimento());
         conta.setCor(request.getCor());
+        conta.setBanco(request.getBanco());
         return conta;
     }
 }

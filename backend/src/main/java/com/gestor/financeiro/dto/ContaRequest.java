@@ -33,6 +33,17 @@ public class ContaRequest {
     @Size(max = 7, message = "Cor deve ter no máximo 7 caracteres")
     private String cor;
 
+    @Size(max = 60, message = "Banco deve ter no máximo 60 caracteres")
+    private String banco;
+
+    public String getBanco() {
+        return banco;
+    }
+
+    public void setBanco(String banco) {
+        this.banco = banco;
+    }
+
     public String getNome() {
         return nome;
     }

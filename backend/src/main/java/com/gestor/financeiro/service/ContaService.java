@@ -56,7 +56,8 @@ public class ContaService {
         conta.setDiaFechamento(contaAtualizada.getDiaFechamento());
         conta.setDiaVencimento(contaAtualizada.getDiaVencimento());
         conta.setCor(contaAtualizada.getCor());
-        
+        conta.setBanco(contaAtualizada.getBanco());
+
         return contaRepository.save(conta);
     }
     

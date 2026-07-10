@@ -14,7 +14,8 @@ public record ContaResponseDto(
     Integer diaFechamento,
     Integer diaVencimento,
     Boolean ativo,
-    String cor
+    String cor,
+    String banco
 ) {
     public static ContaResponseDto fromEntity(Conta conta) {
         return new ContaResponseDto(
@@ -27,7 +28,8 @@ public record ContaResponseDto(
             conta.getDiaFechamento(),
             conta.getDiaVencimento(),
             conta.getAtivo(),
-            conta.getCor()
+            conta.getCor(),
+            conta.getBanco()
         );
     }
 }

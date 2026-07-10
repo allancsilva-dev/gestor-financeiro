@@ -153,9 +153,11 @@ export interface Conta {
   nome: string;
   tipo: TipoConta;
   limiteTotal?: number;
+  valorGasto?: number;
   diaFechamento?: number;
   diaVencimento?: number;
   cor?: string;
+  banco?: string;
 }
 
 export interface ContaRequest {
@@ -165,6 +167,7 @@ export interface ContaRequest {
   diaFechamento?: number;
   diaVencimento?: number;
   cor?: string;
+  banco?: string;
 }
 
 // ── Contas Fixas ───────────────────────────────────────────────────
