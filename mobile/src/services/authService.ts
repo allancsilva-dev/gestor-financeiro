@@ -1,5 +1,5 @@
 import api from './api';
-import { setAccessToken, clearAccessToken, setCsrfToken, clearCsrfToken, setUsuarioCache, clearUsuarioCache } from '../store/auth';
+import { setAccessToken, clearAccessToken, getCsrfToken, setCsrfToken, clearCsrfToken, setUsuarioCache, clearUsuarioCache } from '../store/auth';
 import { LoginResponse, Usuario } from '../types';
 
 export const authService = {
@@ -15,6 +15,16 @@ export const authService = {
   },
 
   async logout(): Promise<void> {
+    // Revoga o refresh token no servidor (cookie HttpOnly + double-submit CSRF).
+    // Best-effort: mesmo se a chamada falhar, a sessão local é sempre limpa.
+    try {
+      const csrf = await getCsrfToken();
+      await api.post('/auth/logout', null, {
+        headers: csrf ? { 'X-CSRF-Token': csrf } : undefined,
+      });
+    } catch {
+      // sem conexão ou token já revogado — segue com a limpeza local
+    }
     await clearAccessToken();
     await clearCsrfToken();
     await clearUsuarioCache();

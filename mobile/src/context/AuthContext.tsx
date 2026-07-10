@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Usuario } from '../types';
 import { authService } from '../services/authService';
-import { getAccessToken, getUsuarioCache, clearAccessToken, clearUsuarioCache } from '../store/auth';
+import { getAccessToken, getUsuarioCache, clearAccessToken, clearUsuarioCache, setUsuarioCache } from '../store/auth';
 import api from '../services/api';
 
 interface AuthContextType {
@@ -10,7 +10,8 @@ interface AuthContextType {
   isLoading: boolean;
   needsOnboarding: boolean;
   login: (email: string, password: string) => Promise<Usuario>;
-  logout: () => void;
+  logout: () => Promise<void>;
+  updateUsuario: (usuario: Usuario) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -53,6 +54,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUsuario(null);
   };
 
+  const updateUsuario = async (user: Usuario) => {
+    setUsuario(user);
+    await setUsuarioCache(user);
+  };
+
   const value: AuthContextType = {
     usuario,
     isAuthenticated: usuario !== null,
@@ -60,6 +66,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     needsOnboarding: usuario !== null && !usuario.onboardingCompleto,
     login,
     logout,
+    updateUsuario,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
