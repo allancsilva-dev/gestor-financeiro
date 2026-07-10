@@ -6,6 +6,7 @@ import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.TipoConta;
+import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.CategoriaRepository;
 import com.gestor.financeiro.repository.ContaRepository;
 import com.gestor.financeiro.repository.TransacaoRepository;
@@ -23,6 +24,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Map;
 
 import static org.hamcrest.Matchers.hasSize;
@@ -92,6 +94,42 @@ class TransacaoControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.content", hasSize(1)))
             .andExpect(jsonPath("$.content[0].descricao").value("Compra A"));
+    }
+
+    @Test
+    @WithMockUser(username = "alice@teste.com")
+    void listarPorPeriodo_deveFiltrarPorTipoEBusca() throws Exception {
+        Transacao entrada = TestDataFactory.transacao(usuarioA, categoriaA, "Salário", new BigDecimal("3000.00"));
+        entrada.setTipo(TipoTransacao.ENTRADA);
+        transacaoRepository.save(entrada);
+        transacaoRepository.save(TestDataFactory.transacao(usuarioA, categoriaA, "Mercado do mês", new BigDecimal("250.00")));
+        transacaoRepository.save(TestDataFactory.transacao(usuarioA, categoriaA, "Farmácia", new BigDecimal("80.00")));
+
+        String inicio = LocalDate.now().withDayOfMonth(1).toString();
+        String fim = LocalDate.now().withDayOfMonth(LocalDate.now().lengthOfMonth()).toString();
+
+        mockMvc.perform(get("/api/v1/transacoes/periodo")
+                .param("inicio", inicio).param("fim", fim).param("tipo", "SAIDA"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content", hasSize(2)));
+
+        mockMvc.perform(get("/api/v1/transacoes/periodo")
+                .param("inicio", inicio).param("fim", fim).param("q", "mercado"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content", hasSize(1)))
+            .andExpect(jsonPath("$.content[0].descricao").value("Mercado do mês"));
+
+        mockMvc.perform(get("/api/v1/transacoes/periodo")
+                .param("inicio", inicio).param("fim", fim).param("tipo", "SAIDA").param("q", "farm"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content", hasSize(1)))
+            .andExpect(jsonPath("$.content[0].descricao").value("Farmácia"));
+
+        mockMvc.perform(get("/api/v1/transacoes/periodo")
+                .param("inicio", inicio).param("fim", fim).param("tipo", "ENTRADA"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.content", hasSize(1)))
+            .andExpect(jsonPath("$.content[0].descricao").value("Salário"));
     }
 
     @Test

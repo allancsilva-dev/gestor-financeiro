@@ -32,6 +32,33 @@ public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
     @EntityGraph(attributePaths = {"categoria", "conta"})
     Page<Transacao> findByUsuarioIdAndDataBetweenAndAtivaTrue(Long usuarioId, LocalDate inicio, LocalDate fim, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"categoria", "conta"})
+    Page<Transacao> findByUsuarioIdAndTipoAndDataBetweenAndAtivaTrue(Long usuarioId, TipoTransacao tipo, LocalDate inicio, LocalDate fim, Pageable pageable);
+
+    // Busca por descrição dentro do período (filtro "q" da listagem mobile)
+    @EntityGraph(attributePaths = {"categoria", "conta"})
+    @Query("SELECT t FROM Transacao t WHERE t.usuario.id = :usuarioId AND t.ativa = true " +
+           "AND t.data BETWEEN :inicio AND :fim " +
+           "AND LOWER(t.descricao) LIKE LOWER(CONCAT('%', :q, '%'))")
+    Page<Transacao> buscarPorPeriodoEDescricao(
+        @Param("usuarioId") Long usuarioId,
+        @Param("inicio") LocalDate inicio,
+        @Param("fim") LocalDate fim,
+        @Param("q") String q,
+        Pageable pageable);
+
+    @EntityGraph(attributePaths = {"categoria", "conta"})
+    @Query("SELECT t FROM Transacao t WHERE t.usuario.id = :usuarioId AND t.ativa = true " +
+           "AND t.tipo = :tipo AND t.data BETWEEN :inicio AND :fim " +
+           "AND LOWER(t.descricao) LIKE LOWER(CONCAT('%', :q, '%'))")
+    Page<Transacao> buscarPorPeriodoTipoEDescricao(
+        @Param("usuarioId") Long usuarioId,
+        @Param("tipo") TipoTransacao tipo,
+        @Param("inicio") LocalDate inicio,
+        @Param("fim") LocalDate fim,
+        @Param("q") String q,
+        Pageable pageable);
+
     @EntityGraph(attributePaths = {"categoria", "conta", "carteira"})
     Optional<Transacao> findByIdAndUsuarioId(Long id, Long usuarioId);
     
@@ -83,10 +110,10 @@ public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
             @Param("inicio") LocalDate inicio,
             @Param("fim") LocalDate fim);
 
-    @Query("SELECT t.categoria.nome, COALESCE(SUM(CASE WHEN t.parcelado = true AND t.valorParcela IS NOT NULL THEN t.valorParcela ELSE t.valorTotal END), 0), t.categoria.cor " +
+    @Query("SELECT t.categoria.nome, COALESCE(SUM(CASE WHEN t.parcelado = true AND t.valorParcela IS NOT NULL THEN t.valorParcela ELSE t.valorTotal END), 0), t.categoria.cor, t.categoria.id, t.categoria.icone " +
            "FROM Transacao t WHERE t.usuario.id = :usuarioId AND t.ativa = true AND t.tipo = :tipo " +
            "AND t.data BETWEEN :inicio AND :fim AND t.categoria IS NOT NULL " +
-           "GROUP BY t.categoria.nome, t.categoria.cor")
+           "GROUP BY t.categoria.id, t.categoria.nome, t.categoria.cor, t.categoria.icone")
     List<Object[]> sumValorEfetivoAgrupadoPorCategoria(
             @Param("usuarioId") Long usuarioId,
              @Param("tipo") TipoTransacao tipo,

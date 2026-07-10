@@ -1,5 +1,14 @@
 import api from './api';
-import { Transacao, TransacaoRequest, PagedResponse } from '../types';
+import { TipoTransacao, Transacao, TransacaoRequest, PagedResponse } from '../types';
+
+export interface FiltroPeriodo {
+  inicio: string;
+  fim: string;
+  tipo?: TipoTransacao;
+  q?: string;
+  page?: number;
+  size?: number;
+}
 
 export const transacaoService = {
   listar: (page = 0, size = 20) =>
@@ -7,10 +16,14 @@ export const transacaoService = {
       `/v1/transacoes/minhas?page=${page}&size=${size}&sort=data,desc`
     ).then(r => r.data),
 
-  listarPorPeriodo: (inicio: string, fim: string, page = 0, size = 20) =>
-    api.get<PagedResponse<Transacao>>(
-      `/v1/transacoes/periodo?inicio=${inicio}&fim=${fim}&page=${page}&size=${size}&sort=data,desc`
-    ).then(r => r.data),
+  listarPorPeriodo: ({ inicio, fim, tipo, q, page = 0, size = 20 }: FiltroPeriodo) =>
+    api.get<PagedResponse<Transacao>>('/v1/transacoes/periodo', {
+      params: {
+        inicio, fim, page, size, sort: 'data,desc',
+        ...(tipo ? { tipo } : {}),
+        ...(q?.trim() ? { q: q.trim() } : {}),
+      },
+    }).then(r => r.data),
 
   buscarPorId: (id: number) =>
     api.get<Transacao>(`/v1/transacoes/${id}`).then(r => r.data),

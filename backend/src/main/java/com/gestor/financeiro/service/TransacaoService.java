@@ -67,6 +67,21 @@ public class TransacaoService {
     }
 
     public Page<Transacao> listarPorPeriodo(Long usuarioId, LocalDate inicio, LocalDate fim, Pageable pageable) {
+        return listarPorPeriodo(usuarioId, inicio, fim, null, null, pageable);
+    }
+
+    public Page<Transacao> listarPorPeriodo(Long usuarioId, LocalDate inicio, LocalDate fim,
+                                            TipoTransacao tipo, String busca, Pageable pageable) {
+        String q = (busca == null || busca.isBlank()) ? null : busca.trim();
+        if (tipo != null && q != null) {
+            return transacaoRepository.buscarPorPeriodoTipoEDescricao(usuarioId, tipo, inicio, fim, q, pageable);
+        }
+        if (tipo != null) {
+            return transacaoRepository.findByUsuarioIdAndTipoAndDataBetweenAndAtivaTrue(usuarioId, tipo, inicio, fim, pageable);
+        }
+        if (q != null) {
+            return transacaoRepository.buscarPorPeriodoEDescricao(usuarioId, inicio, fim, q, pageable);
+        }
         return transacaoRepository.findByUsuarioIdAndDataBetweenAndAtivaTrue(usuarioId, inicio, fim, pageable);
     }
 

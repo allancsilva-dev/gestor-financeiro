@@ -6,6 +6,7 @@ import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.Transacao;
+import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.TransacaoService;
 import com.gestor.financeiro.util.PaginationUtils;
@@ -51,11 +52,13 @@ public class TransacaoController {
     public ResponseEntity<Page<TransacaoResponseDto>> listarPorPeriodo(
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fim,
+        @RequestParam(required = false) TipoTransacao tipo,
+        @RequestParam(required = false) String q,
         @PageableDefault(size = 20, sort = "data", direction = Sort.Direction.DESC) Pageable pageable
     ) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Pageable cappedPageable = PaginationUtils.enforceMaxSize(pageable, 100);
-        Page<Transacao> transacoes = transacaoService.listarPorPeriodo(usuarioId, inicio, fim, cappedPageable);
+        Page<Transacao> transacoes = transacaoService.listarPorPeriodo(usuarioId, inicio, fim, tipo, q, cappedPageable);
         return ResponseEntity.ok(transacoes.map(TransacaoResponseDto::fromEntity));
     }
     

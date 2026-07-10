@@ -95,7 +95,7 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
     if (!isValidDateBR(data)) { setDataError('Data inválida. Use o formato DD/MM/AAAA.'); hasError = true; }
     if (!categoriaId) { setCategoriaError('Selecione uma categoria.'); hasError = true; }
     if (tipo === 'SAIDA' && formaPagamento === 'CARTAO' && !contaId) { setPagamentoError('Selecione um cartão.'); hasError = true; }
-    if (tipo === 'SAIDA' && formaPagamento === 'CARTEIRA' && !carteiraId) { setPagamentoError('Selecione uma carteira.'); hasError = true; }
+    if (tipo === 'SAIDA' && formaPagamento === 'CARTEIRA' && !carteiraId) { setPagamentoError('Selecione uma conta.'); hasError = true; }
     const parcelasNum = parseInt(totalParcelas, 10);
     if (formaPagamento === 'CARTAO' && parcelado && (isNaN(parcelasNum) || parcelasNum < 2 || parcelasNum > 48)) {
       setPagamentoError('Informe entre 2 e 48 parcelas.');
@@ -122,6 +122,8 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
       }
       await transacaoService.criar(request);
       queryClient.invalidateQueries({ queryKey: ['transacoes'] });
+      queryClient.invalidateQueries({ queryKey: ['relatorio'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-evolucao'] });
       queryClient.invalidateQueries({ queryKey: ['transacoes-recentes'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-resumo'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-projecao'] });
@@ -180,7 +182,7 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
             <>
               <Text style={{ color: colors.textSecondary, fontSize: 10, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Pagar com</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-                <Chip label="Carteira" selected={formaPagamento === 'CARTEIRA'} onPress={() => { setFormaPagamento('CARTEIRA'); setParcelado(false); }} />
+                <Chip label="Conta" selected={formaPagamento === 'CARTEIRA'} onPress={() => { setFormaPagamento('CARTEIRA'); setParcelado(false); }} />
                 <Chip label="Cartão" selected={formaPagamento === 'CARTAO'} onPress={() => setFormaPagamento('CARTAO')} />
               </View>
             </>
@@ -188,7 +190,7 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
 
           {formaPagamento === 'CARTEIRA' && carteiras.length > 0 && (
             <>
-              <Text style={{ color: colors.textSecondary, fontSize: 10, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Carteira</Text>
+              <Text style={{ color: colors.textSecondary, fontSize: 10, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Conta</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
                 {carteiras.map(c => (
                   <Chip key={c.id} label={c.nome} selected={carteiraId === c.id} onPress={() => setCarteiraId(c.id)} />
