@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { useTheme } from '../../../src/theme';
 import relatorioService from '../../../src/services/relatorioService';
-import { formatCurrency, formatDate } from '../../../src/utils/format';
+import { formatCurrency, formatDate, formatPercent } from '../../../src/utils/format';
 import Card from '../../../src/components/ui/Card';
 import Chip from '../../../src/components/ui/Chip';
 import IconTile from '../../../src/components/ui/IconTile';
@@ -54,7 +54,20 @@ export default function RelatorioScreen() {
     queryFn: () => relatorioService.evolucaoMensal(),
   });
 
+  const comparacaoQuery = useQuery({
+    queryKey: ['dashboard-comparacao-mensal'],
+    queryFn: () => relatorioService.comparacaoMensal(),
+  });
+
   const maiorGasto = data?.gastosPorCategoria[0]?.valorTotal ?? 0;
+  const comparacao = comparacaoQuery.data;
+  const mesAnterior = comparacao?.find(m => m.periodo.toLowerCase().includes('anterior')) ?? comparacao?.[0];
+  const mesAtual = comparacao?.find(m => m.periodo.toLowerCase().includes('atual')) ?? comparacao?.[1];
+  const saldoPeriodo = (item?: { entradas: number; saidas: number }) => item ? item.entradas - item.saidas : 0;
+  const saldoAnterior = saldoPeriodo(mesAnterior);
+  const saldoAtual = saldoPeriodo(mesAtual);
+  const variacaoSaldo = saldoAtual - saldoAnterior;
+  const variacaoPercentual = saldoAnterior === 0 ? null : (variacaoSaldo / Math.abs(saldoAnterior)) * 100;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -155,6 +168,73 @@ export default function RelatorioScreen() {
                   <Text style={{ color: colors.textSecondary, fontSize: 11 }}>Saídas</Text>
                 </View>
               </View>
+            </Card>
+          )}
+
+          {mesAnterior && mesAtual && comparacao?.some(m => m.entradas > 0 || m.saidas > 0) && (
+            <Card radius={20}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '700' }}>Comparação mensal</Text>
+                  <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 2 }}>
+                    Mês atual contra mês anterior
+                  </Text>
+                </View>
+                <View
+                  style={{
+                    borderRadius: 999,
+                    backgroundColor: variacaoSaldo >= 0 ? colors.successBg : colors.dangerBg,
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                  }}
+                  accessible
+                  accessibilityLabel={`Variação do saldo: ${variacaoSaldo >= 0 ? 'aumento' : 'queda'} de ${formatCurrency(Math.abs(variacaoSaldo))}`}
+                >
+                  <Text style={{ color: variacaoSaldo >= 0 ? colors.success : colors.danger, fontSize: 11, fontWeight: '700' }}>
+                    {variacaoSaldo >= 0 ? '+' : '−'}{formatCurrency(Math.abs(variacaoSaldo))}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={{ marginTop: 14, gap: 12 }}>
+                {[
+                  { item: mesAtual, label: 'Mês atual', saldo: saldoAtual },
+                  { item: mesAnterior, label: 'Mês anterior', saldo: saldoAnterior },
+                ].map(({ item, label, saldo }) => (
+                  <View key={label} style={{ paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.border }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
+                      <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '600' }}>{label}</Text>
+                      <Text
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        style={{ color: saldo >= 0 ? colors.success : colors.danger, fontSize: 18, fontWeight: '800', fontVariant: ['tabular-nums'] }}
+                      >
+                        {formatCurrency(saldo)}
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                      <View style={{ flex: 1, borderRadius: 12, backgroundColor: colors.successBg, paddingHorizontal: 10, paddingVertical: 8 }}>
+                        <Text style={{ color: colors.success, fontSize: 10, fontWeight: '700' }}>Entradas</Text>
+                        <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: colors.success, fontSize: 13, fontWeight: '700', marginTop: 2, fontVariant: ['tabular-nums'] }}>
+                          {formatCurrency(item.entradas)}
+                        </Text>
+                      </View>
+                      <View style={{ flex: 1, borderRadius: 12, backgroundColor: colors.dangerBg, paddingHorizontal: 10, paddingVertical: 8 }}>
+                        <Text style={{ color: colors.danger, fontSize: 10, fontWeight: '700' }}>Saídas</Text>
+                        <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: colors.danger, fontSize: 13, fontWeight: '700', marginTop: 2, fontVariant: ['tabular-nums'] }}>
+                          {formatCurrency(item.saidas)}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </View>
+
+              {variacaoPercentual !== null && (
+                <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 12 }}>
+                  Saldo {variacaoSaldo >= 0 ? 'subiu' : 'caiu'} {formatPercent(Math.abs(variacaoPercentual), 1)} versus o mês anterior.
+                </Text>
+              )}
             </Card>
           )}
 

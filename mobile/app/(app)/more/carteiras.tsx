@@ -27,7 +27,15 @@ function ExtratoModal({ carteira, onClose }: { carteira: Carteira | null; onClos
     enabled: carteira != null,
   });
 
+  const reconciliacaoQuery = useQuery({
+    queryKey: ['carteira-reconciliacao', carteira?.id],
+    queryFn: () => carteiraService.reconciliar(carteira!.id),
+    enabled: carteira != null,
+  });
+
   const movimentos = useMemo(() => data?.pages.flatMap(p => p.content) ?? [], [data]);
+  const reconciliacao = reconciliacaoQuery.data;
+  const reconciliacaoOk = reconciliacao?.status === 'OK';
 
   return (
     <Modal visible={carteira != null} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
@@ -39,10 +47,38 @@ function ExtratoModal({ carteira, onClose }: { carteira: Carteira | null; onClos
               Extrato · saldo {formatCurrency(Number(carteira?.saldo ?? 0))}
             </Text>
           </View>
+          {reconciliacao && (
+            <View
+              style={{
+                borderRadius: 999,
+                backgroundColor: reconciliacaoOk ? colors.successBg : colors.dangerBg,
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                marginRight: 10,
+              }}
+              accessible
+              accessibilityLabel={reconciliacaoOk ? 'Saldo reconciliado com o ledger' : 'Saldo divergente do ledger'}
+            >
+              <Text style={{ color: reconciliacaoOk ? colors.success : colors.danger, fontSize: 11, fontWeight: '700' }}>
+                {reconciliacaoOk ? 'OK' : 'Divergente'}
+              </Text>
+            </View>
+          )}
           <TouchableOpacity onPress={onClose} accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }}>
             <Text style={{ color: colors.brand, fontSize: 15, fontWeight: '600' }}>Fechar</Text>
           </TouchableOpacity>
         </View>
+
+        {reconciliacao && (
+          <View style={{ marginHorizontal: 16, marginTop: 12, borderRadius: 12, borderWidth: 1, borderColor: reconciliacaoOk ? colors.successBg : colors.danger, backgroundColor: reconciliacaoOk ? colors.successBg : colors.dangerBg, padding: 12 }}>
+            <Text style={{ color: reconciliacaoOk ? colors.success : colors.danger, fontSize: 13, fontWeight: '700' }}>
+              {reconciliacaoOk ? 'Saldo conferido' : 'Saldo precisa de revisão'}
+            </Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 4 }}>
+              Conta: {formatCurrency(Number(reconciliacao.saldoMaterializado ?? 0))} · Ledger: {formatCurrency(Number(reconciliacao.saldoLedger ?? 0))} · Diferença: {formatCurrency(Number(reconciliacao.diferenca ?? 0))}
+            </Text>
+          </View>
+        )}
 
         <FlatList
           data={movimentos}

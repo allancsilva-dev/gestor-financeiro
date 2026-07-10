@@ -1,5 +1,5 @@
 import api from './api';
-import { Carteira, CarteiraRequest, MovimentoCarteira, PagedResponse } from '../types';
+import { Carteira, CarteiraRequest, MovimentoCarteira, PagedResponse, ReconciliacaoCarteira } from '../types';
 
 export const carteiraService = {
   listar: () =>
@@ -24,6 +24,12 @@ export const carteiraService = {
     api.get<PagedResponse<MovimentoCarteira>>(
       `/v1/carteiras/${id}/movimentos?page=${page}&size=${size}&sort=dataMovimento,desc`
     ).then(r => r.data),
+
+  reconciliar: (id: number) =>
+    api.get<ReconciliacaoCarteira>(`/v1/carteiras/${id}/reconciliacao`).then(r => r.data),
+
+  reconciliarMinhas: () =>
+    api.get<ReconciliacaoCarteira[]>('/v1/carteiras/minhas/reconciliacao').then(r => r.data),
 
   deletar: (id: number) =>
     api.delete(`/v1/carteiras/${id}`),

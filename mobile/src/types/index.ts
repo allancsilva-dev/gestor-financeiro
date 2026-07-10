@@ -173,6 +173,15 @@ export interface CarteiraRequest {
   banco?: string;
 }
 
+export interface ReconciliacaoCarteira {
+  carteiraId: number;
+  usuarioId: number;
+  saldoMaterializado: number;
+  saldoLedger: number;
+  diferenca: number;
+  status: 'OK' | 'DIVERGENTE';
+}
+
 // ── Contas ─────────────────────────────────────────────────────────
 export interface Conta {
   id: number;
@@ -357,6 +366,13 @@ export interface EvolucaoMensalItem {
   saldo: number;
 }
 
+// GET /v1/dashboard/comparacao-mensal — mês anterior x mês atual
+export interface ComparacaoMensalItem {
+  periodo: string;
+  entradas: number;
+  saidas: number;
+}
+
 export interface RelatorioResponse {
   inicio: string;
   fim: string;
@@ -369,12 +385,89 @@ export interface RelatorioResponse {
   gastosPorConta: RelatorioContaItem[];
 }
 
+// ── Insights ───────────────────────────────────────────────────────
+export interface CategoriaAlerta {
+  categoriaNome: string;
+  gastoAtual: number;
+  gastoMedio: number;
+  variacaoPercentual: number;
+  acimaMedia: boolean;
+}
+
+export interface InsightsResponse {
+  gastoMesAtual: number;
+  gastoMedioMensal: number;
+  variacaoPercentual: number;
+  previsaoSaldoFinal: number;
+  categoriasAlerta: CategoriaAlerta[];
+  recomendacoes: string[];
+  resumo: string;
+}
+
+// ── Anexos / Importação ────────────────────────────────────────────
+export interface Anexo {
+  id: number;
+  nome: string;
+  tipo: string | null;
+  tamanho: number;
+  dataUpload: string;
+}
+
+export interface ImportResult {
+  total: number;
+  importadas: number;
+  ignoradas: number;
+  erros: number;
+}
+
 // ── Parcelas ───────────────────────────────────────────────────────
 export interface Parcela {
   id: number;
+  transacaoId: number;
   numeroParcela: number;
   totalParcelas: number;
   valor: number;
   dataVencimento: string;
   status: StatusPagamento;
+  dataPagamento: string | null;
+}
+
+// ── Investimentos ─────────────────────────────────────────────────
+export type TipoAtivo = 'ACAO' | 'FII' | 'RENDA_FIXA' | 'CRIPTO' | 'OUTRO';
+export type TipoMovimentacaoAtivo = 'COMPRA' | 'VENDA' | 'DIVIDENDO' | 'BONIFICACAO';
+
+export interface Ativo {
+  id: number;
+  ticker: string;
+  nome: string;
+  tipo: TipoAtivo;
+  quantidade: number;
+  custoTotal: number;
+  valorAtual: number;
+  precoMedio: number;
+  lucroPrejuizo: number;
+  rentabilidade: number;
+}
+
+export interface AtivoRequest {
+  ticker: string;
+  nome: string;
+  tipo: TipoAtivo;
+  valorAtual: number;
+}
+
+export interface MovimentacaoAtivo {
+  id: number;
+  tipo: TipoMovimentacaoAtivo;
+  data: string;
+  quantidade: number;
+  precoUnitario: number;
+  valorTotal: number;
+}
+
+export interface MovimentacaoAtivoRequest {
+  tipo: TipoMovimentacaoAtivo;
+  data: string;
+  quantidade: number;
+  precoUnitario: number;
 }

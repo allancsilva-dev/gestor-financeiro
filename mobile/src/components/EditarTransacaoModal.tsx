@@ -1,8 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, Modal, TouchableOpacity, ActivityIndicator, ScrollView, Alert } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import { transacaoService } from '../services/transacaoService';
 import { categoriaService } from '../services/categoriaService';
+import parcelaService from '../services/parcelaService';
+import anexoService, { UploadFile } from '../services/anexoService';
 import { useTheme } from '../theme';
 import { parseDateBR, isValidDateBR, parseCurrencyBR, maskCurrencyInput, maskDateInput } from '../utils/format';
 import { Transacao, TransacaoRequest } from '../types';
@@ -16,6 +20,11 @@ interface EditarTransacaoModalProps {
 }
 
 const isoToBR = (iso: string) => iso.slice(0, 10).split('-').reverse().join('/');
+const bytesLabel = (bytes: number) => {
+  if (!bytes) return '0 KB';
+  if (bytes < 1024 * 1024) return `${Math.max(bytes / 1024, 1).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
 
 // Sheet "Editar Transação" — aberto ao tocar numa linha da lista de transações.
 // Tipo e forma de pagamento ficam fixos; categoria pode mudar sem recriar lançamento.
@@ -25,6 +34,8 @@ export default function EditarTransacaoModal({ visible, transacao, onClose }: Ed
 
   const [salvando, setSalvando] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
+  const [parcelaActionId, setParcelaActionId] = useState<number | null>(null);
+  const [anexoAction, setAnexoAction] = useState<'arquivo' | 'camera' | number | null>(null);
   const [erroForm, setErroForm] = useState<string | null>(null);
   const [descricaoError, setDescricaoError] = useState<string | null>(null);
   const [valorError, setValorError] = useState<string | null>(null);
@@ -56,10 +67,23 @@ export default function EditarTransacaoModal({ visible, transacao, onClose }: Ed
     enabled: visible,
   });
 
+  const parcelasQuery = useQuery({
+    queryKey: ['parcelas', transacao?.id],
+    queryFn: () => parcelaService.listarPorTransacao(transacao!.id),
+    enabled: visible && Boolean(transacao?.parcelado && transacao?.id),
+  });
+
+  const anexosQuery = useQuery({
+    queryKey: ['anexos', transacao?.id],
+    queryFn: () => anexoService.listar(transacao!.id),
+    enabled: visible && Boolean(transacao?.id),
+  });
+
   const invalidarQueries = () => {
     queryClient.invalidateQueries({ queryKey: ['transacoes'] });
     queryClient.invalidateQueries({ queryKey: ['relatorio'] });
     queryClient.invalidateQueries({ queryKey: ['dashboard-evolucao'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboard-comparacao-mensal'] });
     queryClient.invalidateQueries({ queryKey: ['transacoes-recentes'] });
     queryClient.invalidateQueries({ queryKey: ['dashboard-resumo'] });
     queryClient.invalidateQueries({ queryKey: ['dashboard-projecao'] });
@@ -68,6 +92,96 @@ export default function EditarTransacaoModal({ visible, transacao, onClose }: Ed
     queryClient.invalidateQueries({ queryKey: ['contas-fatura'] });
     queryClient.invalidateQueries({ queryKey: ['fatura'] });
     queryClient.invalidateQueries({ queryKey: ['categorias'] });
+    queryClient.invalidateQueries({ queryKey: ['parcelas', transacao?.id] });
+    queryClient.invalidateQueries({ queryKey: ['anexos', transacao?.id] });
+  };
+
+  const handleToggleParcela = async (parcelaId: number, paga: boolean) => {
+    setParcelaActionId(parcelaId);
+    setErroForm(null);
+    try {
+      if (paga) {
+        await parcelaService.despagar(parcelaId);
+      } else {
+        await parcelaService.pagar(parcelaId);
+      }
+      invalidarQueries();
+      await parcelasQuery.refetch();
+    } catch (err: any) {
+      setErroForm(err?.userMessage ?? 'Erro ao atualizar parcela. Tente novamente.');
+    } finally {
+      setParcelaActionId(null);
+    }
+  };
+
+  const uploadAnexo = async (file: UploadFile, action: 'arquivo' | 'camera') => {
+    if (!transacao) return;
+    setAnexoAction(action);
+    setErroForm(null);
+    try {
+      await anexoService.upload(transacao.id, file);
+      await anexosQuery.refetch();
+    } catch (err: any) {
+      setErroForm(err?.userMessage ?? 'Erro ao enviar anexo. Tente novamente.');
+    } finally {
+      setAnexoAction(null);
+    }
+  };
+
+  const handleSelecionarArquivo = async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ['image/*', 'application/pdf'],
+      multiple: false,
+      copyToCacheDirectory: true,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+    await uploadAnexo({
+      uri: asset.uri,
+      name: asset.name || 'comprovante',
+      type: asset.mimeType || 'application/octet-stream',
+    }, 'arquivo');
+  };
+
+  const handleTirarFoto = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Comprovante', 'Permita acesso à câmera para anexar uma foto.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      quality: 0.85,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+    await uploadAnexo({
+      uri: asset.uri,
+      name: asset.fileName || `comprovante-${Date.now()}.jpg`,
+      type: asset.mimeType || 'image/jpeg',
+    }, 'camera');
+  };
+
+  const handleExcluirAnexo = (id: number, nome: string) => {
+    Alert.alert('Excluir anexo', `Excluir "${nome}"?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Excluir',
+        style: 'destructive',
+        onPress: async () => {
+          setAnexoAction(id);
+          setErroForm(null);
+          try {
+            await anexoService.deletar(id);
+            await anexosQuery.refetch();
+          } catch (err: any) {
+            setErroForm(err?.userMessage ?? 'Erro ao excluir anexo. Tente novamente.');
+          } finally {
+            setAnexoAction(null);
+          }
+        },
+      },
+    ]);
   };
 
   const handleSalvar = async () => {
@@ -178,6 +292,131 @@ export default function EditarTransacaoModal({ visible, transacao, onClose }: Ed
           {categoriaError && <Text style={{ color: colors.danger, fontSize: 12, marginBottom: 8 }}>{categoriaError}</Text>}
 
           <Field label="Observações" value={observacoes} onChangeText={setObservacoes} multiline style={{ height: 100, textAlignVertical: 'top' }} />
+
+          {transacao?.parcelado && (
+            <View style={{ backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 16 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: colors.textPrimary, fontSize: 14, fontWeight: '700' }}>Parcelas</Text>
+                  <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 2 }}>Controle individual de pagamento</Text>
+                </View>
+                {parcelasQuery.isFetching && <ActivityIndicator color={colors.brand} size="small" />}
+              </View>
+
+              {parcelasQuery.isError ? (
+                <View style={{ paddingTop: 12 }}>
+                  <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Erro ao carregar parcelas.</Text>
+                  <TouchableOpacity onPress={() => parcelasQuery.refetch()} accessibilityRole="button" style={{ marginTop: 6, minHeight: 36, justifyContent: 'center' }}>
+                    <Text style={{ color: colors.brandFg, fontSize: 13, fontWeight: '600' }}>Tentar novamente</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : parcelasQuery.data?.content.length === 0 ? (
+                <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 12 }}>Nenhuma parcela encontrada.</Text>
+              ) : (
+                <View style={{ marginTop: 10, gap: 8 }}>
+                  {parcelasQuery.data?.content.map(p => {
+                    const paga = p.status === 'PAGO';
+                    return (
+                      <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.border }}>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={{ color: colors.textPrimary, fontSize: 13, fontWeight: '600' }}>
+                            {p.numeroParcela}/{p.totalParcelas} · R$ {Number(p.valor ?? 0).toFixed(2).replace('.', ',')}
+                          </Text>
+                          <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 2 }}>
+                            Vence {isoToBR(p.dataVencimento)} · {paga ? 'Paga' : p.status === 'ATRASADO' ? 'Atrasada' : 'Pendente'}
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          onPress={() => handleToggleParcela(p.id, paga)}
+                          disabled={parcelaActionId != null}
+                          accessibilityRole="button"
+                          accessibilityLabel={paga ? `Desfazer pagamento da parcela ${p.numeroParcela}` : `Pagar parcela ${p.numeroParcela}`}
+                          style={{
+                            minHeight: 36,
+                            borderRadius: 999,
+                            paddingHorizontal: 12,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: paga ? colors.successBg : colors.brandBg,
+                          }}
+                        >
+                          {parcelaActionId === p.id ? (
+                            <ActivityIndicator color={paga ? colors.success : colors.brandFg} size="small" />
+                          ) : (
+                            <Text style={{ color: paga ? colors.success : colors.brandFg, fontSize: 12, fontWeight: '700' }}>
+                              {paga ? 'Desfazer' : 'Pagar'}
+                            </Text>
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+          )}
+
+          <View style={{ backgroundColor: colors.card, borderColor: colors.border, borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.textPrimary, fontSize: 14, fontWeight: '700' }}>Comprovantes</Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 2 }}>Fotos, PDFs ou imagens da transação</Text>
+              </View>
+              {anexosQuery.isFetching && <ActivityIndicator color={colors.brand} size="small" />}
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+              <TouchableOpacity
+                onPress={handleTirarFoto}
+                disabled={anexoAction != null}
+                accessibilityRole="button"
+                style={{ flex: 1, minHeight: 40, borderRadius: 999, backgroundColor: colors.brandBg, alignItems: 'center', justifyContent: 'center' }}
+              >
+                {anexoAction === 'camera' ? <ActivityIndicator color={colors.brandFg} size="small" /> : <Text style={{ color: colors.brandFg, fontSize: 13, fontWeight: '700' }}>Câmera</Text>}
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleSelecionarArquivo}
+                disabled={anexoAction != null}
+                accessibilityRole="button"
+                style={{ flex: 1, minHeight: 40, borderRadius: 999, backgroundColor: colors.infoBg, alignItems: 'center', justifyContent: 'center' }}
+              >
+                {anexoAction === 'arquivo' ? <ActivityIndicator color={colors.info} size="small" /> : <Text style={{ color: colors.info, fontSize: 13, fontWeight: '700' }}>Arquivo</Text>}
+              </TouchableOpacity>
+            </View>
+
+            {anexosQuery.isError ? (
+              <View style={{ paddingTop: 12 }}>
+                <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Erro ao carregar comprovantes.</Text>
+                <TouchableOpacity onPress={() => anexosQuery.refetch()} accessibilityRole="button" style={{ marginTop: 6, minHeight: 36, justifyContent: 'center' }}>
+                  <Text style={{ color: colors.brandFg, fontSize: 13, fontWeight: '600' }}>Tentar novamente</Text>
+                </TouchableOpacity>
+              </View>
+            ) : anexosQuery.data?.length === 0 ? (
+              <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 12 }}>Nenhum comprovante anexado.</Text>
+            ) : (
+              <View style={{ marginTop: 10, gap: 8 }}>
+                {anexosQuery.data?.map(a => (
+                  <View key={a.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.border }}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={{ color: colors.textPrimary, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>{a.nome}</Text>
+                      <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 2 }}>
+                        {bytesLabel(Number(a.tamanho ?? 0))}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => handleExcluirAnexo(a.id, a.nome)}
+                      disabled={anexoAction != null}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Excluir comprovante ${a.nome}`}
+                      style={{ minHeight: 36, borderRadius: 999, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.dangerBg }}
+                    >
+                      {anexoAction === a.id ? <ActivityIndicator color={colors.danger} size="small" /> : <Text style={{ color: colors.danger, fontSize: 12, fontWeight: '700' }}>Excluir</Text>}
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
 
           {erroForm && <Text style={{ color: colors.danger, marginBottom: 8 }}>{erroForm}</Text>}
 

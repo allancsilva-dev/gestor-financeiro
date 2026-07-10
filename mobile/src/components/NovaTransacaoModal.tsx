@@ -124,6 +124,7 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
       queryClient.invalidateQueries({ queryKey: ['transacoes'] });
       queryClient.invalidateQueries({ queryKey: ['relatorio'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-evolucao'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-comparacao-mensal'] });
       queryClient.invalidateQueries({ queryKey: ['transacoes-recentes'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-resumo'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-projecao'] });

@@ -4,8 +4,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { File, Paths } from 'expo-file-system';
+import * as DocumentPicker from 'expo-document-picker';
 import { useTheme } from '../../../src/theme';
 import api from '../../../src/services/api';
+import importService from '../../../src/services/importService';
 import Card from '../../../src/components/ui/Card';
 
 // Grid 2 colunas (DESIGN.md) — tile 44 com tint da cor do item, label + subtítulo
@@ -17,8 +19,10 @@ const itens = [
   { label: 'Relatórios',   sub: 'Gráficos',         rota: '/more/relatorios',   icone: '📋', cor: '#2ed573' },
   { label: 'Categorias',   sub: 'Organizar',        rota: '/more/categorias',   icone: '🏷', cor: '#ff6b81' },
   { label: 'Cartões',      sub: 'Crédito e débito', rota: '/more/contas',       icone: '💳', cor: '#1e90ff' },
+  { label: 'Investimentos', sub: 'Carteira',         rota: '/more/investimentos', icone: '◈', cor: '#2ed573' },
   { label: 'Perfil',       sub: 'Nome e segurança', rota: '/(app)/perfil',      icone: '👤', cor: '#7c5cfc' },
   { label: 'Entrada por IA', sub: 'Em breve',       rota: null,                 icone: '🤖', cor: '#8b2fff', desabilitado: true },
+  { label: 'Importar CSV', sub: 'Extrato',           rota: null,                 icone: '⇪', cor: '#ffa502', acao: 'importar' },
   { label: 'Exportar Dados', sub: 'CSV',            rota: null,                 icone: '📥', cor: '#7c5cfc', acao: 'exportar' },
 ];
 
@@ -52,6 +56,31 @@ const handleExport = async () => {
   }
 };
 
+const handleImport = async () => {
+  try {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ['text/csv', 'text/comma-separated-values', 'application/vnd.ms-excel'],
+      multiple: false,
+      copyToCacheDirectory: true,
+    });
+
+    if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+    const data = await importService.csv({
+      uri: asset.uri,
+      name: asset.name || 'extrato.csv',
+      type: asset.mimeType || 'text/csv',
+    });
+
+    Alert.alert(
+      'Importar CSV',
+      `${data.importadas} importadas · ${data.ignoradas} ignoradas · ${data.erros} erros`
+    );
+  } catch (err: any) {
+    Alert.alert('Importar CSV', err?.userMessage ?? 'Não foi possível importar. Verifique o arquivo e tente novamente.');
+  }
+};
+
 export default function MoreScreen() {
   const colors = useTheme();
   const router = useRouter();
@@ -59,6 +88,7 @@ export default function MoreScreen() {
 
   const navegar = (rota: string | null, acao?: string) => {
     if (acao === 'exportar') { handleExport(); return; }
+    if (acao === 'importar') { handleImport(); return; }
     if (!rota) return;
     router.push(rota as any);
   };

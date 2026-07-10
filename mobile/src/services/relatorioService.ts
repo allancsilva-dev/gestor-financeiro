@@ -1,5 +1,5 @@
 import api from './api';
-import { EvolucaoMensalItem, RelatorioResponse } from '../types';
+import { ComparacaoMensalItem, EvolucaoMensalItem, RelatorioResponse } from '../types';
 
 const relatorioService = {
   gerar: (inicio?: string, fim?: string) => {
@@ -11,6 +11,9 @@ const relatorioService = {
 
   evolucaoMensal: () =>
     api.get<EvolucaoMensalItem[]>('/v1/dashboard/evolucao-mensal').then((r) => r.data),
+
+  comparacaoMensal: () =>
+    api.get<ComparacaoMensalItem[]>('/v1/dashboard/comparacao-mensal').then((r) => r.data),
 };
 
 export default relatorioService;

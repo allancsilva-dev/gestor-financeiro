@@ -17,6 +17,8 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.gestorfinanceiro.mobile",
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -33,7 +35,7 @@
       "expo-secure-store"
     ],
     "extra": {
-      "apiBaseUrl": "http://localhost:8081/api"
+      "apiBaseUrl": "https://financas.nexostech.com.br/api"
     }
   }
 }

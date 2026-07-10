@@ -5,7 +5,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import api from '../../src/services/api';
-import { DashboardResumo, Transacao, PagedResponse, ProjecaoResponse } from '../../src/types';
+import insightsService from '../../src/services/insightsService';
+import { DashboardResumo, Transacao, PagedResponse, ProjecaoResponse, InsightsResponse } from '../../src/types';
 import { useTheme } from '../../src/theme';
 import { useAuth } from '../../src/context/AuthContext';
 import SkeletonBox from '../../src/components/ui/SkeletonBox';
@@ -34,6 +35,11 @@ export default function Dashboard() {
   const projecaoQuery = useQuery<ProjecaoResponse>({
     queryKey: ['dashboard-projecao'],
     queryFn: () => api.get<ProjecaoResponse>('/v1/dashboard/projecao?meses=6').then(r => r.data),
+  });
+
+  const insightsQuery = useQuery<InsightsResponse>({
+    queryKey: ['insights'],
+    queryFn: () => insightsService.buscar(),
   });
 
   const { usuario } = useAuth();
@@ -180,6 +186,60 @@ export default function Dashboard() {
             </React.Fragment>
           ))}
         </Card>
+        </Entrance>
+      )}
+
+      {insightsQuery.data && (
+        <Entrance delay={175}>
+          <Card padded radius={20} style={{ marginBottom: 16 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700' }}>Insights</Text>
+                <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 3 }}>
+                  {insightsQuery.data.resumo || 'Leitura automática do seu mês financeiro.'}
+                </Text>
+              </View>
+              <View style={{ borderRadius: 999, backgroundColor: Number(insightsQuery.data.variacaoPercentual ?? 0) <= 0 ? colors.successBg : colors.warningBg, paddingHorizontal: 10, paddingVertical: 5 }}>
+                <Text style={{ color: Number(insightsQuery.data.variacaoPercentual ?? 0) <= 0 ? colors.success : colors.warning, fontSize: 11, fontWeight: '700' }}>
+                  {Number(insightsQuery.data.variacaoPercentual ?? 0) > 0 ? '+' : ''}{Number(insightsQuery.data.variacaoPercentual ?? 0).toFixed(1)}%
+                </Text>
+              </View>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
+              <View style={{ flex: 1, borderRadius: 12, backgroundColor: colors.dangerBg, padding: 10 }}>
+                <Text style={{ color: colors.danger, fontSize: 10, fontWeight: '700' }}>Gasto mês</Text>
+                <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: colors.danger, fontSize: 13, fontWeight: '800', marginTop: 2, fontVariant: ['tabular-nums'] }}>
+                  {formatCurrency(Number(insightsQuery.data.gastoMesAtual ?? 0))}
+                </Text>
+              </View>
+              <View style={{ flex: 1, borderRadius: 12, backgroundColor: colors.infoBg, padding: 10 }}>
+                <Text style={{ color: colors.info, fontSize: 10, fontWeight: '700' }}>Média</Text>
+                <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: colors.info, fontSize: 13, fontWeight: '800', marginTop: 2, fontVariant: ['tabular-nums'] }}>
+                  {formatCurrency(Number(insightsQuery.data.gastoMedioMensal ?? 0))}
+                </Text>
+              </View>
+            </View>
+
+            {insightsQuery.data.categoriasAlerta?.length > 0 && (
+              <View style={{ marginTop: 12, gap: 8 }}>
+                {insightsQuery.data.categoriasAlerta.slice(0, 2).map((c, i) => (
+                  <View key={`${c.categoriaNome}-${i}`} style={{ paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border }}>
+                    <Text style={{ color: colors.textPrimary, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>{c.categoriaNome}</Text>
+                    <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 2 }}>
+                      {formatCurrency(Number(c.gastoAtual ?? 0))} no mês · {Number(c.variacaoPercentual ?? 0).toFixed(1)}% vs média
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {insightsQuery.data.recomendacoes?.[0] && (
+              <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 12 }}>
+                {insightsQuery.data.recomendacoes[0]}
+              </Text>
+            )}
+          </Card>
         </Entrance>
       )}
 
