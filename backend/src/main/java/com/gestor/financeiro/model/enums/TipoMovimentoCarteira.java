@@ -6,5 +6,7 @@ public enum TipoMovimentoCarteira {
     AJUSTE_MANUAL,
     TRANSFERENCIA_ENTRADA,
     TRANSFERENCIA_SAIDA,
+    RESERVA_META,
+    RESGATE_META,
     ESTORNO
 }

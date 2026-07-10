@@ -96,7 +96,7 @@ public class MetaController {
     ) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         BigDecimal valor = request.getValor();
-        Meta meta = metaService.adicionarValor(id, valor, usuarioId);
+        Meta meta = metaService.adicionarValor(id, valor, request.getCarteiraId(), usuarioId);
         return ResponseEntity.ok(MetaResponseDto.fromEntity(meta));
     }
     
@@ -108,7 +108,7 @@ public class MetaController {
     ) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         BigDecimal valor = request.getValor();
-        Meta meta = metaService.removerValor(id, valor, usuarioId);
+        Meta meta = metaService.removerValor(id, valor, request.getCarteiraId(), usuarioId);
         return ResponseEntity.ok(MetaResponseDto.fromEntity(meta));
     }
     

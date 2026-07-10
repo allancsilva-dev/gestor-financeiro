@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Modal, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, Modal, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { metaService } from '../../src/services/metaService';
+import { carteiraService } from '../../src/services/carteiraService';
 import { formatCurrency, formatPercent, formatDate, parseDateBR, isValidDateBR, parseCurrencyBR, maskCurrencyInput, maskDateInput } from '../../src/utils/format';
 import { Meta, MetaRequest } from '../../src/types';
 import { useTheme } from '../../src/theme';
@@ -13,6 +14,7 @@ import Badge from '../../src/components/ui/Badge';
 import ProgressBar from '../../src/components/ui/ProgressBar';
 import Fab from '../../src/components/ui/Fab';
 import Field from '../../src/components/ui/Field';
+import Chip from '../../src/components/ui/Chip';
 
 export default function Metas() {
   const colors = useTheme();
@@ -20,18 +22,29 @@ export default function Metas() {
   const insets = useSafeAreaInsets();
 
   const [modalAdicionarVisible, setModalAdicionarVisible] = useState(false);
+  const [modalRemoverVisible, setModalRemoverVisible] = useState(false);
   const [modalCriarVisible, setModalCriarVisible] = useState(false);
+  const [modalDetalheVisible, setModalDetalheVisible] = useState(false);
+  const [editandoMeta, setEditandoMeta] = useState<Meta | null>(null);
   const [metaSelecionada, setMetaSelecionada] = useState<Meta | null>(null);
   const [erroCriar, setErroCriar] = useState<string | null>(null);
   const [valorAdicionar, setValorAdicionar] = useState('');
+  const [valorRemover, setValorRemover] = useState('');
   const [erroAdicionar, setErroAdicionar] = useState<string | null>(null);
+  const [erroRemover, setErroRemover] = useState<string | null>(null);
+  const [carteiraOrigemId, setCarteiraOrigemId] = useState<number | null>(null);
+  const [carteiraDestinoId, setCarteiraDestinoId] = useState<number | null>(null);
+  const [erroCarteira, setErroCarteira] = useState<string | null>(null);
+  const [erroCarteiraDestino, setErroCarteiraDestino] = useState<string | null>(null);
 
   const [nomeCriar, setNomeCriar] = useState('');
   const [valorTotalCriar, setValorTotalCriar] = useState('');
+  const [valorMensalCriar, setValorMensalCriar] = useState('');
   const [dataLimiteCriar, setDataLimiteCriar] = useState('');
   const [descricaoCriar, setDescricaoCriar] = useState('');
   const [nomeError, setNomeError] = useState<string | null>(null);
   const [valorTotalError, setValorTotalError] = useState<string | null>(null);
+  const [valorMensalError, setValorMensalError] = useState<string | null>(null);
   const [dataLimiteError, setDataLimiteError] = useState<string | null>(null);
 
   const { data, isLoading, isError, refetch } = useQuery({
@@ -39,14 +52,89 @@ export default function Metas() {
     queryFn: () => metaService.listar(),
   });
 
+  const { data: carteirasData } = useQuery({
+    queryKey: ['carteiras'],
+    queryFn: () => carteiraService.listar(),
+  });
+  const carteiras = carteirasData?.content ?? [];
+
+  const resetFormularioMeta = () => {
+    setEditandoMeta(null);
+    setNomeCriar('');
+    setValorTotalCriar('');
+    setValorMensalCriar('');
+    setDataLimiteCriar('');
+    setDescricaoCriar('');
+    setNomeError(null);
+    setValorTotalError(null);
+    setValorMensalError(null);
+    setDataLimiteError(null);
+    setErroCriar(null);
+  };
+
+  const abrirCriarMeta = () => {
+    resetFormularioMeta();
+    setModalCriarVisible(true);
+  };
+
+  const abrirEditarMeta = (meta: Meta) => {
+    setEditandoMeta(meta);
+    setNomeCriar(meta.nome);
+    setValorTotalCriar(maskCurrencyInput(Number(meta.valorTotal ?? 0).toFixed(2)));
+    setValorMensalCriar(meta.valorMensal ? maskCurrencyInput(Number(meta.valorMensal).toFixed(2)) : '');
+    setDataLimiteCriar(meta.dataPrevista ? formatDate(meta.dataPrevista) : '');
+    setDescricaoCriar(meta.descricao ?? '');
+    setNomeError(null);
+    setValorTotalError(null);
+    setValorMensalError(null);
+    setDataLimiteError(null);
+    setErroCriar(null);
+    setModalDetalheVisible(false);
+    setModalCriarVisible(true);
+  };
+
+  const montarPayloadMeta = (): MetaRequest | null => {
+    setNomeError(null); setValorTotalError(null); setValorMensalError(null); setDataLimiteError(null); setErroCriar(null);
+    let hasErr = false;
+    if (!nomeCriar.trim() || nomeCriar.trim().length < 3) { setNomeError('Nome obrigatório (mínimo 3 caracteres).'); hasErr = true; }
+    const valorTotal = parseCurrencyBR(valorTotalCriar);
+    if (isNaN(valorTotal) || valorTotal <= 0) { setValorTotalError('Valor total obrigatório e positivo.'); hasErr = true; }
+    const valorMensal = valorMensalCriar ? parseCurrencyBR(valorMensalCriar) : undefined;
+    if (valorMensalCriar && (valorMensal == null || isNaN(valorMensal) || valorMensal <= 0)) { setValorMensalError('Valor mensal deve ser positivo.'); hasErr = true; }
+    if (dataLimiteCriar && !isValidDateBR(dataLimiteCriar)) { setDataLimiteError('Data inválida. Use o formato DD/MM/AAAA.'); hasErr = true; }
+    if (hasErr) return null;
+    return {
+      nome: nomeCriar.trim(),
+      valorTotal: Number(valorTotal),
+      valorMensal: valorMensal ? Number(valorMensal) : undefined,
+      dataLimite: dataLimiteCriar ? parseDateBR(dataLimiteCriar) : undefined,
+      descricao: descricaoCriar || undefined,
+    };
+  };
+
   const adicionarMutation = useMutation({
-    mutationFn: ({ id, valor }: { id: number; valor: number }) => metaService.adicionarValor(id, valor),
+    mutationFn: ({ id, valor, carteiraId }: { id: number; valor: number; carteiraId: number }) =>
+      metaService.adicionarValor(id, valor, carteiraId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['metas'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-resumo'] });
+      queryClient.invalidateQueries({ queryKey: ['carteiras'] });
       setModalAdicionarVisible(false);
     },
     onError: (err: any) => setErroAdicionar(err?.userMessage ?? 'Erro ao adicionar.'),
+  });
+
+  const removerMutation = useMutation({
+    mutationFn: ({ id, valor, carteiraId }: { id: number; valor: number; carteiraId: number }) =>
+      metaService.removerValor(id, valor, carteiraId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['metas'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-resumo'] });
+      queryClient.invalidateQueries({ queryKey: ['carteiras'] });
+      setModalRemoverVisible(false);
+      setModalDetalheVisible(false);
+    },
+    onError: (err: any) => setErroRemover(err?.userMessage ?? 'Erro ao retirar.'),
   });
 
   const criarMutation = useMutation({
@@ -55,9 +143,42 @@ export default function Metas() {
       queryClient.invalidateQueries({ queryKey: ['metas'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-resumo'] });
       setModalCriarVisible(false);
+      resetFormularioMeta();
     },
     onError: (err: any) => setErroCriar(err?.userMessage ?? 'Erro ao criar meta.'),
   });
+
+  const atualizarMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: MetaRequest }) => metaService.atualizar(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['metas'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-resumo'] });
+      setModalCriarVisible(false);
+      resetFormularioMeta();
+    },
+    onError: (err: any) => setErroCriar(err?.userMessage ?? 'Erro ao salvar meta.'),
+  });
+
+  const deletarMutation = useMutation({
+    mutationFn: (id: number) => metaService.deletar(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['metas'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-resumo'] });
+      setModalDetalheVisible(false);
+      setMetaSelecionada(null);
+    },
+  });
+
+  const confirmarExcluirMeta = (meta: Meta) => {
+    Alert.alert(
+      'Excluir meta',
+      `Excluir "${meta.nome}"? A meta será desativada e não aparecerá mais na lista.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Excluir', style: 'destructive', onPress: () => deletarMutation.mutate(meta.id) },
+      ],
+    );
+  };
 
   const renderItem = ({ item: meta }: { item: Meta }) => {
     const progresso = Number(meta.valorTotal ?? 0) > 0
@@ -67,6 +188,12 @@ export default function Metas() {
     const concluida = !meta.ativa || progresso >= 100;
 
     return (
+      <TouchableOpacity
+        activeOpacity={0.82}
+        accessibilityRole="button"
+        accessibilityLabel={`Abrir detalhes da meta ${meta.nome}`}
+        onPress={() => { setMetaSelecionada(meta); setModalDetalheVisible(true); }}
+      >
       <Card radius={20} style={{ marginBottom: 12 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
           <IconTile tone={concluida ? 'success' : 'brand'} size={44}>{concluida ? '🏆' : '🎯'}</IconTile>
@@ -89,7 +216,7 @@ export default function Metas() {
         </View>
 
         <TouchableOpacity
-          onPress={() => { setValorAdicionar('0'); setErroAdicionar(null); setMetaSelecionada(meta); setModalAdicionarVisible(true); }}
+          onPress={() => { setValorAdicionar('0'); setErroAdicionar(null); setErroCarteira(null); setCarteiraOrigemId(carteiras.length === 1 ? carteiras[0].id : null); setMetaSelecionada(meta); setModalAdicionarVisible(true); }}
           accessibilityRole="button"
           accessibilityLabel={`Adicionar valor à meta ${meta.nome}`}
           style={{ marginTop: 12, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1, borderColor: colors.brand, alignSelf: 'flex-start' }}
@@ -97,6 +224,7 @@ export default function Metas() {
           <Text style={{ color: colors.brandFg, fontSize: 12, fontWeight: '600' }}>+ Adicionar</Text>
         </TouchableOpacity>
       </Card>
+      </TouchableOpacity>
     );
   };
 
@@ -133,7 +261,77 @@ export default function Metas() {
         />
       )}
 
-      <Fab onPress={() => setModalCriarVisible(true)} accessibilityLabel="Criar meta" />
+      <Fab onPress={abrirCriarMeta} accessibilityLabel="Criar meta" />
+
+      <Modal visible={modalDetalheVisible} animationType="slide" presentationStyle="pageSheet">
+        <View style={{ flex: 1, backgroundColor: colors.bg }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+            <TouchableOpacity onPress={() => setModalDetalheVisible(false)} accessibilityRole="button">
+              <Text style={{ color: colors.brandFg, fontSize: 15 }}>Fechar</Text>
+            </TouchableOpacity>
+            <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700' }}>Detalhes da Meta</Text>
+            <TouchableOpacity
+              onPress={() => metaSelecionada && abrirEditarMeta(metaSelecionada)}
+              accessibilityRole="button"
+            >
+              <Text style={{ color: colors.brandFg, fontSize: 15, fontWeight: '700' }}>Editar</Text>
+            </TouchableOpacity>
+          </View>
+          {metaSelecionada && (
+            <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
+              <Card radius={20}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                  <IconTile tone={metaSelecionada.ativa ? 'brand' : 'success'} size={44}>{metaSelecionada.icone || '🎯'}</IconTile>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={{ color: colors.textPrimary, fontSize: 17, fontWeight: '800' }} numberOfLines={2}>{metaSelecionada.nome}</Text>
+                    <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>
+                      {metaSelecionada.dataPrevista ? `até ${formatDate(metaSelecionada.dataPrevista)}` : 'Sem data limite'}
+                    </Text>
+                  </View>
+                  <Badge tone={metaSelecionada.ativa ? 'brand' : 'success'}>{metaSelecionada.ativa ? 'Ativa' : 'Concluída'}</Badge>
+                </View>
+                <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 8, fontVariant: ['tabular-nums'] }}>
+                  {formatCurrency(Number(metaSelecionada.valorReservado ?? 0))} de {formatCurrency(Number(metaSelecionada.valorTotal ?? 0))}
+                </Text>
+                <ProgressBar value={Number(metaSelecionada.valorTotal ?? 0) > 0 ? Math.min((Number(metaSelecionada.valorReservado ?? 0) / Number(metaSelecionada.valorTotal ?? 0)) * 100, 100) : 0} />
+                {metaSelecionada.valorMensal ? (
+                  <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 10 }}>Reserva mensal: {formatCurrency(Number(metaSelecionada.valorMensal))}</Text>
+                ) : null}
+                {metaSelecionada.descricao ? (
+                  <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 10 }}>{metaSelecionada.descricao}</Text>
+                ) : null}
+              </Card>
+
+              <View style={{ gap: 10, marginTop: 16 }}>
+                <TouchableOpacity
+                  onPress={() => { setValorAdicionar('0'); setErroAdicionar(null); setErroCarteira(null); setCarteiraOrigemId(carteiras.length === 1 ? carteiras[0].id : null); setModalAdicionarVisible(true); }}
+                  accessibilityRole="button"
+                  style={{ height: 48, borderRadius: 12, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Text style={{ color: '#ffffff', fontSize: 15, fontWeight: '700' }}>Adicionar valor</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => { setValorRemover('0'); setErroRemover(null); setErroCarteiraDestino(null); setCarteiraDestinoId(carteiras.length === 1 ? carteiras[0].id : null); setModalRemoverVisible(true); }}
+                  accessibilityRole="button"
+                  style={{ height: 48, borderRadius: 12, borderWidth: 1, borderColor: colors.brand, alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Text style={{ color: colors.brandFg, fontSize: 15, fontWeight: '700' }}>Retirar valor</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => confirmarExcluirMeta(metaSelecionada)}
+                  disabled={deletarMutation.status === 'pending'}
+                  accessibilityRole="button"
+                  style={{ height: 48, borderRadius: 12, borderWidth: 1, borderColor: colors.danger, alignItems: 'center', justifyContent: 'center' }}
+                >
+                  {deletarMutation.status === 'pending'
+                    ? <ActivityIndicator color={colors.danger} size="small" />
+                    : <Text style={{ color: colors.danger, fontSize: 15, fontWeight: '700' }}>Excluir meta</Text>}
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          )}
+        </View>
+      </Modal>
 
       <Modal visible={modalAdicionarVisible} animationType="slide" presentationStyle="pageSheet">
         <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -146,10 +344,11 @@ export default function Metas() {
               disabled={adicionarMutation.status === 'pending'}
               accessibilityRole="button"
               onPress={() => {
-                setErroAdicionar(null);
+                setErroAdicionar(null); setErroCarteira(null);
                 const v = parseCurrencyBR(valorAdicionar);
                 if (isNaN(v) || v <= 0) { setErroAdicionar('Valor deve ser positivo.'); return; }
-                adicionarMutation.mutate({ id: metaSelecionada!.id, valor: v });
+                if (!carteiraOrigemId) { setErroCarteira('Selecione de onde sai o dinheiro.'); return; }
+                adicionarMutation.mutate({ id: metaSelecionada!.id, valor: v, carteiraId: carteiraOrigemId });
               }}
             >
               {adicionarMutation.status === 'pending'
@@ -159,6 +358,70 @@ export default function Metas() {
           </View>
           <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
             <Field label="Valor" value={valorAdicionar} onChangeText={(t) => setValorAdicionar(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" error={erroAdicionar} autoFocus />
+
+            <Text style={{ color: colors.textSecondary, fontSize: 10, letterSpacing: 0.8, marginTop: 8, marginBottom: 6, textTransform: 'uppercase' }}>Sai de</Text>
+            {carteiras.length === 0 ? (
+              <Text style={{ color: colors.textSecondary, fontSize: 13 }}>Você ainda não tem contas. Crie uma em Mais → Contas para reservar dinheiro.</Text>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} keyboardShouldPersistTaps="handled">
+                {carteiras.map(c => (
+                  <Chip
+                    key={c.id}
+                    label={`${c.nome} · ${formatCurrency(Number(c.saldo ?? 0))}`}
+                    selected={carteiraOrigemId === c.id}
+                    onPress={() => { setCarteiraOrigemId(c.id); setErroCarteira(null); }}
+                  />
+                ))}
+              </ScrollView>
+            )}
+            {erroCarteira && <Text style={{ color: colors.danger, fontSize: 12, marginTop: 8 }}>{erroCarteira}</Text>}
+          </ScrollView>
+        </View>
+      </Modal>
+
+      <Modal visible={modalRemoverVisible} animationType="slide" presentationStyle="pageSheet">
+        <View style={{ flex: 1, backgroundColor: colors.bg }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+            <TouchableOpacity onPress={() => { setModalRemoverVisible(false); setValorRemover(''); setErroRemover(null); }} accessibilityRole="button">
+              <Text style={{ color: colors.brandFg, fontSize: 15 }}>Cancelar</Text>
+            </TouchableOpacity>
+            <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600' }}>Retirar Valor</Text>
+            <TouchableOpacity
+              disabled={removerMutation.status === 'pending'}
+              accessibilityRole="button"
+              onPress={() => {
+                setErroRemover(null); setErroCarteiraDestino(null);
+                const v = parseCurrencyBR(valorRemover);
+                if (isNaN(v) || v <= 0) { setErroRemover('Valor deve ser positivo.'); return; }
+                if (metaSelecionada && v > Number(metaSelecionada.valorReservado ?? 0)) { setErroRemover('Valor maior que o reservado.'); return; }
+                if (!carteiraDestinoId) { setErroCarteiraDestino('Selecione para onde volta o dinheiro.'); return; }
+                removerMutation.mutate({ id: metaSelecionada!.id, valor: v, carteiraId: carteiraDestinoId });
+              }}
+            >
+              {removerMutation.status === 'pending'
+                ? <ActivityIndicator color={colors.brand} size="small" />
+                : <Text style={{ color: colors.brandFg, fontSize: 15, fontWeight: '600' }}>Retirar</Text>}
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
+            <Field label="Valor" value={valorRemover} onChangeText={(t) => setValorRemover(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" error={erroRemover} autoFocus />
+
+            <Text style={{ color: colors.textSecondary, fontSize: 10, letterSpacing: 0.8, marginTop: 8, marginBottom: 6, textTransform: 'uppercase' }}>Volta para</Text>
+            {carteiras.length === 0 ? (
+              <Text style={{ color: colors.textSecondary, fontSize: 13 }}>Você ainda não tem contas. Crie uma em Mais → Contas para receber o valor.</Text>
+            ) : (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} keyboardShouldPersistTaps="handled">
+                {carteiras.map(c => (
+                  <Chip
+                    key={c.id}
+                    label={`${c.nome} · ${formatCurrency(Number(c.saldo ?? 0))}`}
+                    selected={carteiraDestinoId === c.id}
+                    onPress={() => { setCarteiraDestinoId(c.id); setErroCarteiraDestino(null); }}
+                  />
+                ))}
+              </ScrollView>
+            )}
+            {erroCarteiraDestino && <Text style={{ color: colors.danger, fontSize: 12, marginTop: 8 }}>{erroCarteiraDestino}</Text>}
           </ScrollView>
         </View>
       </Modal>
@@ -168,32 +431,25 @@ export default function Metas() {
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
             <TouchableOpacity
               accessibilityRole="button"
-              onPress={() => { setModalCriarVisible(false); setNomeCriar(''); setValorTotalCriar(''); setDataLimiteCriar(''); setDescricaoCriar(''); setNomeError(null); setValorTotalError(null); setDataLimiteError(null); setErroCriar(null); }}
+              onPress={() => { setModalCriarVisible(false); resetFormularioMeta(); }}
             >
               <Text style={{ color: colors.brandFg, fontSize: 15 }}>Cancelar</Text>
             </TouchableOpacity>
-            <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600' }}>Criar Meta</Text>
+            <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600' }}>{editandoMeta ? 'Editar Meta' : 'Criar Meta'}</Text>
             <TouchableOpacity
-              disabled={criarMutation.status === 'pending'}
+              disabled={criarMutation.status === 'pending' || atualizarMutation.status === 'pending'}
               accessibilityRole="button"
               onPress={() => {
-                setNomeError(null); setValorTotalError(null); setDataLimiteError(null); setErroCriar(null);
-                let hasErr = false;
-                if (!nomeCriar.trim() || nomeCriar.trim().length < 3) { setNomeError('Nome obrigatório (mínimo 3 caracteres).'); hasErr = true; }
-                const v = parseCurrencyBR(valorTotalCriar);
-                if (isNaN(v) || v <= 0) { setValorTotalError('Valor total obrigatório e positivo.'); hasErr = true; }
-                if (dataLimiteCriar && !isValidDateBR(dataLimiteCriar)) { setDataLimiteError('Data inválida. Use o formato DD/MM/AAAA.'); hasErr = true; }
-                if (hasErr) return;
-                const payload: MetaRequest = {
-                  nome: nomeCriar.trim(),
-                  valorTotal: Number(v),
-                  dataLimite: dataLimiteCriar ? parseDateBR(dataLimiteCriar) : undefined,
-                  descricao: descricaoCriar || undefined,
-                };
-                criarMutation.mutate(payload);
+                const payload = montarPayloadMeta();
+                if (!payload) return;
+                if (editandoMeta) {
+                  atualizarMutation.mutate({ id: editandoMeta.id, payload });
+                } else {
+                  criarMutation.mutate(payload);
+                }
               }}
             >
-              {criarMutation.status === 'pending'
+              {criarMutation.status === 'pending' || atualizarMutation.status === 'pending'
                 ? <ActivityIndicator color={colors.brand} size="small" />
                 : <Text style={{ color: colors.brandFg, fontSize: 15, fontWeight: '600' }}>Salvar</Text>}
             </TouchableOpacity>
@@ -201,6 +457,7 @@ export default function Metas() {
           <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
             <Field label="Nome" value={nomeCriar} onChangeText={setNomeCriar} placeholder="Ex: Reserva de emergência" error={nomeError} autoFocus />
             <Field label="Valor total" value={valorTotalCriar} onChangeText={(t) => setValorTotalCriar(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" error={valorTotalError} />
+            <Field label="Valor mensal (opcional)" value={valorMensalCriar} onChangeText={(t) => setValorMensalCriar(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" error={valorMensalError} />
             <Field label="Data limite" value={dataLimiteCriar} onChangeText={(t) => setDataLimiteCriar(maskDateInput(t))} placeholder="DD/MM/AAAA" keyboardType="number-pad" error={dataLimiteError} />
             <Field label="Descrição (opcional)" value={descricaoCriar} onChangeText={setDescricaoCriar} />
             {erroCriar && <Text style={{ color: colors.danger, marginTop: 8 }}>{erroCriar}</Text>}

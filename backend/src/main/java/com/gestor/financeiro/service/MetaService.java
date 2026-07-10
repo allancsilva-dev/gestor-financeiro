@@ -1,10 +1,13 @@
 package com.gestor.financeiro.service;
 
+import com.gestor.financeiro.exception.BusinessException;
 import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.exception.UnauthorizedAccessException;
 import com.gestor.financeiro.model.Meta;
 import com.gestor.financeiro.model.MovimentoMeta;
 import com.gestor.financeiro.model.Usuario;
+import com.gestor.financeiro.model.enums.OrigemMovimentoCarteira;
+import com.gestor.financeiro.model.enums.TipoMovimentoCarteira;
 import com.gestor.financeiro.repository.MetaRepository;
 import com.gestor.financeiro.repository.MovimentoMetaRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
@@ -16,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode; // ✅ ADICIONAR ESTE IMPORT
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -29,6 +33,9 @@ public class MetaService {
 
     @Autowired
     private MovimentoMetaRepository movimentoMetaRepository;
+
+    @Autowired
+    private LedgerService ledgerService;
     
     // Lista metas ativas do usuário
     public Page<Meta> listarPorUsuario(Long usuarioId, Pageable pageable) {
@@ -53,8 +60,18 @@ public class MetaService {
     
     // Adiciona valor à meta (quando o usuário guarda dinheiro)
     @Transactional
-    public Meta adicionarValor(Long metaId, BigDecimal valor, Long usuarioId) {
+    public Meta adicionarValor(Long metaId, BigDecimal valor, Long carteiraId, Long usuarioId) {
         Meta meta = buscarPorIdDoUsuario(metaId, usuarioId);
+
+        // Reserva sem origem gera dupla contagem: o valor "guardado" continuaria disponível na carteira
+        if (carteiraId == null) {
+            throw new BusinessException("Informe a carteira de origem da reserva");
+        }
+
+        registrarMovimentoCarteira(meta, carteiraId, usuarioId, valor,
+                TipoMovimentoCarteira.RESERVA_META,
+                RegistrarMovimentoCommand.Direcao.SAIDA,
+                "Reserva para meta: " + meta.getNome());
 
         BigDecimal valorAnterior = meta.getValorReservado();
         meta.setValorReservado(valorAnterior.add(valor));
@@ -73,8 +90,22 @@ public class MetaService {
     }
 
     @Transactional
-    public Meta removerValor(Long metaId, BigDecimal valor, Long usuarioId) {
+    public Meta removerValor(Long metaId, BigDecimal valor, Long carteiraId, Long usuarioId) {
         Meta meta = buscarPorIdDoUsuario(metaId, usuarioId);
+
+        if (carteiraId == null) {
+            throw new BusinessException("Informe a carteira de destino do resgate");
+        }
+
+        // Resgatar mais do que foi reservado criaria dinheiro do nada na carteira
+        if (valor.compareTo(meta.getValorReservado()) > 0) {
+            throw new BusinessException("Valor maior que o reservado na meta");
+        }
+
+        registrarMovimentoCarteira(meta, carteiraId, usuarioId, valor,
+                TipoMovimentoCarteira.RESGATE_META,
+                RegistrarMovimentoCommand.Direcao.ENTRADA,
+                "Resgate da meta: " + meta.getNome());
 
         BigDecimal valorAnterior = meta.getValorReservado();
         meta.setValorReservado(valorAnterior.subtract(valor));
@@ -146,6 +177,26 @@ public class MetaService {
         return meta.getValorReservado()
             .divide(meta.getValorTotal(), 4, RoundingMode.HALF_UP)
             .multiply(BigDecimal.valueOf(100));
+    }
+
+    // Debita/credita a carteira via ledger (valida ownership e saldo lá dentro)
+    private void registrarMovimentoCarteira(Meta meta, Long carteiraId, Long usuarioId,
+                                            BigDecimal valor, TipoMovimentoCarteira tipo,
+                                            RegistrarMovimentoCommand.Direcao direcao, String descricao) {
+        ledgerService.registrarMovimento(new RegistrarMovimentoCommand(
+                usuarioId,
+                carteiraId,
+                tipo,
+                valor,
+                direcao,
+                OrigemMovimentoCarteira.META,
+                "META",
+                meta.getId(),
+                descricao,
+                null,
+                LocalDateTime.now(),
+                false
+        ));
     }
 
     private void registroMovimento(Meta meta, Long usuarioId, String tipo,

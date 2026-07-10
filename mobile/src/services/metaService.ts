@@ -15,12 +15,12 @@ export const metaService = {
   atualizar: (id: number, data: MetaRequest) =>
     api.put<Meta>(`/v1/metas/${id}`, data).then(r => r.data),
 
-  // adicionar/remover enviam { valor } no body
-  adicionarValor: (id: number, valor: number) =>
-    api.put<Meta>(`/v1/metas/${id}/adicionar`, { valor }).then(r => r.data),
+  // reserva debita a carteira de origem; resgate credita de volta (carteira obrigatória no backend)
+  adicionarValor: (id: number, valor: number, carteiraId: number) =>
+    api.put<Meta>(`/v1/metas/${id}/adicionar`, { valor, carteiraId }).then(r => r.data),
 
-  removerValor: (id: number, valor: number) =>
-    api.put<Meta>(`/v1/metas/${id}/remover`, { valor }).then(r => r.data),
+  removerValor: (id: number, valor: number, carteiraId: number) =>
+    api.put<Meta>(`/v1/metas/${id}/remover`, { valor, carteiraId }).then(r => r.data),
 
   deletar: (id: number) =>
     api.delete(`/v1/metas/${id}`),
