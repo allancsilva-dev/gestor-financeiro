@@ -306,5 +306,391 @@ Registro de bugs corrigidos. Mantido pelo `docs-reporter`.
 
 ---
 
+## BUG-0017 — Última parcela absorve arredondamento; limite do cartão zera corretamente
+
+- **Problema relacionado:** PROB-0038
+- **Data:** 2026-07-09
+- **Area:** backend
+- **Sintoma:** Compra parcelada (ex.: R$100,00 em 3x) gerava parcelas de valor arredondado (33,33 x 3 = 99,99), deixando R$0,01 residual permanente em `Conta.valorGasto` mesmo após quitar todas as faturas.
+- **Causa raiz:** `valorParcela = valorTotal.divide(n, 2, HALF_UP)` aplicado identicamente em todas as N parcelas, sem reconciliar o resto da divisão inteira.
+- **Correcao aplicada:** Última parcela/lançamento passa a usar `valorTotal - valorParcela*(n-1)` em vez do valor arredondado fixo. Helper `valorParcelaOuResto` criado em `TransacaoService` (usado em `criarParcelas` e `atualizarValorParcelas`); lógica equivalente aplicada inline em `FaturaService.registrarCompraCartao`.
+- **Arquivos alterados:** `backend/src/main/java/com/gestor/financeiro/service/FaturaService.java`, `backend/src/main/java/com/gestor/financeiro/service/TransacaoService.java`
+- **Testes/validacoes executadas:** Novo teste `FaturaCartaoWorkflowTest.ultimaParcelaAbsorveArredondamentoELimiteZeraAposPagarTodasAsFaturas`. `./mvnw -o test` → `Tests run: 76, Failures: 0, Errors: 0` (executado nesta sessão).
+- **Resultado:** PASS
+- **Ressalvas:** Compras/parcelas já persistidas antes da correção (se houver em ambiente real) mantêm o resíduo antigo — sem backfill.
+- **Commit:** pendente
+
+---
+
+## BUG-0018 — Edição de valor/data de compra no cartão ressincroniza fatura e limite
+
+- **Problema relacionado:** PROB-0039
+- **Data:** 2026-07-09
+- **Area:** backend
+- **Sintoma:** Editar valor ou data de uma compra já lançada no cartão não atualizava os lançamentos de fatura (`FaturaLancamento`) nem o `valorGasto` da conta/categoria — fatura e limite ficavam dessincronizados da transação real.
+- **Causa raiz:** `TransacaoService.atualizar()` alterava apenas `valorTotal`/`data` da transação e o Ledger de carteira (`registrarMovimentoDiferenca`), sem tocar em fatura de cartão ou em `valorGasto`.
+- **Correcao aplicada:** Para compras de cartão (`isCompraCartao`) com valor ou data alterados: cancela os lançamentos antigos (`faturaService.cancelarCompraCartao`) antes de salvar e recria (`faturaService.registrarCompraCartao`) depois; `cancelarCompraCartao` falha com `BusinessException` se alguma fatura envolvida já estiver `PAGA`. `Conta.valorGasto` e `Categoria.valorGasto` ajustados pela diferença de valor (apenas transações `SAIDA`). Parcelas legadas (`Parcela`) recalculadas via novo método `atualizarValorParcelas`.
+- **Arquivos alterados:** `backend/src/main/java/com/gestor/financeiro/service/TransacaoService.java`
+- **Testes/validacoes executadas:** Novo teste `FaturaCartaoWorkflowTest.editarValorDeCompraNoCartaoRessincronizaFaturaELimite`. `./mvnw -o test` → 76/76 PASS.
+- **Resultado:** PASS
+- **Ressalvas:** Mensagem de erro exibida no mobile/frontend quando a edição é bloqueada por fatura já paga não foi validada nesta sessão (sem teste de UI/mensagem amigável).
+- **Commit:** pendente
+
+---
+
+## BUG-0019 — Compra retroativa não entra mais em fatura já paga
+
+- **Problema relacionado:** PROB-0040
+- **Data:** 2026-07-09
+- **Area:** backend
+- **Sintoma:** Compra registrada com data retroativa cuja competência correspondia a uma fatura já `PAGA` era lançada normalmente naquela fatura, gerando inconsistência entre valor pago e valor total da fatura.
+- **Causa raiz:** `registrarCompraCartao` buscava/criava a fatura pela competência calculada sem checar `fatura.getStatus()`.
+- **Correcao aplicada:** Novo helper `faturaDisponivelParaLancamento(usuarioId, conta, competencia)` rola a competência mês a mês (limite de 24 iterações) até encontrar uma fatura com status diferente de `PAGA`; lança `BusinessException` se nenhuma for encontrada no período.
+- **Arquivos alterados:** `backend/src/main/java/com/gestor/financeiro/service/FaturaService.java`
+- **Testes/validacoes executadas:** Novo teste `FaturaCartaoWorkflowTest.compraRetroativaNaoEntraEmFaturaPagaVaiParaProximaAberta`. `./mvnw -o test` → 76/76 PASS.
+- **Resultado:** PASS
+- **Ressalvas:** Limite de 24 meses é arbitrário; risco residual aceito como extremamente improvável no fluxo real.
+- **Commit:** pendente
+
+---
+
+## BUG-0020 — Status FECHADA da fatura agora é derivado e exibido
+
+- **Problema relacionado:** PROB-0041
+- **Data:** 2026-07-09
+- **Area:** backend, frontend, mobile
+- **Sintoma:** Fatura com `dataFechamento` já passada (fechada para novos lançamentos, mas ainda não vencida/paga) continuava aparecendo como "Aberta" no mobile e no frontend web.
+- **Causa raiz:** Lógica de derivação de status em `FaturaService` cobria apenas `PAGA` e `VENCIDA` (via `dataVencimento`), sem checar `dataFechamento`.
+- **Correcao aplicada:** Branch adicional: se `dataFechamento` já passou e a fatura não está `PAGA` nem `VENCIDA`, retorna `FaturaStatus.FECHADA`. Labels de badge adicionados: `"FECHADA"` em `mobile/app/(app)/more/faturas.tsx`, `"Fechada"` em `frontend/src/pages/Faturas.tsx`.
+- **Arquivos alterados:** `backend/src/main/java/com/gestor/financeiro/service/FaturaService.java`, `mobile/app/(app)/more/faturas.tsx`, `frontend/src/pages/Faturas.tsx`
+- **Testes/validacoes executadas:** Revisão manual de código e diff. Nenhum teste automatizado dedicado a este branch de status foi adicionado nesta sessão.
+- **Resultado:** PASS_COM_RESSALVA
+- **Ressalvas:** Sem cobertura de teste automatizado para a transição a `FECHADA` nem para a precedência `VENCIDA > FECHADA` quando ambas as datas já passaram.
+- **Commit:** pendente
+
+---
+
+## BUG-0021 — Falso erro "pagamento parcial não suportado" eliminado (soma de lançamentos como fonte da verdade)
+
+- **Problema relacionado:** PROB-0042
+- **Data:** 2026-07-09
+- **Area:** backend
+- **Sintoma:** `pagarFatura` podia rejeitar o pagamento do valor total exibido na tela com erro "Pagamento parcial de fatura ainda não é suportado", quando `fatura.getValorTotal()` persistido divergia da soma real dos `FaturaLancamento` (causado por PROB-0038/PROB-0039 antes da correção, ou por qualquer outra dessincronia futura).
+- **Causa raiz:** `pagarFatura` e `toResponse` priorizavam `fatura.getValorTotal()` persistido em vez da soma calculada dos lançamentos ao validar/exibir o valor da fatura.
+- **Correcao aplicada:** `pagarFatura` e `toResponse` agora tratam a soma dos `FaturaLancamento` (`calcularTotalLancamentos`) como fonte da verdade; usam `fatura.getValorTotal()` persistido apenas como fallback quando não há lançamentos (faturas antigas pré-migration V17).
+- **Arquivos alterados:** `backend/src/main/java/com/gestor/financeiro/service/FaturaService.java`
+- **Testes/validacoes executadas:** Coberto indiretamente pelos 3 novos testes de `FaturaCartaoWorkflowTest` (todos fazem `pagarFatura` com o valor exato da soma de lançamentos). `./mvnw -o test` → 76/76 PASS.
+- **Resultado:** PASS_COM_RESSALVA
+- **Ressalvas:** Sem teste dedicado ao caso específico de fatura pré-V17 (sem `FaturaLancamento`, apenas `valorTotal` persistido) exercitando o fallback.
+- **Commit:** pendente
+
+---
+
+## BUG-0022 — ENTRADA com conta associada não incrementa mais valorGasto (limite) da conta
+
+- **Problema relacionado:** PROB-0043
+- **Data:** 2026-07-09
+- **Area:** backend
+- **Sintoma:** Transação do tipo `ENTRADA` vinculada a uma `Conta` incrementava `Conta.valorGasto` (limite consumido do cartão) da mesma forma que uma `SAIDA`, inflando indevidamente o limite exibido.
+- **Causa raiz:** `TransacaoService.criar()`, `atualizar()` e `deletar()` chamavam `contaService.adicionarGasto`/`removerGasto` sempre que havia `conta` associada, sem checar `transacao.getTipo()`.
+- **Correcao aplicada:** Guarda `transacao.getTipo() == TipoTransacao.SAIDA` adicionada antes de toda chamada a `adicionarGasto`/`removerGasto` em `criar()`, `atualizar()` e `deletar()` — mesmo padrão já aplicado a `Categoria.valorGasto` em BUG-0015.
+- **Arquivos alterados:** `backend/src/main/java/com/gestor/financeiro/service/TransacaoService.java`
+- **Testes/validacoes executadas:** `./mvnw -o test` → 76/76 PASS. Nenhum teste dedicado especificamente a "ENTRADA + conta + valorGasto" foi adicionado nesta sessão.
+- **Resultado:** PASS_COM_RESSALVA
+- **Ressalvas:** Cobertura apenas por revisão manual do código; recomenda-se teste de unidade dedicado.
+- **Commit:** pendente
+
+---
+
+## BUG-0023 — Edição de compra com fatura paga desbloqueada (gera lançamento AJUSTE compensatório)
+
+- **Problema relacionado:** PROB-0044 (substitui o comportamento de bloqueio registrado em PROB-0039)
+- **Data:** 2026-07-09
+- **Area:** backend
+- **Sintoma:** Editar valor/data de uma compra de cartão com pelo menos uma fatura envolvida já paga era bloqueado com `BusinessException`, impedindo o usuário de corrigir o valor de uma compra parcelada após a primeira fatura ser quitada.
+- **Causa raiz:** `TransacaoService.atualizar()` chamava `faturaService.cancelarCompraCartao(transacao)` (versão antiga, sem `usuarioId`), que lançava `BusinessException` para qualquer lançamento em fatura `PAGA`, tratando fatura paga como imutável sem mecanismo de compensação.
+- **Correcao aplicada:** Novo método `FaturaService.ressincronizarCompraCartao(transacao, usuarioId)` chamado por `TransacaoService.atualizar()` no lugar do par cancelar+recriar. Lançamentos em faturas abertas são removidos e recriados com o valor restante redistribuído pelas parcelas ainda não pagas (última parcela em aberto absorve o arredondamento). A diferença sobre a parte já paga (fatura imutável) é lançada como `TipoFaturaLancamento.AJUSTE` (podendo ser negativo) na próxima fatura em aberto — a edição nunca mais é bloqueada.
+- **Arquivos alterados:** `backend/src/main/java/com/gestor/financeiro/service/FaturaService.java`, `backend/src/main/java/com/gestor/financeiro/service/TransacaoService.java`
+- **Testes/validacoes executadas:** Novo teste `FaturaCartaoWorkflowTest.editarCompraJaPagaGeraLancamentoDeAjusteNaProximaFatura` — edita compra parcialmente paga de R$100 para R$150; fatura paga permanece em 100.00 (imutável), fatura seguinte recebe lançamento `AJUSTE` de R$50.00, e `Conta.valorGasto` reflete 50.00. `cd backend && ./mvnw -o test` → `Tests run: 78, Failures: 0, Errors: 0` (executado pelo `docs-reporter` nesta sessão).
+- **Resultado:** PASS
+- **Ressalvas:** Redistribuição das parcelas não pagas usa "restante ÷ parcelas não pagas" (não recalcula parcela cheia) — ver BACKLOG-0055.
+- **Commit:** pendente
+
+---
+
+## BUG-0024 — Cancelamento de compra com fatura paga desbloqueado (gera lançamento ESTORNO compensatório)
+
+- **Problema relacionado:** PROB-0044
+- **Data:** 2026-07-09
+- **Area:** backend
+- **Sintoma:** Cancelar/deletar uma compra de cartão parcelada com pelo menos uma fatura já paga era bloqueado com `BusinessException` ("Não é possível cancelar compra de fatura paga").
+- **Causa raiz:** `FaturaService.cancelarCompraCartao(Transacao transacao)` (assinatura antiga) percorria os lançamentos da transação e lançava `BusinessException` assim que encontrava um em fatura `PAGA`, sem mecanismo de compensação.
+- **Correcao aplicada:** Assinatura alterada para `cancelarCompraCartao(Transacao transacao, Long usuarioId)`. Lançamentos em faturas abertas são removidos normalmente; a soma dos lançamentos em faturas já pagas é calculada e lançada como `TipoFaturaLancamento.ESTORNO` negativo na próxima fatura em aberto (crédito de limite) — o cancelamento nunca mais é bloqueado.
+- **Arquivos alterados:** `backend/src/main/java/com/gestor/financeiro/service/FaturaService.java`, `backend/src/main/java/com/gestor/financeiro/service/TransacaoService.java` (chamada em `deletar()` atualizada para a nova assinatura)
+- **Testes/validacoes executadas:** Novo teste `FaturaCartaoWorkflowTest.cancelarCompraParceladaComFaturaPagaGeraEstornoNaProximaFatura` — compra de R$300 em 3x com uma parcela paga (R$100), cancelada; fatura seguinte recebe lançamento `ESTORNO` de -R$100.00, `Conta.valorGasto` fica em -100.00 (crédito). `./mvnw -o test` → 78/78 PASS.
+- **Resultado:** PASS
+- **Ressalvas:** `Conta.valorGasto` negativo é intencional (autocorrige em compras/pagamentos futuros), mas UI pode exibir de forma pouco intuitiva — ver BACKLOG-0053. Fatura contendo só estorno (total ≤ 0) não é "pagável" pelo fluxo atual — ver BACKLOG-0054.
+- **Commit:** pendente
+
+---
+
+## BUG-0025 — Invariante de limite de cartão centralizado no FaturaService
+
+- **Problema relacionado:** PROB-0044
+- **Data:** 2026-07-09
+- **Area:** backend
+- **Sintoma:** Antes desta correção, `Conta.valorGasto` era ajustado em dois lugares diferentes para compras de cartão: em `TransacaoService` (via `contaService.adicionarGasto`/`removerGasto`) e potencialmente de forma inconsistente com os lançamentos de fatura, aumentando o risco de dessincronia entre o limite exibido e a soma real de lançamentos em faturas não pagas.
+- **Causa raiz:** Ausência de um ponto único de verdade para o ajuste de `valorGasto` relacionado a compras de cartão.
+- **Correcao aplicada:** Estabelecido o invariante `Conta.valorGasto == soma dos lançamentos em faturas não pagas`. Novos helpers privados em `FaturaService`: `criarLancamento(...)` e `removerLancamentoDeFaturaAberta(...)` chamam `ajustarLimiteUtilizado(conta, delta)` a cada mutação de lançamento (criação, remoção, ajuste, estorno). `TransacaoService` deixou de chamar `contaService.adicionarGasto`/`removerGasto` para transações que são compra de cartão (`isCompraCartao`) — mantido apenas para contas que não são cartão de crédito. `pagarFatura` continua liberando limite pelo total da fatura (sem alteração de contrato).
+- **Arquivos alterados:** `backend/src/main/java/com/gestor/financeiro/service/FaturaService.java`, `backend/src/main/java/com/gestor/financeiro/service/TransacaoService.java`
+- **Testes/validacoes executadas:** Coberto indiretamente por todos os testes de `FaturaCartaoWorkflowTest` (7 testes na classe), que verificam `Conta.valorGasto` após criar, editar, pagar e cancelar compras de cartão. `./mvnw -o test` → 78/78 PASS.
+- **Resultado:** PASS
+- **Ressalvas:** Nenhum teste isola exclusivamente o helper `ajustarLimiteUtilizado` fora do fluxo de compra/edição/cancelamento — cobertura é indireta via testes de fluxo completo.
+- **Commit:** pendente
+
+---
+
+## BUG-0026 — UI exibe lançamentos de crédito (ajuste/estorno) em verde com prefixo descritivo
+
+- **Problema relacionado:** PROB-0044
+- **Data:** 2026-07-09
+- **Area:** frontend, mobile
+- **Sintoma:** Antes desta correção, todo lançamento de fatura era exibido em vermelho (cor de débito), inclusive lançamentos de crédito (valor negativo) recém-introduzidos por `AJUSTE`/`ESTORNO` — visualmente indistinguível de uma compra normal.
+- **Causa raiz:** Renderização de `l.valor` em `mobile/app/(app)/more/faturas.tsx` e `frontend/src/pages/Faturas.tsx` usava cor fixa (`colors.danger`/`text-red-400`) sem checar o sinal do valor.
+- **Correcao aplicada:** Cor do valor do lançamento passa a depender do sinal: `l.valor < 0` renderiza em verde (`colors.success`/`text-green-400`), mantendo vermelho para valores positivos. Descrições de lançamentos de ajuste/estorno vêm prefixadas com `"Ajuste: "`/`"Estorno: "` desde o backend (`FaturaService.ressincronizarCompraCartao`/`cancelarCompraCartao`). Campo `tipo: 'COMPRA' | 'AJUSTE' | 'ESTORNO'` adicionado a `FaturaLancamentoDto` (backend), `mobile/src/types/index.ts` e `frontend/src/services/faturaService.ts`.
+- **Arquivos alterados:** `mobile/app/(app)/more/faturas.tsx`, `frontend/src/pages/Faturas.tsx`, `mobile/src/types/index.ts`, `frontend/src/services/faturaService.ts`, `backend/src/main/java/com/gestor/financeiro/dto/FaturaLancamentoDto.java`
+- **Testes/validacoes executadas:** Nenhum teste automatizado de UI (mobile e frontend não têm suíte e2e/component configurada para esta tela). Typecheck mobile limpo (relatado pelo agente de implementação). Erros de TypeScript pré-existentes no frontend, fora dos arquivos de fatura, não foram investigados por estarem fora do escopo desta correção.
+- **Resultado:** NAO_EXECUTADO (sem teste automatizado; validação visual não confirmada por este agente)
+- **Ressalvas:** Verificação de que o typecheck do frontend realmente não introduziu novos erros nos arquivos de fatura não foi reexecutada pelo `docs-reporter` (relato do agente de implementação, não verificado independentemente nesta sessão).
+- **Commit:** pendente
+
+---
+
+## BUG-0027 — Mobile ganhou edição/exclusão de transação (EditarTransacaoModal)
+
+- **Problema relacionado:** PROB-0045
+- **Data:** 2026-07-09
+- **Area:** mobile
+- **Sintoma:** Não havia forma de editar ou excluir uma transação a partir do app mobile — a lista de transações não respondia a toque e não existia modal de edição.
+- **Causa raiz:** Funcionalidade nunca implementada no mobile; apenas criação (`NovaTransacaoModal`) existia.
+- **Correcao aplicada:** Novo componente `mobile/src/components/EditarTransacaoModal.tsx`, aberto ao tocar em uma linha de `mobile/app/(app)/transacoes.tsx`. Edita apenas `valor`, `descricao`, `data`, `observacoes` (únicos campos aplicados pelo backend em `TransacaoService.atualizar`); tipo/categoria/forma de pagamento exibidos como bloco fixo não editável. Para compra de cartão, exibe aviso de que a edição ressincroniza faturas (parte já paga vira ajuste na próxima fatura aberta, conforme `FaturaService.ressincronizarCompraCartao`). Exclusão via `Alert.alert` de confirmação, com texto específico avisando sobre estorno quando é compra de cartão. Após salvar/excluir, invalida as query keys `transacoes`, `transacoes-recentes`, `dashboard-resumo`, `dashboard-projecao`, `carteiras`, `contas`, `contas-fatura`, `fatura`, `categorias`. Subtítulo da lista passa a mostrar `· Nx` quando a transação é parcelada.
+- **Arquivos alterados:** `mobile/src/components/EditarTransacaoModal.tsx` (novo), `mobile/app/(app)/transacoes.tsx`
+- **Testes/validacoes executadas:** `tsc --noEmit` limpo no mobile (relatado pelo agente de implementação, não reexecutado de forma independente pelo `docs-reporter`). Validação manual de contrato contra backend local (porta 8081) com payloads exatos do app: `POST` compra 3x → `201`; `PUT` com corpo exato do modal → `200`; `DELETE` → `204`. Usuário de teste descartável usado e dados de transação removidos após o teste (restou apenas o usuário `teste-fatura-ui@teste.com` no banco local). `FaturaCartaoWorkflowTest`: 7/7 PASS (suite backend não alterada por este item).
+- **Resultado:** PASS_COM_RESSALVA
+- **Ressalvas:** Sem teste automatizado mobile (projeto não tem suíte configurada — ver limitações conhecidas em `SYSTEM_OVERVIEW.md`). Validação de contrato foi manual e única, contra ambiente local, com um único usuário de teste — não cobre concorrência. Ver PROB-0048: a validação manual de contrato rodou contra um processo backend com build defasado (o processo não foi reiniciado na sessão — reinício ficou a cargo do usuário); ela comprova apenas o contrato HTTP (status codes/shape do payload). A validação do comportamento do código atual veio de `FaturaCartaoWorkflowTest` (7/7).
+- **Commit:** pendente
+
+---
+
+## BUG-0028 — Badge de status da fatura no mobile passa a diferenciar ABERTA/FECHADA/VENCIDA/PAGA por cor
+
+- **Problema relacionado:** PROB-0046
+- **Data:** 2026-07-09
+- **Area:** mobile
+- **Sintoma:** Badge de status da fatura em `mobile/app/(app)/more/faturas.tsx` era binário: verde só para `PAGA`, vermelho para qualquer outro status — inclusive `ABERTA`, que é o estado normal de uma fatura dentro do período de compras.
+- **Causa raiz:** Lógica de cor (`fatura.status === 'PAGA' ? verde : vermelho`) nunca foi atualizada quando os status `FECHADA`/`VENCIDA` passaram a ser exibidos como valores distintos (PROB-0041).
+- **Correcao aplicada:** Nova constante `statusBadge` mapeando cada status a uma cor semântica: `PAGA` → `colors.success`; `VENCIDA` → `colors.danger`; `FECHADA` → `colors.warning`; `ABERTA` (padrão) → `colors.brandFg`/`colors.brandBg`, tratando o estado aberto como normal, não como alerta.
+- **Arquivos alterados:** `mobile/app/(app)/more/faturas.tsx`
+- **Testes/validacoes executadas:** Nenhum teste automatizado (mobile sem suíte de UI configurada). Verificação por leitura do diff.
+- **Resultado:** NAO_EXECUTADO (sem teste automatizado; validação visual não confirmada por este agente)
+- **Ressalvas:** Correção de baixo risco (mudança puramente visual), mas sem cobertura de teste dedicada.
+- **Commit:** pendente
+
+---
+
+## BUG-0029 — Lançamentos de ajuste/estorno na fatura (mobile) ganham badge de tipo e descrição sem prefixo redundante
+
+- **Problema relacionado:** PROB-0047
+- **Data:** 2026-07-09
+- **Area:** mobile
+- **Sintoma:** Lançamentos `AJUSTE`/`ESTORNO` na tela de fatura mobile só eram distinguíveis de uma compra normal pelo prefixo textual `"Ajuste: "`/`"Estorno: "` na descrição e pela cor do valor (BUG-0026) — sem nenhum indicador visual dedicado de tipo.
+- **Causa raiz:** BUG-0026 tratou apenas a cor condicional do valor; o campo `tipo` (já disponível no DTO/tipos desde BUG-0026) não tinha uso visual além disso.
+- **Correcao aplicada:** Cada lançamento agora calcula um `tipoBadge`: `ESTORNO` → chip verde (`colors.success`); `AJUSTE` → chip âmbar (`colors.warning`); `COMPRA` → sem badge. O prefixo `"Estorno: "`/`"Ajuste: "` é removido da descrição exibida via regex (`/^(Estorno|Ajuste):\s*/`) já que o badge assume esse papel — a descrição original retornada pela API permanece intacta, apenas a exibição é ajustada.
+- **Arquivos alterados:** `mobile/app/(app)/more/faturas.tsx`
+- **Testes/validacoes executadas:** Nenhum teste automatizado (mobile sem suíte de UI configurada). Verificação por leitura do diff.
+- **Resultado:** NAO_EXECUTADO (sem teste automatizado; validação visual não confirmada por este agente)
+- **Ressalvas:** Regex de remoção do prefixo depende do texto exato gerado pelo backend (`FaturaService.ressincronizarCompraCartao`/`cancelarCompraCartao`); mudança futura nesse texto sem atualizar a regex causaria prefixo duplicado. Não foi verificado nesta rodada se `frontend/src/pages/Faturas.tsx` (web) recebeu o mesmo tratamento (a leitura do diff atual do web mostra apenas a cor condicional de BUG-0026, sem badge/prefixo removido) — ver PROB-0047, próximo passo, e BACKLOG a criar se aplicável.
+- **Commit:** pendente
+
+---
+
+## BUG-0030 — Login não retornava onboardingCompleto e mandava todo usuário pro onboarding
+
+- **Problema relacionado:** BUG-M01 (docs/AUDITORIA_MOBILE_2026-07-10.md)
+- **Data:** 2026-07-10
+- **Area:** backend (auth), mobile
+- **Sintoma:** todo login no mobile redirecionava para `/onboarding`, mesmo usuário com onboarding completo.
+- **Causa raiz:** map `usuario` da resposta de `POST /api/auth/login` só tinha `id/nome/email`; `login.tsx:23` checava `user.onboardingCompleto` → `undefined` → falsy.
+- **Correcao aplicada:** `AuthController` inclui `onboardingCompleto` (via `usuario.isOnboardingCompleto()`) no map `usuario` do login — mesma projeção do `UsuarioResponseDto`.
+- **Arquivos alterados:** `AuthController.java`
+- **Testes/validacoes executadas:** `mvn test -Dtest=AuthControllerTest` — 17/17 PASS.
+- **Resultado:** PASS
+
+---
+
+## BUG-0031 — "Exportar Dados" do mobile sempre dava 401 (URL sem autenticação)
+
+- **Problema relacionado:** BUG-M02 (docs/AUDITORIA_MOBILE_2026-07-10.md)
+- **Data:** 2026-07-10
+- **Area:** mobile
+- **Sintoma:** tile "Exportar Dados" abria/compartilhava a URL crua de `/v1/exportar/completo`; endpoint exige Bearer → 401 sempre; URL da API vazava pelo Share.
+- **Causa raiz:** download via browser/`Share.share` sem header `Authorization`.
+- **Correcao aplicada:** CSV baixado pelo axios autenticado (`responseType: 'text'`); nativo grava com `expo-file-system` (`File`/`Paths.cache`) e compartilha o arquivo com `expo-sharing`; web baixa via Blob + anchor. Deps novas: `expo-file-system ~19.0.23`, `expo-sharing ~14.0.8` (instaladas com `--legacy-peer-deps` por conflito pré-existente react 19.1.0 × react-dom 19.2.7).
+- **Arquivos alterados:** `mobile/app/(app)/more/index.tsx`, `mobile/package.json`, `mobile/package-lock.json`
+- **Testes/validacoes executadas:** `npx tsc --noEmit` — limpo.
+- **Resultado:** PASS
+- **Ressalvas:** validação em device real pendente (fluxo Share nativo).
+
+---
+
+## BUG-0032 — Logout não revogava refresh token no servidor
+
+- **Problema relacionado:** BUG-M03 (docs/AUDITORIA_MOBILE_2026-07-10.md)
+- **Data:** 2026-07-10
+- **Area:** mobile (segurança)
+- **Sintoma:** logout só limpava storage local; refresh token do cookie HttpOnly continuava válido no servidor. Em `perfil.tsx` a chamada nem tinha `await` e o logout era disparado em duplicidade (service + contexto).
+- **Causa raiz:** `authService.logout()` nunca chamava `POST /api/auth/logout`.
+- **Correcao aplicada:** `authService.logout()` chama `POST /auth/logout` com header `X-CSRF-Token` (best-effort: storage local sempre limpo mesmo se a rede falhar); `perfil.tsx` usa apenas o `logout()` do contexto com `await`; tipo do contexto ajustado para `() => Promise<void>`.
+- **Arquivos alterados:** `mobile/src/services/authService.ts`, `mobile/app/(app)/perfil.tsx`, `mobile/src/context/AuthContext.tsx`
+- **Testes/validacoes executadas:** `npx tsc --noEmit` — limpo. Backend já tinha teste de logout+CSRF em `AuthControllerTest` (17/17 PASS).
+- **Resultado:** PASS
+
+---
+
+## BUG-0033 — carteiraService usava endpoints deprecated de adicionar/remover dinheiro
+
+- **Problema relacionado:** BUG-M04 (docs/AUDITORIA_MOBILE_2026-07-10.md)
+- **Data:** 2026-07-10
+- **Area:** mobile
+- **Sintoma:** `carteiraService` apontava para `POST /{id}/adicionar` e `/{id}/remover`, marcados `@Deprecated(since = "PR-LEDGER-06")` — movimentos fora do ledger.
+- **Causa raiz:** service não migrou quando o backend ganhou `POST /{id}/ajustes`.
+- **Correcao aplicada:** `adicionarValor`/`removerValor` substituídos por `ajustarSaldo(id, tipo ENTRADA|SAIDA, valor, descricao?)` chamando `/v1/carteiras/{id}/ajustes`. Nenhuma tela usava os métodos antigos (código morto) — sem mudança de UI.
+- **Arquivos alterados:** `mobile/src/services/carteiraService.ts`
+- **Testes/validacoes executadas:** `npx tsc --noEmit` — limpo; grep confirmou zero chamadores dos métodos removidos.
+- **Resultado:** PASS
+- **Ressalvas:** endpoints deprecated ainda existem no backend; remover quando o frontend web também migrar.
+
+---
+
+## BUG-0034 — Pagar conta fixa não debitava nenhuma carteira (dinheiro sumia)
+
+- **Problema relacionado:** PROD-M05 (docs/AUDITORIA_MOBILE_2026-07-10.md)
+- **Data:** 2026-07-10
+- **Area:** backend + mobile
+- **Sintoma:** `PUT /v1/contas-fixas/{id}/pagar` criava transação SAIDA sem carteira; `saldoCarteiras` não caía ao pagar aluguel/energia.
+- **Causa raiz:** `ContaFixaController` ignorava `ValorRequest.carteiraId`; `ContaFixaService.marcarComoPaga` nunca vinculava carteira à transação.
+- **Correcao aplicada:** controller repassa `carteiraId`; service exige carteira (`BusinessException` 422 se ausente) e seta na transação — `TransacaoService.criar` valida ownership e registra o débito no ledger (mesma mecânica do pagamento de fatura). Mobile: modal Pagar em `more/contas-fixas.tsx` ganhou seletor de carteira (chips, padrão de `more/faturas.tsx`), pré-seleciona quando há uma só, invalida `carteiras` e `transacoes-recentes`.
+- **Arquivos alterados:** `ContaFixaController.java`, `ContaFixaService.java`, `mobile/src/services/contaFixaService.ts`, `mobile/app/(app)/more/contas-fixas.tsx`
+- **Testes/validacoes executadas:** `FinancialIntegrityTest`, `LedgerServiceTest`, `TransacaoServiceLedgerTest` 16/16 PASS; E2E na stack local (payloads do mobile): pagar sem carteira → 422 "Informe a carteira de pagamento"; com carteira → saldo 4000→3850 e movimento SAIDA no extrato.
+- **Resultado:** PASS
+- **Ressalvas:** frontend web (`ContasFixas.tsx`) ainda chama sem `carteiraId` e agora recebe 422 — alinhar quando o web for retomado (antes vazava dinheiro em silêncio; erro explícito é o comportamento correto até lá).
+
+---
+
+## BUG-0035 — Reservar valor em meta não saía de carteira nenhuma (dupla contagem)
+
+- **Problema relacionado:** PROD-M06 (docs/AUDITORIA_MOBILE_2026-07-10.md)
+- **Data:** 2026-07-10
+- **Area:** backend + mobile
+- **Sintoma:** `PUT /v1/metas/{id}/adicionar` só incrementava `valorReservado`; dinheiro "guardado" seguia disponível na carteira.
+- **Causa raiz:** `MetaService.adicionarValor`/`removerValor` não tocavam o ledger de carteiras.
+- **Correcao aplicada:** ambos exigem `carteiraId` (422 se ausente). Reserva debita a carteira (`RESERVA_META`, origem `META`, saldo insuficiente → 422); resgate credita de volta (`RESGATE_META`) e é limitado ao reservado ("Valor maior que o reservado na meta"). Enums novos em `TipoMovimentoCarteira` (coluna é VARCHAR, sem migration). Mobile: modal Adicionar em `metas.tsx` ganhou seletor "Sai de" com chips de carteira.
+- **Arquivos alterados:** `TipoMovimentoCarteira.java`, `MetaService.java`, `MetaController.java`, `mobile/src/services/metaService.ts`, `mobile/app/(app)/metas.tsx`
+- **Testes/validacoes executadas:** mesmos testes de ledger 16/16 PASS; E2E: reservar 200 → saldo 3850→3650 com movimento `RESERVA_META`; resgate acima do reservado → 422; resgatar 80 → saldo 3730 com `RESGATE_META`.
+- **Resultado:** PASS
+- **Ressalvas:** (1) web `Metas.tsx` chama sem `carteiraId` → 422 até alinhar; (2) metas antigas com `valorReservado` acumulado antes da correção nunca debitaram carteira — resgatá-las agora credita dinheiro que não saiu; avaliar backfill/zerar em dados reais; (3) `removerValor` sem UI no mobile (UX-M11) — assinatura do service já aceita `carteiraId`.
+
+---
+
+## BUG-0036 — Home: rótulos de saldo enganavam (patrimônio rotulado como saldo do mês)
+
+- **Problema relacionado:** PROD-M07 (docs/AUDITORIA_MOBILE_2026-07-10.md)
+- **Data:** 2026-07-10
+- **Area:** mobile
+- **Sintoma:** hero mostrava `saldoCarteiras` (patrimônio) com label "Saldo total · {mês}"; KPI "Disponível" repetia o mesmo `saldoCarteiras`; `resumo.saldo` (saldo do mês) não era usado.
+- **Causa raiz:** rótulos herdados do protótipo sem distinguir patrimônio × movimento do mês.
+- **Correcao aplicada:** hero = "Saldo total" (sem mês); chips ↑↓ ganharam sufixo "em {mês}"; KPI "Disponível" virou "Saldo do mês" usando `resumo.saldo`; glifos de Receitas/Despesas alinhados à semântica do hero (↑ entrada, ↓ saída).
+- **Arquivos alterados:** `mobile/app/(app)/index.tsx`
+- **Testes/validacoes executadas:** `npx tsc --noEmit` limpo; E2E confirmou contrato: `resumo.saldo` (2700) ≠ `saldoCarteiras` (3730) no dashboard.
+- **Resultado:** PASS
+- **Ressalvas:** após PROD-M06 em produção, "Disponível" pode voltar como patrimônio − reservas ativas (hoje o débito da reserva já remove da carteira, então `saldoCarteiras` já reflete o disponível real).
+
+---
+
+## BUG-0037 — Transações: paginação falsa e somatório mentiroso
+
+- **Problema relacionado:** UX-M08 (docs/AUDITORIA_MOBILE_2026-07-10.md)
+- **Data:** 2026-07-10
+- **Area:** mobile + backend
+- **Sintoma:** tela carregava só `page=0&size=20` sem infinite scroll; cards Entradas/Saídas somavam apenas os 20 itens carregados; filtro ENTRADA/SAIDA era client-side sobre a página; sem período nem busca.
+- **Causa raiz:** listagem usava `useQuery` fixo em `/minhas` página 0; somatório calculado no client sobre a página; backend não expunha filtro de tipo/busca em `/periodo`.
+- **Correcao aplicada:** backend: `/v1/transacoes/periodo` ganhou parâmetros opcionais `tipo` e `q` (busca case-insensitive por descrição; queries dedicadas no repositório, sempre `ativa = true`). Mobile: `useInfiniteQuery` com paginação real, seletor de mês (‹ mês ›, default atual, avanço bloqueado além do mês corrente), somatório do cabeçalho vindo de `/v1/relatorios` (totais do período), campo de busca com debounce 350ms e chips de tipo virando parâmetros de query. Modais de transação passaram a invalidar `['relatorio']` e `['dashboard-evolucao']`.
+- **Arquivos alterados:** `backend/.../TransacaoController.java`, `TransacaoService.java`, `TransacaoRepository.java`, `mobile/app/(app)/transacoes.tsx`, `mobile/src/services/transacaoService.ts`, `mobile/src/components/NovaTransacaoModal.tsx`, `mobile/src/components/EditarTransacaoModal.tsx`
+- **Testes/validacoes executadas:** `TransacaoControllerTest` com novo teste `listarPorPeriodo_deveFiltrarPorTipoEBusca` (tipo, q, combinado, ENTRADA) PASS; `npx tsc --noEmit` limpo.
+- **Resultado:** PASS
+- **Ressalvas:** backend local (porta 8081) precisa ser reiniciado para expor os novos parâmetros.
+
+---
+
+## BUG-0038 — Sem tela de cadastro no app
+
+- **Problema relacionado:** UX-M09 (docs/AUDITORIA_MOBILE_2026-07-10.md)
+- **Data:** 2026-07-10
+- **Area:** mobile
+- **Sintoma:** backend tinha `POST /auth/register`, mas usuário novo não conseguia criar conta pelo app (só login + forgot-password).
+- **Causa raiz:** tela nunca foi construída.
+- **Correcao aplicada:** `mobile/app/(auth)/register.tsx` consumindo `/auth/register` (`RegisterRequest`: nome, email, password, confirmPassword), validação client espelhando o backend (`@ValidPassword`: mínimo 8, 1 letra, 1 número; nome ≥2; e-mail; confirmação), login automático após sucesso com redirect para onboarding. Link "Criar conta" no login.
+- **Arquivos alterados:** `mobile/app/(auth)/register.tsx` (novo), `mobile/app/(auth)/login.tsx`
+- **Testes/validacoes executadas:** `npx tsc --noEmit` limpo; `AuthControllerTest` PASS (contrato de register inalterado).
+- **Resultado:** PASS
+- **Ressalvas:** validar fluxo completo em device (teclado/scroll) na próxima sessão de testes manuais.
+
+---
+
+## BUG-0039 — Reset de senha terminava no vácuo
+
+- **Problema relacionado:** UX-M10 (docs/AUDITORIA_MOBILE_2026-07-10.md)
+- **Data:** 2026-07-10
+- **Area:** mobile + backend
+- **Sintoma:** forgot-password enviava o e-mail, mas não existia tela para `POST /auth/reset-password` nem deep link.
+- **Causa raiz:** segunda metade do fluxo nunca foi construída.
+- **Correcao aplicada:** `mobile/app/(auth)/reset-password.tsx` (token + nova senha + confirmação, mesma regra `@ValidPassword`); aceita deep link `gestorfinanceiro://reset-password?token=...` via `useLocalSearchParams` (scheme já existia no `app.json`) e colagem manual do token; entrada pela tela de sucesso do forgot-password ("Já recebi o código"). `EmailService` monta o link com a property `app.reset-password-link-base` (default: scheme do app).
+- **Arquivos alterados:** `mobile/app/(auth)/reset-password.tsx` (novo), `mobile/app/(auth)/forgot-password.tsx`, `backend/.../EmailService.java`
+- **Testes/validacoes executadas:** `npx tsc --noEmit` limpo; backend compila; contrato `/auth/reset-password` e `ResetPasswordRequest` inalterados.
+- **Resultado:** PASS
+- **Ressalvas:** envio real de e-mail continua TODO (stub loga sem token); testar deep link em device real.
+
+---
+
+## BUG-0040 — Backend rico, mobile cego: extrato de carteira e evolução mensal (parcial da seção 4)
+
+- **Problema relacionado:** Seção 4 (docs/AUDITORIA_MOBILE_2026-07-10.md) — prioridades "extrato de carteira e gráficos primeiro"
+- **Data:** 2026-07-10
+- **Area:** mobile
+- **Sintoma:** `/v1/carteiras/{id}/movimentos` e `/v1/dashboard/evolucao-mensal` prontos no backend, sem UI.
+- **Causa raiz:** backlog de evolução.
+- **Correcao aplicada:** Carteiras: tocar no card abre extrato do ledger (paginação infinita, valor assinado verde/vermelho, saldo resultante por movimento, labels pt-BR por tipo em `TIPO_MOVIMENTO_LABEL`). Relatórios: card "Evolução mensal" com barras entradas × saídas dos últimos 6 meses (Views puras, sem lib de gráfico; legenda; acessibilidade por mês).
+- **Arquivos alterados:** `mobile/app/(app)/more/carteiras.tsx`, `mobile/app/(app)/more/relatorios.tsx`, `mobile/src/services/carteiraService.ts`, `mobile/src/services/relatorioService.ts`, `mobile/src/types/index.ts`, `mobile/src/utils/format.ts`
+- **Testes/validacoes executadas:** `npx tsc --noEmit` limpo.
+- **Resultado:** PASS
+- **Ressalvas:** restante da seção 4 segue pendente (comparação mensal, insights, parcelas, anexos, importação CSV, investimentos, reconciliação com UI).
+
+---
+
+## BUG-0041 — UX-M11 a M14: metas, categoria, nomenclatura e perfil
+
+- **Problema relacionado:** UX-M11 a UX-M14 (docs/AUDITORIA_MOBILE_2026-07-10.md)
+- **Data:** 2026-07-10
+- **Area:** mobile + backend
+- **Sintoma:** metas sem editar/excluir/retirar valor; edição de transação sem troca de categoria; "Contas" e "Carteiras" confundiam; perfil escondido e sem ações.
+- **Causa raiz:** UI mobile incompleta para contratos já existentes e falta de endpoints de perfil.
+- **Correcao aplicada:** Metas: sheet de detalhe com editar, excluir, adicionar e retirar valor; form expõe `valorMensal`. Transações: edição permite trocar categoria; backend valida ownership e ajusta gasto por categoria. Nomenclatura: UI usa "Contas" para saldos/dinheiro (`carteiras`) e "Cartões" para `contas`. Perfil: entrada no hub "Mais"; formulário de nome e senha; backend `PUT /v1/usuarios/me` e `PUT /v1/usuarios/me/senha`.
+- **Arquivos alterados:** `mobile/app/(app)/metas.tsx`, `mobile/src/components/EditarTransacaoModal.tsx`, `backend/.../TransacaoService.java`, `backend/.../UsuarioController.java`, `mobile/app/(app)/perfil.tsx`, `mobile/app/(app)/more/index.tsx`, telas de contas/cartões/onboarding.
+- **Testes/validacoes executadas:** `npm --prefix mobile run lint -- --pretty false` PASS; `backend/./mvnw -q -Dtest=TransacaoServiceLedgerTest test` PASS; `backend/./mvnw -q -Dtest=TransacaoControllerTest test` PASS com permissão elevada por Mockito/ByteBuddy.
+- **Resultado:** PASS
+- **Ressalvas:** nomes internos, rotas e serviços permanecem `carteiras`/`contas` para evitar migração desnecessária.
+
+---
+
 > Este arquivo e mantido pelo `docs-reporter`. Bugs corrigidos devem ser registrados com o proximo ID
 > sequencial (BUG-0002, BUG-0003, ...). Para historico de versoes, consulte `docs/CHANGELOG.md`.

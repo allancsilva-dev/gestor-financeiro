@@ -217,11 +217,45 @@ Usuario (1)
 > `Transacao` (introduzidos em `V13__transacao_carteira.sql`). Atualizar na proxima revisao do
 > arquivo `.drawio`.
 
+> **Pendencia (ERD) — Fatura de cartao, 2026-07-09:** o ERD tambem nao representa `FaturaCartao`
+> (`conta_id`, `mes`, `ano`, `valorTotal`, `dataFechamento`, `dataVencimento`, `status`
+> ABERTA|FECHADA|VENCIDA|PAGA — introduzida na migration V17) nem `FaturaLancamento`
+> (`fatura_id`, `transacao_id`, `descricao`, `valor`, `dataCompra`, `parcelaNumero`, `totalParcelas`,
+> `tipo` COMPRA|AJUSTE|ESTORNO — coluna `tipo` introduzida na migration `V18__fatura_lancamento_tipo.sql`,
+> 2026-07-09, mesma sessao). A revisao do fluxo de compra no cartao (ver
+> `docs/REVIEW_REPORTS/2026-07-09_backend_review_fatura-cartao-fluxo.md`, `docs/BUGFIX_LOG.md`
+> BUG-0017..BUG-0026) confirmou que `Transacao` parcelada no cartao gera registros em **duas** estruturas
+> paralelas: `Parcela` (legada, 1:N a partir de `Transacao`, vencimento comecando 1 mes apos a compra, sem
+> conceito de ajuste/estorno) e `FaturaLancamento` (atual, agrupado por `FaturaCartao`, fonte da verdade do
+> valor exibido/pago da fatura desde 2026-07-09, com suporte a lancamentos de valor negativo/credito desde a
+> segunda rodada da mesma sessao). Essa redundancia deve ficar explicita no proximo diagrama de entidades —
+> ver BACKLOG-0050 (avaliar aposentadoria de `Parcela` para compras de cartao).
+>
+> **Pendencia adicional (fluxo) — Fatura paga imutavel, 2026-07-09:** o modelo de compensacao
+> (`ressincronizarCompraCartao`/`cancelarCompraCartao` gerando lancamentos `AJUSTE`/`ESTORNO` na proxima
+> fatura em aberto quando a fatura original ja esta `PAGA`, ver PROB-0044) tambem nao esta representado em
+> nenhum diagrama existente. Candidato ao diagrama de fluxo sugerido no item 4 de "Proximos passos
+> opcionais" abaixo.
+
 ### 5. Proximos passos opcionais
 
 1. Exportar PNG/SVG de cada pagina do `.drawio` para preview rapido em PRs.
 2. Atualizar o diagrama sempre que endpoints, entidades, auth ou infra mudarem.
 3. Separar paginas em arquivos `.drawio` individuais se o time preferir revisao por diff menor.
+4. **Sugerido em 2026-07-09:** criar diagrama de fluxo textual/`.drawio` especifico para "Compra no
+   cartao de credito → Fatura", cobrindo: `Transacao` (SAIDA, `conta` cartao) → `FaturaService.registrarCompraCartao`
+   → `faturaDisponivelParaLancamento` (rola competencia se fatura ja paga) → `FaturaLancamento` (N parcelas,
+   ultima absorve arredondamento) + `Parcela` legada (redundante) → `Conta.valorGasto` incrementado →
+   `pagarFatura` (soma de lancamentos como fonte da verdade) → `Conta.valorGasto` decrementado. Objetivo:
+   tornar visivel a duplicidade `Parcela`/`FaturaLancamento` antes de decidir sobre BACKLOG-0050.
+5. **Sugerido em 2026-07-09 (segunda rodada, mesma sessao):** estender o diagrama do item 4 com o ramo de
+   edicao/cancelamento apos fatura paga: `TransacaoService.atualizar`/`deletar` (compra de cartao) →
+   `FaturaService.ressincronizarCompraCartao`/`cancelarCompraCartao` → separa lancamentos por
+   fatura-aberta (removidos/recriados) vs. fatura-paga (imutavel, soma calculada) → lancamento
+   `AJUSTE`/`ESTORNO` (valor podendo ser negativo) criado na proxima fatura em aberto via
+   `faturaDisponivelParaLancamento` → `ajustarLimiteUtilizado` atualiza `Conta.valorGasto` (podendo ficar
+   negativo/credito). Objetivo: tornar visivel o principio "fatura paga e imutavel, sempre compensa" antes
+   de qualquer decisao sobre BACKLOG-0054 (rollover de credito entre faturas).
 
 ---
 

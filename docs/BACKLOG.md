@@ -617,4 +617,123 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 
 ---
 
-> Mantido pelo `docs-reporter`. Ultima atualizacao: 2026-07-09 (correções pós-diagnóstico manual e efeitos visuais do protótipo — ver BUGFIX_LOG BUG-0011 a BUG-0016).
+## BACKLOG-0049 — Avaliar suporte a pagamento parcial de fatura de cartão
+
+- **Titulo:** Decidir se `pagarFatura` deve passar a aceitar pagamento parcial (hoje bloqueado por design)
+- **Prioridade:** P3
+- **Area:** backend, frontend, mobile
+- **Motivo:** Durante a revisão do fluxo de cartão/faturas de 2026-07-09 (PROB-0042/BUG-0021), confirmou-se que o bloqueio de pagamento parcial é uma decisão consciente de design, não um bug — mas não há registro formal do trade-off nem plano de quando/se isso deveria mudar.
+- **Dependencias:** Nenhuma tecnica bloqueante; decisão de produto sobre se pagamento parcial de fatura faz sentido no modelo atual (fatura sem parcelamento de dívida rotativa/juros).
+- **Criterio de aceite:** Decisão documentada em `SYSTEM_OVERVIEW.md` (mantida como está, ou especificação de como pagamento parcial funcionaria: saldo remanescente, juros, rollover para próxima fatura).
+- **Risco se ficar pendente:** Baixo — comportamento atual é intencional e testado; risco é apenas de retrabalho futuro sem contexto se a decisão não estiver registrada.
+- **Status:** ABERTO
+- **Nota (2026-07-09, revisão 2, mesma sessão):** o modelo de edição/cancelamento de compra evoluiu (ver PROB-0044/BACKLOG-0052) para permitir compensação via lançamento `AJUSTE`/`ESTORNO` mesmo com fatura paga. Isso é ortogonal a este item — `pagarFatura` continua exigindo o valor exato da fatura (sem pagamento parcial); mantido `ABERTO` conforme orientação explícita de manter esta decisão em aberto.
+- **Nota (2026-07-09, revisão 3, mesma sessão):** identificado efeito colateral distinto deste item — o mesmo texto de erro do backend também aparece por divergência de corrida (total da fatura muda entre o fetch da tela e o toque em "Pagar Fatura"), não apenas por pagamento parcial intencional. Tratamento de UX para esse caso específico registrado separadamente em BACKLOG-0056.
+
+---
+
+## BACKLOG-0050 — Avaliar aposentadoria da tabela Parcela legada para compras no cartão
+
+- **Titulo:** `Parcela` (legada) e `FaturaLancamento` coexistem para compras parceladas no cartão — avaliar unificação
+- **Prioridade:** P2
+- **Area:** backend, banco
+- **Motivo:** Revisão de 2026-07-09 (BUG-0017/BUG-0018) identificou que compras de cartão geram registros redundantes em duas tabelas: `Parcela` (modelo legado, vencimento começando 1 mês após a compra) e `FaturaLancamento` (modelo atual usado pelo cálculo de fatura desde a migration V17). Ambas precisaram ser corrigidas separadamente para o mesmo bug de arredondamento (`valorParcelaOuResto` em `TransacaoService` e lógica equivalente em `FaturaService`), aumentando a superfície de manutenção e risco de dessincronia futura.
+- **Dependencias:** Levantamento de quem consome `Parcela` hoje (endpoints, telas mobile/frontend, relatórios) antes de qualquer remoção; migration de dados se decidido migrar histórico existente.
+- **Criterio de aceite:** Decisão documentada — manter as duas tabelas (com justificativa) ou depreciar `Parcela` para compras de cartão em favor exclusivo de `FaturaLancamento`, com plano de migração se aplicável.
+- **Risco se ficar pendente:** Bugs que afetam o cálculo de parcelas (como arredondamento) precisam ser corrigidos em dois lugares distintos; risco de corrigir um e esquecer o outro em manutenções futuras.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0051 — Backfill de resíduo de arredondamento em parcelas/faturas antigas
+
+- **Titulo:** Avaliar se compras parceladas de cartão criadas antes da correção de BUG-0017 têm resíduo de arredondamento (limite não zera exatamente)
+- **Prioridade:** P2
+- **Area:** backend, banco
+- **Motivo:** A correção de PROB-0038/BUG-0017 (última parcela absorve o arredondamento) só se aplica a compras criadas/editadas a partir de 2026-07-09. Compras parceladas já persistidas antes dessa data (se houver em ambiente de produção/staging) mantêm o resíduo de centavos no `valorGasto` mesmo após quitação total das faturas.
+- **Dependencias:** Confirmar se há dados reais em produção anteriores a esta correção (o ambiente local de desenvolvimento não representa produção).
+- **Criterio de aceite:** Levantamento de compras parceladas existentes com `SUM(parcelas.valor) != transacao.valorTotal`; script de reconciliação ajustando a última parcela/lançamento de cada compra afetada, se necessário.
+- **Risco se ficar pendente:** Usuários com compras parceladas antigas podem ver limite de cartão com centavos residuais que nunca zeram mesmo após pagar tudo.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0052 — Decidir modelo de edição/cancelamento de compra de cartão com fatura paga
+
+- **Titulo:** Definir se compra de cartão com fatura já paga pode ser editada/cancelada, e como
+- **Prioridade:** P1
+- **Area:** backend, frontend, mobile
+- **Motivo:** Na primeira rodada de correção de 2026-07-09 (PROB-0039), o modelo escolhido foi bloquear qualquer edição/cancelamento de compra que envolvesse fatura já paga (`BusinessException`). Esse bloqueio se mostrou uma limitação funcional real (compra parcelada com parcela já paga não podia ser corrigida nem cancelada) e precisava de uma decisão formal de modelo antes de virar padrão definitivo.
+- **Dependencias:** Nenhuma tecnica bloqueante.
+- **Criterio de aceite:** Modelo definido e implementado — fatura paga tratada como imutável, com lançamento compensatório (`AJUSTE` para edição, `ESTORNO` para cancelamento) na próxima fatura em aberto, sem bloquear a operação do usuário.
+- **Risco se ficar pendente:** Usuário permanentemente impedido de corrigir/cancelar compras parceladas após a primeira fatura ser paga.
+- **Status:** FECHADO (2026-07-09, mesma sessão — ver PROB-0044, BUG-0023, BUG-0024)
+
+---
+
+## BACKLOG-0053 — UX para valorGasto negativo (crédito) do cartão
+
+- **Titulo:** Melhorar exibição do limite do cartão quando `Conta.valorGasto` fica temporariamente negativo
+- **Prioridade:** P3
+- **Area:** frontend, mobile
+- **Motivo:** Desde a implementação do modelo de ajuste/estorno (2026-07-09, PROB-0044/BUG-0024), `Conta.valorGasto` pode ficar negativo quando um estorno (crédito) é maior que as compras em aberto no momento — comportamento intencional que autocorrige na próxima compra/pagamento, mas a tela de contas/cartão pode exibir esse valor negativo de forma pouco intuitiva ao usuário (ex.: "limite usado: -R$100,00" sem explicação).
+- **Dependencias:** Nenhuma tecnica bloqueante; depende de decisão de design de UI (mobile e frontend web).
+- **Criterio de aceite:** Tela de conta/cartão exibe o `valorGasto` negativo com indicação clara de "crédito disponível" ou equivalente, em vez de apenas um número negativo sem contexto.
+- **Risco se ficar pendente:** Confusão do usuário ao ver limite de cartão negativo sem explicação.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0054 — Rollover explícito de crédito entre faturas quando fatura contém apenas estorno
+
+- **Titulo:** Definir comportamento quando uma fatura fecha contendo apenas lançamento(s) de estorno (total ≤ 0)
+- **Prioridade:** P2
+- **Area:** backend
+- **Motivo:** No modelo implementado em 2026-07-09 (PROB-0044), uma fatura cujo total é ≤ 0 (só contém estorno) não é "pagável" pelo fluxo atual de `pagarFatura` — o crédito fica aguardando compras futuras na mesma fatura para compensar. Não há rollover explícito desse crédito para a fatura seguinte nem para a carteira do usuário.
+- **Dependencias:** Nenhuma tecnica bloqueante; decisão de produto sobre o que fazer com crédito de estorno que não é consumido antes do fechamento da fatura.
+- **Criterio de aceite:** Decisão documentada — manter como está (crédito aguarda indefinidamente na mesma fatura) ou implementar rollover automático do saldo credor para a próxima fatura/carteira.
+- **Risco se ficar pendente:** Crédito de estorno pode ficar "preso" numa fatura antiga sem nunca ser aplicado, se o usuário não fizer novas compras naquele cartão.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0055 — Recalcular parcela cheia na redistribuição de edição de compra parcelada
+
+- **Titulo:** Avaliar se a redistribuição de "restante ÷ parcelas não pagas" ao editar compra parcelada deveria recalcular o valor de parcela completo
+- **Prioridade:** P3
+- **Area:** backend
+- **Motivo:** `FaturaService.ressincronizarCompraCartao` (2026-07-09, BUG-0023) redistribui o valor restante (novo total menos o que já foi pago) apenas entre as parcelas ainda não pagas, dividindo igualmente entre elas — não recalcula o valor "cheio" de uma parcela como se todo o parcelamento tivesse sido refeito desde o início. Decisão consciente de simplicidade, mas pode gerar parcelas com valores que divergem do que o usuário esperaria comparando com o parcelamento original.
+- **Dependencias:** Nenhuma tecnica bloqueante; decisão de produto sobre qual comportamento é mais intuitivo para o usuário.
+- **Criterio de aceite:** Decisão documentada — manter a redistribuição simples atual, ou implementar recálculo completo do parcelamento (com possível impacto em parcelas já pagas, o que exigiria tratamento adicional de fatura imutável).
+- **Risco se ficar pendente:** Baixo — comportamento atual é funcional e testado; risco é de estranheza do usuário ao comparar valores de parcela antes/depois da edição.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0056 — Refetch/retry automático quando total da fatura muda entre carregar a tela e tocar em "Pagar Fatura"
+
+- **Titulo:** Mensagem de erro do backend "Pagamento parcial de fatura ainda não é suportado" aparece ao usuário por divergência de corrida (total mudou entre o fetch da tela e o toque em Pagar Fatura), não por pagamento parcial real
+- **Prioridade:** P2
+- **Area:** frontend, mobile
+- **Motivo:** `handlePagar` em `mobile/app/(app)/more/faturas.tsx:100-109` e `frontend/src/pages/Faturas.tsx:81-89` chamam `faturaService.pagarFatura(fatura.id, fatura.valorTotal, carteiraPagamentoId)` usando o `fatura.valorTotal` que já está em memória desde o último fetch. Se, entre o fetch da tela e o toque no botão, um novo lançamento (`COMPRA`/`AJUSTE`/`ESTORNO`) alterar o total real da fatura no backend (`pagarFatura` valida contra a soma atual dos `FaturaLancamento`, ver PROB-0042/BUG-0021), o valor enviado diverge do valor real e o backend responde com a mensagem genérica de "pagamento parcial não suportado" — que é tecnicamente verdadeira (o valor enviado não bate com o total atual) mas confusa para o usuário, que não fez nenhum pagamento parcial intencional.
+- **Dependencias:** Nenhuma tecnica bloqueante.
+- **Criterio de aceite:** Ao receber esse erro específico do backend, o client (web e mobile) refaz o fetch da fatura e tenta o pagamento novamente automaticamente (ou, no mínimo, exibe mensagem clara de "o valor da fatura mudou, tentando novamente com o valor atualizado" em vez do texto cru do backend) — com limite de tentativas para evitar loop.
+- **Risco se ficar pendente:** Usuário recebe mensagem de erro tecnicamente correta mas confusa ("pagamento parcial não suportado") em um cenário que não é pagamento parcial, e precisa descobrir sozinho que precisa recarregar a tela e tentar de novo.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0057 — Paridade mobile/web no badge de tipo de lançamento (ajuste/estorno) da fatura
+
+- **Titulo:** Frontend web (`frontend/src/pages/Faturas.tsx`) não recebeu o badge de tipo (`AJUSTE`/`ESTORNO`) nem a remoção do prefixo textual da descrição, implementados apenas no mobile em 2026-07-09 (PROB-0047/BUG-0029)
+- **Prioridade:** P3
+- **Area:** frontend
+- **Motivo:** Verificação de `git diff -- frontend/src/pages/Faturas.tsx` nesta sessão (2026-07-09) confirma que o frontend web só tem a cor condicional do valor (herdada de BUG-0026) — a descrição de lançamentos `AJUSTE`/`ESTORNO` continua exibida com o prefixo textual cru (`"Ajuste: "`/`"Estorno: "`) e sem nenhum chip/badge indicando o tipo, diferente do mobile.
+- **Dependencias:** Nenhuma tecnica bloqueante; depende apenas de replicar a lógica já implementada no mobile (`mobile/app/(app)/more/faturas.tsx`) para o componente React equivalente.
+- **Criterio de aceite:** `frontend/src/pages/Faturas.tsx` exibe o mesmo badge de tipo (`ESTORNO`/`AJUSTE`) e remove o prefixo textual redundante da descrição, com paridade visual em relação ao mobile.
+- **Risco se ficar pendente:** Inconsistência de UX entre mobile e web para o mesmo dado (usuário que usa os dois clientes vê apresentações diferentes do mesmo lançamento).
+- **Status:** ABERTO
+
+---
+
+> Mantido pelo `docs-reporter`. Ultima atualizacao: 2026-07-09 (terceira rodada da mesma sessao — complemento mobile do modulo de fatura/cartao: EditarTransacaoModal, badges de status/tipo em faturas.tsx — ver PROBLEM_LEDGER PROB-0045 a PROB-0048 e BUGFIX_LOG BUG-0027 a BUG-0029).

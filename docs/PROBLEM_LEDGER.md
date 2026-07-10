@@ -753,4 +753,254 @@ Registro central de problemas encontrados no sistema. Mantido pelo `docs-reporte
 
 ---
 
-> Mantido pelo `docs-reporter`. Ultima atualizacao: 2026-07-09 (correções pós-diagnóstico manual via replicação de payloads mobile — ver BUGFIX_LOG BUG-0011 a BUG-0016).
+## PROB-0038 — Arredondamento HALF_UP de parcelas deixava resíduo permanente no limite do cartão
+
+- **ID:** PROB-0038
+- **Titulo:** parcela = valorTotal/n com RoundingMode.HALF_UP faz a soma das parcelas divergir do valor total, deixando centavo preso no `valorGasto` do cartão
+- **Data:** 2026-07-09
+- **Origem:** revisao do fluxo de compra no cartao + parcelas (apos commit 69e3a3b "feat(faturas): add card purchase flow")
+- **Severidade:** HIGH
+- **Status:** FECHADO (2026-07-09)
+- **Area:** backend
+- **Sintoma:** Uma compra de R$ 100,00 em 3x gerava parcelas de R$ 33,33 cada (100/3 HALF_UP), somando R$ 99,99. Após pagar as 3 faturas, `Conta.valorGasto` (limite do cartão) não retornava a zero — ficava com R$ 0,01 residual permanente.
+- **Causa raiz:** `FaturaService.registrarCompraCartao` e `TransacaoService.criarParcelas`/`atualizarValorParcelas` calculavam `valorParcela = valorTotal.divide(n, 2, HALF_UP)` e aplicavam o mesmo valor arredondado em todas as N parcelas, sem reconciliar o resto da divisão.
+- **Impacto tecnico:** Divergência acumulada entre soma de lançamentos/parcelas e valor real da compra; limite do cartão nunca zera exatamente após quitação total, exigindo ajuste manual (`ContaController`/endpoint de ajuste) para corrigir.
+- **Arquivos relacionados:** `backend/src/main/java/com/gestor/financeiro/service/FaturaService.java:161-181` (método `registrarCompraCartao`), `backend/src/main/java/com/gestor/financeiro/service/TransacaoService.java:138-166` (`criarParcelas`, `valorParcelaOuResto`), `backend/src/main/java/com/gestor/financeiro/service/TransacaoService.java:228-245` (`atualizarValorParcelas`)
+- **Solucao proposta:** Última parcela absorve a diferença de arredondamento (`valorTotal - valorParcela*(n-1)`), garantindo que a soma feche exatamente com o valor total.
+- **Solucao aplicada:** Helper `valorParcelaOuResto` criado em `TransacaoService` e logica equivalente inline em `FaturaService.registrarCompraCartao`; última parcela/lançamento usa o resto calculado em vez do valor arredondado fixo.
+- **Evidencias:** Teste `FaturaCartaoWorkflowTest.ultimaParcelaAbsorveArredondamentoELimiteZeraAposPagarTodasAsFaturas` — 100.00 em 3x gera 33.33/33.33/33.34; `Conta.valorGasto` chega a `BigDecimal.ZERO` apos pagar as 3 faturas. Suite completa: `mvn test` (offline) → `Tests run: 76, Failures: 0, Errors: 0` (verificado nesta sessao via `./mvnw -o test`).
+- **Riscos residuais:** Compras existentes já persistidas antes da correção (se houver) continuam com o resíduo antigo — não houve migração/backfill para parcelas já geradas com o bug antigo.
+- **Proximo passo:** Avaliar se há necessidade de backfill para faturas/parcelas antigas com resíduo de arredondamento (ver BACKLOG-0051 se aplicável).
+
+---
+
+## PROB-0039 — Editar valor/data de compra no cartão dessincronizava fatura e limite
+
+- **ID:** PROB-0039
+- **Titulo:** `TransacaoService.atualizar()` alterava `valorTotal` da transação sem tocar nos lançamentos de fatura (`FaturaLancamento`) nem no `valorGasto` da conta/categoria
+- **Data:** 2026-07-09
+- **Origem:** revisao do fluxo de compra no cartao + parcelas
+- **Severidade:** HIGH
+- **Status:** FECHADO (2026-07-09)
+- **Area:** backend
+- **Sintoma:** Ao editar o valor ou a data de uma compra já lançada no cartão, a transação era atualizada mas a fatura (`FaturaCartao.valorTotal`, `FaturaLancamento`) e o limite (`Conta.valorGasto`) continuavam refletindo o valor antigo — fatura e limite ficavam permanentemente dessincronizados da transação real.
+- **Causa raiz:** `TransacaoService.atualizar()` (linha ~172) fazia apenas `transacao.setValorTotal(novoValor)` e `registrarMovimentoDiferenca` (Ledger de carteira), sem recalcular lançamentos de fatura nem o `valorGasto` acumulado da conta/categoria.
+- **Impacto tecnico:** Fatura do cartão mostra valor incorreto (diferente da soma real de compras); limite de cartão exibido ao usuário não reflete o gasto real; risco de o usuário estourar limite real sem o app indicar.
+- **Arquivos relacionados:** `backend/src/main/java/com/gestor/financeiro/service/TransacaoService.java:172-226` (`atualizar`), `backend/src/main/java/com/gestor/financeiro/service/FaturaService.java` (`cancelarCompraCartao`, `registrarCompraCartao`)
+- **Solucao proposta:** Se valor ou data mudou em uma compra de cartão, cancelar e recriar os lançamentos de fatura; ajustar `valorGasto` da conta e da categoria pela diferença; recalcular parcelas legadas.
+- **Solucao aplicada:** `TransacaoService.atualizar()` agora detecta `valorAlterado`/`dataAlterada` para compras de cartão (`isCompraCartao`), chama `faturaService.cancelarCompraCartao(transacao)` antes de salvar e `faturaService.registrarCompraCartao(salva, usuarioId)` depois; ajusta `Conta.valorGasto` e `Categoria.valorGasto` pela diferença (apenas transações `SAIDA`); recalcula parcelas legadas via `atualizarValorParcelas`. `cancelarCompraCartao` falha com `BusinessException` se alguma fatura envolvida já estiver `PAGA` (edição bloqueada nesse caso).
+- **Evidencias:** Teste `FaturaCartaoWorkflowTest.editarValorDeCompraNoCartaoRessincronizaFaturaELimite` — edita compra de R$100 para R$150 e confirma `FaturaCartao.valorTotal` e `Conta.valorGasto` ambos em 150.00. Suite completa: 76/76 PASS.
+- **Riscos residuais:** ~~Se a fatura já estiver paga, a edição é bloqueada com `BusinessException` — comportamento não validado com teste dedicado de UI/mensagem amigável no mobile/frontend (pode aparecer como erro genérico ao usuário).~~ **Superado em 2026-07-09 (revisão 2, mesma sessão) — ver atualização abaixo.**
+- **Proximo passo:** ~~Validar mensagem de erro exibida no app quando a edição falha por fatura já paga (mobile e frontend).~~ **Resolvido substituindo o bloqueio por modelo de ajuste automático — ver PROB-0044.**
+
+### Atualização 2026-07-09 (revisão 2, mesma sessão) — bloqueio substituído por modelo definitivo de ajuste
+
+O bloqueio (`BusinessException` ao editar compra com fatura já paga) descrito acima como solução aplicada
+foi **removido e substituído** por um modelo definitivo na mesma sessão, antes de qualquer commit. Ver
+**PROB-0044** para o registro completo desta evolução e **BUG-0023**/**BUG-0025** em `BUGFIX_LOG.md` para
+a implementação. Resumo: `TransacaoService.atualizar()` agora chama
+`FaturaService.ressincronizarCompraCartao(transacao, usuarioId)` em vez de
+`cancelarCompraCartao`+`registrarCompraCartao`; lançamentos em faturas abertas são recriados/redistribuídos
+pelas parcelas não pagas, e a diferença sobre a parte já paga (fatura imutável) entra como lançamento
+`TipoFaturaLancamento.AJUSTE` na próxima fatura em aberto, sem nunca bloquear a edição.
+
+---
+
+## PROB-0040 — Compra retroativa podia ser lançada em fatura já paga
+
+- **ID:** PROB-0040
+- **Titulo:** `registrarCompraCartao` não verificava o status da fatura de destino antes de lançar a compra
+- **Data:** 2026-07-09
+- **Origem:** revisao do fluxo de compra no cartao + parcelas
+- **Severidade:** HIGH
+- **Status:** FECHADO (2026-07-09)
+- **Area:** backend
+- **Sintoma:** Ao registrar uma compra com data retroativa cuja competência já correspondia a uma fatura com status `PAGA`, o lançamento era adicionado normalmente àquela fatura já quitada — o valor pago não refletiria mais a fatura, e o total pago ficaria incorretamente menor que o total de lançamentos.
+- **Causa raiz:** `registrarCompraCartao` chamava diretamente `criarOuBuscarFaturaEntidade` pela competência calculada, sem checar `fatura.getStatus()`.
+- **Impacto tecnico:** Fatura marcada como `PAGA` passaria a ter lançamentos não cobertos pelo pagamento já registrado — inconsistência contábil entre valor pago e valor total da fatura.
+- **Arquivos relacionados:** `backend/src/main/java/com/gestor/financeiro/service/FaturaService.java:161-181` (`registrarCompraCartao`), `backend/src/main/java/com/gestor/financeiro/service/FaturaService.java:314-324` (`faturaDisponivelParaLancamento`, novo)
+- **Solucao proposta:** Antes de lançar, verificar se a fatura de destino já está paga; se estiver, rolar a competência para a próxima fatura em aberto.
+- **Solucao aplicada:** Novo helper `faturaDisponivelParaLancamento(usuarioId, conta, competencia)` itera até 24 meses à frente buscando a primeira fatura com status diferente de `PAGA`; lança `BusinessException` se não encontrar nenhuma em 24 meses.
+- **Evidencias:** Teste `FaturaCartaoWorkflowTest.compraRetroativaNaoEntraEmFaturaPagaVaiParaProximaAberta` — fatura de julho paga, compra retroativa de 15/jul (R$50) é redirecionada para agosto; julho permanece em 100.00, agosto recebe 50.00. Suite completa: 76/76 PASS.
+- **Riscos residuais:** Limite de 24 meses é arbitrário — se todas as faturas dos próximos 24 meses já estiverem pagas (cenário extremo/improvável), a operação falha com `BusinessException` em vez de criar uma fatura nova além do horizonte.
+- **Proximo passo:** Nenhuma ação adicional planejada; risco residual aceito como extremamente improvável no fluxo real de uso.
+
+---
+
+## PROB-0041 — Status FECHADA da fatura nunca era exibido
+
+- **ID:** PROB-0041
+- **Titulo:** `determinarStatusAtual` (nome de referência da lógica de status) nunca derivava o status `FECHADA` mesmo quando `dataFechamento` já havia passado
+- **Data:** 2026-07-09
+- **Origem:** revisao do fluxo de compra no cartao + parcelas
+- **Severidade:** MEDIUM
+- **Status:** FECHADO (2026-07-09)
+- **Area:** backend, frontend, mobile
+- **Sintoma:** Fatura com `dataFechamento` já no passado (fechada para novos lançamentos, mas ainda não vencida/paga) continuava aparecendo como "Aberta" tanto no mobile quanto no frontend web — usuário não tinha como saber que a fatura já estava fechada para lançamentos.
+- **Causa raiz:** Lógica de derivação de status em `FaturaService` só cobria `PAGA` e `VENCIDA` (baseado em `dataVencimento`), sem checar `dataFechamento`.
+- **Impacto tecnico:** UX incorreta — usuário podia acreditar que ainda poderia editar/adicionar lançamentos numa fatura já fechada para o ciclo atual.
+- **Arquivos relacionados:** `backend/src/main/java/com/gestor/financeiro/service/FaturaService.java:376-389` (bloco final de derivação de status), `mobile/app/(app)/more/faturas.tsx:196` (label de badge), `frontend/src/pages/Faturas.tsx:168` (label de badge)
+- **Solucao proposta:** Adicionar branch de derivação: se `dataFechamento` já passou e a fatura não está paga nem vencida, retornar `FaturaStatus.FECHADA`. Adicionar labels correspondentes na UI.
+- **Solucao aplicada:** Branch `if (fatura.getDataFechamento() != null && fatura.getDataFechamento().isBefore(hoje)) return FaturaStatus.FECHADA;` adicionado após o branch de `VENCIDA`. Labels `"FECHADA"` (mobile) e `"Fechada"` (frontend) adicionados nos badges de status.
+- **Evidencias:** Diff revisado manualmente em `FaturaService.java`, `mobile/app/(app)/more/faturas.tsx` e `frontend/src/pages/Faturas.tsx` (working tree, ainda não commitado). Não há teste automatizado dedicado a este branch de status nesta sessão.
+- **Riscos residuais:** Ausência de teste automatizado cobrindo especificamente a transição para `FECHADA` (cobertura apenas manual/visual). Ordem de precedência entre `VENCIDA` e `FECHADA` não foi testada para o caso em que `dataFechamento` e `dataVencimento` já passaram simultaneamente (código atual prioriza `VENCIDA`, o que parece correto mas não está coberto por teste).
+- **Proximo passo:** Adicionar teste de unidade/integração cobrindo a derivação de `FECHADA` e a precedência `VENCIDA > FECHADA` (ver BACKLOG).
+
+---
+
+## PROB-0042 — Falso erro "pagamento parcial não suportado" por divergência entre valorTotal persistido e soma de lançamentos
+
+- **ID:** PROB-0042
+- **Titulo:** `pagarFatura` validava o valor pago contra `fatura.getValorTotal()` persistido, que podia divergir da soma real dos `FaturaLancamento`
+- **Data:** 2026-07-09
+- **Origem:** revisao do fluxo de compra no cartao + parcelas
+- **Severidade:** MEDIUM
+- **Status:** FECHADO (2026-07-09)
+- **Area:** backend
+- **Sintoma:** Usuário tentando pagar o valor total exibido na tela da fatura recebia erro "Pagamento parcial de fatura ainda não é suportado" mesmo enviando o valor correto, quando `valorTotal` persistido na entidade `FaturaCartao` divergia (por bugs anteriores de arredondamento/edição, ver PROB-0038/PROB-0039) da soma real dos lançamentos.
+- **Causa raiz:** `pagarFatura` usava `total = calcularTotalLancamentos(fatura)` para checar `total > 0`, mas comparava o valor pago contra `fatura.getValorTotal()` (campo persistido, incrementado incrementalmente por `atualizarTotalFatura` e sujeito a dessincronia). `toResponse` também priorizava `fatura.getValorTotal()` sobre a soma de lançamentos ao montar o DTO exibido ao usuário.
+- **Impacto tecnico:** Bloqueio funcional do fluxo de pagamento de fatura em qualquer cenário onde o campo persistido diverge da soma de lançamentos (inclusive por bugs já corrigidos nesta sessão, mas potencialmente por outras causas futuras).
+- **Arquivos relacionados:** `backend/src/main/java/com/gestor/financeiro/service/FaturaService.java:85-140` (`pagarFatura`), `backend/src/main/java/com/gestor/financeiro/service/FaturaService.java:247-282` (`toResponse`)
+- **Solucao proposta:** Tratar a soma dos `FaturaLancamento` como fonte da verdade tanto para validação de pagamento quanto para exibição, com fallback para `valorTotal` persistido apenas quando não há lançamentos (faturas antigas pré-migration V17).
+- **Solucao aplicada:** `pagarFatura`: se `total` (soma de lançamentos) é zero e `fatura.getValorTotal() != null`, usa o valor persistido como fallback (fatura antiga sem lançamentos); caso contrário usa a soma. `toResponse`: prioriza `total` (soma) sobre `valorTotal` persistido, com o mesmo fallback para faturas pré-V17.
+- **Evidencias:** Diff revisado em `FaturaService.java` (comentários `// Faturas anteriores ao V17 têm valorTotal mas nenhum lançamento` e `// Soma dos lançamentos é a fonte da verdade`). Coberto indiretamente pelos 3 novos testes de `FaturaCartaoWorkflowTest` que fazem `pagarFatura` com o valor exato da soma de lançamentos. Suite completa: 76/76 PASS.
+- **Riscos residuais:** Não há teste dedicado especificamente ao caso de fatura pré-V17 (sem `FaturaLancamento`, apenas `valorTotal` persistido) exercitando o fallback em `pagarFatura`/`toResponse` — cenário coberto apenas pela leitura do código, não por teste automatizado.
+- **Proximo passo:** Adicionar teste cobrindo o fallback de fatura pré-V17 (fatura com `valorTotal` setado manualmente e sem `FaturaLancamento`).
+
+---
+
+## PROB-0043 — Transação ENTRADA com conta associada incrementava valorGasto (limite) do cartão
+
+- **ID:** PROB-0043
+- **Titulo:** `Conta.valorGasto` (usado como limite consumido do cartão) era incrementado mesmo para transações do tipo `ENTRADA`
+- **Data:** 2026-07-09
+- **Origem:** revisao do fluxo de compra no cartao + parcelas
+- **Severidade:** MEDIUM
+- **Status:** FECHADO (2026-07-09)
+- **Area:** backend
+- **Sintoma:** Ao registrar uma transação do tipo `ENTRADA` vinculada a uma `Conta` (ex.: estorno/reembolso lançado como entrada com conta de cartão preenchida), o `valorGasto` da conta era incrementado da mesma forma que uma saída, inflando indevidamente o limite consumido do cartão.
+- **Causa raiz:** `TransacaoService.criar()`, `atualizar()` e `deletar()` chamavam `contaService.adicionarGasto`/`removerGasto` incondicionalmente quando havia `conta` associada, sem checar `transacao.getTipo()`.
+- **Impacto tecnico:** Limite de cartão exibido ao usuário podia ficar artificialmente mais alto (mais "gasto") do que o real, caso o usuário registrasse uma entrada com conta de cartão selecionada.
+- **Arquivos relacionados:** `backend/src/main/java/com/gestor/financeiro/service/TransacaoService.java:101-104` (`criar`), `backend/src/main/java/com/gestor/financeiro/service/TransacaoService.java:206-215` (`atualizar`), `backend/src/main/java/com/gestor/financeiro/service/TransacaoService.java:253` (`deletar`)
+- **Solucao proposta:** Restringir chamadas de `adicionarGasto`/`removerGasto` a transações com `tipo == TipoTransacao.SAIDA`, seguindo o mesmo padrão já aplicado a `Categoria.valorGasto` em PROB-0036/BUG-0015.
+- **Solucao aplicada:** Guarda `if (transacao.getTipo() == TipoTransacao.SAIDA)` adicionada em `criar()`, `atualizar()` (bloco de ajuste por diferença de valor) e `deletar()` antes de qualquer chamada a `contaService.adicionarGasto`/`removerGasto`.
+- **Evidencias:** Diff revisado em `TransacaoService.java`. Suite completa: 76/76 PASS (nenhum teste dedicado exclusivamente a ENTRADA+conta+valorGasto foi adicionado nesta sessão — cobertura indireta pelos testes existentes de fluxo de cartão que usam SAIDA).
+- **Riscos residuais:** Não há teste automatizado específico para "ENTRADA com conta não deve alterar valorGasto" — apenas revisão manual do código confirma a guarda.
+- **Proximo passo:** Adicionar teste de unidade cobrindo ENTRADA com conta associada, confirmando que `valorGasto` permanece inalterado.
+
+---
+
+## PROB-0044 — Bloqueio de edição/cancelamento de compra em fatura paga substituído por modelo definitivo de ajuste/estorno
+
+- **ID:** PROB-0044
+- **Titulo:** Editar ou cancelar uma compra de cartão cuja fatura já estava `PAGA` era bloqueado com `BusinessException`; substituído por modelo definitivo de compensação (fatura paga é imutável, diferença vira lançamento na próxima fatura aberta)
+- **Data:** 2026-07-09
+- **Origem:** revisao do fluxo de compra no cartao + parcelas (segunda rodada, mesma sessão, apos PROB-0038 a PROB-0043)
+- **Severidade:** MEDIUM
+- **Status:** FECHADO (2026-07-09) — decisão de produto/arquitetura implementada, substitui o bloqueio registrado horas antes em PROB-0039
+- **Area:** backend, frontend, mobile
+- **Sintoma:** Na primeira rodada de correção desta mesma sessão (ver PROB-0039, PROB-0040), editar o valor/data de uma compra de cartão com pelo menos uma fatura envolvida já paga, ou cancelar/deletar essa compra, lançava `BusinessException` ("não é possível editar/cancelar compra de fatura paga") — usuário ficava impedido de corrigir ou estornar uma compra real após a fatura correspondente ser quitada, cenário comum (compra parcelada em que algumas parcelas já foram pagas e o usuário precisa editar o valor total ou cancelar a compra restante).
+- **Causa raiz:** O primeiro modelo de correção (PROB-0039) tratava fatura paga como uma trava rígida — qualquer mutação em lançamento de fatura paga era proibida, sem mecanismo de compensação.
+- **Impacto tecnico:** Usuário não conseguia corrigir valor incorreto nem cancelar compra parcelada após a primeira fatura ser paga — bloqueio funcional real em cenário de uso comum (compras parceladas de médio/longo prazo).
+- **Arquivos relacionados:** `backend/src/main/java/com/gestor/financeiro/service/FaturaService.java` (`ressincronizarCompraCartao`, `cancelarCompraCartao`, `criarLancamento`, `removerLancamentoDeFaturaAberta`, `ajustarLimiteUtilizado`), `backend/src/main/java/com/gestor/financeiro/service/TransacaoService.java` (`atualizar`, `deletar`), `backend/src/main/java/com/gestor/financeiro/model/FaturaLancamento.java`, `backend/src/main/java/com/gestor/financeiro/model/enums/TipoFaturaLancamento.java` (novo), `backend/src/main/resources/db/migration/V18__fatura_lancamento_tipo.sql` (novo)
+- **Solucao proposta:** Adotar o princípio "fatura paga é imutável — nunca edita, sempre compensa com lançamento na próxima fatura aberta", análogo a estorno de cartão de crédito real.
+- **Solucao aplicada:**
+  1. Nova coluna `tipo VARCHAR(20) NOT NULL DEFAULT 'COMPRA'` em `fatura_lancamentos` (migration `V18__fatura_lancamento_tipo.sql`) e novo enum `TipoFaturaLancamento` (`COMPRA`, `AJUSTE`, `ESTORNO`). Lançamentos podem ter valor negativo (crédito).
+  2. `FaturaService.ressincronizarCompraCartao(transacao, usuarioId)` (novo método) substitui a chamada direta `cancelarCompraCartao`+`registrarCompraCartao` em `TransacaoService.atualizar()`: lançamentos em faturas ainda abertas são removidos e recriados com o restante redistribuído pelas parcelas não pagas (última parcela em aberto absorve o arredondamento); a diferença sobre a parte já paga (imutável) vira lançamento `AJUSTE` (pode ser negativo) na próxima fatura em aberto.
+  3. `FaturaService.cancelarCompraCartao(transacao, usuarioId)` (assinatura alterada — antes só recebia `transacao`) não lança mais `BusinessException` para fatura paga: remove lançamentos das faturas abertas e cria um lançamento `ESTORNO` negativo da soma da parte já paga na próxima fatura em aberto.
+  4. Novo invariante centralizado: `Conta.valorGasto == soma dos lançamentos em faturas não pagas`. Helpers privados `criarLancamento`/`removerLancamentoDeFaturaAberta`/`ajustarLimiteUtilizado` em `FaturaService` ajustam `valorGasto` a cada mutação de lançamento; `TransacaoService` deixou de chamar `contaService.adicionarGasto`/`removerGasto` para compras de cartão (mantido apenas para contas não-crédito).
+  5. UI: valor negativo de lançamento renderiza em verde (crédito) em `mobile/app/(app)/more/faturas.tsx` e `frontend/src/pages/Faturas.tsx`; descrição prefixada `"Ajuste: "`/`"Estorno: "`.
+- **Evidencias:** Novos testes `FaturaCartaoWorkflowTest.editarCompraJaPagaGeraLancamentoDeAjusteNaProximaFatura` e `.cancelarCompraParceladaComFaturaPagaGeraEstornoNaProximaFatura`. Suite completa executada pelo `docs-reporter` nesta sessão: `cd backend && ./mvnw -o test` → `Tests run: 78, Failures: 0, Errors: 0` — `BUILD SUCCESS`.
+- **Riscos residuais:**
+  1. `Conta.valorGasto` pode ficar temporariamente negativo quando o crédito de um estorno é maior que as compras em aberto no momento — comportamento intencional (autocorrige na próxima compra/pagamento), mas a UI pode exibir um valor negativo de forma pouco intuitiva para o usuário.
+  2. Uma fatura contendo apenas lançamento(s) de estorno (total ≤ 0) não é "pagável" pelo fluxo atual — o crédito fica aguardando compras futuras na mesma fatura para compensar; não há rollover explícito de crédito entre faturas (ex.: se a fatura fechar só com crédito, o crédito não é automaticamente transferido/creditado em carteira).
+  3. A redistribuição de parcelas na edição usa "restante ÷ parcelas não pagas" (não recalcula o valor de uma parcela cheia) — decisão consciente de simplicidade, mas pode gerar parcelas com valores diferentes do que o usuário esperaria ao comparar com o parcelamento original.
+- **Proximo passo:** Ver BACKLOG-0053 (UX para valorGasto negativo), BACKLOG-0054 (rollover de crédito entre faturas) e BACKLOG-0055 (recalcular parcela cheia na redistribuição).
+
+---
+
+## PROB-0045 — Mobile não tinha nenhuma forma de editar ou excluir uma transação já lançada
+
+- **ID:** PROB-0045
+- **Titulo:** `mobile/app/(app)/transacoes.tsx` não expunha edição nem exclusão de transação — única forma de mutação era criar (`NovaTransacaoModal`)
+- **Data:** 2026-07-09
+- **Origem:** revisao de integracao do modulo de faturas/cartao no app mobile (terceira rodada da mesma sessao, apos as duas rodadas de backend registradas em PROB-0038..PROB-0044)
+- **Severidade:** HIGH
+- **Status:** FECHADO (2026-07-09)
+- **Area:** mobile
+- **Sintoma:** A tela de listagem de transações (`mobile/app/(app)/transacoes.tsx`) renderizava cada linha via `ListRow` sem `onPress`, e não havia nenhum componente equivalente a um modal de edição — o usuário não conseguia corrigir um valor/data/descrição digitado errado nem excluir uma transação a partir do app mobile. O backend já suportava `PUT /api/v1/transacoes/{id}` e `DELETE /api/v1/transacoes/{id}` havia meses; a lacuna era exclusivamente de UI mobile.
+- **Causa raiz:** Funcionalidade nunca implementada no mobile — o fluxo mobile foi construído em torno de criação (`NovaTransacaoModal`) sem contraparte de edição/exclusão.
+- **Impacto tecnico:** Especialmente crítico após a introdução do fluxo de compra no cartão (commit `69e3a3b`) e do modelo de ajuste/estorno (PROB-0044): usuário não tinha como corrigir nem cancelar uma compra de cartão parcelada a partir do app mobile — precisava usar o frontend web (se disponível) para qualquer correção.
+- **Arquivos ou modulos relacionados:** `mobile/app/(app)/transacoes.tsx`, `mobile/src/components/EditarTransacaoModal.tsx` (novo), `mobile/src/services/transacaoService.ts` (`atualizar`/`deletar`, já existiam e não foram alterados)
+- **Solucao proposta:** Criar modal de edição/exclusão análogo ao `NovaTransacaoModal`, respeitando o contrato real do backend (que só aplica valor, descrição, data e observações no `PUT`; tipo/categoria/forma de pagamento não são alteráveis por esse endpoint).
+- **Solucao aplicada:** Novo componente `mobile/src/components/EditarTransacaoModal.tsx` (sheet `presentationStyle="pageSheet"`), aberto ao tocar numa linha da lista (`onPress={() => setSelecionada(t)}` em `transacoes.tsx`). Edita apenas `valor`, `descricao`, `data`, `observacoes` — os únicos campos aplicados pelo backend em `TransacaoService.atualizar`; `tipo`/`categoria`/forma de pagamento são exibidos como bloco de contexto fixo, não editável. Quando a transação é compra de cartão (`tipo === 'SAIDA' && conta?.tipo === 'CREDITO'`), exibe aviso de que a edição ressincroniza faturas e que a parte já paga vira ajuste na fatura seguinte (reflete `FaturaService.ressincronizarCompraCartao`, ver PROB-0044). Exclusão via `Alert.alert` de confirmação, com texto específico para compra de cartão avisando sobre estorno. Após salvar/excluir, invalida as query keys: `transacoes`, `transacoes-recentes`, `dashboard-resumo`, `dashboard-projecao`, `carteiras`, `contas`, `contas-fatura`, `fatura`, `categorias`. Subtítulo da linha na lista passou a exibir `· Nx` quando a transação é parcelada.
+- **Evidencias:** `tsc --noEmit` limpo no mobile (relatado pelo agente de implementação). Contrato validado manualmente contra o backend local na porta 8081 com payloads exatos do app: `POST` de compra parcelada em 3x → `201`; `PUT` com o corpo exato produzido pelo modal → `200`; `DELETE` → `204`. Usado usuário de teste descartável (`teste-fatura-ui@teste.com`); dados de transação criados no teste foram removidos ao final, restando apenas o usuário no banco local. `FaturaCartaoWorkflowTest`: 7/7 PASS (suite não foi alterada por este item, é backend já existente).
+- **Riscos residuais:** Não há teste automatizado (mobile não tem suíte configurada — ver limitação conhecida em `SYSTEM_OVERVIEW.md`). Validação de contrato foi manual, contra ambiente local, uma única vez, com um usuário de teste — não cobre concorrência nem todos os tipos de transação (ex.: entrada parcelada, se existir). Ver PROB-0048 para o risco de ambiente identificado durante essa mesma validação manual.
+- **Proximo passo:** Nenhum teste automatizado mobile configurado no projeto no momento (BACKLOG genérico já registrado em limitações conhecidas). Se/quando suíte de testes mobile for criada, adicionar cobertura de `EditarTransacaoModal`.
+
+---
+
+## PROB-0046 — Badge de status da fatura no mobile era binário (só verde/vermelho), sem distinguir ABERTA/FECHADA/VENCIDA
+
+- **ID:** PROB-0046
+- **Titulo:** `mobile/app/(app)/more/faturas.tsx` colorria o badge de status da fatura apenas como `PAGA` (verde) ou "tudo o resto" (vermelho), tratando o estado normal `ABERTA` como se fosse um alerta
+- **Data:** 2026-07-09
+- **Origem:** revisao de integracao do modulo de faturas/cartao no app mobile (terceira rodada da mesma sessao)
+- **Severidade:** LOW
+- **Status:** FECHADO (2026-07-09)
+- **Area:** mobile
+- **Sintoma:** Após PROB-0041 (status `FECHADA` passou a ser derivado e exibido como texto), o badge de cor continuava usando uma lógica binária (`fatura.status === 'PAGA' ? verde : vermelho`), então uma fatura `ABERTA` (estado normal, sem nenhum problema) aparecia com a mesma cor de alerta vermelha usada para `VENCIDA`.
+- **Causa raiz:** A lógica de cor do badge (`backgroundColor: fatura.status === 'PAGA' ? colors.success + '20' : colors.danger + '20'`) nunca foi atualizada quando os status `FECHADA`/`VENCIDA` foram introduzidos como valores distintos exibidos ao usuário (PROB-0041).
+- **Impacto tecnico:** UX confusa — usuário via uma fatura em aberto normal (ainda dentro do período de compras) com a mesma cor de "atenção/erro" usada para fatura vencida, sem sinalização visual da diferença de severidade real entre os quatro estados possíveis.
+- **Arquivos ou modulos relacionados:** `mobile/app/(app)/more/faturas.tsx:127-133` (constante `statusBadge`), `mobile/app/(app)/more/faturas.tsx:201-203` (uso do badge)
+- **Solucao proposta:** Mapear cada um dos 4 status (`ABERTA`, `FECHADA`, `VENCIDA`, `PAGA`) para uma cor semanticamente distinta, com `ABERTA` tratada como estado normal (não como alerta).
+- **Solucao aplicada:** Nova constante `statusBadge` calculada antes do render: `PAGA` → `colors.success`; `VENCIDA` → `colors.danger`; `FECHADA` → `colors.warning`; padrão (`ABERTA`) → `colors.brandFg`/`colors.brandBg` (cor de marca, indicando estado normal, não alerta).
+- **Evidencias:** `git diff -- mobile/app/\(app\)/more/faturas.tsx` (ver `docs/REVIEW_REPORTS/2026-07-09_backend_review_fatura-cartao-fluxo.md`, seção "Atualização (revisão 3)"). Sem teste automatizado (mobile não tem suíte de UI configurada).
+- **Riscos residuais:** Nenhum teste de snapshot/UI cobre a nova lógica de cor — validação apenas por leitura de código.
+- **Proximo passo:** Nenhum imediato; item de baixo risco, encerrado.
+
+---
+
+## PROB-0047 — Lançamentos de ajuste/estorno na fatura (mobile) não eram visualmente distinguíveis de uma compra normal
+
+- **ID:** PROB-0047
+- **Titulo:** `mobile/app/(app)/more/faturas.tsx` exibia lançamentos `AJUSTE`/`ESTORNO` (introduzidos por PROB-0044/BUG-0023/BUG-0024) apenas com o prefixo textual `"Ajuste: "`/`"Estorno: "` na descrição, sem badge, e sem remover o prefixo redundante quando a UI já sinaliza o tipo
+- **Data:** 2026-07-09
+- **Origem:** revisao de integracao do modulo de faturas/cartao no app mobile (terceira rodada da mesma sessao)
+- **Severidade:** LOW
+- **Status:** FECHADO (2026-07-09)
+- **Area:** mobile
+- **Sintoma:** Após o modelo de ajuste/estorno (PROB-0044) começar a gerar lançamentos com `descricao` prefixada por `"Ajuste: "`/`"Estorno: "`, a tela de fatura no mobile exibia essa string crua junto da cor condicional já implementada em BUG-0026 (valor negativo em verde), mas sem nenhum indicador visual de "tipo de lançamento" (chip/badge), dependendo inteiramente do usuário ler o prefixo textual da descrição.
+- **Causa raiz:** A UI mobile foi corrigida em BUG-0026 apenas para a cor do valor (positivo/negativo); a exibição do `tipo` (campo já adicionado ao DTO/tipos em BUG-0026) não tinha nenhum uso visual além da cor do valor.
+- **Impacto tecnico:** Usuário podia não perceber rapidamente, ao olhar a lista de lançamentos, que um item é um ajuste ou estorno (em vez de uma compra), especialmente em listas longas — dependência de leitura atenta do texto da descrição.
+- **Arquivos ou modulos relacionados:** `mobile/app/(app)/more/faturas.tsx:246-278` (map de `fatura.lancamentos`)
+- **Solucao proposta:** Adicionar chip/badge de tipo (`ESTORNO`/`AJUSTE`) ao lado da descrição de cada lançamento, e remover o prefixo textual redundante da descrição já que o badge assume esse papel.
+- **Solucao aplicada:** Cada lançamento agora calcula `tipoBadge` (`ESTORNO` → chip verde `colors.success`; `AJUSTE` → chip âmbar `colors.warning`; `COMPRA` → sem badge) e remove o prefixo `"Estorno: "`/`"Ajuste: "` da descrição exibida via regex `/^(Estorno|Ajuste):\s*/` antes de renderizar (o valor original retornado pela API, com o prefixo, permanece intacto — apenas a exibição é ajustada).
+- **Evidencias:** `git diff -- mobile/app/\(app\)/more/faturas.tsx` (ver `docs/REVIEW_REPORTS/2026-07-09_backend_review_fatura-cartao-fluxo.md`, seção "Atualização (revisão 3)"). Sem teste automatizado.
+- **Riscos residuais:** Regex de remoção do prefixo é sensível ao texto exato gerado pelo backend em `FaturaService.ressincronizarCompraCartao`/`cancelarCompraCartao` (`"Ajuste: "`/`"Estorno: "`); se o backend mudar o texto do prefixo sem atualizar esta regex, o prefixo passaria a ser exibido duplicado com o badge.
+- **Proximo passo:** Confirmado por leitura de `git diff -- frontend/src/pages/Faturas.tsx` nesta rodada: o frontend web recebeu apenas a cor condicional de BUG-0026 (`l.valor < 0 ? 'text-green-400' : 'text-red-400'`), sem badge de tipo nem remoção do prefixo textual — divergência de paridade entre mobile e web. Ver BACKLOG-0057.
+
+---
+
+## PROB-0048 — Backend local (porta 8081) servindo build defasado durante validação manual do fluxo de fatura no mobile
+
+- **ID:** PROB-0048
+- **Titulo:** Processo Spring Boot local (porta 8081) permaneceu com JVM iniciada antes de uma recompilação, servindo classes antigas durante parte da validação manual do fluxo de compra no cartão
+- **Data:** 2026-07-09
+- **Origem:** revisao de integracao do modulo de faturas/cartao no app mobile — verificação manual de contrato (terceira rodada da mesma sessao)
+- **Severidade:** MEDIUM
+- **Status:** ABERTO (2026-07-09) — processo defasado seguia em execução ao fim da sessão (reinício ficou a cargo do usuário); risco operacional documentado, não é bug de código
+- **Area:** infra
+- **Sintoma:** Durante a validação manual do contrato de compra de cartão no ambiente local (porta 8081), uma compra de cartão não gerou os lançamentos de fatura esperados e o `valorGasto` seguiu um caminho de cálculo antigo, divergente do código-fonte atual no working tree.
+- **Causa raiz:** A JVM do processo `./mvnw spring-boot:run` local havia sido iniciada às 08:17, antes das classes serem recompiladas (build mais recente às 22:00 do mesmo dia) — o processo em execução continuava servindo o bytecode carregado no boot, sem hot-reload das mudanças de `FaturaService`/`TransacaoService` feitas ao longo da sessão.
+- **Impacto tecnico:** Nenhum impacto em produção nem no código — é um artefato do fluxo de desenvolvimento local. Risco real é de falso negativo/falso positivo em validações manuais futuras: um teste manual contra um processo defasado pode indicar erroneamente que uma correção não funcionou (ou, inversamente, "funcionou" por acidente usando código antigo).
+- **Arquivos ou modulos relacionados:** Nenhum arquivo de código — processo de desenvolvimento local (`backend`, execução via `./mvnw spring-boot:run` na porta 8081).
+- **Solucao proposta:** Sempre reiniciar `./mvnw spring-boot:run` (ou equivalente) após qualquer recompilação de classes Java, antes de qualquer validação manual de contrato via requests HTTP diretos.
+- **Solucao aplicada:** O processo **não** foi reiniciado durante a sessão — a tentativa do agente de encerrar o processo foi negada por permissão (processo iniciado pelo usuário); o usuário foi orientado explicitamente a reiniciar `./mvnw spring-boot:run` antes de testar as novas telas no app mobile. A validação do comportamento correto do código atual foi feita via `FaturaCartaoWorkflowTest` (contexto de teste isolado, independente do processo de desenvolvimento de longa duração) — 7/7 PASS. Nenhuma alteração de código foi necessária.
+- **Evidencias:** Observação direta durante a sessão de validação manual (comparação entre horário de início da JVM às 08:17 e horário de recompilação das classes às 22:00, reportado pelo agente que executou a validação). Não há log persistido anexado a este registro além da observação relatada.
+- **Riscos residuais:** É um risco recorrente de ambiente de desenvolvimento local (não específico deste dia) — sempre que houver alteração de código Java com o processo `spring-boot:run` já em execução, existe risco de o processo não refletir a mudança sem reinício manual (o projeto não usa DevTools com reload automático configurado, não verificado neste registro). Nenhuma automação impede recorrência.
+- **Proximo passo:** Avaliar adicionar `spring-boot-devtools` (restart automático em mudança de classpath) ao `backend/pom.xml` para reduzir a chance de recorrência — não implementado nesta sessão por estar fora do escopo de `docs-reporter` (alteração de configuração/dependência é responsabilidade de `backend-engineer`). Registrado também como ressalva de risco operacional, não como item de backlog de produto.
+
+---
+
+> Mantido pelo `docs-reporter`. Ultima atualizacao: 2026-07-09 (terceira rodada da mesma sessao — complemento mobile do modulo de fatura/cartao: PROB-0045 a PROB-0048 — ver BUGFIX_LOG BUG-0027 a BUG-0029 e relatorio `REVIEW_REPORTS/2026-07-09_backend_review_fatura-cartao-fluxo.md`).
