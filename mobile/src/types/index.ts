@@ -140,6 +140,32 @@ export interface Carteira {
   banco?: string;
 }
 
+export type TipoMovimentoCarteira =
+  | 'ENTRADA'
+  | 'SAIDA'
+  | 'AJUSTE_MANUAL'
+  | 'TRANSFERENCIA_ENTRADA'
+  | 'TRANSFERENCIA_SAIDA'
+  | 'RESERVA_META'
+  | 'RESGATE_META'
+  | 'ESTORNO';
+
+// Item do extrato (ledger) da carteira — GET /v1/carteiras/{id}/movimentos
+export interface MovimentoCarteira {
+  id: number;
+  carteiraId: number;
+  carteiraNome: string;
+  tipo: TipoMovimentoCarteira;
+  valor: number;
+  valorAssinado: number; // positivo credita, negativo debita
+  origem: string;
+  referenciaTipo?: string;
+  referenciaId?: number;
+  descricao?: string;
+  dataMovimento: string;
+  saldoResultante: number;
+}
+
 export interface CarteiraRequest {
   nome: string;
   tipo: TipoCarteira;

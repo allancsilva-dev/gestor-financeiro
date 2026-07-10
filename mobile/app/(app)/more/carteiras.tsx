@@ -1,16 +1,112 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, FlatList, Modal, ScrollView, TextInput, ActivityIndicator } from 'react-native';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { carteiraService } from '../../../src/services/carteiraService';
-import { TIPO_CARTEIRA_LABEL, formatCurrency, parseCurrencyBR, maskCurrencyInput } from '../../../src/utils/format';
+import { TIPO_CARTEIRA_LABEL, TIPO_MOVIMENTO_LABEL, formatCurrency, formatDateTime, parseCurrencyBR, maskCurrencyInput } from '../../../src/utils/format';
 import { Carteira, CarteiraRequest, TipoCarteira } from '../../../src/types';
 import { useTheme } from '../../../src/theme';
 import SkeletonBox from '../../../src/components/ui/SkeletonBox';
 
+// Extrato do ledger — fonte de confiança do saldo da conta
+function ExtratoModal({ carteira, onClose }: { carteira: Carteira | null; onClose: () => void }) {
+  const colors = useTheme();
+  const {
+    data,
+    isLoading,
+    isError,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ['carteira-movimentos', carteira?.id],
+    queryFn: ({ pageParam }) => carteiraService.listarMovimentos(carteira!.id, pageParam),
+    initialPageParam: 0,
+    getNextPageParam: last => (last.number + 1 < last.totalPages ? last.number + 1 : undefined),
+    enabled: carteira != null,
+  });
+
+  const movimentos = useMemo(() => data?.pages.flatMap(p => p.content) ?? [], [data]);
+
+  return (
+    <Modal visible={carteira != null} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: colors.bg }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700' }} numberOfLines={1}>{carteira?.nome}</Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>
+              Extrato · saldo {formatCurrency(Number(carteira?.saldo ?? 0))}
+            </Text>
+          </View>
+          <TouchableOpacity onPress={onClose} accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }}>
+            <Text style={{ color: colors.brand, fontSize: 15, fontWeight: '600' }}>Fechar</Text>
+          </TouchableOpacity>
+        </View>
+
+        <FlatList
+          data={movimentos}
+          keyExtractor={m => m.id.toString()}
+          contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+          onEndReached={() => { if (hasNextPage && !isFetchingNextPage) fetchNextPage(); }}
+          onEndReachedThreshold={0.4}
+          ListFooterComponent={isFetchingNextPage ? (
+            <View style={{ paddingVertical: 16 }}><ActivityIndicator color={colors.brand} /></View>
+          ) : null}
+          ListEmptyComponent={isLoading ? (
+            <View style={{ gap: 8 }}>
+              {[1, 2, 3, 4, 5].map(i => <SkeletonBox key={i} width="100%" height={64} />)}
+            </View>
+          ) : isError ? (
+            <View style={{ alignItems: 'center', padding: 48 }}>
+              <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600' }}>Erro ao carregar extrato</Text>
+              <TouchableOpacity onPress={() => refetch()} accessibilityRole="button" style={{ marginTop: 8, minHeight: 44, justifyContent: 'center' }}>
+                <Text style={{ color: colors.brand, fontWeight: '600' }}>Tentar novamente</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={{ alignItems: 'center', padding: 48 }}>
+              <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600' }}>Sem movimentos ainda</Text>
+              <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4, textAlign: 'center' }}>
+                Transações e ajustes nesta conta aparecem aqui.
+              </Text>
+            </View>
+          )}
+          renderItem={({ item: m }) => {
+            const credita = Number(m.valorAssinado) >= 0;
+            return (
+              <View style={{ backgroundColor: colors.card, borderRadius: 12, borderWidth: 1, borderColor: colors.border, padding: 12, marginBottom: 8 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
+                  <Text style={{ color: colors.textPrimary, fontSize: 14, fontWeight: '600', flex: 1 }} numberOfLines={1}>
+                    {m.descricao || TIPO_MOVIMENTO_LABEL[m.tipo]}
+                  </Text>
+                  <Text style={{ color: credita ? colors.success : colors.danger, fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
+                    {credita ? '+' : '−'} {formatCurrency(Math.abs(Number(m.valorAssinado)))}
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8, marginTop: 4 }}>
+                  <Text style={{ color: colors.textSecondary, fontSize: 11 }}>
+                    {TIPO_MOVIMENTO_LABEL[m.tipo]} · {formatDateTime(m.dataMovimento)}
+                  </Text>
+                  <Text style={{ color: colors.textSecondary, fontSize: 11, fontVariant: ['tabular-nums'] }}>
+                    Saldo: {formatCurrency(Number(m.saldoResultante))}
+                  </Text>
+                </View>
+              </View>
+            );
+          }}
+        />
+      </View>
+    </Modal>
+  );
+}
+
 export default function CarteirasScreen() {
   const colors = useTheme();
+  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [modalVisible, setModalVisible] = useState(false);
+  const [extratoDe, setExtratoDe] = useState<Carteira | null>(null);
   const [nome, setNome] = useState('');
   const [tipo, setTipo] = useState<TipoCarteira | null>('DINHEIRO');
   const [saldo, setSaldo] = useState('');
@@ -32,7 +128,7 @@ export default function CarteirasScreen() {
       setNome(''); setSaldo(''); setTipo('DINHEIRO');
     },
     onError: (err: any) => {
-      setNomeError(err?.userMessage ?? 'Erro ao criar carteira.');
+      setNomeError(err?.userMessage ?? 'Erro ao criar conta.');
     },
   });
 
@@ -48,14 +144,15 @@ export default function CarteirasScreen() {
     try {
       await criarMutation.mutateAsync(req);
     } catch (err: any) {
-      setNomeError(err?.userMessage ?? 'Erro ao criar carteira.');
+      setNomeError(err?.userMessage ?? 'Erro ao criar conta.');
     }
   };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <View style={{ padding: 16 }}>
-        <Text style={{ color: colors.textPrimary, fontSize: 18, fontWeight: '700' }}>Carteiras</Text>
+      <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 12 }}>
+        <Text style={{ color: colors.textPrimary, fontSize: 23, fontWeight: '800', letterSpacing: -0.4 }}>Contas</Text>
+        <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>Onde seu dinheiro está guardado</Text>
       </View>
 
       {isLoading ? (
@@ -64,7 +161,7 @@ export default function CarteirasScreen() {
         </View>
       ) : isError ? (
         <View style={{ alignItems: 'center', padding: 48 }}>
-          <Text style={{ color: colors.textSecondary }}>Erro ao carregar carteiras</Text>
+          <Text style={{ color: colors.textSecondary }}>Erro ao carregar contas</Text>
           <TouchableOpacity onPress={() => refetch()} style={{ marginTop: 8 }}>
             <Text style={{ color: colors.brand }}>Tentar novamente</Text>
           </TouchableOpacity>
@@ -74,16 +171,27 @@ export default function CarteirasScreen() {
           data={data?.content ?? []}
           keyExtractor={item => item.id.toString()}
           renderItem={({ item: c }) => (
-            <View style={{ backgroundColor: colors.card, borderRadius: 12, borderWidth: 1, borderColor: colors.border, padding: 14, marginBottom: 8, marginHorizontal: 16 }}>
-              <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600' }}>{c.nome}</Text>
-              <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{TIPO_CARTEIRA_LABEL[c.tipo]}</Text>
+            <TouchableOpacity
+              onPress={() => setExtratoDe(c)}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={`Ver extrato da conta ${c.nome}`}
+              style={{ backgroundColor: colors.card, borderRadius: 12, borderWidth: 1, borderColor: colors.border, padding: 14, marginBottom: 8, marginHorizontal: 16 }}
+            >
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600' }}>{c.nome}</Text>
+                  <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{TIPO_CARTEIRA_LABEL[c.tipo]}</Text>
+                </View>
+                <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Extrato ›</Text>
+              </View>
               <Text style={{ color: colors.textPrimary, fontSize: 18, fontWeight: '700', marginTop: 8 }}>{formatCurrency(Number(c.saldo ?? 0))}</Text>
               {c.banco && <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 6 }}>{c.banco}</Text>}
-            </View>
+            </TouchableOpacity>
           )}
           ListEmptyComponent={() => (
             <View style={{ alignItems: 'center', padding: 48 }}>
-              <Text style={{ color: colors.textSecondary }}>Nenhuma carteira encontrada</Text>
+              <Text style={{ color: colors.textSecondary }}>Nenhuma conta encontrada</Text>
             </View>
           )}
         />
@@ -96,13 +204,15 @@ export default function CarteirasScreen() {
         <Text style={{ color: colors.brandText, fontSize: 28, lineHeight: 30 }}>+</Text>
       </TouchableOpacity>
 
+      <ExtratoModal carteira={extratoDe} onClose={() => setExtratoDe(null)} />
+
       <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet">
         <View style={{ flex: 1, backgroundColor: colors.bg }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
             <TouchableOpacity onPress={() => { setModalVisible(false); setNome(''); setSaldo(''); setTipo('DINHEIRO'); setNomeError(null); setTipoError(null); setSaldoError(null); }}>
               <Text style={{ color: colors.brand, fontSize: 15 }}>Cancelar</Text>
             </TouchableOpacity>
-            <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600' }}>Nova Carteira</Text>
+            <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600' }}>Nova Conta</Text>
             <TouchableOpacity onPress={handleSalvar} disabled={criarMutation.status === 'pending'}>
               {criarMutation.status === 'pending' ? <ActivityIndicator color={colors.brand} size="small" /> : <Text style={{ color: colors.brand, fontSize: 15, fontWeight: '600' }}>Salvar</Text>}
             </TouchableOpacity>

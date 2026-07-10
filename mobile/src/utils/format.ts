@@ -1,5 +1,5 @@
 // Utilitários de formatação — sempre usar aqui (não usar Intl direto nos componentes)
-import { TipoCarteira, TipoConta, StatusPagamento } from '../types';
+import { TipoCarteira, TipoConta, TipoMovimentoCarteira, StatusPagamento } from '../types';
 
 export const formatCurrency = (value: number): string =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -76,6 +76,17 @@ export const TIPO_CONTA_LABEL: Record<TipoConta, string> = {
   DEBITO: 'Débito',
   DINHEIRO: 'Dinheiro',
   POUPANCA: 'Poupança',
+};
+
+export const TIPO_MOVIMENTO_LABEL: Record<TipoMovimentoCarteira, string> = {
+  ENTRADA: 'Entrada',
+  SAIDA: 'Saída',
+  AJUSTE_MANUAL: 'Ajuste manual',
+  TRANSFERENCIA_ENTRADA: 'Transferência recebida',
+  TRANSFERENCIA_SAIDA: 'Transferência enviada',
+  RESERVA_META: 'Reserva para meta',
+  RESGATE_META: 'Resgate de meta',
+  ESTORNO: 'Estorno',
 };
 
 export const STATUS_LABEL: Record<StatusPagamento, string> = {

@@ -1,5 +1,5 @@
 import api from './api';
-import { Carteira, CarteiraRequest, PagedResponse } from '../types';
+import { Carteira, CarteiraRequest, MovimentoCarteira, PagedResponse } from '../types';
 
 export const carteiraService = {
   listar: () =>
@@ -15,12 +15,15 @@ export const carteiraService = {
   atualizar: (id: number, data: CarteiraRequest) =>
     api.put<Carteira>(`/v1/carteiras/${id}`, data).then(r => r.data),
 
-  // adicionar/remover enviam { valor } no body
-  adicionarValor: (id: number, valor: number) =>
-    api.post<Carteira>(`/v1/carteiras/${id}/adicionar`, { valor }).then(r => r.data),
+  // Ajuste manual de saldo — registra movimento no ledger da carteira
+  ajustarSaldo: (id: number, tipo: 'ENTRADA' | 'SAIDA', valor: number, descricao?: string) =>
+    api.post<Carteira>(`/v1/carteiras/${id}/ajustes`, { tipo, valor, descricao }).then(r => r.data),
 
-  removerValor: (id: number, valor: number) =>
-    api.post<Carteira>(`/v1/carteiras/${id}/remover`, { valor }).then(r => r.data),
+  // Extrato do ledger da carteira (movimentos com saldo resultante)
+  listarMovimentos: (id: number, page = 0, size = 20) =>
+    api.get<PagedResponse<MovimentoCarteira>>(
+      `/v1/carteiras/${id}/movimentos?page=${page}&size=${size}&sort=dataMovimento,desc`
+    ).then(r => r.data),
 
   deletar: (id: number) =>
     api.delete(`/v1/carteiras/${id}`),
