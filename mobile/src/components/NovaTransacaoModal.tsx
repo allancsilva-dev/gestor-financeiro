@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { transacaoService } from '../services/transacaoService';
 import { categoriaService } from '../services/categoriaService';
 import { carteiraService } from '../services/carteiraService';
+import { contaService } from '../services/contaService';
 import { useTheme } from '../theme';
 import { parseDateBR, isValidDateBR, parseCurrencyBR, maskCurrencyInput, maskDateInput } from '../utils/format';
 import { TransacaoRequest, TipoTransacao } from '../types';
@@ -28,13 +29,18 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
   const [valorError, setValorError] = useState<string | null>(null);
   const [dataError, setDataError] = useState<string | null>(null);
   const [categoriaError, setCategoriaError] = useState<string | null>(null);
+  const [pagamentoError, setPagamentoError] = useState<string | null>(null);
 
   const [descricao, setDescricao] = useState('');
   const [valor, setValor] = useState('');
   const [data, setData] = useState('');
   const [tipo, setTipo] = useState<TipoTransacao>(initialTipo);
+  const [formaPagamento, setFormaPagamento] = useState<'CARTEIRA' | 'CARTAO'>('CARTEIRA');
   const [categoriaId, setCategoriaId] = useState<number | null>(null);
   const [carteiraId, setCarteiraId] = useState<number | null>(null);
+  const [contaId, setContaId] = useState<number | null>(null);
+  const [parcelado, setParcelado] = useState(false);
+  const [totalParcelas, setTotalParcelas] = useState('');
   const [observacoes, setObservacoes] = useState('');
 
   useEffect(() => {
@@ -52,24 +58,49 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
   });
   const carteiras = carteirasPage?.content ?? [];
 
+  const { data: contasPage } = useQuery({
+    queryKey: ['contas'],
+    queryFn: () => contaService.listar(),
+  });
+  const cartoes = (contasPage?.content ?? []).filter(c => c.tipo === 'CREDITO');
+
   // Sem carteira a transação não movimenta saldo — pré-seleciona a primeira
   useEffect(() => {
     if (carteiraId == null && carteiras.length > 0) setCarteiraId(carteiras[0].id);
   }, [carteiras, carteiraId]);
 
+  useEffect(() => {
+    if (contaId == null && cartoes.length > 0) setContaId(cartoes[0].id);
+  }, [cartoes, contaId]);
+
+  useEffect(() => {
+    if (tipo === 'ENTRADA') {
+      setFormaPagamento('CARTEIRA');
+      setParcelado(false);
+      setTotalParcelas('');
+    }
+  }, [tipo]);
+
   const resetForm = () => {
-    setDescricao(''); setValor(''); setData(''); setTipo(initialTipo); setCategoriaId(null); setObservacoes('');
-    setDescricaoError(null); setValorError(null); setDataError(null); setCategoriaError(null); setErroForm(null);
+    setDescricao(''); setValor(''); setData(''); setTipo(initialTipo); setFormaPagamento('CARTEIRA'); setCategoriaId(null); setContaId(null); setParcelado(false); setTotalParcelas(''); setObservacoes('');
+    setDescricaoError(null); setValorError(null); setDataError(null); setCategoriaError(null); setPagamentoError(null); setErroForm(null);
   };
 
   const handleSalvar = async () => {
-    setDescricaoError(null); setValorError(null); setDataError(null); setCategoriaError(null); setErroForm(null);
+    setDescricaoError(null); setValorError(null); setDataError(null); setCategoriaError(null); setPagamentoError(null); setErroForm(null);
     let hasError = false;
     if (!descricao.trim() || descricao.trim().length < 3) { setDescricaoError('Descrição deve ter entre 3 e 255 caracteres.'); hasError = true; }
     const valorNum = parseCurrencyBR(valor);
     if (!valor || isNaN(valorNum) || valorNum <= 0) { setValorError('Valor deve ser positivo.'); hasError = true; }
     if (!isValidDateBR(data)) { setDataError('Data inválida. Use o formato DD/MM/AAAA.'); hasError = true; }
     if (!categoriaId) { setCategoriaError('Selecione uma categoria.'); hasError = true; }
+    if (tipo === 'SAIDA' && formaPagamento === 'CARTAO' && !contaId) { setPagamentoError('Selecione um cartão.'); hasError = true; }
+    if (tipo === 'SAIDA' && formaPagamento === 'CARTEIRA' && !carteiraId) { setPagamentoError('Selecione uma carteira.'); hasError = true; }
+    const parcelasNum = parseInt(totalParcelas, 10);
+    if (formaPagamento === 'CARTAO' && parcelado && (isNaN(parcelasNum) || parcelasNum < 2 || parcelasNum > 48)) {
+      setPagamentoError('Informe entre 2 e 48 parcelas.');
+      hasError = true;
+    }
     if (hasError) return;
 
     setSalvando(true);
@@ -80,15 +111,24 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
         data: parseDateBR(data),
         tipo,
         categoriaId: categoriaId!,
-        carteiraId: carteiraId ?? undefined,
         observacoes: observacoes.trim() || undefined,
       };
+      if (tipo === 'SAIDA' && formaPagamento === 'CARTAO') {
+        request.contaId = contaId ?? undefined;
+        request.parcelado = parcelado;
+        request.totalParcelas = parcelado ? parcelasNum : undefined;
+      } else {
+        request.carteiraId = carteiraId ?? undefined;
+      }
       await transacaoService.criar(request);
       queryClient.invalidateQueries({ queryKey: ['transacoes'] });
       queryClient.invalidateQueries({ queryKey: ['transacoes-recentes'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-resumo'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-projecao'] });
       queryClient.invalidateQueries({ queryKey: ['carteiras'] });
+      queryClient.invalidateQueries({ queryKey: ['contas'] });
+      queryClient.invalidateQueries({ queryKey: ['contas-fatura'] });
+      queryClient.invalidateQueries({ queryKey: ['fatura'] });
       resetForm();
       onClose();
       onSaved?.();
@@ -136,7 +176,17 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
           </View>
           {categoriaError && <Text style={{ color: colors.danger, fontSize: 12, marginBottom: 8 }}>{categoriaError}</Text>}
 
-          {carteiras.length > 0 && (
+          {tipo === 'SAIDA' && (
+            <>
+              <Text style={{ color: colors.textSecondary, fontSize: 10, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Pagar com</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                <Chip label="Carteira" selected={formaPagamento === 'CARTEIRA'} onPress={() => { setFormaPagamento('CARTEIRA'); setParcelado(false); }} />
+                <Chip label="Cartão" selected={formaPagamento === 'CARTAO'} onPress={() => setFormaPagamento('CARTAO')} />
+              </View>
+            </>
+          )}
+
+          {formaPagamento === 'CARTEIRA' && carteiras.length > 0 && (
             <>
               <Text style={{ color: colors.textSecondary, fontSize: 10, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Carteira</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
@@ -146,6 +196,26 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
               </View>
             </>
           )}
+
+          {tipo === 'SAIDA' && formaPagamento === 'CARTAO' && (
+            <>
+              <Text style={{ color: colors.textSecondary, fontSize: 10, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Cartão</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+                {cartoes.map(c => (
+                  <Chip key={c.id} label={c.nome} selected={contaId === c.id} onPress={() => setContaId(c.id)} />
+                ))}
+              </View>
+              {cartoes.length === 0 && <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 8 }}>Cadastre um cartão em Faturas.</Text>}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+                <Chip label="À vista" selected={!parcelado} onPress={() => { setParcelado(false); setTotalParcelas(''); }} />
+                <Chip label="Parcelado" selected={parcelado} onPress={() => setParcelado(true)} />
+              </View>
+              {parcelado && (
+                <Field label="Parcelas" value={totalParcelas} onChangeText={(t) => setTotalParcelas(t.replace(/\D/g, '').slice(0, 2))} keyboardType="number-pad" placeholder="Ex: 6" />
+              )}
+            </>
+          )}
+          {pagamentoError && <Text style={{ color: colors.danger, fontSize: 12, marginBottom: 8 }}>{pagamentoError}</Text>}
 
           <Field label="Observações" value={observacoes} onChangeText={setObservacoes} multiline style={{ height: 100, textAlignVertical: 'top' }} />
 

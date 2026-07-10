@@ -39,8 +39,8 @@ const faturaService = {
     return response.data;
   },
 
-  pagarFatura: async (faturaId: number, valor: number): Promise<FaturaResponse> => {
-    const response = await api.put<FaturaResponse>(`/faturas/${faturaId}/pagar`, { valor });
+  pagarFatura: async (faturaId: number, valor: number, carteiraId: number): Promise<FaturaResponse> => {
+    const response = await api.put<FaturaResponse>(`/faturas/${faturaId}/pagar`, { valor, carteiraId });
     return response.data;
   },
 };

@@ -11,6 +11,7 @@ import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.OrigemMovimentoCarteira;
 import com.gestor.financeiro.model.enums.StatusPagamento;
+import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.model.enums.TipoMovimentoCarteira;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.CarteiraRepository;
@@ -58,6 +59,9 @@ public class TransacaoService {
     @Autowired
     private CarteiraRepository carteiraRepository;
 
+    @Autowired
+    private FaturaService faturaService;
+
     public Page<Transacao> listarPorUsuario(Long usuarioId, Pageable pageable) {
         return transacaoRepository.findByUsuarioIdAndAtivaTrue(usuarioId, pageable);
     }
@@ -91,6 +95,7 @@ public class TransacaoService {
             transacao.setCategoria(categoria);
         }
 
+        boolean compraCartao = false;
         if (transacao.getConta() != null && transacao.getConta().getId() != null) {
             Conta conta = contaRepository.findByIdAndUsuarioId(
                     transacao.getConta().getId(), usuarioId)
@@ -99,9 +104,12 @@ public class TransacaoService {
             contaService.adicionarGasto(conta.getId(), transacao.getValorTotal(), usuarioId);
 
             transacao.setConta(conta);
+            compraCartao = isCompraCartao(transacao);
         }
 
-        if (transacao.getCarteira() != null && transacao.getCarteira().getId() != null) {
+        if (compraCartao) {
+            transacao.setCarteira(null);
+        } else if (transacao.getCarteira() != null && transacao.getCarteira().getId() != null) {
             // Substitui o stub detached vindo do controller por entidade gerenciada (valida ownership)
             Carteira carteira = carteiraRepository.findByIdAndUsuarioId(
                     transacao.getCarteira().getId(), usuarioId)
@@ -117,6 +125,9 @@ public class TransacaoService {
         Transacao salva = transacaoRepository.save(transacao);
 
         registrarMovimentoCriacao(salva, usuarioId);
+        if (compraCartao) {
+            faturaService.registrarCompraCartao(salva, usuarioId);
+        }
 
         return salva;
     }
@@ -175,6 +186,10 @@ public class TransacaoService {
     @Transactional
     public void deletar(Long id, Long usuarioId) {
         Transacao transacao = buscarPorIdDoUsuario(id, usuarioId);
+
+        if (isCompraCartao(transacao)) {
+            faturaService.cancelarCompraCartao(transacao);
+        }
 
         if (transacao.getConta() != null) {
             contaService.removerGasto(
@@ -245,6 +260,13 @@ public class TransacaoService {
                 LocalDateTime.now(),
                 false
         ));
+    }
+
+    private boolean isCompraCartao(Transacao transacao) {
+        return transacao != null
+                && transacao.getConta() != null
+                && transacao.getConta().getTipo() == TipoConta.CREDITO
+                && transacao.getTipo() == TipoTransacao.SAIDA;
     }
 
     private void registrarMovimentoDiferenca(Transacao transacao, Long usuarioId, BigDecimal diferença) {

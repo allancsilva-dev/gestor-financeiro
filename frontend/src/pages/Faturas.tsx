@@ -3,6 +3,7 @@ import Layout from '../components/Layout';
 import toast from 'react-hot-toast';
 import faturaService, { FaturaResponse, FaturaLancamento } from '../services/faturaService';
 import { contaService, Conta } from '../services/contaService';
+import carteiraService, { Carteira } from '../services/carteiraService';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/currency';
 import { CreditCard, Calendar, DollarSign, CheckCircle, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -12,7 +13,9 @@ const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julh
 export default function Faturas() {
   const { usuario } = useAuth();
   const [contasCredito, setContasCredito] = useState<Conta[]>([]);
+  const [carteiras, setCarteiras] = useState<Carteira[]>([]);
   const [contaSelecionada, setContaSelecionada] = useState<Conta | null>(null);
+  const [carteiraPagamentoId, setCarteiraPagamentoId] = useState<number | null>(null);
   const [fatura, setFatura] = useState<FaturaResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
@@ -23,6 +26,7 @@ export default function Faturas() {
   useEffect(() => {
     if (usuario?.id) {
       carregarContas();
+      carregarCarteiras();
     }
   }, [usuario?.id]);
 
@@ -45,6 +49,18 @@ export default function Faturas() {
     }
   };
 
+  const carregarCarteiras = async () => {
+    try {
+      const data = await carteiraService.listarCarteiras(usuario!.id, 0, 50);
+      setCarteiras(data);
+      if (data.length > 0 && !carteiraPagamentoId) {
+        setCarteiraPagamentoId(data[0].id);
+      }
+    } catch {
+      toast.error('Erro ao carregar carteiras');
+    }
+  };
+
   const carregarFatura = async (contaId: number, m: number, a: number) => {
     setLoading(true);
     try {
@@ -64,10 +80,16 @@ export default function Faturas() {
 
   const handlePagar = async () => {
     if (!fatura || fatura.valorTotal <= 0) return;
+    if (!carteiraPagamentoId) {
+      toast.error('Selecione a carteira de pagamento');
+      return;
+    }
     setPaying(true);
     try {
-      const result = await faturaService.pagarFatura(fatura.id, fatura.valorTotal);
+      const result = await faturaService.pagarFatura(fatura.id, fatura.valorTotal, carteiraPagamentoId);
       setFatura(result);
+      carregarCarteiras();
+      carregarContas();
       toast.success('Fatura paga com sucesso!');
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Erro ao pagar fatura');
@@ -151,7 +173,20 @@ export default function Faturas() {
 
                   {/* Botão Pagar */}
                   {fatura.status !== 'PAGA' && fatura.valorTotal > 0 && (
-                    <div className="mb-6">
+                    <div className="mb-6 space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">Pagar com</label>
+                        <select
+                          value={carteiraPagamentoId ?? ''}
+                          onChange={(e) => setCarteiraPagamentoId(e.target.value ? Number(e.target.value) : null)}
+                          className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white"
+                        >
+                          <option value="">Selecione uma carteira</option>
+                          {carteiras.map((c) => (
+                            <option key={c.id} value={c.id}>{c.nome}</option>
+                          ))}
+                        </select>
+                      </div>
                       <button
                         onClick={handlePagar}
                         disabled={paying}

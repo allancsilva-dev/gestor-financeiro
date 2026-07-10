@@ -58,6 +58,6 @@ public class FaturaController {
             @Valid @RequestBody ValorRequest request) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         BigDecimal valor = request.getValor();
-        return ResponseEntity.ok(faturaService.pagarFatura(usuarioId, id, valor));
+        return ResponseEntity.ok(faturaService.pagarFatura(usuarioId, id, valor, request.getCarteiraId()));
     }
 }
