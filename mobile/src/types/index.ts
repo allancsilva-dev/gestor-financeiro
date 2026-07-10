@@ -261,6 +261,7 @@ export interface FaturaLancamento {
   categoriaIcone: string;
   parcelaAtual: number | null;
   totalParcelas: number | null;
+  tipo: 'COMPRA' | 'AJUSTE' | 'ESTORNO';
 }
 
 export interface FaturaResponse {

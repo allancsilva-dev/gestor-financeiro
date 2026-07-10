@@ -13,5 +13,6 @@ public record FaturaLancamentoDto(
     String categoriaCor,
     String categoriaIcone,
     Integer parcelaAtual,
-    Integer totalParcelas
+    Integer totalParcelas,
+    String tipo
 ) {}

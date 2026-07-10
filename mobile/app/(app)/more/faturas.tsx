@@ -100,7 +100,7 @@ export default function FaturasScreen() {
   const handlePagar = async () => {
     if (!fatura || fatura.valorTotal <= 0) return;
     if (!carteiraPagamentoId) {
-      setPayError('Selecione a carteira de pagamento.');
+      setPayError('Selecione a conta de pagamento.');
       return;
     }
     setPayError(null);
@@ -123,6 +123,13 @@ export default function FaturasScreen() {
   const limiteTotal = Number(contaSelecionada?.limiteTotal ?? 0);
   const gasto = Number(contaSelecionada?.valorGasto ?? 0);
   const usoLimite = limiteTotal > 0 ? Math.min(gasto / limiteTotal, 1) : 0;
+
+  // Aberta é estado normal, não alerta: vermelho fica só para vencida
+  const statusBadge =
+    fatura?.status === 'PAGA' ? { fg: colors.success, bg: colors.success + '20', label: 'PAGA' }
+    : fatura?.status === 'VENCIDA' ? { fg: colors.danger, bg: colors.danger + '20', label: 'VENCIDA' }
+    : fatura?.status === 'FECHADA' ? { fg: colors.warning, bg: colors.warning + '20', label: 'FECHADA' }
+    : { fg: colors.brandFg, bg: colors.brandBg, label: 'ABERTA' };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -191,10 +198,8 @@ export default function FaturasScreen() {
                   <View style={{ alignItems: 'flex-end' }}>
                     <Text style={{ color: colors.textPrimary, fontSize: 22, fontWeight: '800', fontVariant: ['tabular-nums'] }}>{formatCurrency(fatura?.valorTotal ?? 0)}</Text>
                     {fatura && (
-                      <View style={[styles.badge, { backgroundColor: fatura.status === 'PAGA' ? colors.success + '20' : colors.danger + '20' }]}>
-                        <Text style={{ color: fatura.status === 'PAGA' ? colors.success : colors.danger, fontSize: 10, fontWeight: '600' }}>
-                          {fatura.status === 'PAGA' ? 'PAGA' : fatura.status === 'VENCIDA' ? 'VENCIDA' : 'ABERTA'}
-                        </Text>
+                      <View style={[styles.badge, { backgroundColor: statusBadge.bg }]}>
+                        <Text style={{ color: statusBadge.fg, fontSize: 10, fontWeight: '600' }}>{statusBadge.label}</Text>
                       </View>
                     )}
                   </View>
@@ -238,21 +243,37 @@ export default function FaturasScreen() {
                   Nenhum lançamento em {MESES[mes - 1].toLowerCase()}
                 </Text>
               ) : (
-                fatura.lancamentos.map((l: FaturaLancamento, i: number) => (
-                  <View key={l.transacaoId || i} style={[styles.lancamento, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                    <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: l.categoriaCor + '20', alignItems: 'center', justifyContent: 'center' }}>
-                      <Text style={{ fontSize: 14 }}>{l.categoriaIcone || '💳'}</Text>
+                fatura.lancamentos.map((l: FaturaLancamento, i: number) => {
+                  // Backend prefixa a descrição com "Estorno:"/"Ajuste:"; o badge assume esse papel
+                  const descricao = l.tipo !== 'COMPRA' ? l.descricao.replace(/^(Estorno|Ajuste):\s*/, '') : l.descricao;
+                  const tipoBadge = l.tipo === 'ESTORNO'
+                    ? { fg: colors.success, bg: colors.success + '20', label: 'ESTORNO' }
+                    : l.tipo === 'AJUSTE'
+                      ? { fg: colors.warning, bg: colors.warning + '20', label: 'AJUSTE' }
+                      : null;
+                  return (
+                    <View key={l.transacaoId || i} style={[styles.lancamento, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                      <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: l.categoriaCor + '20', alignItems: 'center', justifyContent: 'center' }}>
+                        <Text style={{ fontSize: 14 }}>{l.categoriaIcone || '💳'}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text numberOfLines={1} style={{ color: colors.textPrimary, fontSize: 13, flexShrink: 1 }}>{descricao}</Text>
+                          {tipoBadge && (
+                            <View style={{ backgroundColor: tipoBadge.bg, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 8 }}>
+                              <Text style={{ color: tipoBadge.fg, fontSize: 9, fontWeight: '700' }}>{tipoBadge.label}</Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={{ color: colors.textSecondary, fontSize: 11 }}>
+                          {formatDate(l.data)}
+                          {l.totalParcelas ? ` · ${l.parcelaAtual}/${l.totalParcelas}` : ''}
+                        </Text>
+                      </View>
+                      <Text style={{ color: l.valor < 0 ? colors.success : colors.danger, fontSize: 13, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{formatCurrency(l.valor)}</Text>
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: colors.textPrimary, fontSize: 13 }}>{l.descricao}</Text>
-                      <Text style={{ color: colors.textSecondary, fontSize: 11 }}>
-                        {formatDate(l.data)}
-                        {l.totalParcelas ? ` · ${l.parcelaAtual}/${l.totalParcelas}` : ''}
-                      </Text>
-                    </View>
-                    <Text style={{ color: colors.danger, fontSize: 13, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{formatCurrency(l.valor)}</Text>
-                  </View>
-                ))
+                  );
+                })
               )}
             </View>
           )}

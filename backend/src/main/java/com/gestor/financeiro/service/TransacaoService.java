@@ -101,10 +101,14 @@ public class TransacaoService {
                     transacao.getConta().getId(), usuarioId)
                 .orElseThrow(() -> new ResourceNotFoundException("Conta não encontrada"));
 
-            contaService.adicionarGasto(conta.getId(), transacao.getValorTotal(), usuarioId);
-
             transacao.setConta(conta);
             compraCartao = isCompraCartao(transacao);
+
+            // valorGasto da conta acumula apenas saídas; compra de cartão consome
+            // limite via lançamentos de fatura (invariante do FaturaService)
+            if (transacao.getTipo() == TipoTransacao.SAIDA && !compraCartao) {
+                contaService.adicionarGasto(conta.getId(), transacao.getValorTotal(), usuarioId);
+            }
         }
 
         if (compraCartao) {
@@ -145,7 +149,8 @@ public class TransacaoService {
             parcela.setTransacao(transacao);
             parcela.setNumeroParcela(i);
             parcela.setTotalParcelas(transacao.getTotalParcelas());
-            parcela.setValor(valorParcela);
+            parcela.setValor(valorParcelaOuResto(transacao.getValorTotal(), valorParcela,
+                    i, transacao.getTotalParcelas()));
             parcela.setDataVencimento(transacao.getData().plusMonths(i));
             parcela.setStatus(StatusPagamento.PENDENTE);
 
@@ -153,6 +158,15 @@ public class TransacaoService {
         }
 
         transacao.setParcelas(parcelas);
+    }
+
+    // Última parcela absorve a diferença de arredondamento para a soma fechar o valor total
+    private BigDecimal valorParcelaOuResto(BigDecimal valorTotal, BigDecimal valorParcela,
+                                           int numeroParcela, int totalParcelas) {
+        if (numeroParcela < totalParcelas) {
+            return valorParcela;
+        }
+        return valorTotal.subtract(valorParcela.multiply(BigDecimal.valueOf(totalParcelas - 1L)));
     }
 
     @Transactional
@@ -165,33 +179,100 @@ public class TransacaoService {
 
         BigDecimal valorAnterior = transacao.getValorTotal();
         BigDecimal novoValor = transacaoAtualizada.getValorTotal();
+        boolean valorAlterado = novoValor != null && valorAnterior != null
+                && novoValor.compareTo(valorAnterior) != 0;
+        boolean dataAlterada = transacaoAtualizada.getData() != null
+                && !transacaoAtualizada.getData().equals(transacao.getData());
+        boolean compraCartao = isCompraCartao(transacao);
+        Categoria categoriaAnterior = transacao.getCategoria();
+        Long novaCategoriaId = transacaoAtualizada.getCategoria() != null
+                ? transacaoAtualizada.getCategoria().getId()
+                : null;
+        boolean categoriaAlterada = novaCategoriaId != null
+                && (categoriaAnterior == null || !novaCategoriaId.equals(categoriaAnterior.getId()));
+        Categoria novaCategoria = categoriaAnterior;
+        if (categoriaAlterada) {
+            novaCategoria = categoriaRepository.findByIdAndUsuarioId(novaCategoriaId, usuarioId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Categoria não encontrada"));
+        }
 
         transacao.setDescricao(transacaoAtualizada.getDescricao());
         transacao.setValorTotal(novoValor);
         transacao.setData(transacaoAtualizada.getData());
         transacao.setObservacoes(transacaoAtualizada.getObservacoes());
+        transacao.setCategoria(novaCategoria);
 
-        Transacao salva = transacaoRepository.save(transacao);
+        if (valorAlterado) {
+            atualizarValorParcelas(transacao);
 
-        if (novoValor != null && valorAnterior != null) {
-            BigDecimal diferença = novoValor.subtract(valorAnterior);
-            if (diferença.signum() != 0) {
-                registrarMovimentoDiferenca(salva, usuarioId, diferença);
+            BigDecimal diferenca = novoValor.subtract(valorAnterior);
+            // Compra de cartão tem o limite ajustado pelo FaturaService ao ressincronizar
+            if (transacao.getConta() != null && transacao.getTipo() == TipoTransacao.SAIDA
+                    && !compraCartao) {
+                if (diferenca.signum() > 0) {
+                    contaService.adicionarGasto(transacao.getConta().getId(), diferenca, usuarioId);
+                } else {
+                    contaService.removerGasto(transacao.getConta().getId(), diferenca.abs(), usuarioId);
+                }
             }
         }
 
+        if (transacao.getTipo() == TipoTransacao.SAIDA) {
+            if (categoriaAlterada) {
+                if (categoriaAnterior != null) {
+                    categoriaAnterior.setValorGasto(categoriaAnterior.getValorGasto().subtract(valorAnterior));
+                    categoriaRepository.save(categoriaAnterior);
+                }
+                novaCategoria.setValorGasto(novaCategoria.getValorGasto().add(novoValor));
+                categoriaRepository.save(novaCategoria);
+            } else if (valorAlterado && novaCategoria != null) {
+                novaCategoria.setValorGasto(novaCategoria.getValorGasto().add(novoValor.subtract(valorAnterior)));
+                categoriaRepository.save(novaCategoria);
+            }
+        }
+
+        Transacao salva = transacaoRepository.save(transacao);
+
+        if (compraCartao && (valorAlterado || dataAlterada)) {
+            faturaService.ressincronizarCompraCartao(salva, usuarioId);
+        }
+
+        if (valorAlterado) {
+            registrarMovimentoDiferenca(salva, usuarioId, novoValor.subtract(valorAnterior));
+        }
+
         return salva;
+    }
+
+    private void atualizarValorParcelas(Transacao transacao) {
+        List<Parcela> parcelas = transacao.getParcelas();
+        if (parcelas == null || parcelas.isEmpty()) {
+            return;
+        }
+
+        int total = parcelas.size();
+        BigDecimal valorParcela = transacao.getValorTotal()
+            .divide(BigDecimal.valueOf(total), 2, RoundingMode.HALF_UP);
+        transacao.setValorParcela(valorParcela);
+
+        for (Parcela parcela : parcelas) {
+            parcela.setValor(valorParcelaOuResto(
+                    transacao.getValorTotal(), valorParcela, parcela.getNumeroParcela(), total));
+        }
     }
 
     @Transactional
     public void deletar(Long id, Long usuarioId) {
         Transacao transacao = buscarPorIdDoUsuario(id, usuarioId);
 
-        if (isCompraCartao(transacao)) {
-            faturaService.cancelarCompraCartao(transacao);
+        boolean compraCartao = isCompraCartao(transacao);
+        if (compraCartao) {
+            // Libera o limite via remoção dos lançamentos abertos e estorna a parte já paga
+            faturaService.cancelarCompraCartao(transacao, usuarioId);
         }
 
-        if (transacao.getConta() != null) {
+        if (transacao.getConta() != null && transacao.getTipo() == TipoTransacao.SAIDA
+                && !compraCartao) {
             contaService.removerGasto(
                 transacao.getConta().getId(),
                 transacao.getValorTotal(),

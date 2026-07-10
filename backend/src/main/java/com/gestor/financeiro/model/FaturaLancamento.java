@@ -1,5 +1,6 @@
 package com.gestor.financeiro.model;
 
+import com.gestor.financeiro.model.enums.TipoFaturaLancamento;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -42,6 +43,10 @@ public class FaturaLancamento {
 
     @Column(name = "total_parcelas")
     private Integer totalParcelas;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private TipoFaturaLancamento tipo = TipoFaturaLancamento.COMPRA;
 
     @Column(name = "criado_em")
     private LocalDateTime criadoEm;

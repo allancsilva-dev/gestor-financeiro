@@ -6,6 +6,7 @@ import com.gestor.financeiro.model.enums.FaturaStatus;
 import com.gestor.financeiro.model.enums.OrigemMovimentoCarteira;
 import com.gestor.financeiro.model.enums.TipoCarteira;
 import com.gestor.financeiro.model.enums.TipoConta;
+import com.gestor.financeiro.model.enums.TipoFaturaLancamento;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.*;
 import com.gestor.financeiro.service.FaturaService;
@@ -150,6 +151,144 @@ class FaturaCartaoWorkflowTest {
         assertEquals(1, movimentos.size());
         assertEquals(OrigemMovimentoCarteira.FATURA_CARTAO, movimentos.get(0).getOrigem());
         assertEquals(0, new BigDecimal("-100.00").compareTo(movimentos.get(0).getValorAssinado()));
+    }
+
+    @Test
+    void ultimaParcelaAbsorveArredondamentoELimiteZeraAposPagarTodasAsFaturas() {
+        Transacao compra = compraCartao("Celular", new BigDecimal("100.00"), LocalDate.of(2026, 7, 29));
+        compra.setParcelado(true);
+        compra.setTotalParcelas(3);
+
+        transacaoService.criar(compra, usuario.getId());
+
+        FaturaCartao agosto = faturaCartaoRepository
+                .findByContaIdAndMesAndAno(cartao.getId(), 8, 2026).orElseThrow();
+        FaturaCartao setembro = faturaCartaoRepository
+                .findByContaIdAndMesAndAno(cartao.getId(), 9, 2026).orElseThrow();
+        FaturaCartao outubro = faturaCartaoRepository
+                .findByContaIdAndMesAndAno(cartao.getId(), 10, 2026).orElseThrow();
+
+        assertEquals(0, new BigDecimal("33.33").compareTo(agosto.getValorTotal()));
+        assertEquals(0, new BigDecimal("33.33").compareTo(setembro.getValorTotal()));
+        assertEquals(0, new BigDecimal("33.34").compareTo(outubro.getValorTotal()));
+
+        faturaService.pagarFatura(usuario.getId(), agosto.getId(), new BigDecimal("33.33"), carteira.getId());
+        faturaService.pagarFatura(usuario.getId(), setembro.getId(), new BigDecimal("33.33"), carteira.getId());
+        faturaService.pagarFatura(usuario.getId(), outubro.getId(), new BigDecimal("33.34"), carteira.getId());
+
+        assertEquals(0, BigDecimal.ZERO.compareTo(
+                contaRepository.findById(cartao.getId()).orElseThrow().getValorGasto()));
+    }
+
+    @Test
+    void editarValorDeCompraNoCartaoRessincronizaFaturaELimite() {
+        Transacao compra = transacaoService.criar(
+                compraCartao("Mercado", new BigDecimal("100.00"), LocalDate.of(2026, 7, 10)),
+                usuario.getId());
+
+        Transacao atualizacao = new Transacao();
+        atualizacao.setDescricao("Mercado ajustado");
+        atualizacao.setValorTotal(new BigDecimal("150.00"));
+        atualizacao.setData(LocalDate.of(2026, 7, 10));
+
+        transacaoService.atualizar(compra.getId(), atualizacao, usuario.getId());
+
+        FaturaCartao julho = faturaCartaoRepository
+                .findByContaIdAndMesAndAno(cartao.getId(), 7, 2026).orElseThrow();
+        assertEquals(0, new BigDecimal("150.00").compareTo(julho.getValorTotal()));
+        assertEquals(0, new BigDecimal("150.00").compareTo(
+                contaRepository.findById(cartao.getId()).orElseThrow().getValorGasto()));
+    }
+
+    @Test
+    void compraRetroativaNaoEntraEmFaturaPagaVaiParaProximaAberta() {
+        transacaoService.criar(
+                compraCartao("Mercado", new BigDecimal("100.00"), LocalDate.of(2026, 7, 10)),
+                usuario.getId());
+
+        FaturaCartao julho = faturaCartaoRepository
+                .findByContaIdAndMesAndAno(cartao.getId(), 7, 2026).orElseThrow();
+        faturaService.pagarFatura(usuario.getId(), julho.getId(), new BigDecimal("100.00"), carteira.getId());
+
+        transacaoService.criar(
+                compraCartao("Farmácia retroativa", new BigDecimal("50.00"), LocalDate.of(2026, 7, 15)),
+                usuario.getId());
+
+        FaturaCartao julhoAposCompra = faturaCartaoRepository
+                .findByContaIdAndMesAndAno(cartao.getId(), 7, 2026).orElseThrow();
+        assertEquals(0, new BigDecimal("100.00").compareTo(julhoAposCompra.getValorTotal()));
+
+        FaturaCartao agosto = faturaCartaoRepository
+                .findByContaIdAndMesAndAno(cartao.getId(), 8, 2026).orElseThrow();
+        assertEquals(0, new BigDecimal("50.00").compareTo(agosto.getValorTotal()));
+    }
+
+    @Test
+    void editarCompraJaPagaGeraLancamentoDeAjusteNaProximaFatura() {
+        Transacao compra = transacaoService.criar(
+                compraCartao("Mercado", new BigDecimal("100.00"), LocalDate.of(2026, 7, 10)),
+                usuario.getId());
+
+        FaturaCartao julho = faturaCartaoRepository
+                .findByContaIdAndMesAndAno(cartao.getId(), 7, 2026).orElseThrow();
+        faturaService.pagarFatura(usuario.getId(), julho.getId(), new BigDecimal("100.00"), carteira.getId());
+
+        Transacao atualizacao = new Transacao();
+        atualizacao.setDescricao("Mercado ajustado");
+        atualizacao.setValorTotal(new BigDecimal("150.00"));
+        atualizacao.setData(LocalDate.of(2026, 7, 10));
+
+        transacaoService.atualizar(compra.getId(), atualizacao, usuario.getId());
+
+        // Fatura paga permanece imutável
+        FaturaCartao julhoDepois = faturaCartaoRepository
+                .findByContaIdAndMesAndAno(cartao.getId(), 7, 2026).orElseThrow();
+        assertEquals(0, new BigDecimal("100.00").compareTo(julhoDepois.getValorTotal()));
+
+        // Diferença entra como ajuste na próxima fatura aberta
+        FaturaCartao agosto = faturaCartaoRepository
+                .findByContaIdAndMesAndAno(cartao.getId(), 8, 2026).orElseThrow();
+        assertEquals(0, new BigDecimal("50.00").compareTo(agosto.getValorTotal()));
+
+        FaturaLancamento ajuste = faturaLancamentoRepository.findByTransacaoId(compra.getId()).stream()
+                .filter(l -> l.getTipo() == TipoFaturaLancamento.AJUSTE)
+                .findFirst().orElseThrow();
+        assertEquals(0, new BigDecimal("50.00").compareTo(ajuste.getValor()));
+
+        assertEquals(0, new BigDecimal("50.00").compareTo(
+                contaRepository.findById(cartao.getId()).orElseThrow().getValorGasto()));
+    }
+
+    @Test
+    void cancelarCompraParceladaComFaturaPagaGeraEstornoNaProximaFatura() {
+        Transacao compra = compraCartao("Notebook", new BigDecimal("300.00"), LocalDate.of(2026, 7, 10));
+        compra.setParcelado(true);
+        compra.setTotalParcelas(3);
+        Transacao salva = transacaoService.criar(compra, usuario.getId());
+
+        FaturaCartao julho = faturaCartaoRepository
+                .findByContaIdAndMesAndAno(cartao.getId(), 7, 2026).orElseThrow();
+        faturaService.pagarFatura(usuario.getId(), julho.getId(), new BigDecimal("100.00"), carteira.getId());
+
+        transacaoService.deletar(salva.getId(), usuario.getId());
+
+        // Parcelas em faturas abertas removidas; parte paga vira estorno (crédito) na próxima fatura
+        FaturaCartao agosto = faturaCartaoRepository
+                .findByContaIdAndMesAndAno(cartao.getId(), 8, 2026).orElseThrow();
+        assertEquals(0, new BigDecimal("-100.00").compareTo(agosto.getValorTotal()));
+
+        FaturaCartao setembro = faturaCartaoRepository
+                .findByContaIdAndMesAndAno(cartao.getId(), 9, 2026).orElseThrow();
+        assertEquals(0, BigDecimal.ZERO.compareTo(setembro.getValorTotal()));
+
+        FaturaLancamento estorno = faturaLancamentoRepository.findByTransacaoId(salva.getId()).stream()
+                .filter(l -> l.getTipo() == TipoFaturaLancamento.ESTORNO)
+                .findFirst().orElseThrow();
+        assertEquals(0, new BigDecimal("-100.00").compareTo(estorno.getValor()));
+
+        // Crédito de limite: -100 compensa compras futuras na fatura de agosto
+        assertEquals(0, new BigDecimal("-100.00").compareTo(
+                contaRepository.findById(cartao.getId()).orElseThrow().getValorGasto()));
     }
 
     private Transacao compraCartao(String descricao, BigDecimal valor, LocalDate data) {

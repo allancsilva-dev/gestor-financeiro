@@ -165,7 +165,7 @@ export default function Faturas() {
                       <div className="text-right">
                         <p className="text-3xl font-bold text-white">{formatCurrency(fatura.valorTotal)}</p>
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${fatura.status === 'PAGA' ? 'bg-green-500/20 text-green-400' : fatura.status === 'VENCIDA' ? 'bg-red-500/20 text-red-400' : 'bg-orange-500/20 text-orange-400'}`}>
-                          {fatura.status === 'PAGA' ? 'Paga' : fatura.status === 'VENCIDA' ? 'Vencida' : 'Aberta'}
+                          {fatura.status === 'PAGA' ? 'Paga' : fatura.status === 'VENCIDA' ? 'Vencida' : fatura.status === 'FECHADA' ? 'Fechada' : 'Aberta'}
                         </span>
                       </div>
                     </div>
@@ -223,7 +223,7 @@ export default function Faturas() {
                                 </p>
                               </div>
                             </div>
-                            <p className="text-sm font-semibold text-red-400">{formatCurrency(l.valor)}</p>
+                            <p className={`text-sm font-semibold ${l.valor < 0 ? 'text-green-400' : 'text-red-400'}`}>{formatCurrency(l.valor)}</p>
                           </div>
                         ))}
                       </div>
