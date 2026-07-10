@@ -42,13 +42,14 @@ export const metaService = {
     return response.data;
   },
 
-  adicionarValor: async (id: number, valor: number) => {
-    const response = await api.put(`/metas/${id}/adicionar`, { valor });
+  // carteiraId obrigatório: reserva debita a carteira, resgate credita (ledger)
+  adicionarValor: async (id: number, valor: number, carteiraId: number) => {
+    const response = await api.put(`/metas/${id}/adicionar`, { valor, carteiraId });
     return response.data;
   },
 
-  removerValor: async (id: number, valor: number) => {
-    const response = await api.put(`/metas/${id}/remover`, { valor });
+  removerValor: async (id: number, valor: number, carteiraId: number) => {
+    const response = await api.put(`/metas/${id}/remover`, { valor, carteiraId });
     return response.data;
   },
 

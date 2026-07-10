@@ -107,19 +107,20 @@ Princípio: todo real precisa ter origem e destino. Hoje vaza em dois fluxos; fa
 
 ## 4. Backend rico, mobile cego (features prontas sem UI)
 
-**Status:** 🔶 EM ANDAMENTO — prioridades entregues em 2026-07-10 (BUG-0040): extrato de carteira e evolução mensal. Demais itens seguem no backlog.
+**Status:** ✅ CORRIGIDO (2026-07-10, BUG-0040/0042/0043/0044) — mobile cobre os endpoints prontos da seção: relatórios, extrato/reconciliação, insights, parcelas, anexos, importação CSV e investimentos.
 
 | Endpoint pronto | Valor no app |
 |---|---|
-| `/v1/dashboard/gastos-por-categoria` | Coberto: Relatórios já lista gastos por categoria com barras e % (`/v1/relatorios`) |
+| ✅ `/v1/dashboard/gastos-por-categoria` | Coberto: Relatórios já lista gastos por categoria com barras e % (`/v1/relatorios`) |
 | ✅ `/v1/dashboard/evolucao-mensal` | Gráfico de barras entradas × saídas (6 meses) em Relatórios |
-| `/v1/dashboard/comparacao-mensal` | Mês atual × anterior |
-| ✅ `/v1/carteiras/{id}/movimentos` | Extrato da carteira (tocar no card em Carteiras) — reconciliação ainda sem UI |
-| `/v1/insights` | Alertas/insights na home |
-| `/v1/parcelas` (pagar/despagar) | Gestão de parcela individual |
-| `/v1/anexos` | Comprovante por transação (câmera) |
-| `/v1/importar/csv` | Importação de extrato |
-| `/v1/investimentos` | Módulo investimentos |
+| ✅ `/v1/dashboard/comparacao-mensal` | Card em Relatórios comparando mês atual × anterior, com saldo, entradas, saídas e variação |
+| ✅ `/v1/carteiras/{id}/movimentos` | Extrato da carteira (tocar no card em Carteiras) |
+| ✅ `/v1/carteiras/{id}/reconciliacao` | Badge e resumo de conferência no extrato da conta |
+| ✅ `/v1/insights` | Card de insights na home com resumo, gasto do mês, média, alertas e recomendação |
+| ✅ `/v1/parcelas` (pagar/despagar) | Gestão de parcela individual dentro da edição da transação |
+| ✅ `/v1/anexos` | Comprovante por transação na edição: câmera, arquivo, listagem e exclusão |
+| ✅ `/v1/importar/csv` | Importação de extrato no hub Mais via seletor de arquivo |
+| ✅ `/v1/investimentos` | Módulo investimentos com ativos, edição, exclusão e movimentações |
 
 Prioridade: extrato de carteira e gráficos primeiro (reforçam confiança e leitura); investimentos por último.
 
@@ -136,10 +137,10 @@ Prioridade: extrato de carteira e gráficos primeiro (reforçam confiança e lei
 ## 6. Ordem de ataque recomendada
 
 1. ~~**BUG-M01 a M04**~~ ✅ concluído em 2026-07-10 (BUG-0030 a BUG-0033 no BUGFIX_LOG).
-2. ~~**PROD-M05 a M07**~~ ✅ concluído em 2026-07-10 (BUG-0034 a BUG-0036 no BUGFIX_LOG). Ressalva: web ainda chama pagar/reservar sem `carteiraId` → 422 até alinhar.
+2. ~~**PROD-M05 a M07**~~ ✅ concluído em 2026-07-10 (BUG-0034 a BUG-0036 no BUGFIX_LOG). Ressalva resolvida: web alinhado em 2026-07-10 (BUG-0046) — pagar/reservar enviam `carteiraId` com seletor de conta na UI.
 3. ~~**UX-M08**~~ ✅ concluído em 2026-07-10 (BUG-0037).
 4. ~~**UX-M09/M10**~~ ✅ concluído em 2026-07-10 (BUG-0038/0039).
 5. ~~**UX-M11 a M14**~~ ✅ concluído em 2026-07-10.
-6. **Seção 4** — 🔶 prioridades entregues (extrato de carteira + evolução mensal, BUG-0040); restam comparação mensal, insights, parcelas, anexos, CSV, investimentos.
+6. ~~**Seção 4**~~ ✅ concluído em 2026-07-10 (BUG-0040/0042/0043/0044).
 
 > Ao corrigir um item: atualizar o **Status** aqui e registrar em `docs/BUGFIX_LOG.md`.

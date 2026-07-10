@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import contaFixaService, { ContaFixa } from '../services/contaFixaService';
 import { categoriaService } from '../services/categoriaService';
+import carteiraService, { Carteira } from '../services/carteiraService';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import { Plus, Edit2, Trash2, Check, X, Calendar, DollarSign, Tag, SkipForward } from 'lucide-react';
@@ -17,6 +18,8 @@ export default function ContasFixas() {
   const [loading, setLoading] = useState(false);
   const [pagandoConta, setPagandoConta] = useState<number | null>(null);
   const [valorPagamento, setValorPagamento] = useState('');
+  const [carteiras, setCarteiras] = useState<Carteira[]>([]);
+  const [carteiraPagamento, setCarteiraPagamento] = useState('');
 
   const [formData, setFormData] = useState({
     nome: '',
@@ -37,12 +40,14 @@ export default function ContasFixas() {
 
     try {
       setLoading(true);
-      const [contasData, categoriasData] = await Promise.all([
+      const [contasData, categoriasData, carteirasData] = await Promise.all([
         contaFixaService.listarAtivas(usuario.id),
-        categoriaService.listarMinhas(0, 100)
+        categoriaService.listarMinhas(0, 100),
+        carteiraService.listarCarteiras(usuario.id, 0, 100)
       ]);
       setContasFixas(contasData);
       setCategorias(categoriasData);
+      setCarteiras(carteirasData);
     } catch (error: any) {
       toast.error('Erro ao carregar dados');
     } finally {
@@ -132,15 +137,20 @@ export default function ContasFixas() {
       toast.error('Informe o valor pago');
       return;
     }
+    if (!carteiraPagamento) {
+      toast.error('Selecione a conta de onde sai o pagamento');
+      return;
+    }
 
     try {
-      await contaFixaService.marcarComoPaga(id, parseFloat(valorPagamento));
+      await contaFixaService.marcarComoPaga(id, parseFloat(valorPagamento), parseInt(carteiraPagamento, 10));
       toast.success('Conta marcada como paga!');
       setPagandoConta(null);
       setValorPagamento('');
+      setCarteiraPagamento('');
       carregarDados();
     } catch (error: any) {
-      toast.error('Erro ao marcar como paga');
+      toast.error(error?.response?.data?.message ?? 'Erro ao marcar como paga');
     }
   };
 
@@ -444,6 +454,18 @@ export default function ContasFixas() {
                           placeholder="R$ 0,00"
                           autoFocus
                         />
+                        <select
+                          value={carteiraPagamento}
+                          onChange={(e) => setCarteiraPagamento(e.target.value)}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white"
+                        >
+                          <option value="">Pagar com qual conta?</option>
+                          {carteiras.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.nome} · {formatCurrency(c.saldo)}
+                            </option>
+                          ))}
+                        </select>
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleMarcarComoPaga(conta.id)}
@@ -455,6 +477,7 @@ export default function ContasFixas() {
                             onClick={() => {
                               setPagandoConta(null);
                               setValorPagamento('');
+                              setCarteiraPagamento('');
                             }}
                             className="flex-1 bg-slate-700 text-white py-2 rounded-xl hover:bg-slate-600 transition"
                           >

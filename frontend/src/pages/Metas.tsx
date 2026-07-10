@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { metaService, Meta } from '../services/metaService';
+import carteiraService, { Carteira } from '../services/carteiraService';
 import { useAuth } from '../context/AuthContext';
 import { useApi } from '../hooks/useApi';
 import toast from 'react-hot-toast';
@@ -29,6 +30,8 @@ export default function Metas() {
   });
 
   const [valorAdicionar, setValorAdicionar] = useState('');
+  const [carteiras, setCarteiras] = useState<Carteira[]>([]);
+  const [carteiraOrigem, setCarteiraOrigem] = useState('');
   const valorTotalNumerico = formData.valorTotal ? parseFloat(formData.valorTotal) : null;
   const valorMensalNumerico = formData.valorMensal ? parseFloat(formData.valorMensal) : null;
   const valorAdicionarNumerico = valorAdicionar ? parseFloat(valorAdicionar) : null;
@@ -68,6 +71,13 @@ export default function Metas() {
       setTotalPaginas(Math.max(metasPaginadas.totalPages || 1, 1));
     }
   }, [metasPaginadas]);
+
+  useEffect(() => {
+    if (!usuario?.id) return;
+    carteiraService.listarCarteiras(usuario.id, 0, 100)
+      .then(setCarteiras)
+      .catch(() => toast.error('Erro ao carregar contas'));
+  }, [usuario?.id]);
 
   useEffect(() => {
     if (erroLista) {
@@ -163,15 +173,20 @@ export default function Metas() {
 
   const handleAdicionarValor = async (metaId: number) => {
     if (!valorAdicionar) return;
-    
+    if (!carteiraOrigem) {
+      toast.error('Selecione de qual conta o valor sai');
+      return;
+    }
+
     try {
-      await metaService.adicionarValor(metaId, parseFloat(valorAdicionar));
+      await metaService.adicionarValor(metaId, parseFloat(valorAdicionar), parseInt(carteiraOrigem, 10));
       toast.success('Valor adicionado!');
       setValorAdicionar('');
+      setCarteiraOrigem('');
       setMostrarAdicionar(null);
       carregarMetas();
     } catch (error: any) {
-      toast.error('Erro ao adicionar valor');
+      toast.error(error?.response?.data?.message ?? 'Erro ao adicionar valor');
     }
   };
 
@@ -434,6 +449,18 @@ export default function Metas() {
                         className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
                         placeholder="R$ 0,00"
                       />
+                      <select
+                        value={carteiraOrigem}
+                        onChange={(e) => setCarteiraOrigem(e.target.value)}
+                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="">Sai de qual conta?</option>
+                        {carteiras.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.nome} · {formatCurrency(c.saldo)}
+                          </option>
+                        ))}
+                      </select>
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleAdicionarValor(meta.id!)}
@@ -445,6 +472,7 @@ export default function Metas() {
                           onClick={() => {
                             setMostrarAdicionar(null);
                             setValorAdicionar('');
+                            setCarteiraOrigem('');
                           }}
                           className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400 transition"
                         >

@@ -61,10 +61,11 @@ const contaFixaService = {
     await api.delete(`/contas-fixas/${id}`);
   },
 
-  // ✅ CORRIGIDO: Envia valorPago no BODY ao invés de query param
-  marcarComoPaga: async (id: number, valorPago: number): Promise<ContaFixa> => {
+  // carteiraId obrigatório: o pagamento debita a carteira via ledger
+  marcarComoPaga: async (id: number, valorPago: number, carteiraId: number): Promise<ContaFixa> => {
     const response = await api.put(`/contas-fixas/${id}/pagar`, {
-      valor: valorPago
+      valor: valorPago,
+      carteiraId
     });
     return response.data;
   },

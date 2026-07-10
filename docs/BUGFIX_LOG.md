@@ -690,6 +690,79 @@ Registro de bugs corrigidos. Mantido pelo `docs-reporter`.
 - **Resultado:** PASS
 - **Ressalvas:** nomes internos, rotas e serviços permanecem `carteiras`/`contas` para evitar migração desnecessária.
 
+## BUG-0042 — Seção 4: comparação mensal no mobile
+
+- **Problema relacionado:** Seção 4 (docs/AUDITORIA_MOBILE_2026-07-10.md) — endpoint `/v1/dashboard/comparacao-mensal` pronto no backend, sem UI.
+- **Data:** 2026-07-10
+- **Area:** mobile
+- **Sintoma:** Relatórios mostrava evolução de 6 meses, mas não respondia rapidamente se o mês atual melhorou ou piorou contra o mês anterior.
+- **Causa raiz:** backlog de evolução; service mobile ainda não consumia o endpoint de comparação mensal.
+- **Correcao aplicada:** `relatorioService.comparacaoMensal()` consome `/v1/dashboard/comparacao-mensal`; Relatórios ganhou card "Comparação mensal" com saldo, entradas, saídas e variação absoluta/percentual entre mês atual e anterior; criação/edição de transações invalidam o novo cache.
+- **Arquivos alterados:** `mobile/app/(app)/more/relatorios.tsx`, `mobile/src/services/relatorioService.ts`, `mobile/src/types/index.ts`, `mobile/src/components/NovaTransacaoModal.tsx`, `mobile/src/components/EditarTransacaoModal.tsx`
+- **Testes/validacoes executadas:** `npm --prefix mobile run lint -- --pretty false` PASS; detector Impeccable local retornou `[]`.
+- **Resultado:** PASS
+- **Ressalvas:** demais itens da seção 4 seguem pendentes (insights, parcelas, anexos, importação CSV, investimentos, reconciliação com UI).
+
+---
+
+## BUG-0043 — Seção 4: reconciliação, insights e parcelas no mobile
+
+- **Problema relacionado:** Seção 4 (docs/AUDITORIA_MOBILE_2026-07-10.md) — endpoints de reconciliação, insights e parcelas prontos no backend, sem UI mobile.
+- **Data:** 2026-07-10
+- **Area:** mobile
+- **Sintoma:** Usuário não via conferência ledger × saldo da conta, não recebia alertas/recomendações na home e não conseguia pagar/despagar parcelas individualmente pelo app.
+- **Causa raiz:** backlog de evolução mobile sobre contratos já existentes.
+- **Correcao aplicada:** Carteiras: extrato mostra status de reconciliação, saldos comparados e diferença. Home: novo card de insights consome `/v1/insights`, exibe resumo, gasto do mês, média, alertas de categoria e recomendação principal. Transações: edição de transação parcelada lista parcelas via `/v1/parcelas/transacao/{id}` e permite pagar/despagar com invalidação de dashboards, relatórios, faturas e parcelas.
+- **Arquivos alterados:** `mobile/app/(app)/index.tsx`, `mobile/app/(app)/more/carteiras.tsx`, `mobile/src/components/EditarTransacaoModal.tsx`, `mobile/src/services/carteiraService.ts`, `mobile/src/services/insightsService.ts`, `mobile/src/services/parcelaService.ts`, `mobile/src/types/index.ts`, `docs/AUDITORIA_MOBILE_2026-07-10.md`.
+- **Testes/validacoes executadas:** `npm --prefix mobile run lint -- --pretty false` PASS.
+- **Resultado:** PASS
+- **Ressalvas:** anexos, importação CSV e investimentos foram fechados depois em BUG-0044.
+
+---
+
+## BUG-0044 — Seção 4: anexos, importação CSV e investimentos no mobile
+
+- **Problema relacionado:** Seção 4 (docs/AUDITORIA_MOBILE_2026-07-10.md) — últimos endpoints prontos no backend sem UI mobile.
+- **Data:** 2026-07-10
+- **Area:** mobile
+- **Sintoma:** Usuário não conseguia anexar comprovantes por transação, importar extrato CSV pelo app nem gerenciar investimentos.
+- **Causa raiz:** mobile ainda não tinha fluxo de seleção/câmera/arquivo nem tela dedicada de investimentos.
+- **Correcao aplicada:** Instalação das dependências Expo compatíveis `expo-document-picker` e `expo-image-picker`. Edição de transação ganhou seção "Comprovantes" com upload por câmera/arquivo, listagem e exclusão via `/v1/anexos`. Hub "Mais" ganhou importação CSV autenticada via `/v1/importar/csv`. Novo módulo `Investimentos` consome `/v1/investimentos`, permitindo listar, criar, editar, excluir ativos e registrar/listar movimentações.
+- **Arquivos alterados:** `mobile/package.json`, `mobile/package-lock.json`, `mobile/app/(app)/more/index.tsx`, `mobile/app/(app)/more/investimentos.tsx`, `mobile/src/components/EditarTransacaoModal.tsx`, `mobile/src/services/anexoService.ts`, `mobile/src/services/importService.ts`, `mobile/src/services/investimentoService.ts`, `mobile/src/types/index.ts`, `docs/AUDITORIA_MOBILE_2026-07-10.md`.
+- **Testes/validacoes executadas:** `npm --prefix mobile run lint -- --pretty false` PASS.
+- **Resultado:** PASS
+- **Ressalvas:** validar câmera, seletor de documentos e upload multipart em device real/simulador com API rodando.
+
+---
+
+## BUG-0045 — /v1/insights retornava 500 com dados reais (visto no simulador iOS)
+
+- **Problema relacionado:** Seção 4 (docs/AUDITORIA_MOBILE_2026-07-10.md) — home logava `[API Error] {"status": 500, "url": "/v1/insights"}` em loop.
+- **Data:** 2026-07-10
+- **Area:** backend
+- **Sintoma:** `GET /v1/insights` 500 para qualquer usuário com gasto no mês anterior; usuário sem histórico recebia 200.
+- **Causa raiz:** (1) `InsightsService.gerarAlertasCategoria` lia `row[1]` (nome da categoria, String) como `BigDecimal` — `sumSaidasByCategoria` retorna `[id, nome, soma]` → `ClassCastException`. (2) Variação mensal dividia por `gastoMesAtual` — denominador errado (correto: média) e `ArithmeticException` com mês atual zerado.
+- **Correcao aplicada:** `mapAnterior` passa a usar `row[2]` (com conversores defensivos `asLong`/`asBigDecimal`); variação divide por `gastoMedioMensal`.
+- **Arquivos alterados:** `backend/.../InsightsService.java`, `backend/src/test/java/com/gestor/financeiro/InsightsServiceTest.java` (novo)
+- **Testes/validacoes executadas:** `InsightsServiceTest` PASS (regressão dos dois cenários); E2E no backend local: usuário com gasto de R$600 no mês anterior e R$900 no atual → 200 com variação 350% (sobre média de 3 meses) e alerta de categoria +50%.
+- **Resultado:** PASS
+- **Ressalvas:** dependências `expo-image-picker`/`expo-document-picker` estavam em versões do SDK 57 com Expo 54 (`createPermissionHook is not a function` no simulador) — realinhadas para 17.0.10/14.0.8 via `npm install --legacy-peer-deps` (conflito de peer `react-dom@19.2.7` × `react@19.1.0` pré-existente na árvore). Recarregar o app no simulador para pegar os módulos corretos.
+
+---
+
+## BUG-0046 — Web: pagar conta fixa e reservar meta sem carteiraId (422)
+
+- **Problema relacionado:** Ressalva da seção 6, item 2 (docs/AUDITORIA_MOBILE_2026-07-10.md) — após PROD-M05/M06 o backend passou a exigir `carteiraId`, mas o frontend web continuava enviando só `{ valor }`.
+- **Data:** 2026-07-10
+- **Area:** frontend (web)
+- **Sintoma:** No web, "Marcar como Paga" (Contas Fixas) e "Adicionar Dinheiro" (Metas) retornavam 422 sempre.
+- **Causa raiz:** `contaFixaService.marcarComoPaga` e `metaService.adicionarValor`/`removerValor` não enviavam `carteiraId`, agora obrigatório no contrato.
+- **Correcao aplicada:** services passam a enviar `carteiraId` no body; `ContasFixas.tsx` ganhou select "Pagar com qual conta?" no form inline de pagamento e `Metas.tsx` ganhou select "Sai de qual conta?" no form de adicionar valor (ambos listam carteiras com saldo via `/carteiras/minhas`, validação obrigatória, toast com mensagem do backend em erro).
+- **Arquivos alterados:** `frontend/src/services/contaFixaService.ts`, `frontend/src/services/metaService.ts`, `frontend/src/pages/ContasFixas.tsx`, `frontend/src/pages/Metas.tsx`.
+- **Testes/validacoes executadas:** `npx tsc --noEmit` PASS no frontend.
+- **Resultado:** PASS
+- **Ressalvas:** `metaService.removerValor` foi atualizado no contrato, mas a UI web ainda não expõe "retirar valor" (paridade com mobile fica para depois). Validar fluxo E2E no browser com API rodando.
+
 ---
 
 > Este arquivo e mantido pelo `docs-reporter`. Bugs corrigidos devem ser registrados com o proximo ID
