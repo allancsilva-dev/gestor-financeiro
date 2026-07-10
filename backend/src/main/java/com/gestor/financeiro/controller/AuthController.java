@@ -146,7 +146,8 @@ public class AuthController {
             response.put("usuario", Map.of(
                 "id", usuario.getId(),
                 "nome", usuario.getNome(),
-                "email", usuario.getEmail()
+                "email", usuario.getEmail(),
+                "onboardingCompleto", usuario.isOnboardingCompleto()
             ));
 
             // csrfToken também no body: clientes nativos (React Native) não conseguem
