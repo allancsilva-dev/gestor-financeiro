@@ -38,15 +38,15 @@ public class RelatorioService {
         List<RelatorioCategoriaDto> gastosPorCategoria = new ArrayList<>();
         BigDecimal totalGastos = BigDecimal.ZERO;
         for (Object[] row : gastosRaw) {
-            BigDecimal valor = (BigDecimal) row[1];
+            BigDecimal valor = asBigDecimal(row[1]);
             if (valor != null) totalGastos = totalGastos.add(valor);
         }
         for (Object[] row : gastosRaw) {
-            BigDecimal valor = (BigDecimal) row[1];
+            BigDecimal valor = asBigDecimal(row[1]);
             int pct = BigDecimal.ZERO.compareTo(totalGastos) == 0 ? 0
                     : valor.multiply(BigDecimal.valueOf(100)).divide(totalGastos, 0, RoundingMode.HALF_UP).intValue();
             gastosPorCategoria.add(new RelatorioCategoriaDto(
-                    (Long) row[3], (String) row[0], (String) row[2], (String) row[4], valor, BigDecimal.valueOf(pct)));
+                    asLong(row[3]), String.valueOf(row[0]), String.valueOf(row[2]), String.valueOf(row[4]), valor, BigDecimal.valueOf(pct)));
         }
 
         List<Transacao> despesas = transacaoRepository
@@ -94,5 +94,28 @@ public class RelatorioService {
                             tipoConta.get(e.getKey()), e.getValue(), BigDecimal.valueOf(pct));
                 })
                 .collect(Collectors.toList());
+    }
+
+    private static Long asLong(Object value) {
+        if (value instanceof Long longValue) {
+            return longValue;
+        }
+        if (value instanceof Number numberValue) {
+            return numberValue.longValue();
+        }
+        return Long.valueOf(String.valueOf(value));
+    }
+
+    private static BigDecimal asBigDecimal(Object value) {
+        if (value == null) {
+            return BigDecimal.ZERO;
+        }
+        if (value instanceof BigDecimal bigDecimalValue) {
+            return bigDecimalValue;
+        }
+        if (value instanceof Number numberValue) {
+            return new BigDecimal(numberValue.toString());
+        }
+        return new BigDecimal(String.valueOf(value));
     }
 }

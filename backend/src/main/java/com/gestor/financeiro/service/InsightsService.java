@@ -42,11 +42,11 @@ public class InsightsService {
         if (gasto3Meses == null) gasto3Meses = BigDecimal.ZERO;
         BigDecimal gastoMedioMensal = gasto3Meses.divide(new BigDecimal("3"), 2, RoundingMode.HALF_UP);
 
-        // Variação
+        // Variação em relação à média (denominador é a média, nunca o mês atual — que pode ser zero)
         BigDecimal variacao = BigDecimal.ZERO;
         if (gastoMedioMensal.compareTo(BigDecimal.ZERO) > 0) {
             variacao = gastoMesAtual.subtract(gastoMedioMensal)
-                .divide(gastoMesAtual, 4, RoundingMode.HALF_UP)
+                .divide(gastoMedioMensal, 4, RoundingMode.HALF_UP)
                 .multiply(new BigDecimal("100"));
         }
 
@@ -87,16 +87,17 @@ public class InsightsService {
         List<Object[]> gastosAnteriores = transacaoRepository.sumSaidasByCategoria(
             usuarioId, inicioAnterior, inicio.minusDays(1));
 
+        // Colunas de sumSaidasByCategoria: [0]=categoria.id, [1]=categoria.nome, [2]=soma
         Map<Long, BigDecimal> mapAnterior = new HashMap<>();
         for (Object[] row : gastosAnteriores) {
-            mapAnterior.put((Long) row[0], (BigDecimal) row[1]);
+            mapAnterior.put(asLong(row[0]), asBigDecimal(row[2]));
         }
 
         List<CategoriaAlerta> alertas = new ArrayList<>();
         for (Object[] row : gastosAtuais) {
-            Long catId = (Long) row[0];
-            String catNome = (String) row[1];
-            BigDecimal gastoAtual = (BigDecimal) row[2];
+            Long catId = asLong(row[0]);
+            String catNome = String.valueOf(row[1]);
+            BigDecimal gastoAtual = asBigDecimal(row[2]);
             BigDecimal gastoAnterior = mapAnterior.getOrDefault(catId, BigDecimal.ZERO);
 
             BigDecimal var = BigDecimal.ZERO;
@@ -121,6 +122,29 @@ public class InsightsService {
             .sorted((a, b) -> b.getGastoAtual().compareTo(a.getGastoAtual()))
             .limit(5)
             .collect(Collectors.toList());
+    }
+
+    private static Long asLong(Object value) {
+        if (value instanceof Long longValue) {
+            return longValue;
+        }
+        if (value instanceof Number numberValue) {
+            return numberValue.longValue();
+        }
+        return Long.valueOf(String.valueOf(value));
+    }
+
+    private static BigDecimal asBigDecimal(Object value) {
+        if (value == null) {
+            return BigDecimal.ZERO;
+        }
+        if (value instanceof BigDecimal bigDecimalValue) {
+            return bigDecimalValue;
+        }
+        if (value instanceof Number numberValue) {
+            return new BigDecimal(numberValue.toString());
+        }
+        return new BigDecimal(String.valueOf(value));
     }
 
     private List<String> gerarRecomendacoes(BigDecimal variacao, List<CategoriaAlerta> alertas, BigDecimal previsao) {
