@@ -13,9 +13,9 @@ export const contaFixaService = {
   atualizar: (id: number, data: ContaFixaRequest) =>
     api.put<ContaFixa>(`/v1/contas-fixas/${id}`, data).then(r => r.data),
 
-  // marcar como paga envia o valor pago no body
-  marcarComoPaga: (id: number, valor: number) =>
-    api.put<ContaFixa>(`/v1/contas-fixas/${id}/pagar`, { valor }).then(r => r.data),
+  // pagamento debita a carteira informada (obrigatória no backend)
+  marcarComoPaga: (id: number, valor: number, carteiraId: number) =>
+    api.put<ContaFixa>(`/v1/contas-fixas/${id}/pagar`, { valor, carteiraId }).then(r => r.data),
 
   pularMes: (id: number) =>
     api.put<ContaFixa>(`/v1/contas-fixas/${id}/pular`).then(r => r.data),

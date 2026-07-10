@@ -83,7 +83,7 @@ public class ContaFixaController {
     ) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         BigDecimal valorPago = request.getValor();
-        ContaFixa contaPaga = contaFixaService.marcarComoPaga(id, valorPago, usuarioId);
+        ContaFixa contaPaga = contaFixaService.marcarComoPaga(id, valorPago, request.getCarteiraId(), usuarioId);
         return ResponseEntity.ok(ContaFixaResponseDto.fromEntity(contaPaga));
     }
 

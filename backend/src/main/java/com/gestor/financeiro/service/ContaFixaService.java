@@ -3,6 +3,7 @@ package com.gestor.financeiro.service;
 import com.gestor.financeiro.exception.BusinessException;
 import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.exception.UnauthorizedAccessException;
+import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.model.ContaFixa;
 import com.gestor.financeiro.model.Transacao;
@@ -93,14 +94,19 @@ public class ContaFixaService {
     
     // ✅ CORRIGIDO: Mantém como PAGO e só avança o vencimento
     @Transactional
-    public ContaFixa marcarComoPaga(Long id, BigDecimal valorPago, Long usuarioId) {
+    public ContaFixa marcarComoPaga(Long id, BigDecimal valorPago, Long carteiraId, Long usuarioId) {
         ContaFixa conta = buscarPorIdDoUsuario(id, usuarioId);
-        
+
         // ✅ VERIFICA SE JÁ ESTÁ PAGA ESTE MÊS
         if (conta.getStatus() == StatusPagamento.PAGO) {
             throw new BusinessException("Esta conta já foi paga este mês!");
         }
-        
+
+        // Sem carteira o pagamento não debita saldo nenhum — dinheiro sumiria do nada
+        if (carteiraId == null) {
+            throw new BusinessException("Informe a carteira de pagamento");
+        }
+
         // 1. Cria a transação de saída
         Transacao transacao = new Transacao();
         transacao.setDescricao("Pagamento: " + conta.getNome());
@@ -112,6 +118,11 @@ public class ContaFixaService {
         transacao.setUsuario(conta.getUsuario());
         transacao.setContaFixa(conta);
         transacao.setObservacoes("Pagamento automático de conta fixa");
+
+        // TransacaoService valida ownership da carteira e registra o débito no ledger
+        Carteira carteira = new Carteira();
+        carteira.setId(carteiraId);
+        transacao.setCarteira(carteira);
 
         transacaoService.criar(transacao, conta.getUsuario().getId());
         
