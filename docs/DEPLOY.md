@@ -422,23 +422,32 @@ Configure alertas para:
 
 Neon oferece **Point-in-Time Recovery (PITR)** gratuito no plano Free — restore automatizado para qualquer ponto nas ultimas 24h.
 
-### Backup manual (qualquer PostgreSQL)
+### Backup manual criptografado (qualquer PostgreSQL)
 
 ```bash
 # Usando script do projeto
-./scripts/backup-db.sh postgresql://user:pass@host:5432/db
+BACKUP_ENCRYPTION_PASSPHRASE='senha-forte-fora-do-repo' \
+  ./scripts/backup-db.sh postgresql://user:pass@host:5432/db
 
 # Ou via DATABASE_URL no ambiente
 export DATABASE_URL="postgresql://..."
-./scripts/backup-db.sh
+BACKUP_ENCRYPTION_PASSPHRASE='senha-forte-fora-do-repo' ./scripts/backup-db.sh
 ```
 
-Backups salvos em `backups/`. Mantidos ultimos 7.
+Backups salvos em `backups/` como `.sql.gz.gpg`. Mantidos ultimos 7. Backup sem criptografia é bloqueado por padrão; para banco local descartável, use `ALLOW_UNENCRYPTED_BACKUP=true`.
 
 ### Restore manual
 
 ```bash
-./scripts/restore-db.sh backups/gestor_financeiro_20260101.sql.gz postgresql://user:pass@host:5432/db
+BACKUP_ENCRYPTION_PASSPHRASE='senha-forte-fora-do-repo' \
+  ./scripts/restore-db.sh backups/gestor_financeiro_20260101.sql.gz.gpg postgresql://user:pass@host:5432/db
+```
+
+Restore drill em banco descartável:
+
+```bash
+BACKUP_ENCRYPTION_PASSPHRASE='senha-forte-fora-do-repo' \
+  ./scripts/restore-drill-db.sh backups/gestor_financeiro_20260101.sql.gz.gpg postgresql://user:pass@host:5432/db_descartavel
 ```
 
 Apos restore, validar schema com Flyway:

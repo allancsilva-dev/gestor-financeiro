@@ -69,7 +69,9 @@ services:
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
 
   postgres-backup:
-    image: postgres:17-alpine
+    build:
+      context: .
+      dockerfile: deploy/vps/Dockerfile.postgres-backup
     container_name: gf-postgres-backup
     restart: unless-stopped
     depends_on:
@@ -82,6 +84,7 @@ services:
       PGUSER: ${POSTGRES_USER}
       PGPASSWORD: ${POSTGRES_PASSWORD}
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
+      BACKUP_ENCRYPTION_PASSPHRASE: ${BACKUP_ENCRYPTION_PASSPHRASE}
     volumes:
       - ./backups/postgres:/backups
     command:
@@ -89,9 +92,15 @@ services:
       - -c
       - |
         while true; do
-          file="/backups/$${PGDATABASE}_$$(date +%Y%m%d_%H%M%S).dump"
-          pg_dump -Fc -f "$$file"
-          find /backups -type f -name "$${PGDATABASE}_*.dump" -mtime +"$${BACKUP_RETENTION_DAYS}" -delete
+          if [ -z "$${BACKUP_ENCRYPTION_PASSPHRASE}" ]; then
+            echo "BACKUP_ENCRYPTION_PASSPHRASE obrigatorio para backup criptografado" >&2
+            exit 1
+          fi
+          file="/backups/$${PGDATABASE}_$$(date +%Y%m%d_%H%M%S).sql.gz"
+          pg_dump --no-owner --no-acl | gzip -c > "$$file"
+          gpg --batch --yes --pinentry-mode loopback --symmetric --cipher-algo AES256 --passphrase "$${BACKUP_ENCRYPTION_PASSPHRASE}" --output "$$file.gpg" "$$file"
+          rm -f "$$file"
+          find /backups -type f -name "$${PGDATABASE}_*.sql.gz.gpg" -mtime +"$${BACKUP_RETENTION_DAYS}" -delete
           sleep 86400
         done
 
