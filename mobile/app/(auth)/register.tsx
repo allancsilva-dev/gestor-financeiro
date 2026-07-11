@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, ScrollView } from 'react-native';
 import { useAuth } from '../../src/context/AuthContext';
 import { useTheme } from '../../src/theme';
 import api from '../../src/services/api';
 import { ApiErrorWithMessage } from '../../src/types';
 import { useRouter } from 'expo-router';
+import Field from '../../src/components/ui/Field';
 
 // Mesma regra do backend (@ValidPassword): mínimo 8, ao menos 1 letra e 1 número
 const senhaValida = (s: string) => s.length >= 8 && /[A-Za-z]/.test(s) && /\d/.test(s);
@@ -18,6 +19,7 @@ export default function Register() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [aceitaTermos, setAceitaTermos] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,9 +31,10 @@ export default function Register() {
     if (!emailValido(emailTrim)) return setError('Informe um e-mail válido.');
     if (!senhaValida(password)) return setError('Senha deve ter no mínimo 8 caracteres, com ao menos 1 letra e 1 número.');
     if (password !== confirmPassword) return setError('As senhas não coincidem.');
+    if (!aceitaTermos) return setError('É preciso aceitar a política de privacidade para criar a conta.');
     try {
       setLoading(true);
-      await api.post('/auth/register', { nome: nomeTrim, email: emailTrim, password, confirmPassword });
+      await api.post('/auth/register', { nome: nomeTrim, email: emailTrim, password, confirmPassword, aceitaTermos });
       // Conta criada — entra direto e segue para o onboarding
       const user = await login(emailTrim, password);
       router.replace(user.onboardingCompleto ? '/(app)/' : '/onboarding');
@@ -51,17 +54,27 @@ export default function Register() {
         <Text style={[styles.title, { color: colors.textPrimary }]}>Criar conta</Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Comece a organizar suas finanças em minutos</Text>
 
-        <Text style={[styles.label, { color: colors.textSecondary }]}>NOME</Text>
-        <TextInput value={nome} onChangeText={setNome} placeholder="Seu nome" placeholderTextColor={colors.textMuted} autoCapitalize="words" textContentType="name" style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]} />
+        <Field label="Nome" value={nome} onChangeText={setNome} placeholder="Seu nome" autoCapitalize="words" textContentType="name" />
 
-        <Text style={[styles.label, { color: colors.textSecondary, marginTop: 14 }]}>E-MAIL</Text>
-        <TextInput value={email} onChangeText={setEmail} placeholder="seu@email.com" placeholderTextColor={colors.textMuted} autoCapitalize="none" keyboardType="email-address" textContentType="emailAddress" style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]} />
+        <Field label="E-mail" value={email} onChangeText={setEmail} placeholder="seu@email.com" autoCapitalize="none" keyboardType="email-address" textContentType="emailAddress" />
 
-        <Text style={[styles.label, { color: colors.textSecondary, marginTop: 14 }]}>SENHA</Text>
-        <TextInput value={password} onChangeText={setPassword} placeholder="Mínimo 8 caracteres, 1 letra e 1 número" placeholderTextColor={colors.textMuted} secureTextEntry textContentType="newPassword" style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]} />
+        <Field label="Senha" value={password} onChangeText={setPassword} placeholder="Mínimo 8 caracteres, 1 letra e 1 número" secureTextEntry textContentType="newPassword" />
 
-        <Text style={[styles.label, { color: colors.textSecondary, marginTop: 14 }]}>CONFIRMAR SENHA</Text>
-        <TextInput value={confirmPassword} onChangeText={setConfirmPassword} placeholder="Repita a senha" placeholderTextColor={colors.textMuted} secureTextEntry textContentType="newPassword" style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]} />
+        <Field label="Confirmar senha" value={confirmPassword} onChangeText={setConfirmPassword} placeholder="Repita a senha" secureTextEntry textContentType="newPassword" />
+
+        <TouchableOpacity
+          onPress={() => setAceitaTermos((v) => !v)}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: aceitaTermos }}
+          style={styles.termosRow}
+        >
+          <View style={[styles.checkbox, { borderColor: aceitaTermos ? colors.brand : colors.border, backgroundColor: aceitaTermos ? colors.brand : 'transparent' }]}>
+            {aceitaTermos ? <Text style={{ color: colors.brandText, fontSize: 12, fontWeight: '700' }}>✓</Text> : null}
+          </View>
+          <Text style={{ color: colors.textSecondary, fontSize: 13, flex: 1 }}>
+            Li e aceito a <Text style={{ color: colors.brandFg, fontWeight: '600' }}>política de privacidade</Text> e o tratamento dos meus dados conforme a LGPD.
+          </Text>
+        </TouchableOpacity>
 
         {error ? <Text style={{ color: colors.danger, marginTop: 8 }}>{error}</Text> : null}
 
@@ -70,7 +83,7 @@ export default function Register() {
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => router.back()} accessibilityRole="button" style={{ alignSelf: 'center', marginTop: 16, minHeight: 44, justifyContent: 'center' }}>
-          <Text style={{ color: colors.textSecondary, fontSize: 13 }}>Já tenho conta · <Text style={{ color: colors.brand, fontWeight: '600' }}>Entrar</Text></Text>
+          <Text style={{ color: colors.textSecondary, fontSize: 13 }}>Já tenho conta · <Text style={{ color: colors.brandFg, fontWeight: '600' }}>Entrar</Text></Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -84,7 +97,7 @@ const styles = StyleSheet.create({
   logoInner: { width: 22, height: 22, borderRadius: 6 },
   title: { fontSize: 24, fontWeight: '700', marginTop: 16 },
   subtitle: { fontSize: 13, marginBottom: 32 },
-  label: { fontSize: 9, letterSpacing: 0.8, marginBottom: 6 },
-  input: { borderWidth: 1, borderRadius: 8, padding: 12 },
-  button: { marginTop: 24, borderRadius: 8, height: 48, alignItems: 'center', justifyContent: 'center' },
+  termosRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 2, minHeight: 44 },
+  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  button: { marginTop: 24, borderRadius: 12, height: 48, alignItems: 'center', justifyContent: 'center' },
 });

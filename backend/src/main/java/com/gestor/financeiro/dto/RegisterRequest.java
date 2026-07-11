@@ -4,6 +4,7 @@ import com.gestor.financeiro.validation.ValidPassword;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 public class RegisterRequest {
@@ -22,6 +23,11 @@ public class RegisterRequest {
 
     @NotBlank(message = "Campo obrigatorio")
     private String confirmPassword;
+
+    // LGPD: consentimento explícito é condição do cadastro
+    @NotNull(message = "Aceite da política de privacidade é obrigatório")
+    @AssertTrue(message = "Aceite da política de privacidade é obrigatório")
+    private Boolean aceitaTermos;
 
     @AssertTrue(message = "Senhas nao coincidem")
     public boolean isPasswordMatch() {
@@ -67,5 +73,13 @@ public class RegisterRequest {
 
     public void setConfirmPassword(String confirmPassword) {
         this.confirmPassword = confirmPassword;
+    }
+
+    public Boolean getAceitaTermos() {
+        return aceitaTermos;
+    }
+
+    public void setAceitaTermos(Boolean aceitaTermos) {
+        this.aceitaTermos = aceitaTermos;
     }
 }

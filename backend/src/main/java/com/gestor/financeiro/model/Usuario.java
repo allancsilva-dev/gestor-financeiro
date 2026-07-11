@@ -34,4 +34,12 @@ public class Usuario {
 
     @Column(name = "onboarding_completo", nullable = false)
     private boolean onboardingCompleto = false;
+
+    // LGPD: versão da política de privacidade aceita no cadastro e quando.
+    // Nulo em contas anteriores ao registro de consentimento.
+    @Column(name = "politica_versao", length = 20)
+    private String politicaVersao;
+
+    @Column(name = "consentimento_em")
+    private LocalDateTime consentimentoEm;
 }

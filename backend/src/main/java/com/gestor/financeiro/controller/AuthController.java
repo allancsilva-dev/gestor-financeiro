@@ -88,6 +88,10 @@ public class AuthController {
     @Value("${security.auth.lockout-minutes:15}")
     private int lockoutMinutes;
 
+    // Versão vigente da política de privacidade aceita no cadastro (LGPD)
+    @Value("${app.politica.versao:2026-07}")
+    private String politicaVersao;
+
     // ==========================================
     // REGISTRO
     // ==========================================
@@ -105,7 +109,11 @@ public class AuthController {
     usuario.setNome(request.getNome());
     usuario.setEmail(request.getEmail());
     usuario.setSenha(passwordEncoder.encode(request.getPassword()));
-    
+
+    // LGPD: registra qual versão da política foi aceita e quando
+    usuario.setPoliticaVersao(politicaVersao);
+    usuario.setConsentimentoEm(LocalDateTime.now());
+
     Usuario usuarioSalvo = usuarioRepository.save(usuario);
 
     // Nunca expor a entidade (contém hash de senha e campos de lockout)

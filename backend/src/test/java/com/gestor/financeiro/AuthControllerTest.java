@@ -1,12 +1,16 @@
 package com.gestor.financeiro;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gestor.financeiro.model.PasswordResetToken;
+import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.CategoriaRepository;
 import com.gestor.financeiro.repository.ContaFixaRepository;
 import com.gestor.financeiro.repository.ContaRepository;
 import com.gestor.financeiro.repository.MetaRepository;
+import com.gestor.financeiro.repository.PasswordResetTokenRepository;
 import com.gestor.financeiro.repository.RefreshTokenRepository;
+import com.gestor.financeiro.security.TokenHasher;
 import com.gestor.financeiro.repository.UsuarioRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,6 +21,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -37,6 +42,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @Transactional
 class AuthControllerTest {
 
+    // Rate limit e lockout agora usam getRemoteAddr() (X-Forwarded-For cru era spoofável);
+    // cada teste simula um IP distinto direto no request.
+    private static RequestPostProcessor remoteAddr(String ip) {
+        return request -> {
+            request.setRemoteAddr(ip);
+            return request;
+        };
+    }
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -48,6 +62,9 @@ class AuthControllerTest {
 
     @Autowired
     private RefreshTokenRepository refreshTokenRepository;
+
+    @Autowired
+    private PasswordResetTokenRepository passwordResetTokenRepository;
 
     @Autowired
     private CarteiraRepository carteiraRepository;
@@ -76,13 +93,14 @@ class AuthControllerTest {
     @Test
     void register_deveCadastrarComSucesso() throws Exception {
         mockMvc.perform(post("/api/auth/register")
-                .header("X-Forwarded-For", "10.10.0.1")
+                .with(remoteAddr("10.10.0.1"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                         "nome", "Alice",
                         "email", "alice@teste.com",
                         "password", "Senha1234",
-                        "confirmPassword", "Senha1234"
+                        "confirmPassword", "Senha1234",
+                        "aceitaTermos", true
                 ))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.id").exists())
@@ -90,15 +108,67 @@ class AuthControllerTest {
     }
 
     @Test
+    void register_deveGravarConsentimentoLgpd() throws Exception {
+        mockMvc.perform(post("/api/auth/register")
+                .with(remoteAddr("10.10.0.20"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "nome", "Consent",
+                        "email", "consent@teste.com",
+                        "password", "Senha1234",
+                        "confirmPassword", "Senha1234",
+                        "aceitaTermos", true
+                ))))
+            .andExpect(status().isOk());
+
+        Usuario usuario = usuarioRepository.findByEmail("consent@teste.com").orElseThrow();
+        assertThat(usuario.getPoliticaVersao()).isNotBlank();
+        assertThat(usuario.getConsentimentoEm()).isNotNull();
+    }
+
+    @Test
+    void register_deveFalharSemAceiteDaPolitica() throws Exception {
+        // Sem o campo
+        mockMvc.perform(post("/api/auth/register")
+                .with(remoteAddr("10.10.0.21"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "nome", "SemTermos",
+                        "email", "semtermos@teste.com",
+                        "password", "Senha1234",
+                        "confirmPassword", "Senha1234"
+                ))))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+        // Com o campo false
+        mockMvc.perform(post("/api/auth/register")
+                .with(remoteAddr("10.10.0.21"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "nome", "SemTermos",
+                        "email", "semtermos@teste.com",
+                        "password", "Senha1234",
+                        "confirmPassword", "Senha1234",
+                        "aceitaTermos", false
+                ))))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+        assertThat(usuarioRepository.findByEmail("semtermos@teste.com")).isEmpty();
+    }
+
+    @Test
     void register_deveFalharComSenhaFraca() throws Exception {
         mockMvc.perform(post("/api/auth/register")
-                .header("X-Forwarded-For", "10.10.0.2")
+                .with(remoteAddr("10.10.0.2"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                         "nome", "Alice",
                         "email", "alice2@teste.com",
                         "password", "12345678",
-                        "confirmPassword", "12345678"
+                        "confirmPassword", "12345678",
+                        "aceitaTermos", true
                 ))))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
@@ -107,13 +177,14 @@ class AuthControllerTest {
     @Test
     void register_deveFalharComSenhaCurta() throws Exception {
         mockMvc.perform(post("/api/auth/register")
-                .header("X-Forwarded-For", "10.10.0.3")
+                .with(remoteAddr("10.10.0.3"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                         "nome", "Alice",
                         "email", "alice3@teste.com",
                         "password", "Ab1",
-                        "confirmPassword", "Ab1"
+                        "confirmPassword", "Ab1",
+                        "aceitaTermos", true
                 ))))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
@@ -124,13 +195,14 @@ class AuthControllerTest {
         usuarioRepository.save(TestDataFactory.usuario("Alice", "alice@teste.com", passwordEncoder.encode("123456")));
 
         mockMvc.perform(post("/api/auth/register")
-                .header("X-Forwarded-For", "10.10.0.4")
+                .with(remoteAddr("10.10.0.4"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                         "nome", "Alice 2",
                         "email", "alice@teste.com",
                         "password", "Senha1234",
-                        "confirmPassword", "Senha1234"
+                        "confirmPassword", "Senha1234",
+                        "aceitaTermos", true
                 ))))
             .andExpect(status().isUnprocessableEntity())
             .andExpect(jsonPath("$.code").value("BUSINESS_ERROR"));
@@ -139,13 +211,14 @@ class AuthControllerTest {
     @Test
     void register_deveFalharComCamposInvalidos() throws Exception {
         mockMvc.perform(post("/api/auth/register")
-                .header("X-Forwarded-For", "10.10.0.5")
+                .with(remoteAddr("10.10.0.5"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                         "nome", "",
                         "email", "email-invalido",
                         "password", "12",
-                        "confirmPassword", "12"
+                        "confirmPassword", "12",
+                        "aceitaTermos", true
                 ))))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
@@ -156,7 +229,7 @@ class AuthControllerTest {
         usuarioRepository.save(TestDataFactory.usuario("Alice", "alice@teste.com", passwordEncoder.encode("123456")));
 
         mockMvc.perform(post("/api/auth/login")
-                .header("X-Forwarded-For", "10.0.0.11")
+                .with(remoteAddr("10.0.0.11"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                         "email", "alice@teste.com",
@@ -173,13 +246,14 @@ class AuthControllerTest {
     @SuppressWarnings("unchecked")
     void mobile_deveCadastrarFinalizarOnboardingSairEVoltarComDadosPersistidos() throws Exception {
         mockMvc.perform(post("/api/auth/register")
-                .header("X-Forwarded-For", "10.10.0.6")
+                .with(remoteAddr("10.10.0.6"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                         "nome", "Alice",
                         "email", "alice.mobile@teste.com",
                         "password", "Senha1234",
-                        "confirmPassword", "Senha1234"
+                        "confirmPassword", "Senha1234",
+                        "aceitaTermos", true
                 ))))
             .andExpect(status().isOk());
 
@@ -302,7 +376,7 @@ class AuthControllerTest {
         usuarioRepository.save(TestDataFactory.usuario("Alice", "alice@teste.com", passwordEncoder.encode("123456")));
 
         mockMvc.perform(post("/api/auth/login")
-                .header("X-Forwarded-For", "10.0.0.12")
+                .with(remoteAddr("10.0.0.12"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                         "email", "alice@teste.com",
@@ -316,7 +390,7 @@ class AuthControllerTest {
     void login_deveAplicarRateLimit() throws Exception {
         for (int i = 0; i < 5; i++) {
             mockMvc.perform(post("/api/auth/login")
-                    .header("X-Forwarded-For", "10.0.0.13")
+                    .with(remoteAddr("10.0.0.13"))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(Map.of(
                             "email", "nao-existe" + i + "@teste.com",
@@ -326,7 +400,7 @@ class AuthControllerTest {
         }
 
         mockMvc.perform(post("/api/auth/login")
-                .header("X-Forwarded-For", "10.0.0.13")
+                .with(remoteAddr("10.0.0.13"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                         "email", "nao-existe@teste.com",
@@ -341,7 +415,7 @@ class AuthControllerTest {
         usuarioRepository.save(TestDataFactory.usuario("Alice", "alice@teste.com", passwordEncoder.encode("123456")));
 
         List<String> setCookies = mockMvc.perform(post("/api/auth/login")
-                .header("X-Forwarded-For", "10.0.0.14")
+                .with(remoteAddr("10.0.0.14"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                         "email", "alice@teste.com",
@@ -370,7 +444,7 @@ class AuthControllerTest {
         usuarioRepository.save(TestDataFactory.usuario("Alice", "alice@teste.com", passwordEncoder.encode("123456")));
 
         List<String> setCookies = mockMvc.perform(post("/api/auth/login")
-                .header("X-Forwarded-For", "10.0.0.18")
+                .with(remoteAddr("10.0.0.18"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                         "email", "alice@teste.com",
@@ -394,7 +468,7 @@ class AuthControllerTest {
         usuarioRepository.save(TestDataFactory.usuario("Alice", "alice@teste.com", passwordEncoder.encode("123456")));
 
         List<String> setCookies = mockMvc.perform(post("/api/auth/login")
-                .header("X-Forwarded-For", "10.0.0.15")
+                .with(remoteAddr("10.0.0.15"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                         "email", "alice@teste.com",
@@ -428,7 +502,7 @@ class AuthControllerTest {
                 usuarioRepository.save(TestDataFactory.usuario("Alice", "alice@teste.com", passwordEncoder.encode("123456")));
 
                 List<String> loginSetCookies = mockMvc.perform(post("/api/auth/login")
-                                .header("X-Forwarded-For", "10.0.0.17")
+                                .with(remoteAddr("10.0.0.17"))
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(Map.of(
                                                 "email", "alice@teste.com",
@@ -443,7 +517,7 @@ class AuthControllerTest {
                 String csrfToken = extrairValorCookie(loginSetCookies, "csrfToken");
 
                 List<String> refreshSetCookies = mockMvc.perform(post("/api/auth/refresh-token")
-                                .header("X-Forwarded-For", "10.0.0.17")
+                                .with(remoteAddr("10.0.0.17"))
                                 .header("X-CSRF-Token", csrfToken)
                                 .cookie(new jakarta.servlet.http.Cookie("csrfToken", csrfToken))
                                 .cookie(new jakarta.servlet.http.Cookie("refreshToken", tokenA)))
@@ -455,7 +529,7 @@ class AuthControllerTest {
                 assertThat(extrairValorCookie(refreshSetCookies, "refreshToken")).isNotEqualTo(tokenA);
 
                 mockMvc.perform(post("/api/auth/refresh-token")
-                                .header("X-Forwarded-For", "10.0.0.99")
+                                .with(remoteAddr("10.0.0.99"))
                                 .header("X-CSRF-Token", csrfToken)
                                 .cookie(new jakarta.servlet.http.Cookie("csrfToken", csrfToken))
                                 .cookie(new jakarta.servlet.http.Cookie("refreshToken", tokenA)))
@@ -473,7 +547,7 @@ class AuthControllerTest {
         usuarioRepository.save(TestDataFactory.usuario("Alice", "alice@teste.com", passwordEncoder.encode("123456")));
 
         List<String> setCookies = mockMvc.perform(post("/api/auth/login")
-                .header("X-Forwarded-For", "10.0.0.16")
+                .with(remoteAddr("10.0.0.16"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                         "email", "alice@teste.com",
@@ -508,7 +582,7 @@ class AuthControllerTest {
         String ip = "10.0.0.20";
         for (int i = 0; i < 3; i++) {
             mockMvc.perform(post("/api/auth/login")
-                    .header("X-Forwarded-For", ip + i)
+                    .with(remoteAddr(ip + i))
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(objectMapper.writeValueAsString(Map.of(
                             "email", "alice@teste.com",
@@ -518,7 +592,7 @@ class AuthControllerTest {
         }
 
         mockMvc.perform(post("/api/auth/login")
-                .header("X-Forwarded-For", "10.0.0.30")
+                .with(remoteAddr("10.0.0.30"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                         "email", "alice@teste.com",
@@ -533,7 +607,7 @@ class AuthControllerTest {
         usuarioRepository.save(TestDataFactory.usuario("Alice", "alice@teste.com", passwordEncoder.encode("123456")));
 
         mockMvc.perform(post("/api/auth/login")
-                .header("X-Forwarded-For", "10.0.0.40")
+                .with(remoteAddr("10.0.0.40"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                         "email", "alice@teste.com",
@@ -542,7 +616,7 @@ class AuthControllerTest {
             .andExpect(status().isUnprocessableEntity());
 
         mockMvc.perform(post("/api/auth/login")
-                .header("X-Forwarded-For", "10.0.0.41")
+                .with(remoteAddr("10.0.0.41"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                         "email", "alice@teste.com",
@@ -552,7 +626,7 @@ class AuthControllerTest {
             .andExpect(jsonPath("$.accessToken").exists());
 
         mockMvc.perform(post("/api/auth/login")
-                .header("X-Forwarded-For", "10.0.0.42")
+                .with(remoteAddr("10.0.0.42"))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
                         "email", "alice@teste.com",
@@ -577,16 +651,87 @@ class AuthControllerTest {
     void validateToken_deveAplicarRateLimitEmGet() throws Exception {
         for (int i = 0; i < 10; i++) {
             mockMvc.perform(get("/api/auth/validate-token")
-                    .header("X-Forwarded-For", "10.0.0.50")
+                    .with(remoteAddr("10.0.0.50"))
                     .param("token", "fake-token-" + i))
                 .andExpect(status().isUnprocessableEntity());
         }
 
         mockMvc.perform(get("/api/auth/validate-token")
-                .header("X-Forwarded-For", "10.0.0.50")
+                .with(remoteAddr("10.0.0.50"))
                 .param("token", "fake-token-final"))
             .andExpect(status().isTooManyRequests())
             .andExpect(header().string("Retry-After", "60"));
+    }
+
+    @Test
+    void resetPassword_funcionaComValorCruEBancoGuardaSoHash() throws Exception {
+        Usuario usuario = usuarioRepository.save(
+            TestDataFactory.usuario("Reset", "reset@teste.com", passwordEncoder.encode("Senha1234")));
+
+        // Simula o token que iria no email (fluxo real: forgot-password gera e envia)
+        String valorCru = TokenHasher.gerarValor();
+        passwordResetTokenRepository.save(new PasswordResetToken(TokenHasher.sha256Hex(valorCru), usuario));
+
+        // Valor cru não existe no banco
+        assertThat(passwordResetTokenRepository.findByToken(valorCru)).isEmpty();
+
+        mockMvc.perform(get("/api/auth/validate-token")
+                .with(remoteAddr("10.10.0.11"))
+                .param("token", valorCru))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/auth/reset-password")
+                .with(remoteAddr("10.10.0.11"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "token", valorCru,
+                        "novaSenha", "NovaSenha1234"
+                ))))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/auth/login")
+                .with(remoteAddr("10.10.0.11"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "email", "reset@teste.com",
+                        "password", "NovaSenha1234"
+                ))))
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void refreshToken_bancoGuardaHashNuncaOValorCru() throws Exception {
+        mockMvc.perform(post("/api/auth/register")
+                .with(remoteAddr("10.10.0.9"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "nome", "Hash",
+                        "email", "hash@teste.com",
+                        "password", "Senha1234",
+                        "confirmPassword", "Senha1234",
+                        "aceitaTermos", true
+                ))))
+            .andExpect(status().isOk());
+
+        Map<String, Object> login = objectMapper.readValue(mockMvc.perform(post("/api/auth/login")
+                .header("X-Client-Type", "mobile")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "email", "hash@teste.com",
+                        "password", "Senha1234"
+                ))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(), Map.class);
+
+        String valorCru = (String) login.get("refreshToken");
+
+        var persistidos = refreshTokenRepository.findAll();
+        assertThat(persistidos).hasSize(1);
+        String tokenNoBanco = persistidos.get(0).getToken();
+        // Coluna guarda SHA-256 hex (64 chars), nunca o valor entregue ao cliente
+        assertThat(tokenNoBanco).isNotEqualTo(valorCru).matches("[0-9a-f]{64}");
     }
 
     private String extrairValorCookie(List<String> setCookies, String nome) {
