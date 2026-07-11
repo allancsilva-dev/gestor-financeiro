@@ -17,7 +17,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -61,25 +60,14 @@ public class AuthController {
     private static final long REFRESH_COOKIE_MAX_AGE_SECONDS = 7L * 24 * 3600;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    private final UsuarioRepository usuarioRepository;
+    private final PasswordResetTokenRepository tokenRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtUtil jwtUtil;
+    private final EmailService emailService;
+    private final RefreshTokenService refreshTokenService;
 
-    @Autowired
-    private PasswordResetTokenRepository tokenRepository;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private JwtUtil jwtUtil;
-
-    @Autowired
-    private EmailService emailService;
-
-    @Autowired
-    private RefreshTokenService refreshTokenService;
-
-    @org.springframework.beans.factory.annotation.Value("${cookie.secure:false}")
+    @Value("${cookie.secure:false}")
     private boolean cookieSecure;
 
     @Value("${security.auth.max-failed-attempts:5}")
@@ -91,6 +79,20 @@ public class AuthController {
     // Versão vigente da política de privacidade aceita no cadastro (LGPD)
     @Value("${app.politica.versao:2026-07}")
     private String politicaVersao;
+
+    public AuthController(UsuarioRepository usuarioRepository,
+                          PasswordResetTokenRepository tokenRepository,
+                          PasswordEncoder passwordEncoder,
+                          JwtUtil jwtUtil,
+                          EmailService emailService,
+                          RefreshTokenService refreshTokenService) {
+        this.usuarioRepository = usuarioRepository;
+        this.tokenRepository = tokenRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.jwtUtil = jwtUtil;
+        this.emailService = emailService;
+        this.refreshTokenService = refreshTokenService;
+    }
 
     // ==========================================
     // REGISTRO
@@ -160,14 +162,13 @@ public class AuthController {
                 "onboardingCompleto", usuario.isOnboardingCompleto()
             ));
 
-            // csrfToken também no body: clientes nativos (React Native) não conseguem
-            // ler cookies para o double-submit; body cross-origin continua ilegível no browser
-            String csrfToken = createCsrfToken();
-            response.put("csrfToken", csrfToken);
             if (isMobileClient(servletRequest)) {
                 response.put("refreshToken", refreshToken.valor());
+                return ResponseEntity.ok(response);
             }
 
+            String csrfToken = createCsrfToken();
+            response.put("csrfToken", csrfToken);
             ResponseCookie refreshCookie = buildRefreshTokenCookie(refreshToken.valor(), REFRESH_COOKIE_MAX_AGE_SECONDS);
             ResponseCookie csrfCookie = buildCsrfCookie(csrfToken, REFRESH_COOKIE_MAX_AGE_SECONDS);
 
@@ -192,10 +193,7 @@ public class AuthController {
             HttpServletRequest request,
             @RequestBody(required = false) RefreshTokenRequest body
     ) {
-        String refreshTokenValue = extractRefreshTokenFromCookies(request);
-        if ((refreshTokenValue == null || refreshTokenValue.isEmpty()) && body != null) {
-            refreshTokenValue = body.refreshToken();
-        }
+        String refreshTokenValue = resolveRefreshToken(request, body);
         String clientIp = extractClientIp(request);
 
         if (refreshTokenValue == null || refreshTokenValue.isEmpty()) {
@@ -209,14 +207,15 @@ public class AuthController {
         String novoAccessToken = jwtUtil.generateToken(refreshToken.token().getUsuario().getEmail());
 
         // Resposta
-        String csrfToken = createCsrfToken();
         Map<String, Object> response = new HashMap<>();
         response.put("accessToken", novoAccessToken);
-        response.put("csrfToken", csrfToken);
         if (isMobileClient(request)) {
             response.put("refreshToken", refreshToken.valor());
+            return ResponseEntity.ok(response);
         }
 
+        String csrfToken = createCsrfToken();
+        response.put("csrfToken", csrfToken);
         ResponseCookie refreshCookie = buildRefreshTokenCookie(refreshToken.valor(), REFRESH_COOKIE_MAX_AGE_SECONDS);
         ResponseCookie csrfCookie = buildCsrfCookie(csrfToken, REFRESH_COOKIE_MAX_AGE_SECONDS);
 
@@ -237,18 +236,19 @@ public class AuthController {
             HttpServletRequest request,
             @RequestBody(required = false) RefreshTokenRequest body
     ) {
-        String refreshToken = extractRefreshTokenFromCookies(request);
-        if ((refreshToken == null || refreshToken.isEmpty()) && body != null) {
-            refreshToken = body.refreshToken();
-        }
+        String refreshToken = resolveRefreshToken(request, body);
 
         if (refreshToken != null && !refreshToken.isEmpty()) {
             refreshTokenService.revogarToken(refreshToken);
         }
 
+        if (isMobileClient(request)) {
+            return ResponseEntity.ok()
+                .body(Map.of("message", "Logout realizado com sucesso"));
+        }
+
         ResponseCookie clearCookie = buildRefreshTokenCookie("", 0);
         ResponseCookie clearCsrfCookie = buildCsrfCookie("", 0);
-
         return ResponseEntity.ok()
             .header(HttpHeaders.SET_COOKIE, clearCookie.toString(), clearCsrfCookie.toString())
             .body(Map.of("message", "Logout realizado com sucesso"));
@@ -408,6 +408,14 @@ public class AuthController {
 
     private boolean isMobileClient(HttpServletRequest request) {
         return MOBILE_CLIENT_VALUE.equalsIgnoreCase(request.getHeader(MOBILE_CLIENT_HEADER));
+    }
+
+    private String resolveRefreshToken(HttpServletRequest request, RefreshTokenRequest body) {
+        if (isMobileClient(request)) {
+            return body != null ? body.refreshToken() : null;
+        }
+
+        return extractRefreshTokenFromCookies(request);
     }
 
     private String extractRefreshTokenFromCookies(HttpServletRequest request) {

@@ -43,6 +43,12 @@ public class RefreshTokenCsrfFilter extends OncePerRequestFilter {
         }
 
         if (isMobileClient(request)) {
+            String refreshTokenCookie = extractCookie(request, REFRESH_COOKIE_NAME);
+            if (refreshTokenCookie != null && !refreshTokenCookie.isBlank()) {
+                writeForbidden(response, request, "MOBILE_COOKIE_REFRESH_NOT_ALLOWED",
+                        "Cliente mobile deve enviar refresh token no body, sem cookie");
+                return;
+            }
             filterChain.doFilter(request, response);
             return;
         }
@@ -57,7 +63,7 @@ public class RefreshTokenCsrfFilter extends OncePerRequestFilter {
         String csrfHeader = request.getHeader(CSRF_HEADER_NAME);
 
         if (csrfCookie == null || csrfHeader == null || !csrfCookie.equals(csrfHeader)) {
-            writeForbidden(response, request);
+            writeForbidden(response, request, "CSRF_REQUIRED", "CSRF token ausente ou inválido");
             return;
         }
 
@@ -92,15 +98,18 @@ public class RefreshTokenCsrfFilter extends OncePerRequestFilter {
         return null;
     }
 
-    private void writeForbidden(HttpServletResponse response, HttpServletRequest request) throws IOException {
+    private void writeForbidden(HttpServletResponse response,
+                                HttpServletRequest request,
+                                String code,
+                                String message) throws IOException {
         response.setStatus(HttpServletResponse.SC_FORBIDDEN);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
 
         Object requestId = request.getAttribute(RequestIdFilter.REQUEST_ID_ATTRIBUTE);
         ApiError apiError = new ApiError(
-            "CSRF_REQUIRED",
-            "CSRF token ausente ou inválido",
+            code,
+            message,
             Instant.now(),
             requestId != null ? requestId.toString() : null,
             Map.of()

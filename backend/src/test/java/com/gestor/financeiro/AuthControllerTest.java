@@ -267,6 +267,7 @@ class AuthControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.accessToken").exists())
             .andExpect(jsonPath("$.refreshToken").exists())
+            .andExpect(header().doesNotExist("Set-Cookie"))
             .andReturn()
             .getResponse()
             .getContentAsString(), Map.class);
@@ -369,6 +370,31 @@ class AuthControllerTest {
             .andExpect(jsonPath("$.accessToken").exists())
             .andExpect(jsonPath("$.refreshToken").exists())
             .andExpect(jsonPath("$.refreshToken").value(org.hamcrest.Matchers.not(tokenA)));
+    }
+
+    @Test
+    void mobile_deveRejeitarRefreshTokenViaCookieMesmoComHeaderMobile() throws Exception {
+        usuarioRepository.save(TestDataFactory.usuario("Alice", "alice.cookie@teste.com", passwordEncoder.encode("123456")));
+
+        List<String> setCookies = mockMvc.perform(post("/api/auth/login")
+                .with(remoteAddr("10.0.0.60"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "email", "alice.cookie@teste.com",
+                        "password", "123456"
+                ))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getHeaders("Set-Cookie");
+
+        String refreshToken = extrairValorCookie(setCookies, "refreshToken");
+
+        mockMvc.perform(post("/api/auth/refresh-token")
+                .header("X-Client-Type", "mobile")
+                .cookie(new jakarta.servlet.http.Cookie("refreshToken", refreshToken)))
+            .andExpect(status().isForbidden())
+            .andExpect(jsonPath("$.code").value("MOBILE_COOKIE_REFRESH_NOT_ALLOWED"));
     }
 
     @Test

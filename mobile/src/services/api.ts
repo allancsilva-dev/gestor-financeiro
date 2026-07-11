@@ -7,7 +7,6 @@ import {
   getRefreshToken,
   setRefreshToken,
   clearRefreshToken,
-  getCsrfToken,
   setCsrfToken,
   clearCsrfToken,
 } from '../store/auth';
@@ -16,8 +15,8 @@ import { ApiErrorWithMessage } from '../types';
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 15000,
-  // Necessário para o cookie HttpOnly do refresh token ser gravado/enviado
-  withCredentials: true,
+  // Mobile usa refresh token no SecureStore/body; cookie HttpOnly e CSRF são contrato web.
+  withCredentials: false,
   headers: { 'Content-Type': 'application/json', 'X-Client-Type': 'mobile' },
 });
 
@@ -36,18 +35,16 @@ const refreshAccessToken = (): Promise<string | null> => {
   if (!refreshPromise) {
     refreshPromise = (async () => {
       try {
-        const csrf = await getCsrfToken();
         const refreshToken = await getRefreshToken();
         const { data } = await axios.post<{ accessToken?: string; csrfToken?: string; refreshToken?: string }>(
           `${API_BASE_URL}/auth/refresh-token`,
           refreshToken ? { refreshToken } : null,
           {
-            withCredentials: true,
+            withCredentials: false,
             timeout: 15000,
             headers: {
               'Content-Type': 'application/json',
               'X-Client-Type': 'mobile',
-              ...(csrf ? { 'X-CSRF-Token': csrf } : {}),
             },
           }
         );

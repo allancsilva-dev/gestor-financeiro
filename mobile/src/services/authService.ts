@@ -5,7 +5,6 @@ import {
   getRefreshToken,
   setRefreshToken,
   clearRefreshToken,
-  getCsrfToken,
   setCsrfToken,
   clearCsrfToken,
   setUsuarioCache,
@@ -27,14 +26,11 @@ export const authService = {
   },
 
   async logout(): Promise<void> {
-    // Revoga o refresh token no servidor (cookie HttpOnly + double-submit CSRF).
+    // Mobile revoga refresh token pelo body; cookie/CSRF são contrato web.
     // Best-effort: mesmo se a chamada falhar, a sessão local é sempre limpa.
     try {
-      const csrf = await getCsrfToken();
       const refreshToken = await getRefreshToken();
-      await api.post('/auth/logout', refreshToken ? { refreshToken } : null, {
-        headers: csrf ? { 'X-CSRF-Token': csrf } : undefined,
-      });
+      await api.post('/auth/logout', refreshToken ? { refreshToken } : null);
     } catch {
       // sem conexão ou token já revogado — segue com a limpeza local
     }
