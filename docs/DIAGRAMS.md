@@ -255,7 +255,20 @@ Usuario (1)
    `AJUSTE`/`ESTORNO` (valor podendo ser negativo) criado na proxima fatura em aberto via
    `faturaDisponivelParaLancamento` → `ajustarLimiteUtilizado` atualiza `Conta.valorGasto` (podendo ficar
    negativo/credito). Objetivo: tornar visivel o principio "fatura paga e imutavel, sempre compensa" antes
-   de qualquer decisao sobre BACKLOG-0054 (rollover de credito entre faturas).
+   de qualquer decisao sobre BACKLOG-0054 (rollover de credito entre faturas). **Atualizacao 2026-07-11:**
+   BACKLOG-0054 e BACKLOG-0059 foram decididos e implementados (BUG-0053) — ver item 6 abaixo para o
+   diagrama sugerido do fluxo de rollover resultante.
+6. **Sugerido em 2026-07-11 (BUG-0053):** criar diagrama de fluxo textual/`.drawio` para o rollover de
+   credito/saldo devedor de fatura: `FaturaService.buscarAtual`/`buscarPorMes`/`criarOuBuscarFatura`
+   (materializa fatura de competencia M) → `liquidarFaturaAnterior` (recursivo, M-1, M-2, ... ate
+   competencia anterior inexistente ou teto de 24 meses) → para cada fatura anterior ja fechada:
+   total `<= 0` → **R1** gera `FaturaLancamento(CREDITO_ANTERIOR, valor negativo)` na proxima fatura
+   aberta + marca origem `PAGA` (`dataPagamento = dataFechamento`); total `> 0` e `valorPago < total` →
+   **R2** gera `FaturaLancamento(SALDO_DEVEDOR_ANTERIOR, valor positivo)` na proxima fatura aberta →
+   protecao dupla contra duplicacao: guard `existsByFaturaOrigemId` (codigo) + lock pessimista
+   (`findWithLockByIdAndUsuarioId`) + unique index parcial `ux_fatura_rollover_origem_tipo` (banco,
+   `V25__fatura_rollover.sql`). Objetivo: tornar visivel que o rollover e "lazy" (disparado na leitura,
+   sem endpoint de fechamento nem scheduler) e a cadeia recursiva entre faturas do mesmo cartao.
 
 ---
 

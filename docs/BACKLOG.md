@@ -443,7 +443,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Nenhuma
 - **Criterio de aceite:** Alert.alert com "Tem certeza?" antes de executar logout
 - **Risco se ficar pendente:** Logout acidental
-- **Status:** ABERTO
+- **Status:** FECHADO (BUG-0052, 2026-07-11)
 
 ---
 
@@ -456,7 +456,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Nenhuma
 - **Criterio de aceite:** Pull-to-refresh atualiza dados do dashboard
 - **Risco se ficar pendente:** Dados stale sem forma facil de atualizar
-- **Status:** ABERTO
+- **Status:** FECHADO (BUG-0052, 2026-07-11)
 
 ---
 
@@ -573,7 +573,13 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** BUG-0011 e BUG-0012 corrigidos (concluído em 2026-07-09). `LedgerBackfillService` já existe (PR-LEDGER-05) mas foi desenhado para backfill inicial de carteiras sem movimento nenhum, não para reconciliar transações específicas sem carteira.
 - **Criterio de aceite:** Levantamento de quantas transações ativas existem sem `carteira_id` e sem movimento correspondente; decisão documentada (backfill automático vs. correção manual assistida); se aplicado, reconciliação (`LedgerReconciliationService`) retorna `OK` para todas as carteiras afetadas.
 - **Risco se ficar pendente:** Saldo de carteiras de usuários com uso anterior a 2026-07-09 pode ficar permanentemente divergente do histórico real de transações.
-- **Status:** ABERTO
+- **Decisao documentada (2026-07-11):** Definição de "órfã" = transação ativa, com `carteira_id`, que NÃO é compra de cartão (SAIDA em conta CREDITO vai para fatura, não movimenta carteira) e sem `MovimentoCarteira` de origem `TRANSACAO`. Como `carteira.saldo` só é incrementado pelo `LedgerService`, uma órfã não passou pelo ledger E não alterou o saldo — o que gera dois cenários opostos por carteira:
+  - **Cenário A** (saldo já reflete a órfã, setado por código pré-ledger): hoje `DIVERGENTE`, com `saldoMaterializado - saldoLedger == impactoAssinadoDasOrfas`. Correção segura = criar 1 `MovimentoCarteira` por órfã **sem** tocar no saldo (movimento-only), fazendo o ledger convergir → `OK`.
+  - **Cenário B** (saldo NÃO reflete a órfã): hoje `OK` mas subestimado, `saldoMaterializado - saldoLedger == 0` com `impactoOrfas != 0`. Corrigir exigiria mexer no saldo (decisão de produto) → deixado para **revisão manual**, nunca automático.
+  - Regra do automático: só age quando `S - L == O` por carteira; qualquer outro caso é reportado como `REVISAO_MANUAL` e não é alterado. Backfill cego (mexer em todas) corromperia um dos dois cenários.
+- **Solucao aplicada (parcial, 2026-07-11):** (1) `scripts/diagnose-ledger-backfill.sql` — levantamento read-only (5 consultas). (2) `TransacaoRepository.findOrfasSemMovimentoByUsuarioId` (LEFT JOIN em conta p/ não descartar órfãs sem conta). (3) `LedgerBackfillService.reconciliarTransacoesOrfasUsuario(usuarioId, dryRun)` — scenario-aware, idempotente (idempotency key `ledger-backfill-transacao-{id}` + naturalmente idempotente pela própria query). (4) Endpoints self-scoped: `GET /api/v1/carteiras/minhas/backfill-orfas/diagnostico` (dry-run) e `POST /api/v1/carteiras/minhas/backfill-orfas` (aplica). (5) `LedgerBackfillOrfasTest` (6 testes: cenário A entrada/saída, cenário B manual, idempotência, compra-cartão excluída, isolamento por usuário) — reconciliação retorna `OK` após backfill do cenário A.
+- **Pendente:** Executar o diagnóstico contra o PostgreSQL real da VPS (dados de produção não acessíveis do ambiente de dev), registrar os números e, se houver carteiras `RECONCILIAVEL`, aplicar. Carteiras `REVISAO_MANUAL`/órfãs sem carteira (consulta 4 do SQL) continuam decisão manual.
+- **Status:** PARCIAL (código, decisão e testes concluídos em 2026-07-11; execução operacional na VPS pendente)
 
 ---
 
@@ -586,7 +592,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Nenhuma
 - **Criterio de aceite:** Arquivo removido do working tree; `*.swp` adicionado ao `.gitignore` se ainda não estiver coberto.
 - **Risco se ficar pendente:** Baixo — poluição do repositório, risco de commit acidental de arquivo temporário.
-- **Status:** ABERTO
+- **Status:** FECHADO (BUG-0052, 2026-07-11)
 
 ---
 
@@ -626,9 +632,10 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Nenhuma tecnica bloqueante; decisão de produto sobre se pagamento parcial de fatura faz sentido no modelo atual (fatura sem parcelamento de dívida rotativa/juros).
 - **Criterio de aceite:** Decisão documentada em `SYSTEM_OVERVIEW.md` (mantida como está, ou especificação de como pagamento parcial funcionaria: saldo remanescente, juros, rollover para próxima fatura).
 - **Risco se ficar pendente:** Baixo — comportamento atual é intencional e testado; risco é apenas de retrabalho futuro sem contexto se a decisão não estiver registrada.
-- **Status:** ABERTO
-- **Nota (2026-07-09, revisão 2, mesma sessão):** o modelo de edição/cancelamento de compra evoluiu (ver PROB-0044/BACKLOG-0052) para permitir compensação via lançamento `AJUSTE`/`ESTORNO` mesmo com fatura paga. Isso é ortogonal a este item — `pagarFatura` continua exigindo o valor exato da fatura (sem pagamento parcial); mantido `ABERTO` conforme orientação explícita de manter esta decisão em aberto.
+- **Status:** FECHADO (BUG-0052, 2026-07-11)
+- **Nota (2026-07-09, revisão 2, mesma sessão):** o modelo de edição/cancelamento de compra evoluiu (ver PROB-0044/BACKLOG-0052) para permitir compensação via lançamento `AJUSTE`/`ESTORNO` mesmo com fatura paga. Naquele momento, `pagarFatura` ainda exigia o valor exato da fatura e este item foi mantido aberto.
 - **Nota (2026-07-09, revisão 3, mesma sessão):** identificado efeito colateral distinto deste item — o mesmo texto de erro do backend também aparece por divergência de corrida (total da fatura muda entre o fetch da tela e o toque em "Pagar Fatura"), não apenas por pagamento parcial intencional. Tratamento de UX para esse caso específico registrado separadamente em BACKLOG-0056.
+- **Nota (2026-07-11):** pagamento parcial implementado em BUG-0052; `valorPago` acumula e a fatura só vira `PAGA` quando o saldo restante é quitado.
 
 ---
 
@@ -680,7 +687,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Nenhuma tecnica bloqueante; depende de decisão de design de UI (mobile e frontend web).
 - **Criterio de aceite:** Tela de conta/cartão exibe o `valorGasto` negativo com indicação clara de "crédito disponível" ou equivalente, em vez de apenas um número negativo sem contexto.
 - **Risco se ficar pendente:** Confusão do usuário ao ver limite de cartão negativo sem explicação.
-- **Status:** ABERTO
+- **Status:** FECHADO (BUG-0052, 2026-07-11)
 
 ---
 
@@ -690,10 +697,11 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Prioridade:** P2
 - **Area:** backend
 - **Motivo:** No modelo implementado em 2026-07-09 (PROB-0044), uma fatura cujo total é ≤ 0 (só contém estorno) não é "pagável" pelo fluxo atual de `pagarFatura` — o crédito fica aguardando compras futuras na mesma fatura para compensar. Não há rollover explícito desse crédito para a fatura seguinte nem para a carteira do usuário.
-- **Dependencias:** Nenhuma tecnica bloqueante; decisão de produto sobre o que fazer com crédito de estorno que não é consumido antes do fechamento da fatura.
-- **Criterio de aceite:** Decisão documentada — manter como está (crédito aguarda indefinidamente na mesma fatura) ou implementar rollover automático do saldo credor para a próxima fatura/carteira.
+- **Dependencias:** Nenhuma. Decisão de produto **travada em 2026-07-11** — ver spec "Regra de produto: credito de fatura e saldo devedor rolado" em `SYSTEM_OVERVIEW.md` (regra R1).
+- **Decisao documentada (2026-07-11):** crédito de fatura total ≤ 0 vira **crédito do cartão** e é carregado para a próxima fatura (lançamento `CREDITO_ANTERIOR`, valor negativo) até zerar; NÃO vira saldo em carteira. Fatura de origem fecha `PAGA`. Detalhe e exemplos em `SYSTEM_OVERVIEW.md`. Converge com BACKLOG-0059 (implementado junto).
+- **Criterio de aceite:** Conforme spec — fatura ≤ 0 fecha `PAGA` e gera crédito rolado; crédito abate a próxima fatura e some ao zerar; testes cobrem o ciclo.
 - **Risco se ficar pendente:** Crédito de estorno pode ficar "preso" numa fatura antiga sem nunca ser aplicado, se o usuário não fizer novas compras naquele cartão.
-- **Status:** ABERTO
+- **Status:** FECHADO (BUG-0053, 2026-07-11) — implementado via rollover lazy `FaturaService.liquidarFaturaAnterior` (regra R1), migration `V25__fatura_rollover.sql`, testes em `FaturaRolloverTest`. Ver PROB-0050 e BACKLOG-0059.
 
 ---
 
@@ -706,7 +714,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Nenhuma tecnica bloqueante; decisão de produto sobre qual comportamento é mais intuitivo para o usuário.
 - **Criterio de aceite:** Decisão documentada — manter a redistribuição simples atual, ou implementar recálculo completo do parcelamento (com possível impacto em parcelas já pagas, o que exigiria tratamento adicional de fatura imutável).
 - **Risco se ficar pendente:** Baixo — comportamento atual é funcional e testado; risco é de estranheza do usuário ao comparar valores de parcela antes/depois da edição.
-- **Status:** ABERTO
+- **Status:** FECHADO (BUG-0052, 2026-07-11)
 
 ---
 
@@ -715,11 +723,11 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Titulo:** Mensagem de erro do backend "Pagamento parcial de fatura ainda não é suportado" aparece ao usuário por divergência de corrida (total mudou entre o fetch da tela e o toque em Pagar Fatura), não por pagamento parcial real
 - **Prioridade:** P2
 - **Area:** frontend, mobile
-- **Motivo:** `handlePagar` em `mobile/app/(app)/more/faturas.tsx:100-109` e `frontend/src/pages/Faturas.tsx:81-89` chamam `faturaService.pagarFatura(fatura.id, fatura.valorTotal, carteiraPagamentoId)` usando o `fatura.valorTotal` que já está em memória desde o último fetch. Se, entre o fetch da tela e o toque no botão, um novo lançamento (`COMPRA`/`AJUSTE`/`ESTORNO`) alterar o total real da fatura no backend (`pagarFatura` valida contra a soma atual dos `FaturaLancamento`, ver PROB-0042/BUG-0021), o valor enviado diverge do valor real e o backend responde com a mensagem genérica de "pagamento parcial não suportado" — que é tecnicamente verdadeira (o valor enviado não bate com o total atual) mas confusa para o usuário, que não fez nenhum pagamento parcial intencional.
-- **Dependencias:** Nenhuma tecnica bloqueante.
-- **Criterio de aceite:** Ao receber esse erro específico do backend, o client (web e mobile) refaz o fetch da fatura e tenta o pagamento novamente automaticamente (ou, no mínimo, exibe mensagem clara de "o valor da fatura mudou, tentando novamente com o valor atualizado" em vez do texto cru do backend) — com limite de tentativas para evitar loop.
-- **Risco se ficar pendente:** Usuário recebe mensagem de erro tecnicamente correta mas confusa ("pagamento parcial não suportado") em um cenário que não é pagamento parcial, e precisa descobrir sozinho que precisa recarregar a tela e tentar de novo.
-- **Status:** ABERTO
+- **Motivo:** Cenário original obsoleto após BUG-0052 (2026-07-11). O `handlePagar` de `mobile/app/(app)/more/faturas.tsx` e `frontend/src/pages/Faturas.tsx` **não** envia mais `fatura.valorTotal` cheio: agora envia o valor digitado, validado localmente contra `saldoRestante = valorTotal - valorPago`, e exibe `Pago`/`Restante`. A mensagem "pagamento parcial não suportado" foi eliminada (BUG-0021 + BUG-0052) e o `pagarFatura` aceita pagamento parcial.
+- **Dependencias:** Nenhuma.
+- **Criterio de aceite:** N/A — o sintoma descrito (mensagem confusa por envio de total cheio) não reproduz mais.
+- **Risco se ficar pendente:** Resíduo de corrida: se um `ESTORNO` reduzir o total entre o fetch e o toque, o valor digitado pode exceder o novo `saldoRestante` e o backend responde `"Valor de pagamento maior que o saldo restante"` (mensagem clara, não mais "parcial não suportado"). Refetch/retry automático fica como melhoria opcional de UX, não bug.
+- **Status:** FECHADO (BUG-0052, 2026-07-11) — cenário original resolvido; resíduo de corrida rebaixado a melhoria opcional.
 
 ---
 
@@ -732,7 +740,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Nenhuma tecnica bloqueante; depende apenas de replicar a lógica já implementada no mobile (`mobile/app/(app)/more/faturas.tsx`) para o componente React equivalente.
 - **Criterio de aceite:** `frontend/src/pages/Faturas.tsx` exibe o mesmo badge de tipo (`ESTORNO`/`AJUSTE`) e remove o prefixo textual redundante da descrição, com paridade visual em relação ao mobile.
 - **Risco se ficar pendente:** Inconsistência de UX entre mobile e web para o mesmo dado (usuário que usa os dois clientes vê apresentações diferentes do mesmo lançamento).
-- **Status:** ABERTO
+- **Status:** FECHADO (BUG-0052, 2026-07-11)
 
 ---
 
@@ -751,14 +759,14 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 
 ## BACKLOG-0059 — Formalizar modelo completo de fatura, credito e pagamento parcial
 
-- **Titulo:** Definir e implementar comportamento de fatura com pagamento parcial, credito negativo e rollover
+- **Titulo:** Definir e implementar comportamento de fatura com credito negativo, fatura total `<= 0` e rollover (pagamento parcial JA feito em BUG-0052)
 - **Prioridade:** P1
 - **Area:** backend, produto financeiro
-- **Motivo:** PROB-0050 — modelo atual de cartao e robusto para compra/fatura simples, mas incompleto para casos reais de credito.
-- **Dependencias:** Decisao de produto sobre rotativo/juros, saldo devedor, saldo credor, estorno e fechamento de fatura.
-- **Criterio de aceite:** Documento de regra em `SYSTEM_OVERVIEW.md`; testes para fatura parcial, fatura zerada, fatura negativa/credito, rollover para proxima fatura e pagamento total; UI/clientes conseguem exibir os estados sem ambiguidade.
-- **Risco se ficar pendente:** Creditos podem ficar presos e usuarios podem nao entender saldos do cartao.
-- **Status:** ABERTO
+- **Motivo:** PROB-0050 — **pagamento parcial ja implementado** (BUG-0052, 2026-07-11: `pagarFatura` acumula `valorPago`, calcula `saldoRestante`, marca `PAGA` ao quitar). Restam os casos de credito: fatura total `<= 0` (so estorno), saldo credor e rollover para a proxima fatura/carteira. Escopo restante convergente com BACKLOG-0054.
+- **Dependencias:** Decisao de produto **travada em 2026-07-11** — spec completa (R1 credito, R2 saldo devedor rolado, mapeamento no Ledger, novos `TipoFaturaLancamento` `CREDITO_ANTERIOR`/`SALDO_DEVEDOR_ANTERIOR`) em `SYSTEM_OVERVIEW.md`. Rotativo/juros fora de escopo do MVP.
+- **Criterio de aceite:** Conforme spec em `SYSTEM_OVERVIEW.md` — testes para fatura zerada/negativa (credito rolado), saldo devedor rolado no fechamento parcial, rollover idempotente e pagamento total; UI/clientes exibem credito e saldo devedor rolados sem ambiguidade. (Pagamento parcial e total ja cobertos por testes de BUG-0052.)
+- **Risco se ficar pendente:** Creditos de estorno podem ficar presos numa fatura e usuarios podem nao entender saldos do cartao.
+- **Status:** FECHADO (BUG-0053, 2026-07-11) — R1 (credito rolado) e R2 (saldo devedor rolado) implementados via `FaturaService.liquidarFaturaAnterior` (rollover lazy na leitura, sem endpoint de fechar fatura nem scheduler), enum `TipoFaturaLancamento` com `CREDITO_ANTERIOR`/`SALDO_DEVEDOR_ANTERIOR`, migration `V25__fatura_rollover.sql` (unique index parcial de idempotencia), UI web/mobile atualizadas. Testes: `FaturaRolloverTest` (7 casos) + suite completa 142/0 falhas; `scripts/verify-postgres-migrations.sh` PASS com PostgreSQL real de teste. Ver PROB-0050 e BACKLOG-0054.
 
 ---
 
@@ -888,10 +896,17 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Fluxo de deploy oficial.
 - **Criterio de aceite:** Politica documentada; se deploy manual for permitido, build deve barrar testes falhos ou exigir flag explicita; se CI for gate unico, pipeline deve impedir deploy de imagem sem suite verde.
 - **Risco se ficar pendente:** Imagem com regressao pode ser empacotada fora do CI.
-- **Status:** ABERTO
+- **Status:** FECHADO (BUG-0052, 2026-07-11)
 
 ---
 
-> Mantido pelo `docs-reporter`. Ultima atualizacao: 2026-07-11 (fechamento de BACKLOG-0063/PROB-0054 — redesenho do modulo de investimentos com bloqueio de venda acima da posicao e integracao opcional de caixa via `LedgerService`).
+## BACKLOG-0070 — Falso positivo: build TypeScript do frontend web
+
+- **Titulo:** Verificar suspeita de build TypeScript quebrado do frontend web
+- **Prioridade:** P1
+- **Area:** frontend
+- **Motivo:** Suspeita registrada durante BUG-0053 indicava ~36 erros pre-existentes, mas revalidacao direta nesta rodada mostrou que o build atual fecha.
+- **Evidencia:** `frontend npm run build --silent` PASS em 2026-07-11.
+- **Status:** FECHADO (falso positivo, 2026-07-11)
 >
 > Atualizacao anterior: 2026-07-10 (auditoria backend/non-frontend alto nivel: BACKLOG-0058 a BACKLOG-0069 — ver PROBLEM_LEDGER PROB-0049 a PROB-0060 e relatorio `REVIEW_REPORTS/2026-07-10_backend_nonfrontend_high-level-audit.md`).

@@ -4,6 +4,29 @@ Registro de bugs corrigidos. Mantido pelo `docs-reporter`.
 
 ---
 
+## BUG-0052 — Fechamento de P3 baixo em fatura, mobile UX e Docker
+
+- **Problema relacionado:** BACKLOG-0034, BACKLOG-0035, BACKLOG-0046, BACKLOG-0049, BACKLOG-0053, BACKLOG-0055, BACKLOG-0057, BACKLOG-0069, PROB-0060
+- **Data:** 2026-07-11
+- **Area:** backend, frontend, mobile, infra, documentacao
+- **Sintoma:** Itens P3 baixos ainda abertos: logout mobile sem confirmacao, Dashboard mobile sem pull-to-refresh, swap Vim sem ignore, pagamento parcial de fatura sem suporte, credito de cartao exibido como gasto negativo, edicao de compra parcelada redistribuindo restante por parcelas abertas, badge de ajuste/estorno sem paridade web e Dockerfile backend pulando testes.
+- **Correcao aplicada:**
+  1. Mobile perfil passou a confirmar logout com `Alert.alert`.
+  2. Dashboard mobile recebeu `RefreshControl` refazendo resumo, transacoes recentes, projecao e insights.
+  3. `.gitignore` passou a bloquear `*.swp`, `*.swo` e `*.swpx`.
+  4. `pagarFatura` passou a aceitar pagamento parcial com lock pessimista na fatura, acumulando `valorPago`, liberando limite pelo valor pago e marcando `PAGA` apenas ao quitar o saldo restante; web/mobile enviam `Idempotency-Key`.
+  5. Web/mobile exibem `Conta.valorGasto < 0` como credito disponivel, nao gasto negativo.
+  6. Edicao de compra parcelada recalcula o cronograma cheio; parcelas pagas ficam imutaveis e a diferenca vira `AJUSTE` na proxima fatura aberta.
+  7. Web ganhou badge de tipo `AJUSTE`/`ESTORNO` com remocao do prefixo textual, em paridade com mobile.
+  8. `backend/Dockerfile` removeu `-DskipTests`; build de imagem agora roda testes.
+- **Arquivos alterados:** `backend/Dockerfile`, `.gitignore`, `FaturaController.java`, `FaturaService.java`, `FaturaCartaoRepository.java`, `FaturaCartaoWorkflowTest.java`, `mobile/app/(app)/perfil.tsx`, `mobile/app/(app)/index.tsx`, `mobile/app/(app)/more/faturas.tsx`, `mobile/src/services/faturaService.ts`, `frontend/src/pages/Faturas.tsx`, `frontend/src/pages/contas.tsx`, `frontend/src/services/faturaService.ts`, `docs/BACKLOG.md`, `docs/DEPLOY.md`, `docs/PROBLEM_LEDGER.md`, `docs/SYSTEM_OVERVIEW.md`
+- **Testes/validacoes executadas:** `./mvnw -q -Dtest=FaturaCartaoWorkflowTest test` PASS; `./mvnw -q test` PASS; `frontend npm run build -- --mode production` PASS; `mobile npm run lint` (`tsc --noEmit`) PASS.
+- **Resultado:** PASS
+- **Ressalvas:** Fatura com total zero/negativo por estorno puro continua sem rollover explicito (BACKLOG-0054).
+- **Commit:** `a62f594`, `70f24e5`, `85277b7`, `2448089`, `9e4711e`
+
+---
+
 ## BUG-0051 — PROB MEDIUM: rate limit distribuído, sessão mobile, duplo clique financeiro, PostgreSQL real e backup seguro
 
 - **Problema relacionado:** PROB-0031, PROB-0048, PROB-0055, PROB-0056, PROB-0057, PROB-0058, PROB-0059
@@ -900,6 +923,31 @@ Registro de bugs corrigidos. Mantido pelo `docs-reporter`.
 - **Resultado:** PASS
 - **Ressalvas:** Índices de suporte não validados via `PostgresMigrationIT` (segue dependente de Docker/Testcontainers — PROB-0058); validação feita por psql direto. Projeção ainda emite ~3 queries por mês projetado (N pequeno). Mudanças ainda não commitadas.
 - **Commit:** pendente
+
+---
+
+---
+
+## BUG-0053 — Implementado rollover de credito/saldo devedor de fatura de cartao (R1/R2)
+
+- **Problema relacionado:** PROB-0050 (fecha o restante do escopo, ja que pagamento parcial foi resolvido por BUG-0052)
+- **Data:** 2026-07-11
+- **Area:** backend, frontend, mobile, produto financeiro
+- **Sintoma:** A regra de produto para credito de fatura (total `<= 0`) e saldo devedor rolado (pagamento parcial no fechamento) estava **especificada** em `SYSTEM_OVERVIEW.md` (decisao travada em 2026-07-11) mas **nao implementada** em codigo: `pagarFatura` nao tratava o caso de fatura com total zero/negativo e nao havia rollover explicito de credito ou divida entre faturas.
+- **Causa raiz:** Modelo de fatura tratava credito/estorno como quitacao simples dentro da mesma fatura, sem mecanismo de "carregar" saldo (credor ou devedor) para a proxima competencia.
+- **Correcao aplicada:** Arquitetura escolhida pelo dono do produto — **rollover lazy na leitura + servico idempotente + trava de banco**, sem endpoint de fechar fatura nem scheduler (status `FECHADA` continua derivado na leitura, como desde BUG-0020). Novo metodo `FaturaService.liquidarFaturaAnterior(...)`, chamado por `buscarAtual`, `buscarPorMes` e `criarOuBuscarFatura`: ao materializar a fatura de competencia M, liquida recursivamente para tras (M-1, M-2, ...) as faturas existentes ja fechadas. Recursao termina por competencia decrescendo estritamente, fatura anterior inexistente (nao materializa fatura retroativa vazia) ou teto de 24 meses.
+  - **R1** (total da origem `<= 0`): gera lancamento `CREDITO_ANTERIOR` (valor negativo) na proxima fatura em aberto; marca a fatura de origem `PAGA` com `dataPagamento = dataFechamento`. Nunca cria `MovimentoCarteira`.
+  - **R2** (total `> 0` e `valorPago < total`): gera `SALDO_DEVEDOR_ANTERIOR` (valor positivo = total - valorPago) na proxima fatura; nao altera status da origem alem do derivado padrao. Sem juros (fora de escopo do MVP).
+  - **Idempotencia/trava:** guard em codigo `FaturaLancamentoRepository.existsByFaturaOrigemId` + lock pessimista na fatura de origem (`findWithLockByIdAndUsuarioId`) + unique index parcial `ux_fatura_rollover_origem_tipo (fatura_origem_id, tipo) WHERE fatura_origem_id IS NOT NULL` (backstop de banco, migration `V25__fatura_rollover.sql`); `DataIntegrityViolationException` tratada como no-op.
+  - **Modelo:** enum `TipoFaturaLancamento` ganhou `CREDITO_ANTERIOR` e `SALDO_DEVEDOR_ANTERIOR`. `FaturaLancamento.transacao` passou a ser nullable; novo campo `faturaOrigem` para rastreabilidade. `toResponse` corrigido para nao dar NPE em lancamento sem transacao.
+  - **UI web+mobile:** lancamentos `CREDITO_ANTERIOR` exibidos em verde ("Credito anterior"); `SALDO_DEVEDOR_ANTERIOR` em ambar/alerta ("Saldo devedor anterior", nunca vermelho). Tipos TS estendidos.
+- **Arquivos alterados:** `backend/src/main/java/com/gestor/financeiro/service/FaturaService.java`, `backend/src/main/java/com/gestor/financeiro/model/FaturaLancamento.java`, `backend/src/main/java/com/gestor/financeiro/model/enums/TipoFaturaLancamento.java`, `backend/src/main/java/com/gestor/financeiro/repository/FaturaLancamentoRepository.java`, `backend/src/main/resources/db/migration/V25__fatura_rollover.sql` (novo), `frontend/src/pages/Faturas.tsx`, `frontend/src/services/faturaService.ts`, `mobile/app/(app)/more/faturas.tsx`, `mobile/src/services/faturaService.ts`, `mobile/src/types/index.ts`.
+- **Testes/validacoes executadas:** `FaturaRolloverTest.java` (novo) — 7 casos: R1 basico, credito abate a proxima fatura, credito rola de novo (fatura seguinte tambem `<= 0`), R2 saldo devedor rolado, pagamento total sem gerar rollover, idempotencia em dupla leitura (buscar 2x nao duplica lancamento), cadeia de rollover com mes pulado (fatura intermediaria inexistente). Invariante `Conta.valorGasto` assertado dentro dos casos 1, 4 e 6. Execucao real desta rodada: `./mvnw -q test` → **Tests run: 142, Failures: 0, Errors: 0**; `scripts/verify-postgres-migrations.sh` → PASS (`PostgresMigrationIT` 5/0); frontend `npm run build --silent` → PASS; mobile `npm run lint --silent` → PASS. Nao-regressao: `FaturaCartaoWorkflowTest` 9/9 continua verde.
+- **Resultado:** PASS
+- **Ressalvas:**
+  - Unique index `ux_fatura_rollover_origem_tipo` da migration V25 **nao existe no schema de teste** (H2 create-drop, Flyway desligado em teste) — idempotencia testada apenas pelo guard de codigo `existsByFaturaOrigemId`; o backstop de banco nao e exercitado por teste automatizado. Concorrencia real de 2 threads simultaneas materializando a mesma fatura futura **nao tem teste dedicado** (design coberto por lock pessimista + unique index, a validar em producao/PostgreSQL real — mesma limitacao estrutural de `PostgresMigrationIT` dependente de Docker, PROB-0058).
+  - Unique index de rollover foi validado via `scripts/verify-postgres-migrations.sh` em PostgreSQL real de teste (`PostgresMigrationIT`), mas concorrencia real de 2 threads simultaneas materializando a mesma fatura futura ainda nao tem teste dedicado.
+- **Commit:** `a62f594`, `70f24e5`
 
 ---
 

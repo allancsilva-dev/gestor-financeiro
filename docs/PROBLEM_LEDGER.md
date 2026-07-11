@@ -343,17 +343,17 @@ Registro central de problemas encontrados no sistema. Mantido pelo `docs-reporte
 - **Data:** 2026-07-06
 - **Origem:** auditoria completa do sistema
 - **Severidade:** HIGH
-- **Status:** FECHADO (PR-FASE2-02, 2026-07-08)
+- **Status:** FECHADO (2026-07-11; reaberto no mesmo dia apos verificacao de codigo revelar que PR-FASE2-02 nao aplicou o fix, corrigido em seguida)
 - **Area:** mobile
 - **Sintoma:** `headerShown: false` em more/_layout.tsx esconde navegacao. Usuarios iOS precisam saber do gesto de swipe para voltar.
 - **Causa raiz:** Configuracao `headerShown: false` no Stack layout de More
 - **Impacto tecnico:** Navegacao nao descoberta para usuarios iOS
-- **Arquivos relacionados:** `mobile/app/(app)/more/_layout.tsx`
+- **Arquivos relacionados:** `mobile/app/(app)/more/_layout.tsx`, `mobile/src/components/ui/BackButton.tsx`, 8 telas `more/` (carteiras, categorias, contas, contas-fixas, faturas, investimentos, orcamentos, relatorios)
 - **Solucao proposta:** Mostrar header com titulo e seta de voltar, ou adicionar botao customizado
-- **Solucao aplicada:** pendente
-- **Evidencias:** Stack.Screen com headerShown:false
-- **Riscos residuais:** UX mobile confusa até header/botao voltar ser implementado.
-- **Proximo passo:** Mudar headerShown para true
+- **Solucao aplicada:** Mantido `headerShown:false` (telas ja tem titulo proprio in-content; header nativo duplicaria). Novo componente `BackButton` (chevron + "Voltar" chamando `router.back()`) inserido como primeiro filho do bloco de titulo das 8 sub-telas de `more/`. `more/index.tsx` (raiz da aba) nao recebe back por nao ser sub-tela empilhada.
+- **Evidencias:** `<BackButton />` presente nas 8 telas; `tsc --noEmit` 0 erros.
+- **Riscos residuais:** Validacao apenas por typecheck — mobile sem suite de testes (ver SYSTEM_OVERVIEW). Sem verificacao visual em simulador nesta sessao.
+- **Proximo passo:** Conferir alinhamento visual do BackButton em iOS/Android quando houver simulador.
 
 ---
 
@@ -508,17 +508,17 @@ Registro central de problemas encontrados no sistema. Mantido pelo `docs-reporte
 - **Data:** 2026-07-06
 - **Origem:** auditoria completa do sistema
 - **Severidade:** HIGH
-- **Status:** FECHADO (BUG-0051, 2026-07-11)
+- **Status:** FECHADO (2026-07-11; reaberto no mesmo dia apos verificacao de codigo revelar que BUG-0051 nao aplicou o gate, corrigido em seguida)
 - **Area:** mobile, seguranca
 - **Sintoma:** Erros de API expoem paths internos e status codes no console de producao
 - **Causa raiz:** `console.error('[API Error]', { url: error.config?.url, status: error.response?.status })` sem condicional
 - **Impacto tecnico:** Vazamento de informacao de infraestrutura em builds de producao
-- **Arquivos relacionados:** `mobile/src/services/api.ts:24`
+- **Arquivos relacionados:** `mobile/src/services/api.ts:92`
 - **Solucao proposta:** Envolver com `if (__DEV__)` ou remover
-- **Solucao aplicada:** pendente
-- **Evidencias:** Linha 24 do api.ts
-- **Riscos residuais:** Perda de visibilidade de erros em producao — usar crash reporting service
-- **Proximo passo:** Gate com __DEV__
+- **Solucao aplicada:** Bloco `console.error('[API Error]', {url, status})` envolto em `if (__DEV__) { ... }` em `mobile/src/services/api.ts:92`. Producao nao loga mais paths/status no console.
+- **Evidencias:** `api.ts:92` gated por `__DEV__`.
+- **Riscos residuais:** Perda de visibilidade de erros em producao — usar crash reporting service (futuro)
+- **Proximo passo:** Nenhum imediato; considerar crash reporting service (Sentry/etc) para observabilidade de prod.
 
 ---
 
@@ -1031,16 +1031,17 @@ pelas parcelas não pagas, e a diferença sobre a parte já paga (fatura imutáv
 - **Data:** 2026-07-10
 - **Origem:** auditoria backend/non-frontend alto nivel
 - **Severidade:** HIGH
-- **Status:** FECHADO (BUG-0051, 2026-07-11)
+- **Status:** FECHADO (2026-07-11) — **pagamento parcial** implementado em BUG-0052; **credito negativo / rollover / fatura total `<= 0` (saldo devedor rolado)** implementados em BUG-0053 (rollover lazy R1/R2, `FaturaService.liquidarFaturaAnterior`, migration `V25__fatura_rollover.sql`, teste `FaturaRolloverTest` — 7 casos, suite completa 142 testes/0 falhas). ATENCAO: `FECHADO (BUG-0051)` registrado em versao anterior desta entrada era atribuicao incorreta — BUG-0051 foi rate limit/sessao mobile/backup, nao tocou fatura; o fechamento real do escopo de credito/rollover e o BUG-0053.
 - **Area:** backend, produto financeiro
-- **Sintoma:** `pagarFatura` bloqueia total `<= 0` e exige valor exatamente igual ao total atual.
-- **Causa raiz:** Modelo atual trata pagamento de fatura como quitacao total simples; credito/estorno e parcial ainda nao tem ledger de estado proprio.
-- **Impacto tecnico:** Creditos podem ficar presos em faturas antigas; pagamento parcial real e rotativo nao existem; mensagem de erro pode ser correta tecnicamente mas insuficiente para produto financeiro robusto.
-- **Arquivos relacionados:** `backend/src/main/java/com/gestor/financeiro/service/FaturaService.java:85-145`
-- **Solucao proposta:** Formalizar modelo de fatura: `saldoDevedor`, `saldoCredor`, pagamento parcial, rollover de credito, juros/rotativo se aplicavel, e movimentos de ledger associados.
-- **Evidencias:** `FaturaService.java:109-114`; BACKLOG-0049 e BACKLOG-0054 ja registravam partes do problema.
-- **Riscos residuais:** Usuario pode perder confianca quando estorno/credito nao tem comportamento intuitivo.
-- **Proximo passo:** Especificar regra de produto antes de alterar codigo.
+- **Sintoma (historico):** `pagarFatura` bloqueava total `<= 0` (`"Fatura sem valor para pagamento"`) e nao fazia rollover explicito de credito. Pagamento parcial ja havia deixado de ser bloqueado desde BUG-0052 (acumula `valorPago`).
+- **Causa raiz:** Modelo tratava credito/estorno e fatura negativa como quitacao simples; saldo credor e rotativo nao tinham ledger de estado proprio.
+- **Impacto tecnico (historico):** Creditos de estorno podiam ficar presos em faturas antigas; fatura negativa e rollover nao existiam.
+- **Arquivos relacionados:** `backend/src/main/java/com/gestor/financeiro/service/FaturaService.java` (metodo `liquidarFaturaAnterior`), `backend/src/main/java/com/gestor/financeiro/model/FaturaLancamento.java`, `backend/src/main/java/com/gestor/financeiro/model/enums/TipoFaturaLancamento.java`, `backend/src/main/java/com/gestor/financeiro/repository/FaturaLancamentoRepository.java`, `backend/src/main/resources/db/migration/V25__fatura_rollover.sql`, `backend/src/test/java/com/gestor/financeiro/FaturaRolloverTest.java`.
+- **Solucao aplicada (BUG-0052, pagamento parcial, 2026-07-11):** `pagarFatura` aceita pagamento parcial com lock pessimista na fatura, acumulando `valorPago`, calculando `saldoRestante`, liberando limite pelo valor pago e marcando `PAGA` apenas ao quitar o saldo; web e mobile enviam `Idempotency-Key`, validam contra `saldoRestante` e exibem `Pago`/`Restante`. A mensagem "pagamento parcial nao suportado" foi eliminada (ver tambem BUG-0021).
+- **Solucao aplicada (BUG-0053, credito/rollover, 2026-07-11):** Rollover **lazy na leitura** (sem endpoint de fechar fatura e sem scheduler — status `FECHADA` continua derivado). `liquidarFaturaAnterior` e chamado por `buscarAtual`, `buscarPorMes` e `criarOuBuscarFatura`; ao materializar a fatura de competencia M, liquida recursivamente para tras (M-1, M-2, ...) as faturas existentes ja fechadas (recursao termina por competencia estritamente decrescente, fatura anterior inexistente — nunca materializa fatura retroativa vazia — ou teto de 24 meses). **R1** (total origem `<= 0`): gera `CREDITO_ANTERIOR` (valor negativo) na proxima fatura em aberto e marca a origem `PAGA` com `dataPagamento = dataFechamento`; nunca cria `MovimentoCarteira`. **R2** (total `> 0` e `valorPago < total`): gera `SALDO_DEVEDOR_ANTERIOR` (valor positivo = total - valorPago) na proxima fatura, sem juros (fora de escopo do MVP). Idempotencia por `FaturaLancamentoRepository.existsByFaturaOrigemId` (guard em codigo) + lock pessimista (`findWithLockByIdAndUsuarioId`) na fatura de origem + unique index parcial `ux_fatura_rollover_origem_tipo` (backstop de banco, catch de `DataIntegrityViolationException` como no-op). `FaturaLancamento.transacao` passou a ser nullable, com novo campo `faturaOrigem` para rastreabilidade; `toResponse` corrigido para nao dar NPE em lancamento sem transacao. UI web/mobile exibem `CREDITO_ANTERIOR` em verde ("Credito anterior") e `SALDO_DEVEDOR_ANTERIOR` em ambar/alerta ("Saldo devedor anterior", nunca vermelho).
+- **Evidencias:** `FaturaService.java` (`liquidarFaturaAnterior`); BUGFIX_LOG BUG-0052 e BUG-0053; `FaturaRolloverTest` (7 casos: R1 basico, credito abate, credito rola de novo, R2 saldo devedor, pagamento total sem rollover, idempotencia dupla-leitura, cadeia com mes pulado) — `./mvnw -q test` → Tests run: 142, Failures: 0, Errors: 0; `scripts/verify-postgres-migrations.sh` → PASS (`PostgresMigrationIT` 5/0); nao-regressao `FaturaCartaoWorkflowTest` 9/9. Spec de produto em `SYSTEM_OVERVIEW.md` ("Regra de produto: credito de fatura e saldo devedor rolado", agora marcada IMPLEMENTADA).
+- **Riscos residuais:** (1) Unique index `ux_fatura_rollover_origem_tipo` da migration V25 nao existe no schema de teste (H2 create-drop, Flyway desligado em teste) — idempotencia testada apenas pelo guard de codigo `existsByFaturaOrigemId`; o backstop de banco (unique index) nao e exercitado por teste automatizado, e concorrencia real de 2 threads simultaneas nao tem teste dedicado (design coberto por lock pessimista + unique index, mas so validado por revisao de codigo, nao por teste). (2) `pagarFatura` ainda pode ter casos de borda nao cobertos quando o rollover interage com edicao/cancelamento de compra em fatura ja liquidada por rollover — nao testado explicitamente nesta rodada.
+- **Proximo passo:** Nenhum obrigatorio para fechar este PROB. Recomenda-se, quando houver ambiente de teste com Flyway/Postgres real disponivel (ver PROB-0058), validar o unique index `ux_fatura_rollover_origem_tipo` e um cenario de concorrencia real (2 requisicoes simultaneas materializando a mesma fatura futura).
 
 ---
 
@@ -1241,16 +1242,16 @@ pelas parcelas não pagas, e a diferença sobre a parte já paga (fatura imutáv
 - **Data:** 2026-07-10
 - **Origem:** auditoria backend/non-frontend alto nivel
 - **Severidade:** LOW
-- **Status:** ABERTO
+- **Status:** FECHADO (BUG-0052, 2026-07-11)
 - **Area:** backend, CI/CD
 - **Sintoma:** Imagem Docker pode ser criada mesmo se testes falharem, caso build seja executado fora do CI.
 - **Causa raiz:** Dockerfile otimizado para build rapido; responsabilidade de teste delegada ao CI.
 - **Impacto tecnico:** Regressao pode ser empacotada por fluxo manual que ignore CI.
 - **Arquivos relacionados:** `backend/Dockerfile`
-- **Solucao proposta:** Manter `-DskipTests` apenas se pipeline garantir gate anterior obrigatorio; caso contrario, remover ou adicionar argumento explicito `SKIP_TESTS`.
-- **Evidencias:** `backend/Dockerfile:5`.
-- **Riscos residuais:** Baixo se todo deploy passar por CI; medio em deploy manual.
-- **Proximo passo:** Decidir politica de build/deploy.
+- **Solucao aplicada:** `backend/Dockerfile` passou a executar `mvn clean package` sem `-DskipTests`; CI ja mantem `mvn test` e `scripts/verify-postgres-migrations.sh` como gates.
+- **Evidencias:** `backend/Dockerfile:6`, `.github/workflows/ci.yml:23-24`.
+- **Riscos residuais:** Build Docker fica mais lento, mas passa a falhar se a suite backend falhar.
+- **Proximo passo:** Nenhum.
 
 ---
 
@@ -1322,4 +1323,23 @@ pelas parcelas não pagas, e a diferença sobre a parte já paga (fatura imutáv
 
 ---
 
-> Mantido pelo `docs-reporter`. Ultima atualizacao: 2026-07-10 (auditoria de UI mobile: PROB-0061 a PROB-0064 registrados e fechados via BUG-0048).
+## PROB-0065 — Falso positivo: build TypeScript do frontend web
+
+- **ID:** PROB-0065
+- **Titulo:** Suspeita de erros de tipo TypeScript no frontend web
+- **Data:** 2026-07-11
+- **Origem:** implementacao (verificacao de nao-regressao durante BUG-0053, rollover de credito/saldo devedor de fatura)
+- **Severidade:** MEDIUM
+- **Status:** FECHADO (falso positivo, 2026-07-11)
+- **Area:** frontend, documentacao
+- **Sintoma:** Suspeita inicial de ~36 erros em arquivos nao relacionados ao rollover de fatura.
+- **Causa raiz:** Falso positivo/observacao obsoleta.
+- **Impacto tecnico:** Nenhum no estado atual.
+- **Solucao aplicada:** Revalidado build web no estado final desta rodada.
+- **Evidencias:** `frontend npm run build --silent` PASS em 2026-07-11.
+- **Riscos residuais:** Nenhum conhecido.
+- **Proximo passo:** Nenhum.
+
+---
+
+> Mantido pelo `docs-reporter`. Ultima atualizacao: 2026-07-11 (BUG-0053 — rollover de credito/saldo devedor de fatura: PROB-0050 fechado; PROB-0065 fechado como falso positivo apos build web PASS).
