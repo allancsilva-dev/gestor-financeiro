@@ -23,9 +23,11 @@ public class ImportController {
 
     @PostMapping("/csv")
     @Operation(summary = "Importar transações via arquivo CSV")
-    public ResponseEntity<ImportResultDto> importarCsv(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<ImportResultDto> importarCsv(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "carteiraId", required = false) Long carteiraId) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
-        ImportResultDto result = importService.importarCsv(usuarioId, file);
+        ImportResultDto result = importService.importarCsv(usuarioId, file, carteiraId);
         return ResponseEntity.ok(result);
     }
 }

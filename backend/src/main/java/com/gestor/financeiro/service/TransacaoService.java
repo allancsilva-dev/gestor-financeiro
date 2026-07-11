@@ -92,7 +92,9 @@ public class TransacaoService {
 
         transacao.setUsuario(usuario);
         transacao.setAtiva(true);
-        transacao.setStatus(StatusPagamento.PENDENTE);
+        if (transacao.getStatus() == null) {
+            transacao.setStatus(StatusPagamento.PENDENTE);
+        }
 
         if (transacao.getCategoria() != null && transacao.getCategoria().getId() != null) {
             Categoria categoria = categoriaRepository.findByIdAndUsuarioId(

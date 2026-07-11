@@ -29,6 +29,10 @@ public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
     @EntityGraph(attributePaths = {"categoria", "conta"})
     Page<Transacao> findByUsuarioIdAndAtivaTrue(Long usuarioId, Pageable pageable);
 
+    // Deduplicação de importação CSV: mesma data, descrição, valor e tipo já ativos
+    boolean existsByUsuarioIdAndDataAndDescricaoIgnoreCaseAndValorTotalAndTipoAndAtivaTrue(
+        Long usuarioId, LocalDate data, String descricao, BigDecimal valorTotal, TipoTransacao tipo);
+
     @EntityGraph(attributePaths = {"categoria", "conta"})
     Page<Transacao> findByUsuarioIdAndDataBetweenAndAtivaTrue(Long usuarioId, LocalDate inicio, LocalDate fim, Pageable pageable);
 

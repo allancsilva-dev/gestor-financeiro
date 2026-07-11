@@ -1,9 +1,11 @@
 package com.gestor.financeiro;
 
+import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.model.Usuario;
+import com.gestor.financeiro.model.enums.TipoCarteira;
 import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 
@@ -45,6 +47,15 @@ public final class TestDataFactory {
         conta.setSaldoAtual(BigDecimal.ZERO);
         conta.setAtivo(true);
         return conta;
+    }
+
+    public static Carteira carteira(Usuario usuario, String nome, BigDecimal saldo) {
+        Carteira carteira = new Carteira();
+        carteira.setUsuario(usuario);
+        carteira.setNome(nome);
+        carteira.setTipo(TipoCarteira.CONTA_BANCARIA);
+        carteira.setSaldo(saldo);
+        return carteira;
     }
 
     public static Transacao transacao(Usuario usuario, Categoria categoria, String descricao, BigDecimal valor) {

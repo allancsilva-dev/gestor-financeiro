@@ -1,19 +1,17 @@
 package com.gestor.financeiro.service;
 
 import com.gestor.financeiro.dto.ImportResultDto;
+import com.gestor.financeiro.exception.ResourceNotFoundException;
+import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Transacao;
-import com.gestor.financeiro.model.Categoria;
-import com.gestor.financeiro.model.Conta;
-import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.StatusPagamento;
 import com.gestor.financeiro.model.enums.TipoTransacao;
+import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.CategoriaRepository;
 import com.gestor.financeiro.repository.ContaRepository;
 import com.gestor.financeiro.repository.TransacaoRepository;
-import com.gestor.financeiro.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.BufferedReader;
@@ -36,7 +34,7 @@ public class ImportService {
     );
 
     @Autowired
-    private UsuarioRepository usuarioRepository;
+    private TransacaoService transacaoService;
 
     @Autowired
     private TransacaoRepository transacaoRepository;
@@ -47,10 +45,19 @@ public class ImportService {
     @Autowired
     private ContaRepository contaRepository;
 
-    @Transactional(rollbackFor = Exception.class)
-    public ImportResultDto importarCsv(Long usuarioId, MultipartFile file) {
+    @Autowired
+    private CarteiraRepository carteiraRepository;
+
+    // Sem @Transactional aqui de propósito: cada linha importa na transação própria
+    // de TransacaoService.criar(), para uma linha inválida não reverter as demais.
+    public ImportResultDto importarCsv(Long usuarioId, MultipartFile file, Long carteiraPadraoId) {
         ImportResultDto result = new ImportResultDto();
-        Usuario usuario = usuarioRepository.findById(usuarioId).orElseThrow();
+
+        Carteira carteiraPadrao = null;
+        if (carteiraPadraoId != null) {
+            carteiraPadrao = carteiraRepository.findByIdAndUsuarioId(carteiraPadraoId, usuarioId)
+                .orElseThrow(() -> new ResourceNotFoundException("Carteira não encontrada"));
+        }
 
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
@@ -63,20 +70,24 @@ public class ImportService {
             Map<String, Integer> columnMap = parseHeader(headerLine);
 
             String line;
-            int lineNumber = 1;
             while ((line = reader.readLine()) != null) {
-                lineNumber++;
                 if (line.isBlank()) continue;
 
                 try {
                     String[] fields = parseCsvLine(line);
-                    Transacao tx = buildTransacao(usuario, fields, columnMap);
-                    if (tx != null) {
-                        transacaoRepository.save(tx);
-                        result.addImportada();
-                    } else {
+                    Transacao tx = buildTransacao(usuarioId, fields, columnMap, carteiraPadrao);
+                    if (tx == null || tx.getStatus() == StatusPagamento.CANCELADO) {
                         result.addIgnorada();
+                        continue;
                     }
+                    if (transacaoRepository
+                            .existsByUsuarioIdAndDataAndDescricaoIgnoreCaseAndValorTotalAndTipoAndAtivaTrue(
+                                usuarioId, tx.getData(), tx.getDescricao(), tx.getValorTotal(), tx.getTipo())) {
+                        result.addDuplicada();
+                        continue;
+                    }
+                    transacaoService.criar(tx, usuarioId);
+                    result.addImportada();
                 } catch (Exception e) {
                     result.addErro();
                 }
@@ -97,7 +108,8 @@ public class ImportService {
         return map;
     }
 
-    private Transacao buildTransacao(Usuario usuario, String[] fields, Map<String, Integer> col) {
+    private Transacao buildTransacao(Long usuarioId, String[] fields, Map<String, Integer> col,
+                                     Carteira carteiraPadrao) {
         String dataStr = getField(fields, col, "data");
         String descricao = getField(fields, col, "descricao");
         String valorStr = getField(fields, col, "valor");
@@ -121,22 +133,32 @@ public class ImportService {
         TipoTransacao tipo = parseTipo(tipoStr);
 
         Transacao tx = new Transacao();
-        tx.setUsuario(usuario);
         tx.setData(data);
         tx.setDescricao(descricao.trim());
         tx.setValorTotal(valor);
         tx.setTipo(tipo);
 
         String categoriaNome = getField(fields, col, "categoria");
-        if (categoriaNome != null && !categoriaNome.isBlank()) {
-            categoriaRepository.findByUsuarioIdAndNomeIgnoreCase(usuario.getId(), categoriaNome.trim())
+        if (categoriaNome != null) {
+            categoriaRepository.findByUsuarioIdAndNomeIgnoreCase(usuarioId, categoriaNome)
                 .ifPresent(tx::setCategoria);
         }
 
         String contaNome = getField(fields, col, "conta");
-        if (contaNome != null && !contaNome.isBlank()) {
-            contaRepository.findByUsuarioIdAndNomeIgnoreCase(usuario.getId(), contaNome.trim())
+        if (contaNome != null) {
+            contaRepository.findByUsuarioIdAndNomeIgnoreCase(usuarioId, contaNome)
                 .ifPresent(tx::setConta);
+        }
+
+        // Carteira nomeada mas inexistente é erro de linha: importar sem carteira
+        // criaria transação que não movimenta saldo — exatamente o que este fluxo evita
+        String carteiraNome = getField(fields, col, "carteira");
+        if (carteiraNome != null) {
+            Carteira carteira = carteiraRepository.findByUsuarioIdAndNomeIgnoreCase(usuarioId, carteiraNome)
+                .orElseThrow(() -> new ResourceNotFoundException("Carteira não encontrada: " + carteiraNome));
+            tx.setCarteira(carteira);
+        } else if (carteiraPadrao != null) {
+            tx.setCarteira(carteiraPadrao);
         }
 
         String statusStr = getField(fields, col, "status");
