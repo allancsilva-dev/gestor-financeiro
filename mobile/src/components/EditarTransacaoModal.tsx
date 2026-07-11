@@ -19,6 +19,10 @@ interface EditarTransacaoModalProps {
   onClose: () => void;
 }
 
+// Espelha a whitelist do AnexoService no backend (pdf, jpg, jpeg, png, webp)
+const TIPOS_ANEXO = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
+const EXTENSOES_ANEXO = ['pdf', 'jpg', 'jpeg', 'png', 'webp'];
+
 const isoToBR = (iso: string) => iso.slice(0, 10).split('-').reverse().join('/');
 const bytesLabel = (bytes: number) => {
   if (!bytes) return '0 KB';
@@ -130,12 +134,18 @@ export default function EditarTransacaoModal({ visible, transacao, onClose }: Ed
 
   const handleSelecionarArquivo = async () => {
     const result = await DocumentPicker.getDocumentAsync({
-      type: ['image/*', 'application/pdf'],
+      type: TIPOS_ANEXO,
       multiple: false,
       copyToCacheDirectory: true,
     });
     if (result.canceled || !result.assets?.[0]) return;
     const asset = result.assets[0];
+    // Android pode ignorar o filtro de tipo do picker; revalida antes do upload (backend recusa com 422)
+    const extensao = (asset.name?.split('.').pop() ?? '').toLowerCase();
+    if (!TIPOS_ANEXO.includes(asset.mimeType ?? '') && !EXTENSOES_ANEXO.includes(extensao)) {
+      setErroForm('Formato não suportado. Use pdf, jpg, png ou webp.');
+      return;
+    }
     await uploadAnexo({
       uri: asset.uri,
       name: asset.name || 'comprovante',
@@ -155,10 +165,13 @@ export default function EditarTransacaoModal({ visible, transacao, onClose }: Ed
     });
     if (result.canceled || !result.assets?.[0]) return;
     const asset = result.assets[0];
+    // Com quality < 1 o expo-image-picker reencoda para JPEG; força nome/tipo .jpg
+    // para evitar mimeType HEIC do iOS (backend recusa com 422)
+    const nomeJpg = (asset.fileName || `comprovante-${Date.now()}`).replace(/\.(heic|heif)$/i, '') ;
     await uploadAnexo({
       uri: asset.uri,
-      name: asset.fileName || `comprovante-${Date.now()}.jpg`,
-      type: asset.mimeType || 'image/jpeg',
+      name: nomeJpg.toLowerCase().endsWith('.jpg') || nomeJpg.toLowerCase().endsWith('.jpeg') ? nomeJpg : `${nomeJpg}.jpg`,
+      type: 'image/jpeg',
     }, 'camera');
   };
 

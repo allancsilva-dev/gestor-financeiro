@@ -7,6 +7,7 @@ import com.gestor.financeiro.service.AnexoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @RestController
@@ -50,11 +52,14 @@ public class AnexoController {
         Anexo anexo = anexoService.getAnexo(usuarioId, id);
         byte[] data = anexoService.download(usuarioId, id);
 
-        String contentType = anexo.getTipo() != null ? anexo.getTipo() : "application/octet-stream";
+        // Builder escapa o filename (evita injeção de header por nomes legados).
+        ContentDisposition disposition = ContentDisposition.attachment()
+            .filename(anexo.getNome() != null ? anexo.getNome() : "anexo", StandardCharsets.UTF_8)
+            .build();
+
         return ResponseEntity.ok()
-            .header(HttpHeaders.CONTENT_DISPOSITION,
-                "attachment; filename=\"" + anexo.getNome() + "\"")
-            .contentType(MediaType.parseMediaType(contentType))
+            .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+            .contentType(MediaType.parseMediaType(anexoService.contentTypeSeguro(anexo)))
             .body(data);
     }
 
