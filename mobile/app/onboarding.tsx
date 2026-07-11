@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
@@ -14,20 +13,23 @@ import { useTheme } from '../src/theme';
 import { onboardingService, OnboardingFinalizarRequest } from '../src/services/onboardingService';
 import { ApiErrorWithMessage, TipoCarteira, TipoConta } from '../src/types';
 import { useAuth } from '../src/context/AuthContext';
-import { maskCurrencyInput, parseCurrencyBR } from '../src/utils/format';
+import { CATEGORY_COLORS, maskCurrencyInput, parseCurrencyBR } from '../src/utils/format';
+import Field from '../src/components/ui/Field';
+import Chip from '../src/components/ui/Chip';
 
 const PASSOS = ['Conta', 'Cartão', 'Categorias', 'Renda', 'Meta', 'Confirmar'];
 
+// Cores da paleta canônica de categorias (CATEGORY_COLORS) — mesma do seletor em Mais > Categorias
 const CATEGORIAS_SUGERIDAS = [
-  { nome: 'Alimentação', cor: '#EF4444', icone: '🍔' },
-  { nome: 'Transporte', cor: '#F59E0B', icone: '🚗' },
-  { nome: 'Moradia', cor: '#8B5CF6', icone: '🏠' },
-  { nome: 'Saúde', cor: '#EC4899', icone: '🏥' },
-  { nome: 'Educação', cor: '#3B82F6', icone: '📚' },
-  { nome: 'Lazer', cor: '#10B981', icone: '🎮' },
-  { nome: 'Vestuário', cor: '#6366F1', icone: '👕' },
-  { nome: 'Assinaturas', cor: '#F97316', icone: '📱' },
-  { nome: 'Outros', cor: '#6B7280', icone: '📦' },
+  { nome: 'Alimentação', cor: CATEGORY_COLORS[2], icone: '🍔' }, // vermelho
+  { nome: 'Transporte', cor: CATEGORY_COLORS[3], icone: '🚗' }, // amarelo
+  { nome: 'Moradia', cor: CATEGORY_COLORS[4], icone: '🏠' }, // roxo
+  { nome: 'Saúde', cor: CATEGORY_COLORS[5], icone: '🏥' }, // rosa
+  { nome: 'Educação', cor: CATEGORY_COLORS[6], icone: '📚' }, // azul royal
+  { nome: 'Lazer', cor: CATEGORY_COLORS[1], icone: '🎮' }, // verde
+  { nome: 'Vestuário', cor: CATEGORY_COLORS[0], icone: '👕' }, // ciano
+  { nome: 'Assinaturas', cor: CATEGORY_COLORS[7], icone: '📱' }, // laranja
+  { nome: 'Outros', cor: CATEGORY_COLORS[8], icone: '📦' }, // cinza neutro
 ];
 
 export default function OnboardingScreen() {
@@ -89,7 +91,7 @@ export default function OnboardingScreen() {
   const montarRequest = (): OnboardingFinalizarRequest => {
     const categorias = categoriasSelecionadas.map((nome) => {
       const sugerida = CATEGORIAS_SUGERIDAS.find((c) => c.nome === nome);
-      return { nome, cor: sugerida?.cor ?? '#6B7280', icone: sugerida?.icone ?? '📌' };
+      return { nome, cor: sugerida?.cor ?? CATEGORY_COLORS[8], icone: sugerida?.icone ?? '📌' };
     });
 
     return {
@@ -151,7 +153,7 @@ export default function OnboardingScreen() {
               height: 3,
               borderRadius: 2,
               marginHorizontal: 1,
-              backgroundColor: i < passo ? colors.brand : i === passo ? colors.brand : colors.border,
+              backgroundColor: i <= passo ? colors.brand : colors.border,
               opacity: i === passo ? 1 : 0.4,
             }}
           />
@@ -162,76 +164,60 @@ export default function OnboardingScreen() {
 
       {passo === 0 && (
         <View style={styles.form}>
-          <Text style={[styles.label, { color: colors.textSecondary }]}>NOME</Text>
-          <TextInput
-            style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]}
+          <Field
+            label="Nome"
             value={carteira.nome}
             onChangeText={(t) => setCarteira((c) => ({ ...c, nome: t }))}
             placeholder="Ex: Conta Principal"
-            placeholderTextColor={colors.textMuted}
           />
-          <Text style={[styles.label, { color: colors.textSecondary, marginTop: 12 }]}>TIPO</Text>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>TIPO</Text>
           <View style={styles.chipRow}>
             {(['CONTA_BANCARIA', 'DINHEIRO', 'POUPANCA'] as TipoCarteira[]).map((t) => (
-              <TouchableOpacity
+              <Chip
                 key={t}
+                label={t === 'CONTA_BANCARIA' ? 'Bancária' : t === 'DINHEIRO' ? 'Dinheiro' : 'Poupança'}
+                selected={carteira.tipo === t}
                 onPress={() => setCarteira((c) => ({ ...c, tipo: t }))}
-                style={[styles.chip, { backgroundColor: carteira.tipo === t ? colors.brand : colors.card, borderColor: carteira.tipo === t ? colors.brand : colors.border }]}
-              >
-                <Text style={{ color: carteira.tipo === t ? colors.brandText : colors.textSecondary, fontSize: 13 }}>
-                  {t === 'CONTA_BANCARIA' ? 'Bancária' : t === 'DINHEIRO' ? 'Dinheiro' : 'Poupança'}
-                </Text>
-              </TouchableOpacity>
+              />
             ))}
           </View>
-          <Text style={[styles.label, { color: colors.textSecondary, marginTop: 12 }]}>SALDO INICIAL (R$)</Text>
-          <TextInput
-            style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]}
+          <Field
+            label="Saldo inicial (R$)"
             value={carteira.saldo}
             onChangeText={(t) => setCarteira((c) => ({ ...c, saldo: maskCurrencyInput(t) }))}
             keyboardType="number-pad"
             placeholder="0,00"
-            placeholderTextColor={colors.textMuted}
           />
         </View>
       )}
 
       {passo === 1 && (
         <View style={styles.form}>
-          <Text style={[styles.label, { color: colors.textSecondary }]}>NOME</Text>
-          <TextInput
-            style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]}
+          <Field
+            label="Nome"
             value={conta.nome}
             onChangeText={(t) => setConta((c) => ({ ...c, nome: t }))}
             placeholder="Ex: Cartão Nubank"
-            placeholderTextColor={colors.textMuted}
           />
-          <Text style={[styles.label, { color: colors.textSecondary, marginTop: 12 }]}>TIPO</Text>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>TIPO</Text>
           <View style={styles.chipRow}>
             {(['CREDITO', 'DEBITO', 'DINHEIRO'] as TipoConta[]).map((t) => (
-              <TouchableOpacity
+              <Chip
                 key={t}
+                label={t === 'CREDITO' ? 'Crédito' : t === 'DEBITO' ? 'Débito' : 'Dinheiro'}
+                selected={conta.tipo === t}
                 onPress={() => setConta((c) => ({ ...c, tipo: t }))}
-                style={[styles.chip, { backgroundColor: conta.tipo === t ? colors.brand : colors.card, borderColor: conta.tipo === t ? colors.brand : colors.border }]}
-              >
-                <Text style={{ color: conta.tipo === t ? colors.brandText : colors.textSecondary, fontSize: 13 }}>
-                  {t === 'CREDITO' ? 'Crédito' : t === 'DEBITO' ? 'Débito' : 'Dinheiro'}
-                </Text>
-              </TouchableOpacity>
+              />
             ))}
           </View>
           {conta.tipo === 'CREDITO' && (
-            <>
-              <Text style={[styles.label, { color: colors.textSecondary, marginTop: 12 }]}>LIMITE (R$)</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]}
-                value={conta.limiteTotal}
-                onChangeText={(t) => setConta((c) => ({ ...c, limiteTotal: maskCurrencyInput(t) }))}
-                keyboardType="number-pad"
-                placeholder="0,00"
-                placeholderTextColor={colors.textMuted}
-              />
-            </>
+            <Field
+              label="Limite (R$)"
+              value={conta.limiteTotal}
+              onChangeText={(t) => setConta((c) => ({ ...c, limiteTotal: maskCurrencyInput(t) }))}
+              keyboardType="number-pad"
+              placeholder="0,00"
+            />
           )}
         </View>
       )}
@@ -246,10 +232,13 @@ export default function OnboardingScreen() {
                 <TouchableOpacity
                   key={cat.nome}
                   onPress={() => setCategoriasSelecionadas((p) => (p.includes(cat.nome) ? p.filter((c) => c !== cat.nome) : [...p, cat.nome]))}
-                  style={[styles.gridItem, { backgroundColor: sel ? colors.brand + '20' : colors.card, borderColor: sel ? colors.brand : colors.border }]}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: sel }}
+                  accessibilityLabel={cat.nome}
+                  style={[styles.gridItem, { backgroundColor: sel ? colors.brandBg : colors.card, borderColor: sel ? colors.brand : colors.border }]}
                 >
                   <Text style={{ fontSize: 20 }}>{cat.icone}</Text>
-                  <Text style={{ color: sel ? colors.brand : colors.textSecondary, fontSize: 12, marginTop: 4, textAlign: 'center' }}>{cat.nome}</Text>
+                  <Text style={{ color: sel ? colors.brandFg : colors.textSecondary, fontSize: 12, marginTop: 4, textAlign: 'center' }}>{cat.nome}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -260,25 +249,31 @@ export default function OnboardingScreen() {
       {passo === 3 && (
         <View style={styles.form}>
           <Text style={[styles.hint, { color: colors.textSecondary }]}>Sua renda principal (opcional):</Text>
-          <Text style={[styles.label, { color: colors.textSecondary, marginTop: 8 }]}>NOME</Text>
-          <TextInput
-            style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary, opacity: pularRenda ? 0.4 : 1 }]}
+          <Field
+            label="Nome"
             value={renda.nome} onChangeText={(t) => setRenda((r) => ({ ...r, nome: t }))}
-            placeholder="Ex: Salário" placeholderTextColor={colors.textMuted} editable={!pularRenda}
+            placeholder="Ex: Salário" editable={!pularRenda}
+            style={{ opacity: pularRenda ? 0.4 : 1 }}
           />
-          <Text style={[styles.label, { color: colors.textSecondary, marginTop: 12 }]}>VALOR MENSAL (R$)</Text>
-          <TextInput
-            style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary, opacity: pularRenda ? 0.4 : 1 }]}
+          <Field
+            label="Valor mensal (R$)"
             value={renda.valor} onChangeText={(t) => setRenda((r) => ({ ...r, valor: maskCurrencyInput(t) }))}
-            keyboardType="number-pad" placeholder="0,00" placeholderTextColor={colors.textMuted} editable={!pularRenda}
+            keyboardType="number-pad" placeholder="0,00" editable={!pularRenda}
+            style={{ opacity: pularRenda ? 0.4 : 1 }}
           />
-          <Text style={[styles.label, { color: colors.textSecondary, marginTop: 12 }]}>DIA DO RECEBIMENTO</Text>
-          <TextInput
-            style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary, opacity: pularRenda ? 0.4 : 1 }]}
+          <Field
+            label="Dia do recebimento"
             value={renda.diaVencimento} onChangeText={(t) => setRenda((r) => ({ ...r, diaVencimento: t }))}
-            keyboardType="number-pad" placeholder="1" placeholderTextColor={colors.textMuted} editable={!pularRenda}
+            keyboardType="number-pad" placeholder="1" editable={!pularRenda}
+            style={{ opacity: pularRenda ? 0.4 : 1 }}
           />
-          <TouchableOpacity onPress={() => setPularRenda(!pularRenda)} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 16, gap: 8 }}>
+          <TouchableOpacity
+            onPress={() => setPularRenda(!pularRenda)}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: pularRenda }}
+            accessibilityLabel="Pular — configuro depois"
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 }}
+          >
             <View style={{ width: 20, height: 20, borderRadius: 4, borderWidth: 2, borderColor: pularRenda ? colors.brand : colors.textSecondary, backgroundColor: pularRenda ? colors.brand : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
               {pularRenda && <Text style={{ color: colors.brandText, fontSize: 14 }}>✓</Text>}
             </View>
@@ -290,19 +285,25 @@ export default function OnboardingScreen() {
       {passo === 4 && (
         <View style={styles.form}>
           <Text style={[styles.hint, { color: colors.textSecondary }]}>Sua primeira meta financeira (opcional):</Text>
-          <Text style={[styles.label, { color: colors.textSecondary, marginTop: 8 }]}>NOME</Text>
-          <TextInput
-            style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary, opacity: pularMeta ? 0.4 : 1 }]}
+          <Field
+            label="Nome"
             value={meta.nome} onChangeText={(t) => setMeta((m) => ({ ...m, nome: t }))}
-            placeholder="Ex: Reserva de emergência" placeholderTextColor={colors.textMuted} editable={!pularMeta}
+            placeholder="Ex: Reserva de emergência" editable={!pularMeta}
+            style={{ opacity: pularMeta ? 0.4 : 1 }}
           />
-          <Text style={[styles.label, { color: colors.textSecondary, marginTop: 12 }]}>VALOR TOTAL (R$)</Text>
-          <TextInput
-            style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary, opacity: pularMeta ? 0.4 : 1 }]}
+          <Field
+            label="Valor total (R$)"
             value={meta.valorTotal} onChangeText={(t) => setMeta((m) => ({ ...m, valorTotal: maskCurrencyInput(t) }))}
-            keyboardType="number-pad" placeholder="0,00" placeholderTextColor={colors.textMuted} editable={!pularMeta}
+            keyboardType="number-pad" placeholder="0,00" editable={!pularMeta}
+            style={{ opacity: pularMeta ? 0.4 : 1 }}
           />
-          <TouchableOpacity onPress={() => setPularMeta(!pularMeta)} style={{ flexDirection: 'row', alignItems: 'center', marginTop: 16, gap: 8 }}>
+          <TouchableOpacity
+            onPress={() => setPularMeta(!pularMeta)}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: pularMeta }}
+            accessibilityLabel="Pular — configuro depois"
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 44 }}
+          >
             <View style={{ width: 20, height: 20, borderRadius: 4, borderWidth: 2, borderColor: pularMeta ? colors.brand : colors.textSecondary, backgroundColor: pularMeta ? colors.brand : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
               {pularMeta && <Text style={{ color: colors.brandText, fontSize: 14 }}>✓</Text>}
             </View>
@@ -321,13 +322,13 @@ export default function OnboardingScreen() {
 
       <View style={styles.buttons}>
         {passo > 0 && (
-          <TouchableOpacity onPress={() => setPasso(passo - 1)} style={[styles.btnSecondary, { borderColor: colors.border }]}>
+          <TouchableOpacity onPress={() => setPasso(passo - 1)} accessibilityRole="button" style={[styles.btnSecondary, { borderColor: colors.border }]}>
             <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>Voltar</Text>
           </TouchableOpacity>
         )}
         <View style={{ flex: 1 }} />
         {passo < 5 ? (
-          <TouchableOpacity onPress={handleAvancar} disabled={loading} style={[styles.btnPrimary, { backgroundColor: colors.brand, opacity: loading ? 0.6 : 1 }]}>
+          <TouchableOpacity onPress={handleAvancar} disabled={loading} accessibilityRole="button" style={[styles.btnPrimary, { backgroundColor: colors.brand, opacity: loading ? 0.6 : 1 }]}>
             {loading ? (
               <ActivityIndicator color={colors.brandText} />
             ) : (
@@ -335,11 +336,11 @@ export default function OnboardingScreen() {
             )}
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity onPress={handleFinalizar} disabled={loading} style={[styles.btnPrimary, { backgroundColor: '#22C55E', opacity: loading ? 0.6 : 1 }]}>
+          <TouchableOpacity onPress={handleFinalizar} disabled={loading} accessibilityRole="button" style={[styles.btnPrimary, { backgroundColor: colors.brand, opacity: loading ? 0.6 : 1 }]}>
             {loading ? (
-              <ActivityIndicator color="white" />
+              <ActivityIndicator color={colors.brandText} />
             ) : (
-              <Text style={{ color: 'white', fontWeight: '700' }}>Começar</Text>
+              <Text style={{ color: colors.brandText, fontWeight: '700' }}>Começar</Text>
             )}
           </TouchableOpacity>
         )}
@@ -353,12 +354,10 @@ const styles = StyleSheet.create({
   progressBar: { flexDirection: 'row', marginBottom: 12 },
   stepLabel: { fontSize: 11, textAlign: 'center', marginBottom: 4 },
   title: { fontSize: 22, fontWeight: '700', textAlign: 'center', marginBottom: 24 },
-  form: { gap: 4 },
-  label: { fontSize: 10, letterSpacing: 0.8 },
-  hint: { fontSize: 13, marginBottom: 8 },
-  input: { borderWidth: 1, borderRadius: 8, padding: 12, fontSize: 15 },
-  chipRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
-  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
+  form: {},
+  label: { fontSize: 10, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 },
+  hint: { fontSize: 13, marginBottom: 12 },
+  chipRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   gridItem: {
     width: '31%',
@@ -369,6 +368,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buttons: { flexDirection: 'row', marginTop: 32, alignItems: 'center', gap: 12 },
-  btnSecondary: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: 8, borderWidth: 1 },
-  btnPrimary: { paddingHorizontal: 32, paddingVertical: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  btnSecondary: { paddingHorizontal: 16, minHeight: 48, justifyContent: 'center', borderRadius: 12, borderWidth: 1 },
+  btnPrimary: { paddingHorizontal: 32, minHeight: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
 });

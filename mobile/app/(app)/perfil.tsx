@@ -117,7 +117,7 @@ export default function Perfil() {
           accessibilityRole="button"
           style={{ height: 48, borderRadius: 12, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' }}
         >
-          {salvandoNome ? <ActivityIndicator color="#ffffff" /> : <Text style={{ color: '#ffffff', fontSize: 15, fontWeight: '700' }}>Salvar nome</Text>}
+          {salvandoNome ? <ActivityIndicator color={colors.brandText} /> : <Text style={{ color: colors.brandText, fontSize: 15, fontWeight: '700' }}>Salvar nome</Text>}
         </TouchableOpacity>
       </Card>
 
@@ -138,9 +138,9 @@ export default function Perfil() {
       <TouchableOpacity
         onPress={handleLogout}
         accessibilityRole="button"
-        style={{ backgroundColor: colors.danger, borderRadius: 12, height: 48, alignItems: 'center', justifyContent: 'center' }}
+        style={{ backgroundColor: colors.dangerBg, borderRadius: 12, height: 48, alignItems: 'center', justifyContent: 'center' }}
       >
-        <Text style={{ color: '#ffffff', fontSize: 15, fontWeight: '700' }}>Sair</Text>
+        <Text style={{ color: colors.danger, fontSize: 15, fontWeight: '700' }}>Sair</Text>
       </TouchableOpacity>
     </ScrollView>
   );

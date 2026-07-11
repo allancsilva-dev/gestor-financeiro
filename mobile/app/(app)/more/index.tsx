@@ -10,20 +10,20 @@ import api from '../../../src/services/api';
 import importService from '../../../src/services/importService';
 import Card from '../../../src/components/ui/Card';
 
-// Grid 2 colunas (DESIGN.md) — tile 44 com tint da cor do item, label + subtítulo
+// Grid 2 colunas (DESIGN.md) — tile 44 violeta (navegação é marca, nunca arco-íris), label + subtítulo
 const itens = [
-  { label: 'Contas',       sub: 'Saldos e dinheiro', rota: '/more/carteiras',    icone: '₿',  cor: '#7c5cfc' },
-  { label: 'Contas Fixas', sub: 'Mensais',          rota: '/more/contas-fixas', icone: '📅', cor: '#8b2fff' },
-  { label: 'Orçamentos',   sub: 'Por categoria',    rota: '/more/orcamentos',   icone: '📊', cor: '#ffa502' },
-  { label: 'Cartão',       sub: 'Faturas',          rota: '/more/faturas',      icone: '💳', cor: '#ff4757' },
-  { label: 'Relatórios',   sub: 'Gráficos',         rota: '/more/relatorios',   icone: '📋', cor: '#2ed573' },
-  { label: 'Categorias',   sub: 'Organizar',        rota: '/more/categorias',   icone: '🏷', cor: '#ff6b81' },
-  { label: 'Cartões',      sub: 'Crédito e débito', rota: '/more/contas',       icone: '💳', cor: '#1e90ff' },
-  { label: 'Investimentos', sub: 'Carteira',         rota: '/more/investimentos', icone: '◈', cor: '#2ed573' },
-  { label: 'Perfil',       sub: 'Nome e segurança', rota: '/(app)/perfil',      icone: '👤', cor: '#7c5cfc' },
-  { label: 'Entrada por IA', sub: 'Em breve',       rota: null,                 icone: '🤖', cor: '#8b2fff', desabilitado: true },
-  { label: 'Importar CSV', sub: 'Extrato',           rota: null,                 icone: '⇪', cor: '#ffa502', acao: 'importar' },
-  { label: 'Exportar Dados', sub: 'CSV',            rota: null,                 icone: '📥', cor: '#7c5cfc', acao: 'exportar' },
+  { label: 'Contas',       sub: 'Saldos e dinheiro', rota: '/more/carteiras',    icone: '₿' },
+  { label: 'Contas Fixas', sub: 'Mensais',          rota: '/more/contas-fixas', icone: '📅' },
+  { label: 'Orçamentos',   sub: 'Por categoria',    rota: '/more/orcamentos',   icone: '📊' },
+  { label: 'Cartão',       sub: 'Faturas',          rota: '/more/faturas',      icone: '💳' },
+  { label: 'Relatórios',   sub: 'Gráficos',         rota: '/more/relatorios',   icone: '📋' },
+  { label: 'Categorias',   sub: 'Organizar',        rota: '/more/categorias',   icone: '🏷' },
+  { label: 'Cartões',      sub: 'Crédito e débito', rota: '/more/contas',       icone: '💳' },
+  { label: 'Investimentos', sub: 'Carteira',         rota: '/more/investimentos', icone: '◈' },
+  { label: 'Perfil',       sub: 'Nome e segurança', rota: '/(app)/perfil',      icone: '👤' },
+  { label: 'Entrada por IA', sub: 'Em breve',       rota: null,                 icone: '🤖', desabilitado: true },
+  { label: 'Importar CSV', sub: 'Extrato',           rota: null,                 icone: '⇪', acao: 'importar' },
+  { label: 'Exportar Dados', sub: 'CSV',            rota: null,                 icone: '📥', acao: 'exportar' },
 ];
 
 // Baixa o CSV pela API autenticada e compartilha o arquivo — nunca expor URL da API
@@ -113,13 +113,13 @@ export default function MoreScreen() {
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <View style={{
                   width: 44, height: 44, borderRadius: 12, marginBottom: 12,
-                  backgroundColor: it.cor + '24', alignItems: 'center', justifyContent: 'center',
+                  backgroundColor: colors.brandBg, alignItems: 'center', justifyContent: 'center',
                 }}>
                   <Text style={{ fontSize: 22 }}>{it.icone}</Text>
                 </View>
                 {it.desabilitado && (
                   <View style={{ backgroundColor: colors.warningBg, paddingHorizontal: 6, paddingVertical: 3, borderRadius: 999 }}>
-                    <Text style={{ color: colors.warning, fontSize: 8, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 }}>Em breve</Text>
+                    <Text style={{ color: colors.warning, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 }}>Em breve</Text>
                   </View>
                 )}
               </View>

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, ScrollView } from 'react-native';
 import { useTheme } from '../../src/theme';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import api from '../../src/services/api';
 import { ApiErrorWithMessage } from '../../src/types';
+import Field from '../../src/components/ui/Field';
 
 // Mesma regra do backend (@ValidPassword): mínimo 8, ao menos 1 letra e 1 número
 const senhaValida = (s: string) => s.length >= 8 && /[A-Za-z]/.test(s) && /\d/.test(s);
@@ -61,17 +62,12 @@ export default function ResetPassword() {
         </Text>
 
         {!params.token && (
-          <>
-            <Text style={[styles.label, { color: colors.textSecondary }]}>CÓDIGO DE RECUPERAÇÃO</Text>
-            <TextInput value={token} onChangeText={setToken} placeholder="Código do e-mail" placeholderTextColor={colors.textMuted} autoCapitalize="none" autoCorrect={false} style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]} />
-          </>
+          <Field label="Código de recuperação" value={token} onChangeText={setToken} placeholder="Código do e-mail" autoCapitalize="none" autoCorrect={false} />
         )}
 
-        <Text style={[styles.label, { color: colors.textSecondary, marginTop: params.token ? 0 : 14 }]}>NOVA SENHA</Text>
-        <TextInput value={novaSenha} onChangeText={setNovaSenha} placeholder="Mínimo 8 caracteres, 1 letra e 1 número" placeholderTextColor={colors.textMuted} secureTextEntry textContentType="newPassword" style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]} />
+        <Field label="Nova senha" value={novaSenha} onChangeText={setNovaSenha} placeholder="Mínimo 8 caracteres, 1 letra e 1 número" secureTextEntry textContentType="newPassword" />
 
-        <Text style={[styles.label, { color: colors.textSecondary, marginTop: 14 }]}>CONFIRMAR SENHA</Text>
-        <TextInput value={confirmar} onChangeText={setConfirmar} placeholder="Repita a senha" placeholderTextColor={colors.textMuted} secureTextEntry textContentType="newPassword" style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]} />
+        <Field label="Confirmar senha" value={confirmar} onChangeText={setConfirmar} placeholder="Repita a senha" secureTextEntry textContentType="newPassword" />
 
         {error ? <Text style={{ color: colors.danger, marginTop: 8 }}>{error}</Text> : null}
 
@@ -92,7 +88,5 @@ const styles = StyleSheet.create({
   inner: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 32 },
   title: { fontSize: 24, fontWeight: '700', marginTop: 16 },
   subtitle: { fontSize: 13, marginBottom: 32 },
-  label: { fontSize: 9, letterSpacing: 0.8, marginBottom: 6 },
-  input: { borderWidth: 1, borderRadius: 8, padding: 12 },
-  button: { marginTop: 24, borderRadius: 8, height: 48, alignItems: 'center', justifyContent: 'center' },
+  button: { marginTop: 24, borderRadius: 12, height: 48, alignItems: 'center', justifyContent: 'center' },
 });

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, FlatList, Modal, ScrollView, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, Modal, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { categoriaService } from '../../../src/services/categoriaService';
@@ -7,6 +7,8 @@ import { CATEGORY_COLORS, formatCurrency } from '../../../src/utils/format';
 import { Categoria, CategoriaRequest } from '../../../src/types';
 import { useTheme } from '../../../src/theme';
 import SkeletonBox from '../../../src/components/ui/SkeletonBox';
+import Field from '../../../src/components/ui/Field';
+import Fab from '../../../src/components/ui/Fab';
 
 export default function CategoriasScreen() {
   const colors = useTheme();
@@ -73,21 +75,16 @@ export default function CategoriasScreen() {
         />
       )}
 
-      <TouchableOpacity
-        onPress={() => setModalVisible(true)}
-        style={{ position: 'absolute', bottom: 24, right: 16, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' }}
-      >
-        <Text style={{ color: colors.brandText, fontSize: 28, lineHeight: 30 }}>+</Text>
-      </TouchableOpacity>
+      <Fab onPress={() => setModalVisible(true)} accessibilityLabel="Nova categoria" />
 
       <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet">
         <View style={{ flex: 1, backgroundColor: colors.bg }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-            <TouchableOpacity onPress={() => { setModalVisible(false); setNome(''); setCorSelecionada(CATEGORY_COLORS[0]); setNomeError(null); setCorError(null); }}>
-              <Text style={{ color: colors.brand, fontSize: 15 }}>Cancelar</Text>
+            <TouchableOpacity accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }} onPress={() => { setModalVisible(false); setNome(''); setCorSelecionada(CATEGORY_COLORS[0]); setNomeError(null); setCorError(null); }}>
+              <Text style={{ color: colors.brandFg, fontSize: 15 }}>Cancelar</Text>
             </TouchableOpacity>
             <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600' }}>Nova Categoria</Text>
-            <TouchableOpacity disabled={criarMutation.status === 'pending'} onPress={() => {
+            <TouchableOpacity accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }} disabled={criarMutation.status === 'pending'} onPress={() => {
               setNomeError(null); setCorError(null);
               let hasErr = false;
               if (!nome.trim()) { setNomeError('Nome obrigatório.'); hasErr = true; }
@@ -95,18 +92,24 @@ export default function CategoriasScreen() {
               if (hasErr) return;
               criarMutation.mutate({ nome: nome.trim(), cor: corSelecionada });
             }}>
-              <Text style={{ color: criarMutation.status === 'pending' ? colors.textMuted : colors.brand, fontSize: 15, fontWeight: '600' }}>Salvar</Text>
+              <Text style={{ color: criarMutation.status === 'pending' ? colors.textMuted : colors.brandFg, fontSize: 15, fontWeight: '600' }}>Salvar</Text>
             </TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={{ padding: 16 }}>
-            <Text style={{ color: colors.textSecondary, fontSize: 9, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Nome</Text>
-            <TextInput value={nome} onChangeText={setNome} placeholderTextColor={colors.textMuted} style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, color: colors.textPrimary, fontSize: 15, marginBottom: 16 }} />
-            {nomeError && <Text style={{ color: colors.danger, marginBottom: 8 }}>{nomeError}</Text>}
+            <Field label="Nome" value={nome} onChangeText={setNome} placeholder="Ex: Alimentação" error={nomeError} />
 
-            <Text style={{ color: colors.textSecondary, fontSize: 9, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Cor</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
-              {CATEGORY_COLORS.map(cor => (
-                <TouchableOpacity key={cor} onPress={() => setCorSelecionada(cor)} style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: cor, borderWidth: corSelecionada === cor ? 3 : 0, borderColor: colors.textPrimary, marginRight: 8 }} />
+            <Text style={{ color: colors.textSecondary, fontSize: 10, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Cor</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 8 }}>
+              {CATEGORY_COLORS.map((cor, i) => (
+                <TouchableOpacity
+                  key={cor}
+                  onPress={() => setCorSelecionada(cor)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: corSelecionada === cor }}
+                  accessibilityLabel={`Cor ${i + 1}`}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: cor, borderWidth: corSelecionada === cor ? 3 : 0, borderColor: colors.textPrimary }}
+                />
               ))}
             </View>
             {corError && <Text style={{ color: colors.danger, marginBottom: 8 }}>{corError}</Text>}

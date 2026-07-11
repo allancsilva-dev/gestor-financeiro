@@ -97,7 +97,7 @@ export const STATUS_LABEL: Record<StatusPagamento, string> = {
 };
 
 export const CATEGORY_COLORS = [
-  '#00c8ff', // azul brand
+  '#00c8ff', // ciano
   '#2ed573', // verde
   '#ff4757', // vermelho
   '#ffa502', // amarelo
@@ -105,4 +105,5 @@ export const CATEGORY_COLORS = [
   '#ff6b81', // rosa
   '#1e90ff', // azul royal
   '#ff6348', // laranja
+  '#747d8c', // cinza neutro
 ];
