@@ -15,6 +15,9 @@ public interface MetaRepository extends JpaRepository<Meta, Long> {
     // Query gerada: SELECT * FROM metas WHERE usuario_id = ? AND ativa = true
     List<Meta> findByUsuarioIdAndAtivaTrue(Long usuarioId);
 
+    // Todas as metas, inclusive inativas (exportação LGPD)
+    List<Meta> findByUsuarioId(Long usuarioId);
+
     // Busca metas ativas com paginação.
     Page<Meta> findByUsuarioIdAndAtivaTrue(Long usuarioId, Pageable pageable);
 

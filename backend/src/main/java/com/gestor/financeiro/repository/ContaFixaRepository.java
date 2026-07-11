@@ -20,6 +20,10 @@ public interface ContaFixaRepository extends JpaRepository<ContaFixa, Long> {
     @EntityGraph(attributePaths = {"categoria"})
     List<ContaFixa> findByUsuarioIdAndAtivoTrue(Long usuarioId);
 
+    // Todas as contas fixas, inclusive inativas (exportação LGPD)
+    @EntityGraph(attributePaths = {"categoria"})
+    List<ContaFixa> findByUsuarioId(Long usuarioId);
+
     @EntityGraph(attributePaths = {"categoria"})
     Page<ContaFixa> findByUsuarioIdAndAtivoTrue(Long usuarioId, Pageable pageable);
 

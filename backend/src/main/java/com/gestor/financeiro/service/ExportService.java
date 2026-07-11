@@ -32,6 +32,9 @@ public class ExportService {
     @Autowired
     private ContaFixaRepository contaFixaRepository;
 
+    @Autowired
+    private UsuarioRepository usuarioRepository;
+
     private static final DateTimeFormatter DF = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     public String exportarTransacoesCsv(Long usuarioId, LocalDate inicio, LocalDate fim) {
@@ -99,12 +102,90 @@ public class ExportService {
         return csv.toString();
     }
 
+    /**
+     * Exportação completa dos dados do titular (LGPD art. 18, V - portabilidade).
+     */
     public String exportarCompletoCsv(Long usuarioId) {
         StringJoiner sj = new StringJoiner("\n\n");
+        sj.add("=== DADOS CADASTRAIS ===\n" + exportarCadastroCsv(usuarioId));
         sj.add("=== TRANSAÇÕES ===\n" + exportarTransacoesCsv(usuarioId, null, null));
         sj.add("=== CATEGORIAS ===\n" + exportarCategoriasCsv(usuarioId));
         sj.add("=== CONTAS ===\n" + exportarContasCsv(usuarioId));
+        sj.add("=== CARTEIRAS ===\n" + exportarCarteirasCsv(usuarioId));
+        sj.add("=== METAS ===\n" + exportarMetasCsv(usuarioId));
+        sj.add("=== CONTAS FIXAS ===\n" + exportarContasFixasCsv(usuarioId));
         return sj.toString();
+    }
+
+    private String exportarCadastroCsv(Long usuarioId) {
+        Usuario usuario = usuarioRepository.findById(usuarioId).orElseThrow();
+
+        StringBuilder csv = new StringBuilder();
+        csv.append("Nome,Email\n");
+        csv.append(escapeCsv(usuario.getNome())).append(",");
+        csv.append(escapeCsv(usuario.getEmail())).append("\n");
+        return csv.toString();
+    }
+
+    private String exportarCarteirasCsv(Long usuarioId) {
+        List<Carteira> carteiras = carteiraRepository.findByUsuarioId(usuarioId);
+
+        StringBuilder csv = new StringBuilder();
+        csv.append("ID,Nome,Tipo,Saldo,Banco\n");
+
+        for (Carteira c : carteiras) {
+            csv.append(c.getId()).append(",");
+            csv.append(escapeCsv(c.getNome())).append(",");
+            csv.append(c.getTipo() != null ? c.getTipo() : "").append(",");
+            csv.append(c.getSaldo() != null ? c.getSaldo() : "0").append(",");
+            csv.append(c.getBanco() != null ? escapeCsv(c.getBanco()) : "").append("\n");
+        }
+
+        return csv.toString();
+    }
+
+    private String exportarMetasCsv(Long usuarioId) {
+        List<Meta> metas = metaRepository.findByUsuarioId(usuarioId);
+
+        StringBuilder csv = new StringBuilder();
+        csv.append("ID,Nome,Descrição,Valor Total,Valor Reservado,Valor Mensal,Data Início,Data Prevista,Data Conclusão,Ativa\n");
+
+        for (Meta m : metas) {
+            csv.append(m.getId()).append(",");
+            csv.append(escapeCsv(m.getNome())).append(",");
+            csv.append(m.getDescricao() != null ? escapeCsv(m.getDescricao()) : "").append(",");
+            csv.append(m.getValorTotal() != null ? m.getValorTotal() : "0").append(",");
+            csv.append(m.getValorReservado() != null ? m.getValorReservado() : "0").append(",");
+            csv.append(m.getValorMensal() != null ? m.getValorMensal() : "0").append(",");
+            csv.append(m.getDataInicio() != null ? m.getDataInicio().format(DF) : "").append(",");
+            csv.append(m.getDataPrevista() != null ? m.getDataPrevista().format(DF) : "").append(",");
+            csv.append(m.getDataConclusao() != null ? m.getDataConclusao().format(DF) : "").append(",");
+            csv.append(Boolean.TRUE.equals(m.getAtiva()) ? "Sim" : "Não").append("\n");
+        }
+
+        return csv.toString();
+    }
+
+    private String exportarContasFixasCsv(Long usuarioId) {
+        List<ContaFixa> contasFixas = contaFixaRepository.findByUsuarioId(usuarioId);
+
+        StringBuilder csv = new StringBuilder();
+        csv.append("ID,Nome,Categoria,Valor Planejado,Valor Real,Dia Vencimento,Status,Recorrente,Ativo,Observações\n");
+
+        for (ContaFixa cf : contasFixas) {
+            csv.append(cf.getId()).append(",");
+            csv.append(escapeCsv(cf.getNome())).append(",");
+            csv.append(cf.getCategoria() != null ? escapeCsv(cf.getCategoria().getNome()) : "").append(",");
+            csv.append(cf.getValorPlanejado() != null ? cf.getValorPlanejado() : "0").append(",");
+            csv.append(cf.getValorReal() != null ? cf.getValorReal() : "0").append(",");
+            csv.append(cf.getDiaVencimento() != null ? cf.getDiaVencimento() : "").append(",");
+            csv.append(cf.getStatus() != null ? cf.getStatus() : "").append(",");
+            csv.append(Boolean.TRUE.equals(cf.getRecorrente()) ? "Sim" : "Não").append(",");
+            csv.append(Boolean.TRUE.equals(cf.getAtivo()) ? "Sim" : "Não").append(",");
+            csv.append(cf.getObservacoes() != null ? escapeCsv(cf.getObservacoes()) : "").append("\n");
+        }
+
+        return csv.toString();
     }
 
     private String escapeCsv(String value) {
