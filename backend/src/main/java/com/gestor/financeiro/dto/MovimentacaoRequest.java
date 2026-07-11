@@ -10,4 +10,6 @@ public class MovimentacaoRequest {
     private LocalDate data;
     private BigDecimal quantidade;
     private BigDecimal precoUnitario;
+    // Opcional: se informado, a movimentacao debita/credita o caixa desta carteira via ledger.
+    private Long carteiraId;
 }

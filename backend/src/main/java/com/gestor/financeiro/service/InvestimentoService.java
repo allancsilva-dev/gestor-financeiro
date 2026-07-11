@@ -1,15 +1,18 @@
 package com.gestor.financeiro.service;
 
 import com.gestor.financeiro.dto.*;
+import com.gestor.financeiro.exception.BusinessException;
+import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.model.Ativo;
 import com.gestor.financeiro.model.MovimentacaoAtivo;
 import com.gestor.financeiro.model.Usuario;
+import com.gestor.financeiro.model.enums.OrigemMovimentoCarteira;
 import com.gestor.financeiro.model.enums.TipoAtivo;
 import com.gestor.financeiro.model.enums.TipoMovimentacao;
+import com.gestor.financeiro.model.enums.TipoMovimentoCarteira;
 import com.gestor.financeiro.repository.AtivoRepository;
 import com.gestor.financeiro.repository.MovimentacaoAtivoRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,14 +24,20 @@ import java.util.stream.Collectors;
 @Service
 public class InvestimentoService {
 
-    @Autowired
-    private AtivoRepository ativoRepository;
+    private final AtivoRepository ativoRepository;
+    private final MovimentacaoAtivoRepository movimentacaoRepository;
+    private final UsuarioRepository usuarioRepository;
+    private final LedgerService ledgerService;
 
-    @Autowired
-    private MovimentacaoAtivoRepository movimentacaoRepository;
-
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    public InvestimentoService(AtivoRepository ativoRepository,
+                               MovimentacaoAtivoRepository movimentacaoRepository,
+                               UsuarioRepository usuarioRepository,
+                               LedgerService ledgerService) {
+        this.ativoRepository = ativoRepository;
+        this.movimentacaoRepository = movimentacaoRepository;
+        this.usuarioRepository = usuarioRepository;
+        this.ledgerService = ledgerService;
+    }
 
     @Transactional
     public AtivoResponse criarAtivo(Long usuarioId, AtivoRequest request) {
@@ -53,7 +62,7 @@ public class InvestimentoService {
     @Transactional
     public AtivoResponse atualizarAtivo(Long usuarioId, Long ativoId, AtivoRequest request) {
         Ativo ativo = ativoRepository.findByIdAndUsuarioId(ativoId, usuarioId)
-            .orElseThrow(() -> new RuntimeException("Ativo nao encontrado"));
+            .orElseThrow(() -> new ResourceNotFoundException("Ativo nao encontrado"));
         ativo.setTicker(request.getTicker().toUpperCase());
         ativo.setNome(request.getNome());
         ativo.setTipo(TipoAtivo.valueOf(request.getTipo()));
@@ -64,30 +73,41 @@ public class InvestimentoService {
     @Transactional
     public void deletarAtivo(Long usuarioId, Long ativoId) {
         Ativo ativo = ativoRepository.findByIdAndUsuarioId(ativoId, usuarioId)
-            .orElseThrow(() -> new RuntimeException("Ativo nao encontrado"));
+            .orElseThrow(() -> new ResourceNotFoundException("Ativo nao encontrado"));
         ativoRepository.delete(ativo);
     }
 
     @Transactional
     public MovimentacaoResponse adicionarMovimentacao(Long usuarioId, Long ativoId, MovimentacaoRequest request) {
         Ativo ativo = ativoRepository.findByIdAndUsuarioId(ativoId, usuarioId)
-            .orElseThrow(() -> new RuntimeException("Ativo nao encontrado"));
+            .orElseThrow(() -> new ResourceNotFoundException("Ativo nao encontrado"));
         Usuario usuario = usuarioRepository.findById(usuarioId).orElseThrow();
 
-        TipoMovimentacao tipo = TipoMovimentacao.valueOf(request.getTipo());
-        BigDecimal valorTotal = request.getQuantidade().multiply(request.getPrecoUnitario());
+        TipoMovimentacao tipo = parseTipo(request.getTipo());
+        BigDecimal quantidade = request.getQuantidade();
+        BigDecimal preco = request.getPrecoUnitario();
+        validarValores(tipo, quantidade, preco);
+
+        BigDecimal valorTotal = quantidade.multiply(preco);
+
+        // Bloqueia venda acima da posicao antes de qualquer efeito colateral (PROB-0054).
+        if (tipo == TipoMovimentacao.VENDA && quantidade.compareTo(ativo.getQuantidade()) > 0) {
+            throw new BusinessException("Quantidade insuficiente para venda: posicao atual "
+                + ativo.getQuantidade() + ", venda solicitada " + quantidade);
+        }
 
         MovimentacaoAtivo mov = new MovimentacaoAtivo();
         mov.setAtivo(ativo);
         mov.setUsuario(usuario);
         mov.setTipo(tipo);
         mov.setData(request.getData());
-        mov.setQuantidade(request.getQuantidade());
-        mov.setPrecoUnitario(request.getPrecoUnitario());
+        mov.setQuantidade(quantidade);
+        mov.setPrecoUnitario(preco);
         mov.setValorTotal(valorTotal);
         mov = movimentacaoRepository.save(mov);
 
-        updateAtivoPosicao(ativo, tipo, request.getQuantidade(), valorTotal);
+        updateAtivoPosicao(ativo, tipo, quantidade, valorTotal);
+        integrarCaixa(usuario, ativo, mov, tipo, valorTotal, request);
 
         return MovimentacaoResponse.builder()
             .id(mov.getId())
@@ -100,16 +120,91 @@ public class InvestimentoService {
     }
 
     private void updateAtivoPosicao(Ativo ativo, TipoMovimentacao tipo, BigDecimal qtd, BigDecimal valor) {
-        if (tipo == TipoMovimentacao.COMPRA || tipo == TipoMovimentacao.BONIFICACAO) {
-            ativo.setQuantidade(ativo.getQuantidade().add(qtd));
-            ativo.setCustoTotal(ativo.getCustoTotal().add(valor));
-        } else if (tipo == TipoMovimentacao.VENDA) {
-            BigDecimal precoMedio = ativo.getCustoTotal().divide(ativo.getQuantidade(), 8, RoundingMode.HALF_UP);
-            BigDecimal custoVendido = precoMedio.multiply(qtd);
-            ativo.setQuantidade(ativo.getQuantidade().subtract(qtd));
-            ativo.setCustoTotal(ativo.getCustoTotal().subtract(custoVendido).max(BigDecimal.ZERO));
+        switch (tipo) {
+            case COMPRA -> {
+                ativo.setQuantidade(ativo.getQuantidade().add(qtd));
+                ativo.setCustoTotal(ativo.getCustoTotal().add(valor));
+            }
+            case BONIFICACAO -> {
+                // Acoes gratuitas: aumentam a quantidade sem custo, reduzindo o preco medio.
+                ativo.setQuantidade(ativo.getQuantidade().add(qtd));
+            }
+            case VENDA -> {
+                // qtd <= quantidade (validado antes), entao quantidade > 0: sem divisao por zero.
+                BigDecimal precoMedio = ativo.getCustoTotal()
+                    .divide(ativo.getQuantidade(), 8, RoundingMode.HALF_UP);
+                BigDecimal custoVendido = precoMedio.multiply(qtd);
+                ativo.setQuantidade(ativo.getQuantidade().subtract(qtd));
+                ativo.setCustoTotal(ativo.getCustoTotal().subtract(custoVendido).max(BigDecimal.ZERO));
+            }
+            case DIVIDENDO -> {
+                // Provento em caixa: nao altera quantidade nem custo da posicao.
+            }
         }
         ativoRepository.save(ativo);
+    }
+
+    private static TipoMovimentacao parseTipo(String tipo) {
+        try {
+            return TipoMovimentacao.valueOf(tipo);
+        } catch (IllegalArgumentException | NullPointerException e) {
+            throw new BusinessException("Tipo de movimentacao invalido: " + tipo);
+        }
+    }
+
+    private static void validarValores(TipoMovimentacao tipo, BigDecimal qtd, BigDecimal preco) {
+        if (qtd == null || qtd.signum() <= 0) {
+            throw new BusinessException("Quantidade deve ser positiva");
+        }
+        if (preco == null || preco.signum() < 0) {
+            throw new BusinessException("Preco unitario nao pode ser negativo");
+        }
+        // Bonificacao pode ter preco zero (acoes gratuitas); os demais exigem preco positivo.
+        if (tipo != TipoMovimentacao.BONIFICACAO && preco.signum() == 0) {
+            throw new BusinessException("Preco unitario deve ser positivo");
+        }
+    }
+
+    // Integra a movimentacao ao caixa quando uma carteira e informada (PROB-0054).
+    private void integrarCaixa(Usuario usuario, Ativo ativo, MovimentacaoAtivo mov,
+                               TipoMovimentacao tipo, BigDecimal valorTotal, MovimentacaoRequest request) {
+        if (request.getCarteiraId() == null) {
+            return; // Movimentacao apenas de posicao, sem efeito de caixa.
+        }
+
+        RegistrarMovimentoCommand.Direcao direcao;
+        switch (tipo) {
+            case COMPRA -> direcao = RegistrarMovimentoCommand.Direcao.SAIDA;
+            case VENDA, DIVIDENDO -> direcao = RegistrarMovimentoCommand.Direcao.ENTRADA;
+            default -> {
+                return; // BONIFICACAO nao movimenta caixa.
+            }
+        }
+
+        if (valorTotal.signum() <= 0) {
+            return; // Guarda extra: nada a movimentar.
+        }
+
+        TipoMovimentoCarteira tipoMov = direcao == RegistrarMovimentoCommand.Direcao.ENTRADA
+            ? TipoMovimentoCarteira.ENTRADA
+            : TipoMovimentoCarteira.SAIDA;
+
+        // A carteira precisa ser do usuario; LedgerService valida ownership com lock e
+        // bloqueia saldo insuficiente na COMPRA (permitirSaldoNegativo = false).
+        ledgerService.registrarMovimento(new RegistrarMovimentoCommand(
+            usuario.getId(),
+            request.getCarteiraId(),
+            tipoMov,
+            valorTotal,
+            direcao,
+            OrigemMovimentoCarteira.INVESTIMENTO,
+            "ATIVO",
+            ativo.getId(),
+            tipo.getDescricao() + " de " + ativo.getTicker(),
+            "MOV_ATIVO_" + mov.getId(),
+            request.getData() != null ? request.getData().atStartOfDay() : null,
+            false
+        ));
     }
 
     public List<MovimentacaoResponse> listarMovimentacoes(Long usuarioId, Long ativoId) {

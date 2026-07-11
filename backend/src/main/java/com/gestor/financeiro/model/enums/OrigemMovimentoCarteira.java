@@ -8,5 +8,6 @@ public enum OrigemMovimentoCarteira {
     FATURA_CARTAO,
     META,
     TRANSFERENCIA,
+    INVESTIMENTO,
     BACKFILL
 }
