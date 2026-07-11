@@ -1,6 +1,7 @@
 package com.gestor.financeiro.controller;
 
 import com.gestor.financeiro.dto.AlterarSenhaRequest;
+import com.gestor.financeiro.dto.ExcluirContaRequest;
 import com.gestor.financeiro.dto.UsuarioUpdateRequest;
 import com.gestor.financeiro.dto.UsuarioResponseDto;
 import com.gestor.financeiro.exception.BusinessException;
@@ -8,6 +9,7 @@ import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.repository.UsuarioRepository;
 import com.gestor.financeiro.security.AuthenticatedUserService;
+import com.gestor.financeiro.service.UsuarioExclusaoService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,6 +30,9 @@ public class UsuarioController {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private UsuarioExclusaoService usuarioExclusaoService;
 
     @GetMapping("/me")
     public ResponseEntity<UsuarioResponseDto> getCurrentUser() {
@@ -61,6 +66,23 @@ public class UsuarioController {
 
         usuario.setSenha(passwordEncoder.encode(request.getNovaSenha()));
         usuarioRepository.save(usuario);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Exclusão definitiva da conta e de todos os dados do titular (LGPD art. 18, V).
+     * Exige a senha atual como confirmação.
+     */
+    @DeleteMapping("/me")
+    public ResponseEntity<Void> excluirConta(@Valid @RequestBody ExcluirContaRequest request) {
+        Usuario usuario = usuarioRepository.findById(authenticatedUserService.getAuthenticatedUserId())
+            .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+
+        if (!passwordEncoder.matches(request.getSenha(), usuario.getSenha())) {
+            throw new BusinessException("Senha incorreta");
+        }
+
+        usuarioExclusaoService.excluirConta(usuario.getId());
         return ResponseEntity.noContent().build();
     }
 }
