@@ -99,6 +99,8 @@ public class SecurityConfig {
                 ))
             )
             .authorizeHttpRequests(auth -> {
+                // Mais específico primeiro: logout-all revoga sessões e exige usuário autenticado.
+                auth.requestMatchers("/api/auth/logout-all").authenticated();
                 auth.requestMatchers("/api/auth/**", "/actuator/health", "/actuator/info").permitAll();
 
                 // Swagger fica livre em dev e protegido em produção via app.docs.public.

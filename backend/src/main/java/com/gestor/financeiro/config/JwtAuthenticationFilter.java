@@ -35,14 +35,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         
         String requestPath = request.getRequestURI();
         log.debug("JWT filter interceptando URL {}", requestPath);
-        
-        // ✅ PULA O FILTRO PARA ROTAS PÚBLICAS
-        if (requestPath.startsWith("/api/auth/")) {
-            log.debug("Rota pública de auth detectada, pulando autenticação JWT");
-            filterChain.doFilter(request, response);
-            return;  // ← IMPORTANTE: Para aqui!
-        }
-        
+
+        // Não pulamos rotas por prefixo: endpoints públicos já são liberados no
+        // SecurityConfig (permitAll). O filtro apenas popula o SecurityContext quando
+        // há um Bearer token válido — ausência de token é inofensiva aqui. Pular
+        // "/api/auth/**" quebraria endpoints autenticados sob esse prefixo (ex.: logout-all).
         String authHeader = request.getHeader("Authorization");
         String token = null;
         String email = null;
