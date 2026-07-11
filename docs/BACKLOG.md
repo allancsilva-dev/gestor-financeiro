@@ -560,7 +560,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Resolver PROB-0031
 - **Criterio de aceite:** Botões de criar/pagar/estornar/ajustar/cancelar/excluir ficam disabled durante mutation; usuário recebe feedback visual; POSTs financeiros críticos enviam `Idempotency-Key` quando aplicável; testes ou validação manual documentada.
 - **Risco se ficar pendente:** Requisições duplicadas, mensagens de erro confusas e menor confiança em operações financeiras.
-- **Status:** ABERTO
+- **Status:** FECHADO (BUG-0051, 2026-07-11)
 
 ---
 
@@ -745,7 +745,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Definir contrato de importacao: carteira obrigatoria/opcional, conta/cartao, deduplicacao e mapeamento de categoria.
 - **Criterio de aceite:** CSV importado gera os mesmos efeitos de uma transacao criada via API normal; testes cobrem transacao com carteira, sem carteira, cartao de credito, categoria e erro parcial; nenhuma linha e persistida por `transacaoRepository.save` direto fora do fluxo central.
 - **Risco se ficar pendente:** Dados importados podem corromper saldos e relatorios.
-- **Status:** ABERTO
+- **Status:** FEITO (PROB-0049, 2026-07-10) — `ImportService` chama `transacaoService.criar()` por linha; entrada defasada no backlog.
 
 ---
 
@@ -771,7 +771,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Levantamento de dados existentes para evitar migration quebrar banco com registros legados invalidos.
 - **Criterio de aceite:** Migrations adicionam constraints para valores positivos/nao-negativos, ranges de mes/dia, total de parcelas, enum/status valido e coerencia basica; testes PostgreSQL cobrem constraints; dados legados tratados por backfill ou migration defensiva.
 - **Risco se ficar pendente:** Qualquer bug/import/script pode persistir estado financeiro invalido.
-- **Status:** ABERTO
+- **Status:** FEITO (PROB-0051, 2026-07-11) — `V20__hardening_check_constraints.sql`; validado em PostgreSQL 16 real + testes em `PostgresMigrationIT`.
 
 ---
 
@@ -784,7 +784,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Verificar se ja existem duplicidades em dados reais antes de aplicar constraint.
 - **Criterio de aceite:** Migration impede duplicidade de compra a vista e parcelada; teste PostgreSQL tenta inserir duplicata com `parcela_numero NULL` e falha; codigo continua idempotente.
 - **Risco se ficar pendente:** Compra a vista duplicada pode inflar fatura/limite.
-- **Status:** ABERTO
+- **Status:** FEITO (PROB-0052, 2026-07-11) — `V21__fatura_lancamentos_unique_null_safe.sql` com indice funcional `COALESCE(parcela_numero, 0)`; validado em PostgreSQL 16 real.
 
 ---
 
@@ -797,7 +797,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Definir DTOs/projections de repository e indices necessarios.
 - **Criterio de aceite:** Top despesas, gastos por conta, contas fixas, parcelas e faturas futuras calculadas por queries agregadas/paginadas; teste com volume representativo; endpoints mantem contrato atual.
 - **Risco se ficar pendente:** Lentidao/OOM com historico grande.
-- **Status:** ABERTO
+- **Status:** CONCLUIDO (2026-07-11) — `RelatorioService`/`ProjecaoService` migrados para queries agregadas (`SUM`/`GROUP BY`/`ORDER BY`/`Pageable`); contrato dos endpoints mantido; indices de suporte na `V23__relatorio_projecao_support_indexes.sql`; testes `RelatorioServiceTest` + `ProjecaoServiceTest`. Ver PROB-0053.
 
 ---
 
@@ -810,7 +810,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Decidir se investimentos usam carteira especifica, carteira de corretora ou novo subledger.
 - **Criterio de aceite:** Quantidade/preco positivos; venda acima da posicao retorna erro; compra debita carteira; venda credita carteira; eventos de investimento auditaveis; testes cobrem compra, venda total, venda parcial e erro de venda excedente.
 - **Risco se ficar pendente:** Patrimonio reportado diverge do dinheiro real.
-- **Status:** ABERTO
+- **Status:** FECHADO (PROB-0054, 2026-07-11) — `InvestimentoService` reescrito (venda bloqueada acima da posicao, quantidade/preco validados, tipo invalido tratado); integracao de caixa implementada como opt-in via `MovimentacaoRequest.carteiraId` + `LedgerService` com origem `INVESTIMENTO` (nova migration V22); 14 testes novos em `InvestimentoServiceTest`. Decidiu-se por integracao opcional/nao-breaking em vez de carteira obrigatoria — mobile ainda precisa passar a enviar `carteiraId` para ativar o efeito de caixa (ver proximo passo de PROB-0054).
 
 ---
 
@@ -823,7 +823,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Escolha de Redis/gateway e estrategia de chave por IP/email/rota.
 - **Criterio de aceite:** Rate limit consistente entre replicas; reinicio de uma instancia nao zera tentativas; testes cobrem 429 e headers; fallback operacional documentado.
 - **Risco se ficar pendente:** Brute force fica mais facil em escala horizontal.
-- **Status:** ABERTO
+- **Status:** FECHADO (BUG-0051, 2026-07-11) — rate limit persistido em `rate_limit_buckets` com lock pessimista; ver PROB-0055.
 
 ---
 
@@ -836,7 +836,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Confirmar storage mobile real e comportamento CORS/preflight em producao.
 - **Criterio de aceite:** Documento de threat model; testes backend para web sem CSRF (403), web com CSRF (200), mobile com contrato oficial (200), request spoofado fora do contrato (bloqueado); clientes alinhados.
 - **Risco se ficar pendente:** Ambiguidade de seguranca entre navegador e app nativo.
-- **Status:** ABERTO
+- **Status:** FECHADO (BUG-0051, 2026-07-11) — contrato web cookie+CSRF e mobile body+SecureStore separado; ver PROB-0056.
 
 ---
 
@@ -849,7 +849,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Nenhuma; pode ser feito incrementalmente junto dos fixes.
 - **Criterio de aceite:** Services tocados em fixes passam para construtor; novos services nao usam field injection; padrao documentado.
 - **Risco se ficar pendente:** Manutencao e testes ficam mais dificeis, sem impacto funcional imediato.
-- **Status:** ABERTO
+- **Status:** FECHADO (BUG-0051, 2026-07-11) — `backend/src/main/java` sem `@Autowired`; produção usa constructor injection.
 
 ---
 
@@ -862,7 +862,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Docker funcional no ambiente ou CI com Testcontainers habilitado.
 - **Criterio de aceite:** `PostgresMigrationIT` roda em CI e pelo menos um ambiente local documentado; falha por Docker indisponivel fica clara; migrations novas exigem teste PostgreSQL.
 - **Risco se ficar pendente:** Schema pode quebrar em PostgreSQL real apesar de testes unitarios passarem.
-- **Status:** ABERTO
+- **Status:** FECHADO (BUG-0051, 2026-07-11) — `scripts/verify-postgres-migrations.sh` roda `PostgresMigrationIT` contra PostgreSQL Docker real e CI usa o script.
 
 ---
 
@@ -875,7 +875,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Definir destino seguro, chave de criptografia e retencao.
 - **Criterio de aceite:** Backups criptografados; restore periodico em banco descartavel; log/alerta de falha; runbook de recuperacao; teste de restore documentado.
 - **Risco se ficar pendente:** Vazamento de dados financeiros ou backup inutil em incidente.
-- **Status:** ABERTO
+- **Status:** FECHADO (BUG-0051, 2026-07-11) — backup criptografado por padrão, restore `.gpg` e restore drill automatizado.
 
 ---
 
@@ -892,4 +892,6 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 
 ---
 
-> Mantido pelo `docs-reporter`. Ultima atualizacao: 2026-07-10 (auditoria backend/non-frontend alto nivel: BACKLOG-0058 a BACKLOG-0069 — ver PROBLEM_LEDGER PROB-0049 a PROB-0060 e relatorio `REVIEW_REPORTS/2026-07-10_backend_nonfrontend_high-level-audit.md`).
+> Mantido pelo `docs-reporter`. Ultima atualizacao: 2026-07-11 (fechamento de BACKLOG-0063/PROB-0054 — redesenho do modulo de investimentos com bloqueio de venda acima da posicao e integracao opcional de caixa via `LedgerService`).
+>
+> Atualizacao anterior: 2026-07-10 (auditoria backend/non-frontend alto nivel: BACKLOG-0058 a BACKLOG-0069 — ver PROBLEM_LEDGER PROB-0049 a PROB-0060 e relatorio `REVIEW_REPORTS/2026-07-10_backend_nonfrontend_high-level-audit.md`).

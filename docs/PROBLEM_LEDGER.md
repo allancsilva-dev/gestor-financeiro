@@ -508,7 +508,7 @@ Registro central de problemas encontrados no sistema. Mantido pelo `docs-reporte
 - **Data:** 2026-07-06
 - **Origem:** auditoria completa do sistema
 - **Severidade:** HIGH
-- **Status:** ABERTO
+- **Status:** FECHADO (BUG-0051, 2026-07-11)
 - **Area:** mobile, seguranca
 - **Sintoma:** Erros de API expoem paths internos e status codes no console de producao
 - **Causa raiz:** `console.error('[API Error]', { url: error.config?.url, status: error.response?.status })` sem condicional
@@ -613,17 +613,17 @@ Registro central de problemas encontrados no sistema. Mantido pelo `docs-reporte
 - **Data:** 2026-07-08
 - **Origem:** verificação pós-PR-LEDGER-20
 - **Severidade:** MEDIUM
-- **Status:** ABERTO
+- **Status:** FECHADO (BUG-0051, 2026-07-11)
 - **Area:** frontend, mobile, UX, integridade financeira
 - **Sintoma:** Backend possui idempotência e conflitos padronizados, mas o checklist PR-LEDGER-20 ainda marca "Web/mobile impedem duplo clique financeiro" como `PENDENTE`.
 - **Causa raiz:** PR-LEDGER-18 fechou garantias backend, mas não consolidou estados de loading/disabled/idempotency key no web/mobile para todos os comandos financeiros.
 - **Impacto tecnico:** Usuário pode disparar requisições duplicadas pela interface; backend tende a proteger, mas UX fica inconsistente e pode exibir erro/confusão.
 - **Arquivos relacionados:** telas web/mobile de criação, pagamento, ajuste, cancelamento e exclusão financeira.
 - **Solucao proposta:** Desabilitar botões durante mutations, padronizar loading state, impedir submit duplo, propagar `Idempotency-Key` nos POSTs financeiros quando aplicável.
-- **Solucao aplicada:** pendente
-- **Evidencias:** `docs/CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md` PR-LEDGER-20: "Web/mobile impedem duplo clique financeiro" = `PENDENTE`.
-- **Riscos residuais:** UX de confiança incompleta em operações financeiras de alto impacto.
-- **Proximo passo:** Criar PR frontend/mobile para fechar PR-LEDGER-18 sem ressalva.
+- **Solucao aplicada:** Locks síncronos e estado visual adicionados nas ações financeiras mais sensíveis dos clientes: pagamento de fatura web/mobile (`payingRef`), movimentação de carteira web (`movimentandoRef`), pagamento/pulo de contas fixas web/mobile (`acaoFinanceiraId`/pending), reserva em meta web (`acaoFinanceiraId`). Botões ficam `disabled` durante a mutation e exibem feedback de processamento quando aplicável.
+- **Evidencias:** `frontend/src/pages/Faturas.tsx`, `mobile/app/(app)/more/faturas.tsx`, `frontend/src/pages/Carteira.tsx`, `frontend/src/pages/ContasFixas.tsx`, `mobile/app/(app)/more/contas-fixas.tsx`, `frontend/src/pages/Metas.tsx`. Validações: frontend build PASS; mobile `tsc --noEmit` PASS; backend suite PASS.
+- **Riscos residuais:** Idempotency-Key no cliente ainda pode ser ampliado em POSTs financeiros futuros, mas duplo clique por UI ficou bloqueado nos fluxos financeiros atuais de maior impacto.
+- **Proximo passo:** Manter padrão em novas telas/mutations financeiras.
 
 ---
 
@@ -989,17 +989,17 @@ pelas parcelas não pagas, e a diferença sobre a parte já paga (fatura imutáv
 - **Data:** 2026-07-09
 - **Origem:** revisao de integracao do modulo de faturas/cartao no app mobile — verificação manual de contrato (terceira rodada da mesma sessao)
 - **Severidade:** MEDIUM
-- **Status:** ABERTO (2026-07-09) — processo defasado seguia em execução ao fim da sessão (reinício ficou a cargo do usuário); risco operacional documentado, não é bug de código
+- **Status:** FECHADO (BUG-0051, 2026-07-11) — verificação local sem listener em 8081
 - **Area:** infra
 - **Sintoma:** Durante a validação manual do contrato de compra de cartão no ambiente local (porta 8081), uma compra de cartão não gerou os lançamentos de fatura esperados e o `valorGasto` seguiu um caminho de cálculo antigo, divergente do código-fonte atual no working tree.
 - **Causa raiz:** A JVM do processo `./mvnw spring-boot:run` local havia sido iniciada às 08:17, antes das classes serem recompiladas (build mais recente às 22:00 do mesmo dia) — o processo em execução continuava servindo o bytecode carregado no boot, sem hot-reload das mudanças de `FaturaService`/`TransacaoService` feitas ao longo da sessão.
 - **Impacto tecnico:** Nenhum impacto em produção nem no código — é um artefato do fluxo de desenvolvimento local. Risco real é de falso negativo/falso positivo em validações manuais futuras: um teste manual contra um processo defasado pode indicar erroneamente que uma correção não funcionou (ou, inversamente, "funcionou" por acidente usando código antigo).
 - **Arquivos ou modulos relacionados:** Nenhum arquivo de código — processo de desenvolvimento local (`backend`, execução via `./mvnw spring-boot:run` na porta 8081).
 - **Solucao proposta:** Sempre reiniciar `./mvnw spring-boot:run` (ou equivalente) após qualquer recompilação de classes Java, antes de qualquer validação manual de contrato via requests HTTP diretos.
-- **Solucao aplicada:** O processo **não** foi reiniciado durante a sessão — a tentativa do agente de encerrar o processo foi negada por permissão (processo iniciado pelo usuário); o usuário foi orientado explicitamente a reiniciar `./mvnw spring-boot:run` antes de testar as novas telas no app mobile. A validação do comportamento correto do código atual foi feita via `FaturaCartaoWorkflowTest` (contexto de teste isolado, independente do processo de desenvolvimento de longa duração) — 7/7 PASS. Nenhuma alteração de código foi necessária.
-- **Evidencias:** Observação direta durante a sessão de validação manual (comparação entre horário de início da JVM às 08:17 e horário de recompilação das classes às 22:00, reportado pelo agente que executou a validação). Não há log persistido anexado a este registro além da observação relatada.
-- **Riscos residuais:** É um risco recorrente de ambiente de desenvolvimento local (não específico deste dia) — sempre que houver alteração de código Java com o processo `spring-boot:run` já em execução, existe risco de o processo não refletir a mudança sem reinício manual (o projeto não usa DevTools com reload automático configurado, não verificado neste registro). Nenhuma automação impede recorrência.
-- **Proximo passo:** Avaliar adicionar `spring-boot-devtools` (restart automático em mudança de classpath) ao `backend/pom.xml` para reduzir a chance de recorrência — não implementado nesta sessão por estar fora do escopo de `docs-reporter` (alteração de configuração/dependência é responsabilidade de `backend-engineer`). Registrado também como ressalva de risco operacional, não como item de backlog de produto.
+- **Solucao aplicada:** Verificação operacional em 2026-07-11 confirmou que não há processo escutando em `127.0.0.1:8081`; `nc -vz 127.0.0.1 8081` retornou `Connection refused`. Nenhuma alteração de código era necessária.
+- **Evidencias:** `lsof -nP -iTCP:8081 -sTCP:LISTEN` sem saída; `nc` com conexão recusada. `ps` amplo foi bloqueado pelo sandbox, mas a porta afetada está livre.
+- **Riscos residuais:** Risco recorrente de desenvolvimento local se `spring-boot:run` ficar aberto após recompilação. Mitigação operacional: reiniciar backend antes de validação manual HTTP.
+- **Proximo passo:** Nenhum para código. Manter disciplina de reinício em validações locais.
 
 ---
 
@@ -1031,7 +1031,7 @@ pelas parcelas não pagas, e a diferença sobre a parte já paga (fatura imutáv
 - **Data:** 2026-07-10
 - **Origem:** auditoria backend/non-frontend alto nivel
 - **Severidade:** HIGH
-- **Status:** ABERTO
+- **Status:** FECHADO (BUG-0051, 2026-07-11)
 - **Area:** backend, produto financeiro
 - **Sintoma:** `pagarFatura` bloqueia total `<= 0` e exige valor exatamente igual ao total atual.
 - **Causa raiz:** Modelo atual trata pagamento de fatura como quitacao total simples; credito/estorno e parcial ainda nao tem ledger de estado proprio.
@@ -1051,16 +1051,17 @@ pelas parcelas não pagas, e a diferença sobre a parte já paga (fatura imutáv
 - **Data:** 2026-07-10
 - **Origem:** auditoria backend/non-frontend alto nivel
 - **Severidade:** HIGH
-- **Status:** ABERTO
+- **Status:** FECHADO (2026-07-11)
 - **Area:** banco, integridade financeira
 - **Sintoma:** `transacoes.valor_total`, `parcelas.valor`, `total_parcelas`, dias de vencimento/fechamento e enums dependem majoritariamente da validacao Java.
 - **Causa raiz:** Baseline Flyway nasceu como espelho minimo do schema JPA, sem camada completa de invariantes no banco.
 - **Impacto tecnico:** Bugs, imports, scripts ou futuras rotas podem persistir estado financeiramente invalido mesmo com `ddl-auto=validate`.
 - **Arquivos relacionados:** `backend/src/main/resources/db/migration/V1__baseline_schema.sql`, migrations posteriores de fatura/investimentos/orcamento.
 - **Solucao proposta:** Adicionar migrations com `CHECK` constraints para valores positivos/nao-negativos conforme dominio, ranges de mes/dia, total de parcelas, status/tipo validos e coerencia basica.
-- **Evidencias:** `V1__baseline_schema.sql:45-75` nao tem `CHECK` para `valor_total > 0` nem parcelas validas.
-- **Riscos residuais:** Corrupcao silenciosa de dados se alguma entrada escapar da validacao da API.
-- **Proximo passo:** Criar migration de hardening e testes PostgreSQL.
+- **Solucao aplicada:** Migration `V20__hardening_check_constraints.sql` adiciona CHECK em transacoes (valor_total>0, tipo/status no dominio, total_parcelas>=1, valor_parcela>0), parcelas (numero>=1, total>=1, numero<=total, valor>0, status), contas (tipo, limite>=0, dias 1..31), carteiras (tipo), categorias (valor_esperado>=0), contas_fixas (valor_planejado>0, valor_real>=0, dia 1..31, status), metas (valor_total>0, reservado>=0, mensal>=0), orcamentos (mes 1..12, valores>=0), faturas_cartao (mes 1..12, valor_pago>=0, status), ativos (quantidade>=0 — tambem backstop de PROB-0054, custo/valor>=0, tipo), movimentacoes_ativo (quantidade>=0, preco>=0, tipo), movimentos_meta (valor>0, tipo ADICAO/REMOCAO, coerencia valor_assinado) e movimentos_carteira (tipo/origem no dominio, complementando os CHECK de valor da V11). Campos que legitimamente podem ser negativos/zero (`contas.valor_gasto`, `categorias.valor_gasto`, `carteiras.saldo`, `contas.saldo_atual`, `faturas_cartao.valor_total` por rollover/estorno) ficaram sem restricao de sinal, de proposito.
+- **Evidencias:** Validado em PostgreSQL 16 real: V1..V21 aplicam limpo; insercoes invalidas (valor_total=0, tipo/status fora do dominio, dia_vencimento=40, ativo quantidade=-1, movimento_meta incoerente) rejeitadas pelo CHECK correto; linha valida passa. Testes `checkConstraintsRejeitamValoresFinanceirosInvalidos` e `uniqueFaturaLancamentoImpedeCompraAVistaDuplicada` adicionados em `PostgresMigrationIT`.
+- **Riscos residuais:** Se algum ambiente ja tiver dado legado violando um invariante (ex.: posicao de ativo negativa por PROB-0054, ou compra a vista duplicada por PROB-0052), a migration V20/V21 falha de proposito no deploy — a correcao do dado e manual, nunca silenciosa. `PostgresMigrationIT` continua dependente de Docker valido (PROB-0058); validacao acima foi feita subindo Postgres 16 via CLI e aplicando as migrations em ordem.
+- **Proximo passo:** Nenhum. Fechar PROB-0053/0054 elimina os caminhos de codigo que hoje o banco passa a barrar.
 
 ---
 
@@ -1071,16 +1072,17 @@ pelas parcelas não pagas, e a diferença sobre a parte já paga (fatura imutáv
 - **Data:** 2026-07-10
 - **Origem:** auditoria backend/non-frontend alto nivel
 - **Severidade:** HIGH
-- **Status:** ABERTO
+- **Status:** FECHADO (2026-07-11)
 - **Area:** banco, cartao, integridade financeira
 - **Sintoma:** Compras a vista usam `parcela_numero = NULL`; PostgreSQL permite multiplas linhas iguais em unique quando coluna nullable e `NULL`.
 - **Causa raiz:** Constraint unica nao considerou semantica de `NULL` em PostgreSQL.
 - **Impacto tecnico:** Duplicidade de lancamento de compra a vista pode inflar fatura e `Conta.valorGasto`.
 - **Arquivos relacionados:** `backend/src/main/resources/db/migration/V17__fatura_lancamentos.sql`
 - **Solucao proposta:** Criar unique index funcional parcial, por exemplo com `COALESCE(parcela_numero, 0)`, ou constraints separadas para compra a vista e parcelada.
-- **Evidencias:** `V17__fatura_lancamentos.sql:11`.
-- **Riscos residuais:** Idempotencia de `registrarCompraCartao` depende de codigo; banco nao garante sozinho.
-- **Proximo passo:** Migration + teste PostgreSQL cobrindo duplicidade com `NULL`.
+- **Solucao aplicada:** Migration `V21__fatura_lancamentos_unique_null_safe.sql` remove a unique constraint inline da V17 (via bloco `DO` que localiza a constraint por `pg_constraint`, sem depender do nome auto-gerado) e cria `CREATE UNIQUE INDEX ux_fatura_lancamentos_unico ON fatura_lancamentos (fatura_id, transacao_id, COALESCE(parcela_numero, 0))`. Parcelas reais sao numeradas a partir de 1, entao 0 nunca colide com parcela valida. Confirmado que AJUSTE/ESTORNO (tambem `parcela_numero` NULL) nao colidem entre si porque `ressincronizarCompraCartao`/`cancelarCompraCartao` removem antes todos os lancamentos abertos da transacao — no maximo um lancamento NULL por (fatura, transacao).
+- **Evidencias:** Validado em PostgreSQL 16 real: duplicata de compra a vista (`parcela_numero` NULL) agora rejeitada por `ux_fatura_lancamentos_unico` (era o bug); parcela 1 coexiste com a a vista (COALESCE=1 != 0); parcela duplicada rejeitada. Teste `uniqueFaturaLancamentoImpedeCompraAVistaDuplicada` em `PostgresMigrationIT`.
+- **Riscos residuais:** Se um ambiente ja tiver duplicata legada (fatura, transacao, parcela NULL), o `CREATE UNIQUE INDEX` falha de proposito no deploy — dedupe manual (nunca silencioso, por ser lancamento financeiro). Idempotencia de `registrarCompraCartao` no codigo continua valendo, agora com o banco como backstop.
+- **Proximo passo:** Nenhum.
 
 ---
 
@@ -1091,16 +1093,18 @@ pelas parcelas não pagas, e a diferença sobre a parte já paga (fatura imutáv
 - **Data:** 2026-07-10
 - **Origem:** auditoria backend/non-frontend alto nivel
 - **Severidade:** HIGH
-- **Status:** ABERTO
+- **Status:** RESOLVIDO (2026-07-11)
 - **Area:** backend, performance, banco
 - **Sintoma:** Relatorio carrega transacoes do periodo para top despesas/gastos por conta; projecao carrega contas fixas, parcelas e faturas e filtra em Java.
 - **Causa raiz:** Dashboard foi otimizado para SQL, mas relatorios/projecoes mantiveram padrao antigo.
 - **Impacto tecnico:** Lentidao, alto consumo de memoria e risco de OOM com historico grande.
 - **Arquivos relacionados:** `backend/src/main/java/com/gestor/financeiro/service/RelatorioService.java`, `backend/src/main/java/com/gestor/financeiro/service/ProjecaoService.java`
 - **Solucao proposta:** Substituir por queries agregadas/paginadas no banco (`SUM`, `GROUP BY`, `ORDER BY`, `LIMIT`) e indices coerentes.
-- **Evidencias:** `RelatorioService.java:52-63`, `ProjecaoService.java:82-120`.
-- **Riscos residuais:** Produto pode degradar exatamente onde usuario espera confianca: fechamento mensal e previsao.
-- **Proximo passo:** Refatorar por repositorios agregados e adicionar testes de contrato.
+- **Solucao aplicada:** `RelatorioService` deixou de carregar `findByUsuarioIdAndDataBetween` em memoria. Tres queries agregadas novas em `TransacaoRepository`: `findMaioresDespesas` (LEFT JOIN categoria, `ORDER BY valorTotal DESC` + `Pageable(0,10)`), `sumSaidasAgrupadoPorConta` (`GROUP BY` conta, `ORDER BY SUM DESC` + `Pageable(0,8)`) e `countSaidasByUsuarioIdAndPeriodo`. `ProjecaoService` trocou os tres helpers (`somarContasFixasNoMes`/`somarParcelasNoMes`/`somarFaturasEmAberto`) por `SUM(COALESCE(...))` no banco: `ContaFixaRepository.somarPlanejadoNoPeriodo`, `ParcelaRepository.somarValorNoPeriodo` e `FaturaCartaoRepository.somarValorTotalPorStatusNoPeriodo`. Efeito colateral corretivo: as novas queries filtram `ativa = true`, alinhando maiores despesas / gasto por conta / contagem aos totais (antes o load em memoria incluia transacoes canceladas — coerente com PROB-0035).
+- **Evidencias:** Testes `RelatorioServiceTest` (3) e `ProjecaoServiceTest` (2) validam agregacao no banco (SQL logado com `group by`/`order by`/`fetch first N rows only`), ordenacao, limite, cor padrao sem categoria, exclusao de ENTRADA e canceladas, e exclusao de conta fixa PAGA. Suite completa: 121 testes, 0 falhas.
+- **Indices de suporte:** Migration `V23__relatorio_projecao_support_indexes.sql` adiciona `idx_transacoes_usuario_tipo_data_ativa (usuario_id, tipo, data) WHERE ativa = true` (parcial, casa com relatorio/dashboard), `idx_contas_fixas_usuario_vencimento_ativo (usuario_id, data_proximo_vencimento) WHERE ativo = true` e `idx_faturas_usuario_status_vencimento (usuario_id, status, data_vencimento)`. Gasto por conta ja usava `idx_transacoes_conta`. Validado aplicando V1..V23 em PostgreSQL 16 real (via psql em container descartavel, ja que Testcontainers nao sobe aqui — PROB-0058): todas as migrations aplicam limpo e os 3 indices sao criados.
+- **Riscos residuais:** Projecao ainda emite ~3 queries por mes projetado (N pequeno), nao mais N loads de tabela cheia.
+- **Proximo passo:** Se necessario, colapsar as somas mensais da projecao em uma unica query agrupada por mes.
 
 ---
 
@@ -1111,16 +1115,17 @@ pelas parcelas não pagas, e a diferença sobre a parte já paga (fatura imutáv
 - **Data:** 2026-07-10
 - **Origem:** auditoria backend/non-frontend alto nivel
 - **Severidade:** HIGH
-- **Status:** ABERTO
+- **Status:** FECHADO (2026-07-11)
 - **Area:** backend, investimentos, integridade financeira
 - **Sintoma:** Venda calcula preco medio e subtrai quantidade sem validar posicao suficiente.
 - **Causa raiz:** Modulo de investimentos foi implementado como controle isolado de posicao, nao como evento financeiro integrado ao ledger.
 - **Impacto tecnico:** Quantidade negativa, custo medio incorreto, patrimonio/investimentos desconectados do saldo real.
-- **Arquivos relacionados:** `backend/src/main/java/com/gestor/financeiro/service/InvestimentoService.java`
+- **Arquivos relacionados:** `backend/src/main/java/com/gestor/financeiro/service/InvestimentoService.java`, `backend/src/main/java/com/gestor/financeiro/dto/MovimentacaoRequest.java`, `backend/src/main/java/com/gestor/financeiro/model/enums/OrigemMovimentoCarteira.java`, `backend/src/main/resources/db/migration/V22__movimentos_carteira_origem_investimento.sql`, `backend/src/test/java/com/gestor/financeiro/InvestimentoServiceTest.java`
 - **Solucao proposta:** Validar quantidade/preco positivos, bloquear venda acima da posicao, integrar compras/vendas a carteira/ledger e registrar eventos auditaveis.
-- **Evidencias:** `InvestimentoService.java:102-110`.
-- **Riscos residuais:** Patrimonio e caixa ficam inconsistentes se usuario usar investimentos de forma real.
-- **Proximo passo:** Redesenhar fluxo de movimentacao de ativos antes de expandir o modulo.
+- **Solucao aplicada:** `InvestimentoService.adicionarMovimentacao`/`updateAtivoPosicao` reescritos: (1) VENDA bloqueia quantidade acima da posicao atual com `BusinessException` ("Quantidade insuficiente para venda..."), eliminando quantidade negativa e a divisao por zero de VENDA com posicao 0; (2) quantidade sempre > 0, preco >= 0 e > 0 exceto BONIFICACAO (acoes gratuitas com preco 0), tipo invalido agora vira `BusinessException` em vez de 500; (3) DIVIDENDO nao altera quantidade nem custo (provento em caixa); BONIFICACAO aumenta quantidade com custo ZERO, reduzindo preco medio (antes somava `valorTotal` ao custo indevidamente); (4) integracao de caixa **opcional e nao-breaking** via novo campo `MovimentacaoRequest.carteiraId` — se informado, COMPRA debita (SAIDA) e VENDA/DIVIDENDO creditam (ENTRADA) o caixa via `LedgerService.registrarMovimento` com origem `INVESTIMENTO` (novo valor em `OrigemMovimentoCarteira`), `referenciaTipo="ATIVO"`, `referenciaId=ativo.id`, `idempotencyKey="MOV_ATIVO_<movId>"`; COMPRA com carteira valida saldo suficiente (`permitirSaldoNegativo=false`) e ownership com lock via `LedgerService`; se `carteiraId` ausente, so atualiza posicao (compativel com o mobile atual, que ainda nao envia `carteiraId`); BONIFICACAO nunca move caixa; (5) lookups de ativo migrados de `RuntimeException` para `ResourceNotFoundException`. Migration `V22__movimentos_carteira_origem_investimento.sql` estende o CHECK `chk_movimentos_carteira_origem` (criado na V20/PROB-0051) para aceitar o novo valor `INVESTIMENTO` — fecha o "proximo passo" ja previsto em PROB-0051, onde o backstop de banco (`ativo.quantidade>=0`) ja existia mas sem o caminho de codigo correspondente barrado na aplicacao.
+- **Evidencias:** `InvestimentoServiceTest.java` (novo, 14 testes) cobre: venda acima da posicao rejeitada, venda sem posicao nao divide por zero, quantidade/preco nao-positivos rejeitados, tipo invalido, bonificacao sem custo, dividendo sem alterar posicao, compra/venda/dividendo movimentando caixa, saldo insuficiente na compra, origem `INVESTIMENTO`, sem-carteira nao gera movimento. Suite completa: 116 testes, 0 falha, BUILD SUCCESS. Migration V22 (chain V1..V22) aplicada limpa em PostgreSQL 16 real via Docker CLI (Testcontainers segue indisponivel — ver PROB-0058); CHECK confirmado aceitando `INVESTIMENTO` e rejeitando valor fora do dominio.
+- **Riscos residuais:** Integracao de caixa e opt-in por request; enquanto o mobile nao enviar `carteiraId`, patrimonio de investimentos e caixa seguem desacoplados (por escolha de produto, nao-breaking). Migrations V20/V21/V22 ainda nao commitadas/deployadas; PROB-0058 (Testcontainers sem Docker socket) segue aberto.
+- **Proximo passo:** Mobile passar a enviar `carteiraId` nas movimentacoes de ativo para ativar a integracao de caixa opcional ja implementada. Commit/deploy das migrations V20-V22 pendente (fora do escopo deste agente).
 
 ---
 
@@ -1131,16 +1136,17 @@ pelas parcelas não pagas, e a diferença sobre a parte já paga (fatura imutáv
 - **Data:** 2026-07-10
 - **Origem:** auditoria backend/non-frontend alto nivel
 - **Severidade:** MEDIUM
-- **Status:** ABERTO
+- **Status:** FECHADO (BUG-0051, 2026-07-11)
 - **Area:** backend, seguranca, infra
 - **Sintoma:** Tentativas sao contadas apenas dentro da JVM atual.
 - **Causa raiz:** Implementacao simples local, sem store distribuido.
 - **Impacto tecnico:** Em multi-instancia, atacante distribui tentativas entre replicas; reinicio limpa historico.
 - **Arquivos relacionados:** `backend/src/main/java/com/gestor/financeiro/config/LoginRateLimitFilter.java`
-- **Solucao proposta:** Migrar para Redis/Bucket4j ou outro rate limiter distribuido, com chave por rota/IP/email quando fizer sentido.
-- **Evidencias:** `LoginRateLimitFilter.java:50`.
-- **Riscos residuais:** Protecao de brute force depende da topologia.
-- **Proximo passo:** Planejar Redis ou gateway rate limit antes de escala horizontal.
+- **Solucao proposta:** Migrar para store compartilhado. Redis/Bucket4j era uma opção; como o sistema já depende de PostgreSQL, foi adotado bucket transacional no banco para evitar nova infraestrutura.
+- **Solucao aplicada:** Criado `RateLimitBucket` + `RateLimitBucketRepository` + `RateLimitService`. `LoginRateLimitFilter` deixou de usar `ConcurrentHashMap` e chama `RateLimitService.consume()`, que usa lock pessimista por chave no banco. Migration `V24__rate_limit_buckets.sql` cria tabela e índice. Limpeza periódica remove buckets expirados.
+- **Evidencias:** Testes `AuthControllerTest`/`SecurityTest` PASS; backend suite PASS; `scripts/verify-postgres-migrations.sh` PASS validando `V24` em PostgreSQL real.
+- **Riscos residuais:** Rate limit depende do PostgreSQL estar disponível; isso é aceitável porque a API também depende do banco para autenticação.
+- **Proximo passo:** Nenhum imediato. Avaliar Redis/gateway apenas se volume/latência justificar.
 
 ---
 
@@ -1151,16 +1157,17 @@ pelas parcelas não pagas, e a diferença sobre a parte já paga (fatura imutáv
 - **Data:** 2026-07-10
 - **Origem:** auditoria backend/non-frontend alto nivel
 - **Severidade:** MEDIUM
-- **Status:** ABERTO
+- **Status:** FECHADO (BUG-0051, 2026-07-11)
 - **Area:** backend, seguranca, mobile
 - **Sintoma:** `RefreshTokenCsrfFilter` retorna sem validar CSRF quando header mobile esta presente.
 - **Causa raiz:** Cliente nativo nao usa o mesmo modelo de cookie/CSRF do navegador; backend aceita header declarativo.
 - **Impacto tecnico:** Se o backend confiar em header spoofavel sem outra garantia, o limite entre cliente web e mobile fica fraco. O risco pratico depende de CORS, cookies, storage mobile e envio de refresh token no body.
 - **Arquivos relacionados:** `backend/src/main/java/com/gestor/financeiro/config/RefreshTokenCsrfFilter.java`, `backend/src/main/java/com/gestor/financeiro/controller/AuthController.java`
-- **Solucao proposta:** Documentar threat model e separar contratos: web cookie+CSRF; mobile refresh token no body/secure storage sem cookie, ou exigir header adicional nao spoofavel por browser conforme CORS/preflight.
-- **Evidencias:** `RefreshTokenCsrfFilter.java:45-47`; `AuthController` retorna refresh token no body para header mobile.
-- **Riscos residuais:** Ambiguidade de seguranca entre web e mobile.
-- **Proximo passo:** Definir contrato oficial de sessao mobile e adicionar testes.
+- **Solucao proposta:** Documentar e aplicar contratos separados: web usa cookie HttpOnly + double-submit CSRF; mobile usa refresh token no body, armazenado em SecureStore, sem cookies.
+- **Solucao aplicada:** `RefreshTokenCsrfFilter` agora bloqueia request com `X-Client-Type: mobile` se houver cookie `refreshToken` (`MOBILE_COOKIE_REFRESH_NOT_ALLOWED`). `AuthController` em modo mobile emite/rotaciona refresh token apenas no body e não envia `Set-Cookie`; refresh/logout mobile resolvem token só pelo body. Axios mobile passou a `withCredentials:false` e removeu CSRF do refresh/logout.
+- **Evidencias:** Novo teste `mobile_deveRejeitarRefreshTokenViaCookieMesmoComHeaderMobile`; teste mobile de refresh body-only; `AuthControllerTest`/`SecurityTest` PASS; mobile `tsc --noEmit` PASS.
+- **Riscos residuais:** Segurança mobile depende de SecureStore e proteção do dispositivo, conforme threat model nativo.
+- **Proximo passo:** Nenhum imediato.
 
 ---
 
@@ -1171,16 +1178,17 @@ pelas parcelas não pagas, e a diferença sobre a parte já paga (fatura imutáv
 - **Data:** 2026-07-10
 - **Origem:** auditoria backend/non-frontend alto nivel
 - **Severidade:** MEDIUM
-- **Status:** ABERTO
+- **Status:** FECHADO (BUG-0051, 2026-07-11)
 - **Area:** backend, qualidade
 - **Sintoma:** 135 usos de `@Autowired` em `backend/src/main/java`.
 - **Causa raiz:** Padrao historico de injecao por campo nos controllers/services/configs.
 - **Impacto tecnico:** Dificulta testes unitarios puros, construcao de objetos, imutabilidade e leitura de dependencias obrigatorias.
 - **Arquivos relacionados:** multiplos arquivos em `backend/src/main/java/com/gestor/financeiro`.
 - **Solucao proposta:** Migrar gradualmente para constructor injection, priorizando services financeiros e filtros/configuracoes.
-- **Evidencias:** `rg "@Autowired" backend/src/main/java -c`.
-- **Riscos residuais:** Baixo risco funcional, medio risco de manutencao.
-- **Proximo passo:** Aplicar por modulo durante fixes, sem refatoracao massiva isolada.
+- **Solucao aplicada:** Sweep completo em `backend/src/main/java`: controllers, services, config e security migrados para constructor injection com dependencias `final` e `@RequiredArgsConstructor`. Novos `LoginRateLimitFilter`/`RateLimitService` já nasceram com injeção por construtor.
+- **Evidencias:** `rg "@Autowired" backend/src/main/java` sem ocorrencias; backend compile PASS; backend suite PASS.
+- **Riscos residuais:** Testes Spring ainda usam `@Autowired`, aceitavel para testes de integracao/contexto Spring e fora do escopo de producao.
+- **Proximo passo:** Nenhum imediato.
 
 ---
 
@@ -1191,16 +1199,17 @@ pelas parcelas não pagas, e a diferença sobre a parte já paga (fatura imutáv
 - **Data:** 2026-07-10
 - **Origem:** auditoria backend/non-frontend alto nivel
 - **Severidade:** MEDIUM
-- **Status:** ABERTO
+- **Status:** FECHADO (BUG-0051, 2026-07-11)
 - **Area:** testes, infra
 - **Sintoma:** Suite unit/slice passa, mas integration-test PostgreSQL nao roda no ambiente local auditado.
 - **Causa raiz:** Docker/Testcontainers indisponivel ou mal configurado no host.
 - **Impacto tecnico:** Validação real de Flyway/PostgreSQL fica dependente de CI ou ambiente manual.
 - **Arquivos relacionados:** `backend/src/test/java/com/gestor/financeiro/PostgresMigrationIT.java`, profile `integration-test`.
-- **Solucao proposta:** Garantir Docker funcional no ambiente de dev/CI, documentar requisito e opcionalmente marcar IT com skip explicito quando Docker indisponivel.
-- **Evidencias:** `verify -Pintegration-test` -> `Could not find a valid Docker environment`.
-- **Riscos residuais:** Schema pode passar em H2/unit e falhar em PostgreSQL real se CI nao executar.
-- **Proximo passo:** Rodar em CI ou corrigir Docker local.
+- **Solucao proposta:** Garantir execução real em PostgreSQL no CI/dev sem mascarar erro por skip.
+- **Solucao aplicada:** `PostgresMigrationIT` agora aceita PostgreSQL externo via `POSTGRES_IT_JDBC_URL`/`POSTGRES_IT_USERNAME`/`POSTGRES_IT_PASSWORD`; se env ausente, ainda tenta Testcontainers. Novo script `scripts/verify-postgres-migrations.sh` sobe PostgreSQL 16 descartável via Docker CLI, executa `PostgresMigrationIT` contra ele e remove o container. CI passou a usar esse script como gate real de migrations.
+- **Evidencias:** `scripts/verify-postgres-migrations.sh` PASS local; Docker CLI `docker run --rm hello-world` PASS; `mvn verify -Pintegration-test` ainda falha neste host por bug/socket do Testcontainers, mas o gate real via Docker CLI cobre o mesmo objetivo sem skip.
+- **Riscos residuais:** Testcontainers puro ainda depende de ambiente Docker compatível; CI/local usam script canônico para validação real.
+- **Proximo passo:** Usar `scripts/verify-postgres-migrations.sh` para validar migrations novas.
 
 ---
 
@@ -1211,16 +1220,17 @@ pelas parcelas não pagas, e a diferença sobre a parte já paga (fatura imutáv
 - **Data:** 2026-07-10
 - **Origem:** auditoria backend/non-frontend alto nivel
 - **Severidade:** MEDIUM
-- **Status:** ABERTO
+- **Status:** FECHADO (BUG-0051, 2026-07-11)
 - **Area:** infra, seguranca, operacao
 - **Sintoma:** `pg_dump` gera arquivo local/volume; restore e manual com confirmacao humana.
 - **Causa raiz:** Backup implementado como rotina basica, nao como plano operacional completo.
 - **Impacto tecnico:** Vazamento de backup expõe dados financeiros; backup pode ser inutil se restore nunca for testado.
 - **Arquivos relacionados:** `scripts/backup-db.sh`, `scripts/restore-db.sh`, `docker-compose.vps.yml`
-- **Solucao proposta:** Criptografar backups, registrar retencao/local seguro, automatizar restore drill em banco descartavel e alertar falhas.
-- **Evidencias:** Scripts atuais nao usam criptografia nem job de restore validation.
-- **Riscos residuais:** Perda de dados ou vazamento de dados sensiveis em incidente.
-- **Proximo passo:** Criar runbook e automacao de restore drill.
+- **Solucao proposta:** Criptografar backups, registrar retenção/local seguro, automatizar restore drill em banco descartável e alertar falhas.
+- **Solucao aplicada:** `scripts/backup-db.sh` agora bloqueia backup sem criptografia por padrão e suporta `BACKUP_GPG_RECIPIENT` ou `BACKUP_ENCRYPTION_PASSPHRASE` (AES256). `scripts/restore-db.sh` restaura `.sql.gz` e `.sql.gz.gpg`, com modo não interativo controlado por `RESTORE_ASSUME_YES=true`. Novo `scripts/restore-drill-db.sh` automatiza restore em banco descartável e valida tabelas básicas. `docker-compose.vps.yml` usa imagem própria `deploy/vps/Dockerfile.postgres-backup` com `gnupg`, exige `BACKUP_ENCRYPTION_PASSPHRASE` e gera `.sql.gz.gpg`.
+- **Evidencias:** `bash -n scripts/backup-db.sh scripts/restore-db.sh scripts/restore-drill-db.sh` PASS; frontend/mobile/backend validações PASS.
+- **Riscos residuais:** Restore drill precisa ser agendado em ambiente operacional com banco descartável e chave gerenciada fora do repositório.
+- **Proximo passo:** Configurar secret `BACKUP_ENCRYPTION_PASSPHRASE` no VPS e agendar restore drill.
 
 ---
 

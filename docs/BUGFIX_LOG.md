@@ -4,6 +4,27 @@ Registro de bugs corrigidos. Mantido pelo `docs-reporter`.
 
 ---
 
+## BUG-0051 — PROB MEDIUM: rate limit distribuído, sessão mobile, duplo clique financeiro, PostgreSQL real e backup seguro
+
+- **Problema relacionado:** PROB-0031, PROB-0048, PROB-0055, PROB-0056, PROB-0057, PROB-0058, PROB-0059
+- **Data:** 2026-07-11
+- **Area:** backend, frontend, mobile, infra, segurança, operação
+- **Sintoma:** PROBs MEDIUM abertos cobriam duplo clique financeiro nos clientes, rate limit local em memória, contrato CSRF mobile ambíguo, validação PostgreSQL real dependente de Testcontainers quebrado no host, backup sem criptografia/restore drill e field injection em módulos centrais.
+- **Correcao aplicada:**
+  1. `LoginRateLimitFilter` passou a usar `RateLimitService` com tabela `rate_limit_buckets` e lock pessimista (`V24__rate_limit_buckets.sql`), eliminando `ConcurrentHashMap` local.
+  2. Contrato de sessão separado: web usa cookie HttpOnly + CSRF; mobile usa refresh token no body/SecureStore, sem `Set-Cookie` e com bloqueio de cookie em request mobile.
+  3. Web/mobile receberam locks/disabled para ações financeiras críticas: pagar fatura, movimentar carteira, pagar/pular conta fixa e reservar meta.
+  4. `PostgresMigrationIT` aceita PostgreSQL externo; `scripts/verify-postgres-migrations.sh` sobe PostgreSQL via Docker CLI e virou gate no CI.
+  5. Backup passou a exigir criptografia (`BACKUP_GPG_RECIPIENT` ou `BACKUP_ENCRYPTION_PASSPHRASE`), restore aceita `.gpg`, e `restore-drill-db.sh` automatiza drill em banco descartável; compose VPS gera `.sql.gz.gpg`.
+  6. Sweep completo de `@Autowired` em `backend/src/main/java`: controllers, services, config e security passaram para constructor injection com dependencias `final` e `@RequiredArgsConstructor`.
+- **Arquivos alterados:** `LoginRateLimitFilter.java`, `RateLimitService.java`, `RateLimitBucket.java`, `RateLimitBucketRepository.java`, `V24__rate_limit_buckets.sql`, `RefreshTokenCsrfFilter.java`, `AuthController.java`, `mobile/src/services/api.ts`, `mobile/src/services/authService.ts`, `frontend/src/pages/Faturas.tsx`, `frontend/src/pages/Carteira.tsx`, `frontend/src/pages/ContasFixas.tsx`, `frontend/src/pages/Metas.tsx`, `mobile/app/(app)/more/faturas.tsx`, `mobile/app/(app)/more/contas-fixas.tsx`, `PostgresMigrationIT.java`, `scripts/verify-postgres-migrations.sh`, `scripts/backup-db.sh`, `scripts/restore-db.sh`, `scripts/restore-drill-db.sh`, `docker-compose.vps.yml`, `deploy/vps/Dockerfile.postgres-backup`, `.github/workflows/ci.yml`
+- **Testes/validacoes executadas:** `AuthControllerTest,SecurityTest` PASS; backend `./mvnw -q test` PASS; frontend `npm run build -- --mode production` PASS; mobile `npm run lint` (`tsc --noEmit`) PASS; `scripts/verify-postgres-migrations.sh` PASS; `bash -n scripts/backup-db.sh scripts/restore-db.sh scripts/restore-drill-db.sh` PASS; `rg "@Autowired" backend/src/main/java` sem ocorrencias; `nc -vz 127.0.0.1 8081` confirmou porta 8081 sem backend local.
+- **Resultado:** PASS_COM_RESSALVA
+- **Ressalvas:** `mvn verify -Pintegration-test` ainda falha neste host porque Testcontainers recebe resposta inválida do socket Docker Desktop, apesar do Docker CLI rodar containers. O gate canônico agora é `scripts/verify-postgres-migrations.sh`. Testes Spring ainda usam `@Autowired`, aceitavel para testes de integracao/contexto Spring.
+- **Commit:** pendente
+
+---
+
 ## BUG-0047 — logout-all quebrado (NPE/500) por skip do filtro JWT em /api/auth/**
 
 - **Problema relacionado:** Auditoria de segurança 2026-07-10
@@ -847,6 +868,38 @@ Registro de bugs corrigidos. Mantido pelo `docs-reporter`.
 - **Testes/validacoes executadas:** `npx tsc --noEmit` PASS no mobile (script `lint`).
 - **Resultado:** PASS
 - **Ressalvas:** Mudanças visuais/a11y — validar no Expo nos dois temas (onboarding e auth). Demais telas `more/` (faturas, contas-fixas, investimentos, ...) ainda têm inputs manuais fora do `Field` — mesmo padrão, pendente de replicação. Verificações Entrance/ScreenTransition/FloatEmoji: já respeitavam Reduce Motion (nenhuma ação).
+
+---
+
+## BUG-0049 — Investimentos: venda acima da posição, divisão por zero e 500 em tipo inválido
+
+- **Problema relacionado:** PROB-0054
+- **Data:** 2026-07-11
+- **Area:** backend, investimentos, integridade financeira
+- **Sintoma:** `InvestimentoService.adicionarMovimentacao` permitia VENDA com quantidade maior que a posição atual (quantidade final negativa), dividia por zero ao calcular preço médio em VENDA com posição zero, lançava `RuntimeException` genérica (500) para tipo de movimentação inválido, e BONIFICACAO somava `valorTotal` ao custo indevidamente (deveria ser custo zero, reduzindo o preço médio).
+- **Causa raiz:** `adicionarMovimentacao`/`updateAtivoPosicao` implementados como atualização aritmética direta sobre `Ativo.quantidade`/`custoTotal` sem validação de domínio nem tratamento por tipo de movimentação (COMPRA/VENDA/DIVIDENDO/BONIFICACAO).
+- **Correcao aplicada:** Reescrita de `adicionarMovimentacao` e `updateAtivoPosicao`: VENDA acima da posição rejeitada com `BusinessException` ("Quantidade insuficiente para venda..."); quantidade sempre > 0 e preço >= 0 (> 0 exceto BONIFICACAO); tipo inválido vira `BusinessException` em vez de exceção não tratada; DIVIDENDO não altera quantidade/custo; BONIFICACAO usa custo ZERO. Lookups de ativo migrados de `RuntimeException` para `ResourceNotFoundException`. Adicionalmente, integração opcional de caixa: novo campo `MovimentacaoRequest.carteiraId` — se informado, COMPRA debita e VENDA/DIVIDENDO creditam a carteira via `LedgerService.registrarMovimento` (nova origem `INVESTIMENTO`).
+- **Arquivos alterados:** `backend/src/main/java/com/gestor/financeiro/service/InvestimentoService.java`, `backend/src/main/java/com/gestor/financeiro/dto/MovimentacaoRequest.java`, `backend/src/main/java/com/gestor/financeiro/model/enums/OrigemMovimentoCarteira.java`, `backend/src/main/resources/db/migration/V22__movimentos_carteira_origem_investimento.sql`, `backend/src/test/java/com/gestor/financeiro/InvestimentoServiceTest.java` (novo).
+- **Testes/validacoes executadas:** 14 novos testes em `InvestimentoServiceTest` (venda acima da posição, venda sem posição não divide por zero, quantidade/preço não positivos, tipo inválido, bonificação sem custo, dividendo sem alterar posição, compra/venda/dividendo movimentando caixa, saldo insuficiente na compra, origem `INVESTIMENTO`, sem carteira não gera movimento). Suite completa: 116 testes, 0 falha. Migration V22 (chain V1..V22) aplicada em PostgreSQL 16 real via Docker CLI; CHECK confirmado aceitando `INVESTIMENTO` e rejeitando valor fora do domínio.
+- **Resultado:** PASS
+- **Ressalvas:** Integração de caixa é opt-in — enquanto o mobile não enviar `carteiraId`, patrimônio de investimentos e caixa seguem desacoplados (decisão de produto, não regressão). Migrations V20/V21/V22 e as mudanças de código deste fix ainda não commitadas/deployadas. `PostgresMigrationIT` segue dependente de Docker (PROB-0058).
+- **Commit:** pendente
+
+---
+
+## BUG-0050 — Relatório somava transações canceladas em maiores despesas, gasto por conta e contagem
+
+- **Problema relacionado:** PROB-0053 (também PROB-0035)
+- **Data:** 2026-07-11
+- **Area:** backend, relatórios, performance
+- **Sintoma:** No relatório, `totalEntradas`/`totalSaidas` já excluíam transações canceladas (`ativa = false`), mas "maiores despesas", "gasto por conta" e a contagem de transações vinham de `findByUsuarioIdAndDataBetween` — que **não filtrava `ativa`** — então uma SAIDA cancelada aparecia entre as maiores despesas, somava no gasto por conta e inflava a contagem, divergindo dos totais. Em paralelo, relatórios e projeções carregavam listas completas em memória (risco de OOM com histórico grande).
+- **Causa raiz:** `RelatorioService` e `ProjecaoService` mantiveram o padrão antigo de carregar entidades e filtrar/somar em Java (o dashboard já havia migrado para SQL). O load em memória do relatório usava uma query sem o predicado `ativa = true`.
+- **Correcao aplicada:** `RelatorioService` migrado para 3 queries agregadas em `TransacaoRepository` (`findMaioresDespesas` com LEFT JOIN categoria + `ORDER BY valorTotal DESC` + `Pageable(0,10)`; `sumSaidasAgrupadoPorConta` com `GROUP BY` conta + `ORDER BY SUM DESC` + `Pageable(0,8)`; `countSaidasByUsuarioIdAndPeriodo`) — todas filtrando `ativa = true`, alinhando os três blocos aos totais. `ProjecaoService` trocou os helpers por `SUM(COALESCE(...))` no banco (`ContaFixaRepository.somarPlanejadoNoPeriodo`, `ParcelaRepository.somarValorNoPeriodo`, `FaturaCartaoRepository.somarValorTotalPorStatusNoPeriodo`). Contrato dos endpoints mantido.
+- **Arquivos alterados:** `backend/src/main/java/com/gestor/financeiro/service/RelatorioService.java`, `.../service/ProjecaoService.java`, `.../repository/TransacaoRepository.java`, `.../repository/ContaFixaRepository.java`, `.../repository/ParcelaRepository.java`, `.../repository/FaturaCartaoRepository.java`, `backend/src/main/resources/db/migration/V23__relatorio_projecao_support_indexes.sql` (novo), `backend/src/test/java/com/gestor/financeiro/RelatorioServiceTest.java` (novo), `.../ProjecaoServiceTest.java` (novo).
+- **Testes/validacoes executadas:** `RelatorioServiceTest` (3: totais ignorando ENTRADA e cancelada, maiores despesas ordenadas/limitadas/cor padrão sem categoria, gasto por conta agrupado/ordenado/tipo resolvido) e `ProjecaoServiceTest` (2: soma conta fixa pendente do mês e ignora paga, sem lançamentos mantém saldo). SQL logado confirma `group by`/`order by`/`fetch first N rows only`. Suíte completa: 121 testes, 0 falha. Migrations V1..V23 aplicadas em PostgreSQL 16 real (psql em container descartável); 3 índices de suporte criados (2 parciais `WHERE ativa/ativo = true` + 1 composto).
+- **Resultado:** PASS
+- **Ressalvas:** Índices de suporte não validados via `PostgresMigrationIT` (segue dependente de Docker/Testcontainers — PROB-0058); validação feita por psql direto. Projeção ainda emite ~3 queries por mês projetado (N pequeno). Mudanças ainda não commitadas.
+- **Commit:** pendente
 
 ---
 
