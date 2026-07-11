@@ -1,6 +1,7 @@
 package com.gestor.financeiro.controller;
 
 import lombok.RequiredArgsConstructor;
+import com.gestor.financeiro.config.IdempotencyFilter;
 import com.gestor.financeiro.dto.FaturaResponse;
 import com.gestor.financeiro.dto.ValorRequest;
 import com.gestor.financeiro.security.AuthenticatedUserService;
@@ -52,9 +53,11 @@ public class FaturaController {
     @Operation(summary = "Pagar fatura")
     public ResponseEntity<FaturaResponse> pagarFatura(
             @PathVariable Long id,
+            @RequestHeader(value = IdempotencyFilter.HEADER, required = false) String idempotencyKey,
             @Valid @RequestBody ValorRequest request) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         BigDecimal valor = request.getValor();
-        return ResponseEntity.ok(faturaService.pagarFatura(usuarioId, id, valor, request.getCarteiraId()));
+        return ResponseEntity.ok(faturaService.pagarFatura(
+                usuarioId, id, valor, request.getCarteiraId(), idempotencyKey));
     }
 }

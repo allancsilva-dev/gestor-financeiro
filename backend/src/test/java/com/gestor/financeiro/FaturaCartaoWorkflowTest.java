@@ -154,6 +154,44 @@ class FaturaCartaoWorkflowTest {
     }
 
     @Test
+    void pagarFaturaPermitePagamentoParcialEApenasQuitaSaldoRestante() {
+        transacaoService.criar(
+                compraCartao("Mercado", new BigDecimal("100.00"), LocalDate.of(2026, 7, 10)),
+                usuario.getId());
+
+        FaturaCartao fatura = faturaCartaoRepository
+                .findByContaIdAndMesAndAno(cartao.getId(), 7, 2026).orElseThrow();
+
+        FaturaResponse parcial = faturaService.pagarFatura(
+                usuario.getId(), fatura.getId(), new BigDecimal("40.00"), carteira.getId(), "parcial-1");
+
+        assertEquals(FaturaStatus.ABERTA.name(), parcial.status());
+        assertEquals(0, new BigDecimal("40.00").compareTo(parcial.valorPago()));
+        assertEquals(0, new BigDecimal("960.00").compareTo(
+                carteiraRepository.findById(carteira.getId()).orElseThrow().getSaldo()));
+        assertEquals(0, new BigDecimal("60.00").compareTo(
+                contaRepository.findById(cartao.getId()).orElseThrow().getValorGasto()));
+
+        FaturaResponse quitada = faturaService.pagarFatura(
+                usuario.getId(), fatura.getId(), new BigDecimal("60.00"), carteira.getId(), "parcial-2");
+
+        assertEquals(FaturaStatus.PAGA.name(), quitada.status());
+        assertEquals(0, new BigDecimal("100.00").compareTo(quitada.valorPago()));
+        assertEquals(0, new BigDecimal("900.00").compareTo(
+                carteiraRepository.findById(carteira.getId()).orElseThrow().getSaldo()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(
+                contaRepository.findById(cartao.getId()).orElseThrow().getValorGasto()));
+
+        FaturaResponse retry = faturaService.pagarFatura(
+                usuario.getId(), fatura.getId(), new BigDecimal("60.00"), carteira.getId(), "parcial-2");
+
+        assertEquals(FaturaStatus.PAGA.name(), retry.status());
+        assertEquals(2, movimentoCarteiraRepository
+                .findByUsuarioIdAndCarteiraIdOrderByDataMovimentoDescIdDesc(usuario.getId(), carteira.getId())
+                .size());
+    }
+
+    @Test
     void ultimaParcelaAbsorveArredondamentoELimiteZeraAposPagarTodasAsFaturas() {
         Transacao compra = compraCartao("Celular", new BigDecimal("100.00"), LocalDate.of(2026, 7, 29));
         compra.setParcelado(true);
@@ -257,6 +295,48 @@ class FaturaCartaoWorkflowTest {
 
         assertEquals(0, new BigDecimal("50.00").compareTo(
                 contaRepository.findById(cartao.getId()).orElseThrow().getValorGasto()));
+    }
+
+    @Test
+    void editarCompraParceladaRecalculaParcelaCheiaENaoDivideRestantePorAbertas() {
+        Transacao compra = compraCartao("Notebook", new BigDecimal("300.00"), LocalDate.of(2026, 7, 10));
+        compra.setParcelado(true);
+        compra.setTotalParcelas(3);
+        Transacao salva = transacaoService.criar(compra, usuario.getId());
+
+        FaturaCartao julho = faturaCartaoRepository
+                .findByContaIdAndMesAndAno(cartao.getId(), 7, 2026).orElseThrow();
+        faturaService.pagarFatura(usuario.getId(), julho.getId(), new BigDecimal("100.00"), carteira.getId());
+
+        Transacao atualizacao = new Transacao();
+        atualizacao.setDescricao("Notebook ajustado");
+        atualizacao.setValorTotal(new BigDecimal("600.00"));
+        atualizacao.setData(LocalDate.of(2026, 7, 10));
+
+        transacaoService.atualizar(salva.getId(), atualizacao, usuario.getId());
+
+        FaturaCartao agosto = faturaCartaoRepository
+                .findByContaIdAndMesAndAno(cartao.getId(), 8, 2026).orElseThrow();
+        FaturaCartao setembro = faturaCartaoRepository
+                .findByContaIdAndMesAndAno(cartao.getId(), 9, 2026).orElseThrow();
+
+        assertEquals(0, new BigDecimal("300.00").compareTo(agosto.getValorTotal()));
+        assertEquals(0, new BigDecimal("200.00").compareTo(setembro.getValorTotal()));
+
+        List<FaturaLancamento> lancamentos = faturaLancamentoRepository.findByTransacaoId(salva.getId());
+        FaturaLancamento segundaParcela = lancamentos.stream()
+                .filter(l -> Integer.valueOf(2).equals(l.getParcelaNumero()))
+                .findFirst().orElseThrow();
+        FaturaLancamento terceiraParcela = lancamentos.stream()
+                .filter(l -> Integer.valueOf(3).equals(l.getParcelaNumero()))
+                .findFirst().orElseThrow();
+        FaturaLancamento ajuste = lancamentos.stream()
+                .filter(l -> l.getTipo() == TipoFaturaLancamento.AJUSTE)
+                .findFirst().orElseThrow();
+
+        assertEquals(0, new BigDecimal("200.00").compareTo(segundaParcela.getValor()));
+        assertEquals(0, new BigDecimal("200.00").compareTo(terceiraParcela.getValor()));
+        assertEquals(0, new BigDecimal("100.00").compareTo(ajuste.getValor()));
     }
 
     @Test

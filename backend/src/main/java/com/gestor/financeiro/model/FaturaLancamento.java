@@ -26,8 +26,14 @@ public class FaturaLancamento {
     private FaturaCartao fatura;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "transacao_id", nullable = false)
+    @JoinColumn(name = "transacao_id", nullable = true)
     private Transacao transacao;
+
+    // Preenchido apenas em lancamentos de rollover (CREDITO_ANTERIOR/SALDO_DEVEDOR_ANTERIOR):
+    // referencia a fatura de origem de onde o credito/divida foi rolado. Ver V25.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "fatura_origem_id")
+    private FaturaCartao faturaOrigem;
 
     @Column(nullable = false)
     private String descricao;

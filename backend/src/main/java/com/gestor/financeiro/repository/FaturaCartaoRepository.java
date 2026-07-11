@@ -2,7 +2,9 @@ package com.gestor.financeiro.repository;
 
 import com.gestor.financeiro.model.FaturaCartao;
 import com.gestor.financeiro.model.enums.FaturaStatus;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -17,6 +19,9 @@ public interface FaturaCartaoRepository extends JpaRepository<FaturaCartao, Long
     Optional<FaturaCartao> findByContaIdAndMesAndAno(Long contaId, Integer mes, Integer ano);
 
     Optional<FaturaCartao> findByIdAndUsuarioId(Long id, Long usuarioId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<FaturaCartao> findWithLockByIdAndUsuarioId(Long id, Long usuarioId);
 
     List<FaturaCartao> findByContaIdAndUsuarioIdOrderByAnoDescMesDesc(Long contaId, Long usuarioId);
 
