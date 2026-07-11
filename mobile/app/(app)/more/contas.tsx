@@ -6,6 +6,7 @@ import { contaService } from '../../../src/services/contaService';
 import { TIPO_CONTA_LABEL, formatCurrency, parseCurrencyBR, maskCurrencyInput } from '../../../src/utils/format';
 import { Conta, ContaRequest, TipoConta } from '../../../src/types';
 import { useTheme } from '../../../src/theme';
+import BackButton from '../../../src/components/ui/BackButton';
 import SkeletonBox from '../../../src/components/ui/SkeletonBox';
 
 export default function ContasScreen() {
@@ -43,6 +44,7 @@ export default function ContasScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 12 }}>
+        <BackButton />
         <Text style={{ color: colors.textPrimary, fontSize: 23, fontWeight: '800', letterSpacing: -0.4 }}>Cartões</Text>
         <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>Crédito, débito e pagamento</Text>
       </View>

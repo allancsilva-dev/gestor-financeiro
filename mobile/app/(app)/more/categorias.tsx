@@ -6,6 +6,7 @@ import { categoriaService } from '../../../src/services/categoriaService';
 import { CATEGORY_COLORS, formatCurrency } from '../../../src/utils/format';
 import { Categoria, CategoriaRequest } from '../../../src/types';
 import { useTheme } from '../../../src/theme';
+import BackButton from '../../../src/components/ui/BackButton';
 import SkeletonBox from '../../../src/components/ui/SkeletonBox';
 import Field from '../../../src/components/ui/Field';
 import Fab from '../../../src/components/ui/Fab';
@@ -40,6 +41,7 @@ export default function CategoriasScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 12 }}>
+        <BackButton />
         <Text style={{ color: colors.textPrimary, fontSize: 23, fontWeight: '800', letterSpacing: -0.4 }}>Categorias</Text>
         <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>Organize seus gastos por tipo</Text>
       </View>

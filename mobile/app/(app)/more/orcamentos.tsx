@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, TextInput,
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '../../../src/theme';
+import BackButton from '../../../src/components/ui/BackButton';
 import { orcamentoService } from '../../../src/services/orcamentoService';
 import { categoriaService } from '../../../src/services/categoriaService';
 import { ApiErrorWithMessage, OrcamentoResponse, OrcamentoCategoriaItem } from '../../../src/types';
@@ -74,6 +75,7 @@ export default function OrcamentoScreen() {
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.bg }]} contentContainerStyle={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 40 }}>
       <View style={{ paddingBottom: 12 }}>
+        <BackButton />
         <Text style={{ color: colors.textPrimary, fontSize: 23, fontWeight: '800', letterSpacing: -0.4 }}>Orçamentos</Text>
         <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>Limites de gasto por categoria</Text>
       </View>

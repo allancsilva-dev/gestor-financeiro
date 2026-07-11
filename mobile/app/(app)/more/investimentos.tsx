@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import investimentoService from '../../../src/services/investimentoService';
 import { Ativo, AtivoRequest, TipoAtivo, TipoMovimentacaoAtivo } from '../../../src/types';
 import { useTheme } from '../../../src/theme';
+import BackButton from '../../../src/components/ui/BackButton';
 import { formatCurrency, formatDate, isValidDateBR, maskCurrencyInput, maskDateInput, parseCurrencyBR, parseDateBR } from '../../../src/utils/format';
 import Card from '../../../src/components/ui/Card';
 import Chip from '../../../src/components/ui/Chip';
@@ -302,6 +303,7 @@ export default function InvestimentosScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 12 }}>
+        <BackButton />
         <Text style={{ color: colors.textPrimary, fontSize: 23, fontWeight: '800', letterSpacing: -0.4 }}>Investimentos</Text>
         <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>Ativos, posição e movimentações</Text>
       </View>

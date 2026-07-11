@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { useTheme } from '../../../src/theme';
+import BackButton from '../../../src/components/ui/BackButton';
 import relatorioService from '../../../src/services/relatorioService';
 import { formatCurrency, formatDate, formatPercent } from '../../../src/utils/format';
 import Card from '../../../src/components/ui/Card';
@@ -72,6 +73,7 @@ export default function RelatorioScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 12 }}>
+        <BackButton />
         <Text style={{ color: colors.textPrimary, fontSize: 23, fontWeight: '800', letterSpacing: -0.4 }}>Relatórios</Text>
         <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>
           {formatDate(inicio + 'T00:00:00')} até {formatDate(fim + 'T00:00:00')}
