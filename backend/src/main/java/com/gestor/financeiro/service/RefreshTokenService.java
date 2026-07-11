@@ -6,6 +6,7 @@ import com.gestor.financeiro.exception.TokenReuseDetectedException;
 import com.gestor.financeiro.model.RefreshToken;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.repository.RefreshTokenRepository;
+import com.gestor.financeiro.security.TokenHasher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,7 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
-import java.util.UUID;
 
 /**
  * Service para gerenciamento de Refresh Tokens
@@ -37,33 +37,38 @@ public class RefreshTokenService {
     private static final int EXPIRATION_DAYS = 7;
 
     /**
+     * Par emitido na criação/rotação: o valor cru vai ao cliente uma única vez;
+     * no banco fica somente o hash SHA-256.
+     */
+    public record TokenGerado(String valor, RefreshToken token) {}
+
+    /**
      * Cria um novo refresh token para um usuário
-     * 
+     *
      * @param usuario o usuário para quem criar o token
-     * @return o RefreshToken criado
+     * @return valor cru (para o cliente) + entidade persistida (com hash)
      */
     @Transactional
-    public RefreshToken criarRefreshToken(Usuario usuario) {
-        // Gerar token único com UUID
-        String tokenValue = UUID.randomUUID().toString();
-        
+    public TokenGerado criarRefreshToken(Usuario usuario) {
+        // 32 bytes de SecureRandom; no banco só o hash — vazamento do DB não rouba sessão
+        String valor = gerarValorAleatorio();
+
         // Data de expiração (7 dias a partir de agora)
         LocalDateTime dataExpiracao = LocalDateTime.now().plusDays(EXPIRATION_DAYS);
-        
-        // Criar e salvar o token
-        RefreshToken refreshToken = new RefreshToken(usuario, tokenValue, dataExpiracao);
-        
-        return refreshTokenRepository.save(refreshToken);
+
+        RefreshToken refreshToken = new RefreshToken(usuario, hash(valor), dataExpiracao);
+
+        return new TokenGerado(valor, refreshTokenRepository.save(refreshToken));
     }
 
     /**
-     * Busca um refresh token pelo valor do token
-     * 
+     * Busca um refresh token pelo valor cru apresentado pelo cliente
+     *
      * @param token o valor do token
      * @return Optional contendo o RefreshToken se encontrado
      */
     public Optional<RefreshToken> buscarPorToken(String token) {
-        return refreshTokenRepository.findByToken(token);
+        return refreshTokenRepository.findByToken(hash(token));
     }
 
     /**
@@ -75,7 +80,7 @@ public class RefreshTokenService {
      * @throws RuntimeException se o token for inválido
      */
     public RefreshToken validarRefreshToken(String token) {
-        RefreshToken refreshToken = refreshTokenRepository.findByToken(token)
+        RefreshToken refreshToken = refreshTokenRepository.findByToken(hash(token))
             .orElseThrow(() -> new ResourceNotFoundException("Refresh token não encontrado"));
 
         if (refreshToken.isExpirado()) {
@@ -96,8 +101,8 @@ public class RefreshTokenService {
      * @return novo refresh token persistido
      */
     @Transactional
-    public RefreshToken rotacionarRefreshToken(String tokenAtual, String clientIp) {
-        RefreshToken atual = refreshTokenRepository.findByToken(tokenAtual)
+    public TokenGerado rotacionarRefreshToken(String tokenAtual, String clientIp) {
+        RefreshToken atual = refreshTokenRepository.findByToken(hash(tokenAtual))
             .orElseThrow(() -> new ResourceNotFoundException("Refresh token não encontrado"));
 
         if (atual.isExpirado()) {
@@ -117,8 +122,7 @@ public class RefreshTokenService {
         atual.revogar();
         refreshTokenRepository.save(atual);
 
-        RefreshToken novo = criarRefreshToken(atual.getUsuario());
-        return novo;
+        return criarRefreshToken(atual.getUsuario());
     }
 
     /**
@@ -128,7 +132,7 @@ public class RefreshTokenService {
      */
     @Transactional
     public void revogarToken(String token) {
-        Optional<RefreshToken> refreshToken = refreshTokenRepository.findByToken(token);
+        Optional<RefreshToken> refreshToken = refreshTokenRepository.findByToken(hash(token));
         
         if (refreshToken.isPresent()) {
             RefreshToken rt = refreshToken.get();
@@ -167,5 +171,13 @@ public class RefreshTokenService {
      */
     public long contarTokensValidosDoUsuario(Usuario usuario) {
         return refreshTokenRepository.countValidTokensByUsuario(usuario, LocalDateTime.now());
+    }
+
+    private String gerarValorAleatorio() {
+        return TokenHasher.gerarValor();
+    }
+
+    private String hash(String valor) {
+        return TokenHasher.sha256Hex(valor);
     }
 }

@@ -33,7 +33,7 @@ import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
+import com.gestor.financeiro.security.TokenHasher;
 
 /**
  * Controller de Autenticação COMPLETO
@@ -139,7 +139,7 @@ public class AuthController {
 
             String accessToken = jwtUtil.generateToken(usuario.getEmail());
 
-            RefreshToken refreshToken = refreshTokenService.criarRefreshToken(usuario);
+            RefreshTokenService.TokenGerado refreshToken = refreshTokenService.criarRefreshToken(usuario);
 
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Login realizado com sucesso!");
@@ -157,10 +157,10 @@ public class AuthController {
             String csrfToken = createCsrfToken();
             response.put("csrfToken", csrfToken);
             if (isMobileClient(servletRequest)) {
-                response.put("refreshToken", refreshToken.getToken());
+                response.put("refreshToken", refreshToken.valor());
             }
 
-            ResponseCookie refreshCookie = buildRefreshTokenCookie(refreshToken.getToken(), REFRESH_COOKIE_MAX_AGE_SECONDS);
+            ResponseCookie refreshCookie = buildRefreshTokenCookie(refreshToken.valor(), REFRESH_COOKIE_MAX_AGE_SECONDS);
             ResponseCookie csrfCookie = buildCsrfCookie(csrfToken, REFRESH_COOKIE_MAX_AGE_SECONDS);
 
             return ResponseEntity.ok()
@@ -195,10 +195,10 @@ public class AuthController {
         }
 
         // Rotaciona token: revoga atual e emite um novo.
-        RefreshToken refreshToken = refreshTokenService.rotacionarRefreshToken(refreshTokenValue, clientIp);
+        RefreshTokenService.TokenGerado refreshToken = refreshTokenService.rotacionarRefreshToken(refreshTokenValue, clientIp);
 
         // Gerar novo access token
-        String novoAccessToken = jwtUtil.generateToken(refreshToken.getUsuario().getEmail());
+        String novoAccessToken = jwtUtil.generateToken(refreshToken.token().getUsuario().getEmail());
 
         // Resposta
         String csrfToken = createCsrfToken();
@@ -206,10 +206,10 @@ public class AuthController {
         response.put("accessToken", novoAccessToken);
         response.put("csrfToken", csrfToken);
         if (isMobileClient(request)) {
-            response.put("refreshToken", refreshToken.getToken());
+            response.put("refreshToken", refreshToken.valor());
         }
 
-        ResponseCookie refreshCookie = buildRefreshTokenCookie(refreshToken.getToken(), REFRESH_COOKIE_MAX_AGE_SECONDS);
+        ResponseCookie refreshCookie = buildRefreshTokenCookie(refreshToken.valor(), REFRESH_COOKIE_MAX_AGE_SECONDS);
         ResponseCookie csrfCookie = buildCsrfCookie(csrfToken, REFRESH_COOKIE_MAX_AGE_SECONDS);
 
         return ResponseEntity.ok()
@@ -281,12 +281,13 @@ public class AuthController {
         Usuario usuario = usuarioOpt.get();
         
         tokenRepository.findByUsuario(usuario).ifPresent(tokenRepository::delete);
-        
-        String token = UUID.randomUUID().toString();
-        
-        PasswordResetToken resetToken = new PasswordResetToken(token, usuario);
+
+        // Valor cru só no email; banco guarda o hash
+        String token = TokenHasher.gerarValor();
+
+        PasswordResetToken resetToken = new PasswordResetToken(TokenHasher.sha256Hex(token), usuario);
         tokenRepository.save(resetToken);
-        
+
         emailService.enviarEmailRecuperacaoSenha(usuario.getEmail(), token);
         
         return ResponseEntity.ok("Se o email existir, você receberá um link de recuperação.");
@@ -296,14 +297,14 @@ public class AuthController {
     @PostMapping("/reset-password")
     @Operation(summary = "Resetar senha", description = "Aplica nova senha com token válido de recuperação")
     public ResponseEntity<?> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
-        Optional<PasswordResetToken> tokenOpt = tokenRepository.findByToken(request.getToken());
-        
+        Optional<PasswordResetToken> tokenOpt = tokenRepository.findByToken(TokenHasher.sha256Hex(request.getToken()));
+
         if (tokenOpt.isEmpty()) {
             throw new BusinessException("Token inválido!");
         }
-        
+
         PasswordResetToken resetToken = tokenOpt.get();
-        
+
         if (resetToken.isExpired()) {
             throw new BusinessException("Token expirado! Solicite um novo link de recuperação.");
         }
@@ -326,7 +327,7 @@ public class AuthController {
     @GetMapping("/validate-token")
     @Operation(summary = "Validar token de recuperação", description = "Confere validade do token de reset de senha")
     public ResponseEntity<?> validateToken(@RequestParam String token) {
-        Optional<PasswordResetToken> tokenOpt = tokenRepository.findByToken(token);
+        Optional<PasswordResetToken> tokenOpt = tokenRepository.findByToken(TokenHasher.sha256Hex(token));
         
         if (tokenOpt.isEmpty()) {
             throw new BusinessException("Token inválido!");
