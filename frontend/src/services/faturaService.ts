@@ -11,7 +11,7 @@ export interface FaturaLancamento {
   categoriaIcone: string;
   parcelaAtual: number | null;
   totalParcelas: number | null;
-  tipo: 'COMPRA' | 'AJUSTE' | 'ESTORNO';
+  tipo: 'COMPRA' | 'AJUSTE' | 'ESTORNO' | 'CREDITO_ANTERIOR' | 'SALDO_DEVEDOR_ANTERIOR';
 }
 
 export interface FaturaResponse {
@@ -40,8 +40,17 @@ const faturaService = {
     return response.data;
   },
 
-  pagarFatura: async (faturaId: number, valor: number, carteiraId: number): Promise<FaturaResponse> => {
-    const response = await api.put<FaturaResponse>(`/faturas/${faturaId}/pagar`, { valor, carteiraId });
+  pagarFatura: async (
+    faturaId: number,
+    valor: number,
+    carteiraId: number,
+    idempotencyKey?: string
+  ): Promise<FaturaResponse> => {
+    const response = await api.put<FaturaResponse>(
+      `/faturas/${faturaId}/pagar`,
+      { valor, carteiraId },
+      idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : undefined
+    );
     return response.data;
   },
 };

@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '../../../src/theme';
+import BackButton from '../../../src/components/ui/BackButton';
 import faturaService from '../../../src/services/faturaService';
 import { contaService } from '../../../src/services/contaService';
 import { carteiraService } from '../../../src/services/carteiraService';
@@ -23,6 +24,7 @@ export default function FaturasScreen() {
   const payingRef = useRef(false);
   const [payError, setPayError] = useState<string | null>(null);
   const [carteiraPagamentoId, setCarteiraPagamentoId] = useState<number | null>(null);
+  const [valorPagamento, setValorPagamento] = useState('');
 
   const [modalVisible, setModalVisible] = useState(false);
   const [nome, setNome] = useState('');
@@ -62,6 +64,11 @@ export default function FaturasScreen() {
     enabled: !!contaSelecionada?.id,
   });
 
+  useEffect(() => {
+    const restante = Math.max(Number(fatura?.valorTotal ?? 0) - Number(fatura?.valorPago ?? 0), 0);
+    setValorPagamento(restante > 0 ? maskCurrencyInput(Math.round(restante * 100).toString()) : '');
+  }, [fatura?.id, fatura?.valorTotal, fatura?.valorPago]);
+
   const resetForm = () => {
     setNome(''); setBanco(''); setLimite(''); setDiaFechamento(''); setDiaVencimento(''); setFormError(null);
   };
@@ -100,16 +107,26 @@ export default function FaturasScreen() {
 
   const handlePagar = async () => {
     if (payingRef.current) return;
-    if (!fatura || fatura.valorTotal <= 0) return;
+    if (!fatura || saldoRestante <= 0) return;
     if (!carteiraPagamentoId) {
       setPayError('Selecione a conta de pagamento.');
+      return;
+    }
+    const valor = parseCurrencyBR(valorPagamento);
+    if (!Number.isFinite(valor) || valor <= 0) {
+      setPayError('Informe um valor de pagamento válido.');
+      return;
+    }
+    if (valor > saldoRestante) {
+      setPayError(`Valor máximo: ${formatCurrency(saldoRestante)}.`);
       return;
     }
     setPayError(null);
     payingRef.current = true;
     setPaying(true);
     try {
-      await faturaService.pagarFatura(fatura.id, fatura.valorTotal, carteiraPagamentoId);
+      const key = `${fatura.id}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+      await faturaService.pagarFatura(fatura.id, valor, carteiraPagamentoId, key);
       queryClient.invalidateQueries({ queryKey: ['carteiras'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-resumo'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-projecao'] });
@@ -128,7 +145,9 @@ export default function FaturasScreen() {
 
   const limiteTotal = Number(contaSelecionada?.limiteTotal ?? 0);
   const gasto = Number(contaSelecionada?.valorGasto ?? 0);
-  const usoLimite = limiteTotal > 0 ? Math.min(gasto / limiteTotal, 1) : 0;
+  const creditoCartao = gasto < 0 ? Math.abs(gasto) : 0;
+  const usoLimite = limiteTotal > 0 ? Math.min(Math.max(gasto, 0) / limiteTotal, 1) : 0;
+  const saldoRestante = Math.max(Number(fatura?.valorTotal ?? 0) - Number(fatura?.valorPago ?? 0), 0);
 
   // Aberta é estado normal, não alerta: vermelho fica só para vencida
   const statusBadge =
@@ -141,6 +160,7 @@ export default function FaturasScreen() {
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
         <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 12 }}>
+          <BackButton />
           <Text style={{ color: colors.textPrimary, fontSize: 23, fontWeight: '800', letterSpacing: -0.4 }}>Faturas</Text>
           <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>
             {contasCredito.length > 0
@@ -214,9 +234,13 @@ export default function FaturasScreen() {
                 {limiteTotal > 0 && (
                   <View style={{ marginTop: 12 }}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <Text style={{ color: colors.textSecondary, fontSize: 11 }}>Limite usado</Text>
+                      <Text style={{ color: colors.textSecondary, fontSize: 11 }}>
+                        {creditoCartao > 0 ? 'Crédito disponível' : 'Limite usado'}
+                      </Text>
                       <Text style={{ color: colors.textSecondary, fontSize: 11, fontVariant: ['tabular-nums'] }}>
-                        {formatCurrency(gasto)} de {formatCurrency(limiteTotal)}
+                        {creditoCartao > 0
+                          ? `${formatCurrency(creditoCartao)} de crédito`
+                          : `${formatCurrency(gasto)} de ${formatCurrency(limiteTotal)}`}
                       </Text>
                     </View>
                     <View style={{ height: 6, borderRadius: 3, backgroundColor: colors.border, overflow: 'hidden' }}>
@@ -226,9 +250,15 @@ export default function FaturasScreen() {
                 )}
               </View>
 
-              {fatura && fatura.status !== 'PAGA' && fatura.valorTotal > 0 && (
+              {fatura && fatura.status !== 'PAGA' && saldoRestante > 0 && (
                 <View style={{ gap: 10 }}>
                   <Text style={{ color: colors.textPrimary, fontWeight: '600' }}>Pagar com</Text>
+                  {fatura.valorPago > 0 && (
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
+                      <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Pago: {formatCurrency(fatura.valorPago)}</Text>
+                      <Text style={{ color: colors.textPrimary, fontSize: 12, fontWeight: '700' }}>Restante: {formatCurrency(saldoRestante)}</Text>
+                    </View>
+                  )}
                   <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
                     {carteiras.map((c: Carteira) => (
                       <TouchableOpacity key={c.id} onPress={() => setCarteiraPagamentoId(c.id)} style={[styles.chip, { backgroundColor: carteiraPagamentoId === c.id ? colors.brand : colors.card, borderColor: carteiraPagamentoId === c.id ? colors.brand : colors.border }]}>
@@ -236,6 +266,14 @@ export default function FaturasScreen() {
                       </TouchableOpacity>
                     ))}
                   </View>
+                  <TextInput
+                    value={valorPagamento}
+                    onChangeText={(t) => setValorPagamento(maskCurrencyInput(t))}
+                    keyboardType="number-pad"
+                    placeholder="0,00"
+                    placeholderTextColor={colors.textMuted}
+                    style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]}
+                  />
                   {payError && <Text style={{ color: colors.danger, fontSize: 12 }}>{payError}</Text>}
                   <TouchableOpacity onPress={handlePagar} disabled={paying} style={[styles.payBtn, { backgroundColor: colors.success }]}>
                     {paying ? <ActivityIndicator color="white" /> : <Text style={{ color: 'white', fontWeight: '700', fontSize: 15 }}>Pagar Fatura</Text>}
@@ -256,7 +294,15 @@ export default function FaturasScreen() {
                     ? { fg: colors.success, bg: colors.success + '20', label: 'ESTORNO' }
                     : l.tipo === 'AJUSTE'
                       ? { fg: colors.warning, bg: colors.warning + '20', label: 'AJUSTE' }
-                      : null;
+                      : l.tipo === 'CREDITO_ANTERIOR'
+                        ? { fg: colors.success, bg: colors.success + '20', label: 'CRÉDITO ANTERIOR' }
+                        : l.tipo === 'SALDO_DEVEDOR_ANTERIOR'
+                          ? { fg: colors.warning, bg: colors.warning + '20', label: 'SALDO DEVEDOR ANTERIOR' }
+                          : null;
+                  // Saldo devedor rolado é aviso (dívida carregada), não erro: nunca usar a cor de perigo aqui.
+                  const valorColor = l.tipo === 'SALDO_DEVEDOR_ANTERIOR'
+                    ? colors.warning
+                    : l.valor < 0 ? colors.success : colors.danger;
                   return (
                     <View key={l.transacaoId || i} style={[styles.lancamento, { backgroundColor: colors.card, borderColor: colors.border }]}>
                       <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: l.categoriaCor + '20', alignItems: 'center', justifyContent: 'center' }}>
@@ -276,7 +322,7 @@ export default function FaturasScreen() {
                           {l.totalParcelas ? ` · ${l.parcelaAtual}/${l.totalParcelas}` : ''}
                         </Text>
                       </View>
-                      <Text style={{ color: l.valor < 0 ? colors.success : colors.danger, fontSize: 13, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{formatCurrency(l.valor)}</Text>
+                      <Text style={{ color: valorColor, fontSize: 13, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{formatCurrency(l.valor)}</Text>
                     </View>
                   );
                 })

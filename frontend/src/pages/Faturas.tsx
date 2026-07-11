@@ -6,6 +6,7 @@ import { contaService, Conta } from '../services/contaService';
 import carteiraService, { Carteira } from '../services/carteiraService';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/currency';
+import CurrencyInput from '../components/CurrencyInput';
 import { CreditCard, Calendar, DollarSign, CheckCircle, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -20,6 +21,7 @@ export default function Faturas() {
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
   const payingRef = useRef(false);
+  const [valorPagamento, setValorPagamento] = useState<number | null>(null);
   const now = new Date();
   const [mes, setMes] = useState(now.getMonth() + 1);
   const [ano, setAno] = useState(now.getFullYear());
@@ -36,6 +38,11 @@ export default function Faturas() {
       carregarFatura(contaSelecionada.id!, mes, ano);
     }
   }, [contaSelecionada, mes, ano]);
+
+  useEffect(() => {
+    const restante = Math.max((fatura?.valorTotal ?? 0) - (fatura?.valorPago ?? 0), 0);
+    setValorPagamento(restante > 0 ? restante : null);
+  }, [fatura?.id, fatura?.valorTotal, fatura?.valorPago]);
 
   const carregarContas = async () => {
     try {
@@ -81,15 +88,25 @@ export default function Faturas() {
 
   const handlePagar = async () => {
     if (payingRef.current) return;
-    if (!fatura || fatura.valorTotal <= 0) return;
+    if (!fatura || saldoRestante <= 0) return;
     if (!carteiraPagamentoId) {
       toast.error('Selecione a carteira de pagamento');
+      return;
+    }
+    const valor = valorPagamento ?? 0;
+    if (valor <= 0) {
+      toast.error('Informe um valor de pagamento válido');
+      return;
+    }
+    if (valor > saldoRestante) {
+      toast.error(`Valor máximo: ${formatCurrency(saldoRestante)}`);
       return;
     }
     payingRef.current = true;
     setPaying(true);
     try {
-      const result = await faturaService.pagarFatura(fatura.id, fatura.valorTotal, carteiraPagamentoId);
+      const key = `${fatura.id}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+      const result = await faturaService.pagarFatura(fatura.id, valor, carteiraPagamentoId, key);
       setFatura(result);
       carregarCarteiras();
       carregarContas();
@@ -104,6 +121,7 @@ export default function Faturas() {
 
   const mesAnterior = () => { if (mes === 1) { setMes(12); setAno(ano - 1); } else setMes(mes - 1); };
   const mesProximo = () => { if (mes === 12) { setMes(1); setAno(ano + 1); } else setMes(mes + 1); };
+  const saldoRestante = Math.max((fatura?.valorTotal ?? 0) - (fatura?.valorPago ?? 0), 0);
 
   return (
     <Layout>
@@ -176,8 +194,14 @@ export default function Faturas() {
                   </div>
 
                   {/* Botão Pagar */}
-                  {fatura.status !== 'PAGA' && fatura.valorTotal > 0 && (
+                  {fatura.status !== 'PAGA' && saldoRestante > 0 && (
                     <div className="mb-6 space-y-3">
+                      {fatura.valorPago > 0 && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-slate-400">Pago: {formatCurrency(fatura.valorPago)}</span>
+                          <span className="font-semibold text-white">Restante: {formatCurrency(saldoRestante)}</span>
+                        </div>
+                      )}
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-2">Pagar com</label>
                         <select
@@ -191,6 +215,14 @@ export default function Faturas() {
                           ))}
                         </select>
                       </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">Valor a pagar</label>
+                        <CurrencyInput
+                          value={valorPagamento}
+                          onValueChange={setValorPagamento}
+                          className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white"
+                        />
+                      </div>
                       <button
                         onClick={handlePagar}
                         disabled={paying}
@@ -201,7 +233,7 @@ export default function Faturas() {
                         ) : (
                           <DollarSign className="w-5 h-5" />
                         )}
-                        Pagar Fatura — {formatCurrency(fatura.valorTotal)}
+                        Pagar Fatura — {formatCurrency(valorPagamento ?? 0)}
                       </button>
                     </div>
                   )}
@@ -213,23 +245,47 @@ export default function Faturas() {
                       <p className="text-sm text-slate-400 text-center py-8">Nenhum lançamento nesta fatura</p>
                     ) : (
                       <div className="space-y-2">
-                        {fatura.lancamentos.map((l: FaturaLancamento, i: number) => (
+                        {fatura.lancamentos.map((l: FaturaLancamento, i: number) => {
+                          const descricao = l.tipo !== 'COMPRA' ? l.descricao.replace(/^(Estorno|Ajuste):\s*/, '') : l.descricao;
+                          const tipoBadge = l.tipo === 'ESTORNO'
+                            ? { classe: 'bg-green-500/20 text-green-400', label: 'ESTORNO' }
+                            : l.tipo === 'AJUSTE'
+                              ? { classe: 'bg-amber-500/20 text-amber-300', label: 'AJUSTE' }
+                              : l.tipo === 'CREDITO_ANTERIOR'
+                                ? { classe: 'bg-green-500/20 text-green-400', label: 'CRÉDITO ANTERIOR' }
+                                : l.tipo === 'SALDO_DEVEDOR_ANTERIOR'
+                                  ? { classe: 'bg-amber-500/20 text-amber-300', label: 'SALDO DEVEDOR ANTERIOR' }
+                                  : null;
+                          // Saldo devedor rolado é aviso (dívida carregada da fatura passada), não erro:
+                          // nunca usar a cor de perigo (vermelho) aqui, mesmo com valor positivo.
+                          const valorClasse = l.tipo === 'SALDO_DEVEDOR_ANTERIOR'
+                            ? 'text-amber-300'
+                            : l.valor < 0 ? 'text-green-400' : 'text-red-400';
+                          return (
                           <div key={l.transacaoId || i} className="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg border border-slate-700">
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 rounded-lg flex items-center justify-center text-sm" style={{ backgroundColor: l.categoriaCor + '20' }}>
                                 {l.categoriaIcone || '💳'}
                               </div>
                               <div>
-                                <p className="text-sm text-white">{l.descricao}</p>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm text-white">{descricao}</p>
+                                  {tipoBadge && (
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${tipoBadge.classe}`}>
+                                      {tipoBadge.label}
+                                    </span>
+                                  )}
+                                </div>
                                 <p className="text-xs text-slate-400">
                                   {new Date(l.data).toLocaleDateString('pt-BR')}
                                   {l.totalParcelas && l.parcelaAtual ? ` • Parcela ${l.parcelaAtual}/${l.totalParcelas}` : ''}
                                 </p>
                               </div>
                             </div>
-                            <p className={`text-sm font-semibold ${l.valor < 0 ? 'text-green-400' : 'text-red-400'}`}>{formatCurrency(l.valor)}</p>
+                            <p className={`text-sm font-semibold ${valorClasse}`}>{formatCurrency(l.valor)}</p>
                           </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>

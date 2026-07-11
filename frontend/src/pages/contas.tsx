@@ -255,7 +255,13 @@ export default function Contas() {
                 <p className="text-gray-400 text-sm mt-2">Clique em "+ Novo Cartão" para adicionar seu primeiro cartão de crédito</p>
               </div>
             ) : (
-              contas.map((conta) => (
+              contas.map((conta) => {
+                const valorGasto = conta.valorGasto || 0;
+                const limiteTotal = conta.limiteTotal || 0;
+                const creditoDisponivel = valorGasto < 0 ? Math.abs(valorGasto) : 0;
+                const percentualUso = limiteTotal > 0 ? Math.min((Math.max(valorGasto, 0) / limiteTotal) * 100, 100) : 0;
+
+                return (
                 <div
                   key={conta.id}
                   className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition"
@@ -291,29 +297,29 @@ export default function Contas() {
                     </div>
 
                     <div>
-                      <p className="text-sm text-gray-600">Valor Gasto</p>
-                      <p className={`text-lg font-bold ${(conta.valorGasto || 0) > (conta.limiteTotal || 0) ? 'text-red-600' : 'text-green-600'}`}>
-                        {formatCurrency(conta.valorGasto || 0)}
+                      <p className="text-sm text-gray-600">{creditoDisponivel > 0 ? 'Crédito disponível' : 'Valor Gasto'}</p>
+                      <p className={`text-lg font-bold ${creditoDisponivel > 0 ? 'text-green-600' : valorGasto > limiteTotal ? 'text-red-600' : 'text-green-600'}`}>
+                        {formatCurrency(creditoDisponivel > 0 ? creditoDisponivel : valorGasto)}
                       </p>
                     </div>
 
                     <div>
                       <p className="text-sm text-gray-600 mb-1">Disponível</p>
                       <p className="text-sm font-semibold text-blue-600 mb-2">
-                        {formatCurrency((conta.limiteTotal || 0) - (conta.valorGasto || 0))}
+                        {formatCurrency(limiteTotal - valorGasto)}
                       </p>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
                           className={`h-2 rounded-full transition-all ${
-                            (conta.valorGasto || 0) > (conta.limiteTotal || 0) 
+                            valorGasto > limiteTotal
                               ? 'bg-red-600' 
                               : 'bg-blue-600'
                           }`}
-                          style={{ width: `${Math.min(((conta.valorGasto || 0) / (conta.limiteTotal || 1) * 100), 100)}%` }}
+                          style={{ width: `${percentualUso}%` }}
                         ></div>
                       </div>
                       <p className="text-xs text-gray-500 mt-1 text-right">
-                        {(((conta.valorGasto || 0) / (conta.limiteTotal || 1)) * 100).toFixed(1)}% usado
+                        {percentualUso.toFixed(1)}% usado
                       </p>
                     </div>
 
@@ -329,7 +335,8 @@ export default function Contas() {
                     </div>
                   </div>
                 </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
