@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -43,4 +44,15 @@ public interface ContaFixaRepository extends JpaRepository<ContaFixa, Long> {
     int atualizarStatusContasAtrasadas(@Param("status") StatusPagamento status,
                                         @Param("novoStatus") StatusPagamento novoStatus,
                                         @Param("data") LocalDate data);
+
+    // Projecao: soma planejada das contas fixas ativas vencendo no periodo, excluindo pago/cancelado.
+    @Query("SELECT COALESCE(SUM(cf.valorPlanejado), 0) FROM ContaFixa cf " +
+           "WHERE cf.usuario.id = :usuarioId AND cf.ativo = true " +
+           "AND cf.dataProximoVencimento BETWEEN :inicio AND :fim " +
+           "AND cf.status <> :pago AND cf.status <> :cancelado")
+    BigDecimal somarPlanejadoNoPeriodo(@Param("usuarioId") Long usuarioId,
+                                        @Param("inicio") LocalDate inicio,
+                                        @Param("fim") LocalDate fim,
+                                        @Param("pago") StatusPagamento pago,
+                                        @Param("cancelado") StatusPagamento cancelado);
 }

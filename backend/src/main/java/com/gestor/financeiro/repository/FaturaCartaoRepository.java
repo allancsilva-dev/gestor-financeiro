@@ -1,8 +1,13 @@
 package com.gestor.financeiro.repository;
 
 import com.gestor.financeiro.model.FaturaCartao;
+import com.gestor.financeiro.model.enums.FaturaStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -16,4 +21,13 @@ public interface FaturaCartaoRepository extends JpaRepository<FaturaCartao, Long
     List<FaturaCartao> findByContaIdAndUsuarioIdOrderByAnoDescMesDesc(Long contaId, Long usuarioId);
 
     List<FaturaCartao> findByUsuarioId(Long usuarioId);
+
+    // Projecao: soma das faturas com o status informado (ABERTA) vencendo no periodo.
+    @Query("SELECT COALESCE(SUM(f.valorTotal), 0) FROM FaturaCartao f " +
+           "WHERE f.usuario.id = :usuarioId AND f.status = :status " +
+           "AND f.dataVencimento BETWEEN :inicio AND :fim")
+    BigDecimal somarValorTotalPorStatusNoPeriodo(@Param("usuarioId") Long usuarioId,
+                                                  @Param("status") FaturaStatus status,
+                                                  @Param("inicio") LocalDate inicio,
+                                                  @Param("fim") LocalDate fim);
 }

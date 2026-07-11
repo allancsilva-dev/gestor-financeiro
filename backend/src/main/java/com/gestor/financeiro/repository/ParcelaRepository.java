@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -40,4 +41,13 @@ public interface ParcelaRepository extends JpaRepository<Parcela, Long> {
     List<Parcela> findFuturasByUsuarioId(@Param("usuarioId") Long usuarioId,
                                           @Param("inicio") LocalDate inicio,
                                           @Param("statusExcluido") StatusPagamento statusExcluido);
+
+    // Projecao: soma das parcelas vencendo no periodo, excluindo status informado (PAGO).
+    @Query("SELECT COALESCE(SUM(p.valor), 0) FROM Parcela p " +
+           "WHERE p.transacao.usuario.id = :usuarioId AND p.status <> :statusExcluido " +
+           "AND p.dataVencimento BETWEEN :inicio AND :fim")
+    BigDecimal somarValorNoPeriodo(@Param("usuarioId") Long usuarioId,
+                                    @Param("inicio") LocalDate inicio,
+                                    @Param("fim") LocalDate fim,
+                                    @Param("statusExcluido") StatusPagamento statusExcluido);
 }

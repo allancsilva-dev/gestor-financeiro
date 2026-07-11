@@ -1,36 +1,25 @@
 package com.gestor.financeiro.service;
 
+import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.dto.ProjecaoMensalDto;
 import com.gestor.financeiro.dto.ProjecaoResponse;
-import com.gestor.financeiro.model.ContaFixa;
-import com.gestor.financeiro.model.FaturaCartao;
-import com.gestor.financeiro.model.Parcela;
 import com.gestor.financeiro.model.enums.FaturaStatus;
 import com.gestor.financeiro.model.enums.StatusPagamento;
 import com.gestor.financeiro.repository.*;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 @Service
+@RequiredArgsConstructor
 public class ProjecaoService {
-
-    @Autowired
-    private CarteiraRepository carteiraRepository;
-
-    @Autowired
-    private ContaFixaRepository contaFixaRepository;
-
-    @Autowired
-    private ParcelaRepository parcelaRepository;
-
-    @Autowired
-    private FaturaCartaoRepository faturaCartaoRepository;
+    private final CarteiraRepository carteiraRepository;
+    private final ContaFixaRepository contaFixaRepository;
+    private final ParcelaRepository parcelaRepository;
+    private final FaturaCartaoRepository faturaCartaoRepository;
 
     public ProjecaoResponse projetar(Long usuarioId, int mesesProjecao) {
         BigDecimal saldoAtual = carteiraRepository.sumSaldoByUsuarioId(usuarioId);
@@ -80,44 +69,20 @@ public class ProjecaoService {
     }
 
     private BigDecimal somarContasFixasNoMes(Long usuarioId, LocalDate inicio, LocalDate fim) {
-        BigDecimal total = BigDecimal.ZERO;
-        List<ContaFixa> contas = contaFixaRepository.findByUsuarioIdAndAtivoTrue(usuarioId);
-        for (ContaFixa cf : contas) {
-            if (cf.getDataProximoVencimento() != null &&
-                    !cf.getDataProximoVencimento().isBefore(inicio) &&
-                    !cf.getDataProximoVencimento().isAfter(fim) &&
-                    cf.getStatus() != StatusPagamento.PAGO &&
-                    cf.getStatus() != StatusPagamento.CANCELADO) {
-                total = total.add(cf.getValorPlanejado() != null ? cf.getValorPlanejado() : BigDecimal.ZERO);
-            }
-        }
-        return total;
+        BigDecimal total = contaFixaRepository.somarPlanejadoNoPeriodo(
+                usuarioId, inicio, fim, StatusPagamento.PAGO, StatusPagamento.CANCELADO);
+        return total != null ? total : BigDecimal.ZERO;
     }
 
     private BigDecimal somarParcelasNoMes(Long usuarioId, LocalDate inicio, LocalDate fim) {
-        BigDecimal total = BigDecimal.ZERO;
-        List<Parcela> parcelas = parcelaRepository.findFuturasByUsuarioId(usuarioId, inicio, StatusPagamento.PAGO);
-        for (Parcela p : parcelas) {
-            if (p.getDataVencimento() != null &&
-                    !p.getDataVencimento().isBefore(inicio) &&
-                    !p.getDataVencimento().isAfter(fim)) {
-                total = total.add(p.getValor() != null ? p.getValor() : BigDecimal.ZERO);
-            }
-        }
-        return total;
+        BigDecimal total = parcelaRepository.somarValorNoPeriodo(
+                usuarioId, inicio, fim, StatusPagamento.PAGO);
+        return total != null ? total : BigDecimal.ZERO;
     }
 
     private BigDecimal somarFaturasEmAberto(Long usuarioId, LocalDate inicio, LocalDate fim) {
-        BigDecimal total = BigDecimal.ZERO;
-        List<FaturaCartao> faturas = faturaCartaoRepository.findByUsuarioId(usuarioId);
-        for (FaturaCartao f : faturas) {
-            if (f.getStatus() == FaturaStatus.ABERTA &&
-                    f.getDataVencimento() != null &&
-                    !f.getDataVencimento().isBefore(inicio) &&
-                    !f.getDataVencimento().isAfter(fim)) {
-                total = total.add(f.getValorTotal() != null ? f.getValorTotal() : BigDecimal.ZERO);
-            }
-        }
-        return total;
+        BigDecimal total = faturaCartaoRepository.somarValorTotalPorStatusNoPeriodo(
+                usuarioId, FaturaStatus.ABERTA, inicio, fim);
+        return total != null ? total : BigDecimal.ZERO;
     }
 }

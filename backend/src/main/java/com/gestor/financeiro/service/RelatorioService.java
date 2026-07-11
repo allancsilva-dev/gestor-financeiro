@@ -1,23 +1,22 @@
 package com.gestor.financeiro.service;
 
+import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.dto.*;
-import com.gestor.financeiro.model.Transacao;
+import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.TransacaoRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class RelatorioService {
-
-    @Autowired
-    private TransacaoRepository transacaoRepository;
+    private final TransacaoRepository transacaoRepository;
 
     public RelatorioResponse gerarRelatorio(Long usuarioId, LocalDate inicio, LocalDate fim) {
         if (inicio == null) inicio = LocalDate.now().withDayOfMonth(1);
@@ -49,51 +48,39 @@ public class RelatorioService {
                     asLong(row[3]), String.valueOf(row[0]), String.valueOf(row[2]), String.valueOf(row[4]), valor, BigDecimal.valueOf(pct)));
         }
 
-        List<Transacao> despesas = transacaoRepository
-                .findByUsuarioIdAndDataBetween(usuarioId, inicio, fim);
-        List<RelatorioTransacaoDto> maioresDespesas = despesas.stream()
-                .filter(t -> t.getTipo() == TipoTransacao.SAIDA)
-                .sorted((a, b) -> b.getValorTotal().compareTo(a.getValorTotal()))
-                .limit(10)
-                .map(t -> new RelatorioTransacaoDto(t.getId(), t.getDescricao(), t.getValorTotal(), t.getData(),
-                        t.getCategoria() != null ? t.getCategoria().getNome() : null,
-                        t.getCategoria() != null ? t.getCategoria().getCor() : "#6B7280"))
-                .collect(Collectors.toList());
+        List<Object[]> despesasRaw = transacaoRepository.findMaioresDespesas(
+                usuarioId, inicio, fim, PageRequest.of(0, 10));
+        List<RelatorioTransacaoDto> maioresDespesas = new ArrayList<>();
+        for (Object[] row : despesasRaw) {
+            String categoriaNome = row[4] != null ? String.valueOf(row[4]) : null;
+            String categoriaCor = row[5] != null ? String.valueOf(row[5]) : "#6B7280";
+            maioresDespesas.add(new RelatorioTransacaoDto(
+                    asLong(row[0]), String.valueOf(row[1]), asBigDecimal(row[2]),
+                    (LocalDate) row[3], categoriaNome, categoriaCor));
+        }
 
-        List<RelatorioContaDto> gastosPorConta = calcularGastosPorConta(despesas, totalGastos);
+        List<RelatorioContaDto> gastosPorConta = calcularGastosPorConta(usuarioId, inicio, fim, totalGastos);
 
-        int totalTransacoes = (int) despesas.stream()
-                .filter(t -> t.getTipo() == TipoTransacao.SAIDA)
-                .count();
+        int totalTransacoes = (int) transacaoRepository
+                .countSaidasByUsuarioIdAndPeriodo(usuarioId, inicio, fim);
 
         return new RelatorioResponse(inicio, fim, totalEntradas, totalSaidas, saldo, totalTransacoes,
                 gastosPorCategoria, maioresDespesas, gastosPorConta);
     }
 
-    private List<RelatorioContaDto> calcularGastosPorConta(List<Transacao> despesas, BigDecimal totalGastos) {
-        Map<Long, BigDecimal> porConta = new HashMap<>();
-        Map<Long, String> nomeConta = new HashMap<>();
-        Map<Long, String> tipoConta = new HashMap<>();
-
-        for (Transacao t : despesas) {
-            if (t.getTipo() != TipoTransacao.SAIDA) continue;
-            if (t.getConta() == null) continue;
-            Long contaId = t.getConta().getId();
-            porConta.merge(contaId, t.getValorTotal() != null ? t.getValorTotal() : BigDecimal.ZERO, BigDecimal::add);
-            nomeConta.putIfAbsent(contaId, t.getConta().getNome());
-            tipoConta.putIfAbsent(contaId, t.getConta().getTipo().getDescricao());
+    private List<RelatorioContaDto> calcularGastosPorConta(Long usuarioId, LocalDate inicio, LocalDate fim, BigDecimal totalGastos) {
+        List<Object[]> contasRaw = transacaoRepository.sumSaidasAgrupadoPorConta(
+                usuarioId, inicio, fim, PageRequest.of(0, 8));
+        List<RelatorioContaDto> gastosPorConta = new ArrayList<>();
+        for (Object[] row : contasRaw) {
+            BigDecimal valor = asBigDecimal(row[3]);
+            int pct = BigDecimal.ZERO.compareTo(totalGastos) == 0 ? 0
+                    : valor.multiply(BigDecimal.valueOf(100)).divide(totalGastos, 0, RoundingMode.HALF_UP).intValue();
+            TipoConta tipo = (TipoConta) row[2];
+            gastosPorConta.add(new RelatorioContaDto(asLong(row[0]), String.valueOf(row[1]),
+                    tipo != null ? tipo.getDescricao() : null, valor, BigDecimal.valueOf(pct)));
         }
-
-        return porConta.entrySet().stream()
-                .sorted((a, b) -> b.getValue().compareTo(a.getValue()))
-                .limit(8)
-                .map(e -> {
-                    int pct = BigDecimal.ZERO.compareTo(totalGastos) == 0 ? 0
-                            : e.getValue().multiply(BigDecimal.valueOf(100)).divide(totalGastos, 0, RoundingMode.HALF_UP).intValue();
-                    return new RelatorioContaDto(e.getKey(), nomeConta.get(e.getKey()),
-                            tipoConta.get(e.getKey()), e.getValue(), BigDecimal.valueOf(pct));
-                })
-                .collect(Collectors.toList());
+        return gastosPorConta;
     }
 
     private static Long asLong(Object value) {

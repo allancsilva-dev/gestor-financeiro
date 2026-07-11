@@ -140,4 +140,37 @@ public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
             @Param("usuarioId") Long usuarioId,
             @Param("inicio") LocalDate inicio,
             @Param("fim") LocalDate fim);
+
+    // Relatorio: maiores despesas do periodo (id, descricao, valorTotal, data, categoriaNome, categoriaCor).
+    // LEFT JOIN para incluir saidas sem categoria. Ordenacao/limite no banco via Pageable.
+    @Query("SELECT t.id, t.descricao, t.valorTotal, t.data, c.nome, c.cor " +
+           "FROM Transacao t LEFT JOIN t.categoria c " +
+           "WHERE t.usuario.id = :usuarioId AND t.ativa = true AND t.tipo = 'SAIDA' " +
+           "AND t.data BETWEEN :inicio AND :fim " +
+           "ORDER BY t.valorTotal DESC")
+    List<Object[]> findMaioresDespesas(
+            @Param("usuarioId") Long usuarioId,
+            @Param("inicio") LocalDate inicio,
+            @Param("fim") LocalDate fim,
+            Pageable pageable);
+
+    // Relatorio: gasto por conta agregado no banco (contaId, nome, tipo, soma). Ordenado desc, limite via Pageable.
+    @Query("SELECT co.id, co.nome, co.tipo, COALESCE(SUM(t.valorTotal), 0) " +
+           "FROM Transacao t JOIN t.conta co " +
+           "WHERE t.usuario.id = :usuarioId AND t.ativa = true AND t.tipo = 'SAIDA' " +
+           "AND t.data BETWEEN :inicio AND :fim " +
+           "GROUP BY co.id, co.nome, co.tipo ORDER BY SUM(t.valorTotal) DESC")
+    List<Object[]> sumSaidasAgrupadoPorConta(
+            @Param("usuarioId") Long usuarioId,
+            @Param("inicio") LocalDate inicio,
+            @Param("fim") LocalDate fim,
+            Pageable pageable);
+
+    @Query("SELECT COUNT(t) FROM Transacao t " +
+           "WHERE t.usuario.id = :usuarioId AND t.ativa = true AND t.tipo = 'SAIDA' " +
+           "AND t.data BETWEEN :inicio AND :fim")
+    long countSaidasByUsuarioIdAndPeriodo(
+            @Param("usuarioId") Long usuarioId,
+            @Param("inicio") LocalDate inicio,
+            @Param("fim") LocalDate fim);
 }
