@@ -2,30 +2,25 @@ package com.gestor.financeiro.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gestor.financeiro.dto.ApiError;
+import com.gestor.financeiro.service.RateLimitService;
+import com.gestor.financeiro.service.RateLimitService.RateLimitDecision;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Component
 public class LoginRateLimitFilter extends OncePerRequestFilter {
 
-    private static final Logger log = LoggerFactory.getLogger(LoginRateLimitFilter.class);
-
-    private static final long WINDOW_MILLIS = 60_000L;
+    private static final Duration WINDOW = Duration.ofMinutes(1);
 
     private static final int LOGIN_LIMIT = 5;
 
@@ -47,12 +42,12 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
 
     private static final String VALIDATE_TOKEN_PATH = "/api/auth/validate-token";
 
-    private final ConcurrentHashMap<String, List<Long>> attemptsByKey = new ConcurrentHashMap<>();
-
     private final ObjectMapper objectMapper;
+    private final RateLimitService rateLimitService;
 
-    public LoginRateLimitFilter(ObjectMapper objectMapper) {
+    public LoginRateLimitFilter(ObjectMapper objectMapper, RateLimitService rateLimitService) {
         this.objectMapper = objectMapper;
+        this.rateLimitService = rateLimitService;
     }
 
     @Override
@@ -75,44 +70,13 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
         }
 
         String key = buildClientKey(request, path);
-        long now = System.currentTimeMillis();
-
-        List<Long> timestamps = attemptsByKey.computeIfAbsent(key, unused -> new ArrayList<>());
-
-        synchronized (timestamps) {
-            // Remove tentativas fora da janela móvel de 1 minuto.
-            timestamps.removeIf(ts -> (now - ts) > WINDOW_MILLIS);
-
-            if (timestamps.size() >= limit) {
-                writeRateLimitResponse(response, limit);
-                return;
-            }
-
-            timestamps.add(now);
+        RateLimitDecision decision = rateLimitService.consume(key, limit, WINDOW);
+        if (!decision.allowed()) {
+            writeRateLimitResponse(response, limit, decision.retryAfterSeconds());
+            return;
         }
 
         filterChain.doFilter(request, response);
-    }
-
-    @Scheduled(fixedRate = 60_000)
-    public void cleanupExpiredEntries() {
-        long now = System.currentTimeMillis();
-        int removed = 0;
-
-        for (Map.Entry<String, List<Long>> entry : attemptsByKey.entrySet()) {
-            List<Long> timestamps = entry.getValue();
-            synchronized (timestamps) {
-                timestamps.removeIf(ts -> (now - ts) > WINDOW_MILLIS);
-                if (timestamps.isEmpty()) {
-                    attemptsByKey.remove(entry.getKey(), entry.getValue());
-                    removed++;
-                }
-            }
-        }
-
-        if (removed > 0) {
-            log.debug("Rate limit cleanup: {} expired entries removed", removed);
-        }
     }
 
     private int resolveLimitForPath(String path) {
@@ -158,12 +122,12 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
         return path + "|" + request.getRemoteAddr();
     }
 
-    private void writeRateLimitResponse(HttpServletResponse response, int limit) throws IOException {
+    private void writeRateLimitResponse(HttpServletResponse response, int limit, long retryAfterSeconds) throws IOException {
         response.setStatus(429);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
 
-        response.setHeader("Retry-After", "60");
+        response.setHeader("Retry-After", String.valueOf(retryAfterSeconds));
         response.setHeader("X-RateLimit-Limit", String.valueOf(limit));
         response.setHeader("X-RateLimit-Remaining", "0");
 
