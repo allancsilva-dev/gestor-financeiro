@@ -417,11 +417,9 @@ public class AuthController {
     }
 
     private String extractClientIp(HttpServletRequest request) {
-        String forwardedFor = request.getHeader("X-Forwarded-For");
-        if (forwardedFor != null && !forwardedFor.isBlank()) {
-            return forwardedFor.split(",")[0].trim();
-        }
-
+        // Não ler X-Forwarded-For cru: header é spoofável por qualquer cliente.
+        // Atrás de proxy, server.forward-headers-strategy=framework já faz o
+        // ForwardedHeaderFilter refletir o IP real em getRemoteAddr().
         return request.getRemoteAddr();
     }
 }

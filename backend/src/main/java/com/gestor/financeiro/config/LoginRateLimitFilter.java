@@ -152,16 +152,10 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
     }
 
     private String buildClientKey(HttpServletRequest request, String path) {
-        String forwardedFor = request.getHeader("X-Forwarded-For");
-        String ip;
-
-        if (forwardedFor != null && !forwardedFor.isBlank()) {
-            ip = forwardedFor.split(",")[0].trim();
-        } else {
-            ip = request.getRemoteAddr();
-        }
-
-        return path + "|" + ip;
+        // Não ler X-Forwarded-For cru: header é spoofável por qualquer cliente.
+        // Atrás de proxy, server.forward-headers-strategy=framework já faz o
+        // ForwardedHeaderFilter refletir o IP real em getRemoteAddr().
+        return path + "|" + request.getRemoteAddr();
     }
 
     private void writeRateLimitResponse(HttpServletResponse response, int limit) throws IOException {
