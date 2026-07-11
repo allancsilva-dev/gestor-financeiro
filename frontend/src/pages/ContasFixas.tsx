@@ -16,6 +16,7 @@ export default function ContasFixas() {
   const [mostrarForm, setMostrarForm] = useState(false);
   const [editando, setEditando] = useState<ContaFixa | null>(null);
   const [loading, setLoading] = useState(false);
+  const [acaoFinanceiraId, setAcaoFinanceiraId] = useState<string | null>(null);
   const [pagandoConta, setPagandoConta] = useState<number | null>(null);
   const [valorPagamento, setValorPagamento] = useState('');
   const [carteiras, setCarteiras] = useState<Carteira[]>([]);
@@ -133,6 +134,8 @@ export default function ContasFixas() {
   };
 
   const handleMarcarComoPaga = async (id: number) => {
+    const actionKey = `pagar:${id}`;
+    if (acaoFinanceiraId) return;
     if (!valorPagamento) {
       toast.error('Informe o valor pago');
       return;
@@ -143,6 +146,7 @@ export default function ContasFixas() {
     }
 
     try {
+      setAcaoFinanceiraId(actionKey);
       await contaFixaService.marcarComoPaga(id, parseFloat(valorPagamento), parseInt(carteiraPagamento, 10));
       toast.success('Conta marcada como paga!');
       setPagandoConta(null);
@@ -151,16 +155,23 @@ export default function ContasFixas() {
       carregarDados();
     } catch (error: any) {
       toast.error(error?.response?.data?.message ?? 'Erro ao marcar como paga');
+    } finally {
+      setAcaoFinanceiraId(null);
     }
   };
 
   const handlePularMes = async (id: number) => {
+    const actionKey = `pular:${id}`;
+    if (acaoFinanceiraId) return;
     try {
+      setAcaoFinanceiraId(actionKey);
       await contaFixaService.pularMes(id);
       toast.success('Mês pulado!');
       carregarDados();
     } catch (error: any) {
       toast.error('Erro ao pular mês');
+    } finally {
+      setAcaoFinanceiraId(null);
     }
   };
 
@@ -467,19 +478,21 @@ export default function ContasFixas() {
                           ))}
                         </select>
                         <div className="flex gap-2">
-                          <button
+                        <button
+                            disabled={acaoFinanceiraId !== null}
                             onClick={() => handleMarcarComoPaga(conta.id)}
-                            className="flex-1 bg-green-500 text-white py-2 rounded-xl hover:bg-green-600 transition"
+                            className="flex-1 bg-green-500 text-white py-2 rounded-xl hover:bg-green-600 transition disabled:opacity-50"
                           >
-                            Confirmar
+                            {acaoFinanceiraId === `pagar:${conta.id}` ? 'Processando...' : 'Confirmar'}
                           </button>
                           <button
+                            disabled={acaoFinanceiraId !== null}
                             onClick={() => {
                               setPagandoConta(null);
                               setValorPagamento('');
                               setCarteiraPagamento('');
                             }}
-                            className="flex-1 bg-slate-700 text-white py-2 rounded-xl hover:bg-slate-600 transition"
+                            className="flex-1 bg-slate-700 text-white py-2 rounded-xl hover:bg-slate-600 transition disabled:opacity-50"
                           >
                             Cancelar
                           </button>
@@ -488,18 +501,20 @@ export default function ContasFixas() {
                     ) : (
                       <div className="flex gap-2">
                         <button
+                          disabled={acaoFinanceiraId !== null}
                           onClick={() => {
                             setPagandoConta(conta.id);
                             setValorPagamento(conta.valorPlanejado.toString());
                           }}
-                          className="flex-1 bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 py-3 rounded-xl transition border border-orange-500/30 font-medium"
+                          className="flex-1 bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 py-3 rounded-xl transition border border-orange-500/30 font-medium disabled:opacity-50"
                         >
                           Marcar como Paga
                         </button>
                         {conta.recorrente !== false && (
                           <button
+                            disabled={acaoFinanceiraId !== null}
                             onClick={() => handlePularMes(conta.id)}
-                            className="px-4 py-3 bg-slate-700/50 hover:bg-slate-600/50 text-slate-400 hover:text-slate-300 rounded-xl transition border border-slate-600/30 flex items-center gap-1"
+                            className="px-4 py-3 bg-slate-700/50 hover:bg-slate-600/50 text-slate-400 hover:text-slate-300 rounded-xl transition border border-slate-600/30 flex items-center gap-1 disabled:opacity-50"
                             title="Pular este mês"
                           >
                             <SkipForward className="w-4 h-4" />

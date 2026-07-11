@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Layout from '../components/Layout';
 import toast from 'react-hot-toast';
 import faturaService, { FaturaResponse, FaturaLancamento } from '../services/faturaService';
@@ -19,6 +19,7 @@ export default function Faturas() {
   const [fatura, setFatura] = useState<FaturaResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
+  const payingRef = useRef(false);
   const now = new Date();
   const [mes, setMes] = useState(now.getMonth() + 1);
   const [ano, setAno] = useState(now.getFullYear());
@@ -79,11 +80,13 @@ export default function Faturas() {
   };
 
   const handlePagar = async () => {
+    if (payingRef.current) return;
     if (!fatura || fatura.valorTotal <= 0) return;
     if (!carteiraPagamentoId) {
       toast.error('Selecione a carteira de pagamento');
       return;
     }
+    payingRef.current = true;
     setPaying(true);
     try {
       const result = await faturaService.pagarFatura(fatura.id, fatura.valorTotal, carteiraPagamentoId);
@@ -94,6 +97,7 @@ export default function Faturas() {
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Erro ao pagar fatura');
     } finally {
+      payingRef.current = false;
       setPaying(false);
     }
   };

@@ -15,6 +15,7 @@ export default function Metas() {
   const [mostrarForm, setMostrarForm] = useState(false);
   const [mostrarAdicionar, setMostrarAdicionar] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
+  const [acaoFinanceiraId, setAcaoFinanceiraId] = useState<string | null>(null);
   const [editando, setEditando] = useState<Meta | null>(null);
   const [paginaAtual, setPaginaAtual] = useState(0);
   const [totalPaginas, setTotalPaginas] = useState(1);
@@ -172,6 +173,8 @@ export default function Metas() {
   };
 
   const handleAdicionarValor = async (metaId: number) => {
+    const actionKey = `adicionar:${metaId}`;
+    if (acaoFinanceiraId) return;
     if (!valorAdicionar) return;
     if (!carteiraOrigem) {
       toast.error('Selecione de qual conta o valor sai');
@@ -179,6 +182,7 @@ export default function Metas() {
     }
 
     try {
+      setAcaoFinanceiraId(actionKey);
       await metaService.adicionarValor(metaId, parseFloat(valorAdicionar), parseInt(carteiraOrigem, 10));
       toast.success('Valor adicionado!');
       setValorAdicionar('');
@@ -187,6 +191,8 @@ export default function Metas() {
       carregarMetas();
     } catch (error: any) {
       toast.error(error?.response?.data?.message ?? 'Erro ao adicionar valor');
+    } finally {
+      setAcaoFinanceiraId(null);
     }
   };
 
@@ -463,18 +469,20 @@ export default function Metas() {
                       </select>
                       <div className="flex gap-2">
                         <button
+                          disabled={acaoFinanceiraId !== null}
                           onClick={() => handleAdicionarValor(meta.id!)}
-                          className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition"
+                          className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50"
                         >
-                          Confirmar
+                          {acaoFinanceiraId === `adicionar:${meta.id}` ? 'Processando...' : 'Confirmar'}
                         </button>
                         <button
+                          disabled={acaoFinanceiraId !== null}
                           onClick={() => {
                             setMostrarAdicionar(null);
                             setValorAdicionar('');
                             setCarteiraOrigem('');
                           }}
-                          className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400 transition"
+                          className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400 transition disabled:opacity-50"
                         >
                           Cancelar
                         </button>

@@ -59,6 +59,7 @@ export default function ContasFixasScreen() {
   });
 
   const pularMes = (cf: ContaFixa) => {
+    if (pulandoId != null || pagarMutation.status === 'pending') return;
     Alert.alert('Pular este mês?', `${cf.nome} não será cobrada neste mês.`, [
       { text: 'Cancelar', style: 'cancel' },
       {
@@ -130,8 +131,8 @@ export default function ContasFixasScreen() {
             <View style={{ flexDirection: 'row', gap: 8 }}>
               {cf.recorrente !== false && (
                 <TouchableOpacity
-                  onPress={() => pularMes(cf)}
-                  disabled={pulandoId === cf.id}
+                onPress={() => pularMes(cf)}
+                  disabled={pulandoId != null || pagarMutation.status === 'pending'}
                   accessibilityRole="button"
                   accessibilityLabel={`Pular ${cf.nome} este mês`}
                   style={{ minHeight: 36, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1, borderColor: colors.border, justifyContent: 'center' }}
@@ -142,6 +143,7 @@ export default function ContasFixasScreen() {
                 </TouchableOpacity>
               )}
               <TouchableOpacity
+                disabled={pulandoId != null || pagarMutation.status === 'pending'}
                 onPress={() => { setSelecionada(cf); setValorPago(formatNumber(Number(cf.valorPlanejado ?? 0))); setErroPagar(null); setErroCarteira(null); setCarteiraPagamentoId(carteiras.length === 1 ? carteiras[0].id : null); setModalPagarVisible(true); }}
                 accessibilityRole="button"
                 accessibilityLabel={`Pagar ${cf.nome}`}
@@ -207,6 +209,7 @@ export default function ContasFixasScreen() {
               disabled={pagarMutation.status === 'pending'}
               accessibilityRole="button"
               onPress={() => {
+                if (pagarMutation.status === 'pending') return;
                 setErroPagar(null); setErroCarteira(null);
                 const v = parseCurrencyBR(valorPago);
                 if (isNaN(v) || v <= 0) { setErroPagar('Valor deve ser positivo.'); return; }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Layout from '../components/Layout';
 import carteiraService, { Carteira } from '../services/carteiraService.ts';
 import { useAuth } from '../context/AuthContext';
@@ -51,6 +51,8 @@ const CarteiraPage = () => {
   const [carteiraSelecionada, setCarteiraSelecionada] = useState<number | null>(null);
   const [valorMovimentacao, setValorMovimentacao] = useState('');
   const [tipoMovimentacao, setTipoMovimentacao] = useState<'adicionar' | 'remover'>('adicionar');
+  const [movimentando, setMovimentando] = useState(false);
+  const movimentandoRef = useRef(false);
   const saldoNumerico = saldo ? parseFloat(saldo) : null;
   const valorMovimentacaoNumerico = valorMovimentacao ? parseFloat(valorMovimentacao) : null;
 
@@ -146,6 +148,7 @@ const CarteiraPage = () => {
 
   const handleMovimentacao = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (movimentandoRef.current) return;
     
     if (!carteiraSelecionada || !valorMovimentacao) {
       toast.error('Preencha todos os campos');
@@ -153,6 +156,8 @@ const CarteiraPage = () => {
     }
 
     try {
+      movimentandoRef.current = true;
+      setMovimentando(true);
       const valor = parseFloat(valorMovimentacao);
       
       if (tipoMovimentacao === 'adicionar') {
@@ -168,6 +173,9 @@ const CarteiraPage = () => {
       carregarCarteiras();
     } catch (error) {
       toast.error('Erro ao movimentar dinheiro');
+    } finally {
+      movimentandoRef.current = false;
+      setMovimentando(false);
     }
   };
 
@@ -446,6 +454,7 @@ const CarteiraPage = () => {
                   <CurrencyInput
                     value={valorMovimentacaoNumerico}
                     onValueChange={(value) => setValorMovimentacao(value === null ? '' : value.toString())}
+                    disabled={movimentando}
                     className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
                     placeholder="R$ 0,00"
                     required
@@ -455,23 +464,25 @@ const CarteiraPage = () => {
                 <div className="flex gap-3 justify-end">
                   <button
                     type="button"
+                    disabled={movimentando}
                     onClick={() => {
                       setCarteiraSelecionada(null);
                       setValorMovimentacao('');
                     }}
-                    className="px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white hover:bg-slate-600 transition"
+                    className="px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white hover:bg-slate-600 transition disabled:opacity-50"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
-                    className={`px-4 py-2 rounded-lg text-white transition ${
+                    disabled={movimentando}
+                    className={`px-4 py-2 rounded-lg text-white transition disabled:opacity-50 ${
                       tipoMovimentacao === 'adicionar'
                         ? 'bg-green-600 hover:bg-green-700'
                         : 'bg-red-600 hover:bg-red-700'
                     }`}
                   >
-                    Confirmar
+                    {movimentando ? 'Processando...' : 'Confirmar'}
                   </button>
                 </div>
               </form>

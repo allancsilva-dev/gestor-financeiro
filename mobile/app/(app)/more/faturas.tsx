@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet, Modal, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -20,6 +20,7 @@ export default function FaturasScreen() {
   const [ano, setAno] = useState(now.getFullYear());
   const [contaIdx, setContaIdx] = useState(0);
   const [paying, setPaying] = useState(false);
+  const payingRef = useRef(false);
   const [payError, setPayError] = useState<string | null>(null);
   const [carteiraPagamentoId, setCarteiraPagamentoId] = useState<number | null>(null);
 
@@ -98,12 +99,14 @@ export default function FaturasScreen() {
   };
 
   const handlePagar = async () => {
+    if (payingRef.current) return;
     if (!fatura || fatura.valorTotal <= 0) return;
     if (!carteiraPagamentoId) {
       setPayError('Selecione a conta de pagamento.');
       return;
     }
     setPayError(null);
+    payingRef.current = true;
     setPaying(true);
     try {
       await faturaService.pagarFatura(fatura.id, fatura.valorTotal, carteiraPagamentoId);
@@ -114,7 +117,10 @@ export default function FaturasScreen() {
       refetch();
     } catch (err: any) {
       setPayError(err?.userMessage ?? 'Erro ao pagar fatura.');
-    } finally { setPaying(false); }
+    } finally {
+      payingRef.current = false;
+      setPaying(false);
+    }
   };
 
   const mesAnterior = () => { if (mes === 1) { setMes(12); setAno(ano - 1); } else setMes(mes - 1); };
