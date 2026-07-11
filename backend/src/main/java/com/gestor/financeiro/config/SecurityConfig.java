@@ -1,6 +1,6 @@
 package com.gestor.financeiro.config;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -30,16 +30,11 @@ import java.util.stream.Collectors;
 
 @Configuration
 @EnableWebSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
-
-    @Autowired
-    private JwtAuthenticationFilter jwtAuthenticationFilter;
-
-    @Autowired
-    private LoginRateLimitFilter loginRateLimitFilter;
-
-    @Autowired
-    private RefreshTokenCsrfFilter refreshTokenCsrfFilter;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final LoginRateLimitFilter loginRateLimitFilter;
+    private final RefreshTokenCsrfFilter refreshTokenCsrfFilter;
 
     @Value("${cors.allowed.origins:}")
     private String corsAllowedOrigins;

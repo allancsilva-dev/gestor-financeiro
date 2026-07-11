@@ -1,5 +1,6 @@
 package com.gestor.financeiro.service;
 
+import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.exception.UnauthorizedAccessException;
 import com.gestor.financeiro.model.Conta;
@@ -8,20 +9,16 @@ import com.gestor.financeiro.repository.ContaRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class ContaService {
-    
-    @Autowired
-    private ContaRepository contaRepository;
-
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    private final ContaRepository contaRepository;
+    private final UsuarioRepository usuarioRepository;
     
     // Lista contas ativas do usuário
     public Page<Conta> listarPorUsuario(Long usuarioId, Pageable pageable) {

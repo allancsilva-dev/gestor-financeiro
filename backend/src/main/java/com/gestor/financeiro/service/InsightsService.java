@@ -1,9 +1,9 @@
 package com.gestor.financeiro.service;
 
+import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.dto.CategoriaAlerta;
 import com.gestor.financeiro.dto.InsightsResponse;
 import com.gestor.financeiro.repository.*;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -13,16 +13,11 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class InsightsService {
-
-    @Autowired
-    private TransacaoRepository transacaoRepository;
-
-    @Autowired
-    private CategoriaRepository categoriaRepository;
-
-    @Autowired
-    private CarteiraRepository carteiraRepository;
+    private final TransacaoRepository transacaoRepository;
+    private final CategoriaRepository categoriaRepository;
+    private final CarteiraRepository carteiraRepository;
 
     public InsightsResponse gerarInsights(Long usuarioId) {
         LocalDate hoje = LocalDate.now();

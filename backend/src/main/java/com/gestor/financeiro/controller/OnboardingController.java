@@ -1,5 +1,6 @@
 package com.gestor.financeiro.controller;
 
+import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.dto.OnboardingStatusResponse;
 import com.gestor.financeiro.dto.OnboardingFinalizarRequest;
 import com.gestor.financeiro.dto.UsuarioResponseDto;
@@ -11,7 +12,6 @@ import com.gestor.financeiro.service.OnboardingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -19,16 +19,11 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/onboarding")
 @Tag(name = "Onboarding", description = "Fluxo de onboarding financeiro guiado")
+@RequiredArgsConstructor
 public class OnboardingController {
-
-    @Autowired
-    private UsuarioRepository usuarioRepository;
-
-    @Autowired
-    private AuthenticatedUserService authenticatedUserService;
-
-    @Autowired
-    private OnboardingService onboardingService;
+    private final UsuarioRepository usuarioRepository;
+    private final AuthenticatedUserService authenticatedUserService;
+    private final OnboardingService onboardingService;
 
     @GetMapping("/status")
     @Operation(summary = "Verifica se onboarding está completo")

@@ -1,12 +1,12 @@
 package com.gestor.financeiro.controller;
 
+import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.dto.AnexoResponse;
 import com.gestor.financeiro.model.Anexo;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.AnexoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -21,13 +21,10 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/anexos")
 @Tag(name = "Anexos", description = "Upload e download de comprovantes")
+@RequiredArgsConstructor
 public class AnexoController {
-
-    @Autowired
-    private AnexoService anexoService;
-
-    @Autowired
-    private AuthenticatedUserService authenticatedUserService;
+    private final AnexoService anexoService;
+    private final AuthenticatedUserService authenticatedUserService;
 
     @PostMapping("/{transacaoId}")
     @Operation(summary = "Enviar anexo para uma transação")

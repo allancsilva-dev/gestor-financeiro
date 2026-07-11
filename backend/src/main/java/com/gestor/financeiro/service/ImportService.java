@@ -1,5 +1,6 @@
 package com.gestor.financeiro.service;
 
+import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.dto.ImportResultDto;
 import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.model.Carteira;
@@ -10,7 +11,6 @@ import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.CategoriaRepository;
 import com.gestor.financeiro.repository.ContaRepository;
 import com.gestor.financeiro.repository.TransacaoRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -24,6 +24,7 @@ import java.time.format.DateTimeParseException;
 import java.util.*;
 
 @Service
+@RequiredArgsConstructor
 public class ImportService {
 
     private static final List<DateTimeFormatter> DATE_FORMATS = List.of(
@@ -32,21 +33,11 @@ public class ImportService {
         DateTimeFormatter.ofPattern("MM/dd/yyyy"),
         DateTimeFormatter.ofPattern("dd-MM-yyyy")
     );
-
-    @Autowired
-    private TransacaoService transacaoService;
-
-    @Autowired
-    private TransacaoRepository transacaoRepository;
-
-    @Autowired
-    private CategoriaRepository categoriaRepository;
-
-    @Autowired
-    private ContaRepository contaRepository;
-
-    @Autowired
-    private CarteiraRepository carteiraRepository;
+    private final TransacaoService transacaoService;
+    private final TransacaoRepository transacaoRepository;
+    private final CategoriaRepository categoriaRepository;
+    private final ContaRepository contaRepository;
+    private final CarteiraRepository carteiraRepository;
 
     // Sem @Transactional aqui de propósito: cada linha importa na transação própria
     // de TransacaoService.criar(), para uma linha inválida não reverter as demais.

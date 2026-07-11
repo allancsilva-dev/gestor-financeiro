@@ -1,5 +1,6 @@
 package com.gestor.financeiro.controller;
 
+import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.dto.FaturaResponse;
 import com.gestor.financeiro.dto.ValorRequest;
 import com.gestor.financeiro.security.AuthenticatedUserService;
@@ -7,7 +8,6 @@ import com.gestor.financeiro.service.FaturaService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,13 +16,10 @@ import java.math.BigDecimal;
 @RestController
 @RequestMapping("/api/v1/faturas")
 @Tag(name = "Faturas", description = "Faturas de cartão de crédito")
+@RequiredArgsConstructor
 public class FaturaController {
-
-    @Autowired
-    private FaturaService faturaService;
-
-    @Autowired
-    private AuthenticatedUserService authenticatedUserService;
+    private final FaturaService faturaService;
+    private final AuthenticatedUserService authenticatedUserService;
 
     @GetMapping("/conta/{contaId}/atual")
     @Operation(summary = "Consulta fatura do mês atual (somente leitura)")

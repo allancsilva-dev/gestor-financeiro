@@ -1,11 +1,11 @@
 package com.gestor.financeiro.controller;
 
+import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.dto.*;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.InvestimentoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,13 +14,10 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/investimentos")
 @Tag(name = "Investimentos", description = "Gerenciamento de ativos e movimentacoes")
+@RequiredArgsConstructor
 public class InvestimentoController {
-
-    @Autowired
-    private InvestimentoService investimentoService;
-
-    @Autowired
-    private AuthenticatedUserService authenticatedUserService;
+    private final InvestimentoService investimentoService;
+    private final AuthenticatedUserService authenticatedUserService;
 
     @PostMapping
     @Operation(summary = "Criar ativo")

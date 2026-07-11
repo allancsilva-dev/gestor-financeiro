@@ -1,5 +1,6 @@
 package com.gestor.financeiro.service;
 
+import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.exception.BusinessException;
 import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.exception.TokenReuseDetectedException;
@@ -9,7 +10,6 @@ import com.gestor.financeiro.repository.RefreshTokenRepository;
 import com.gestor.financeiro.security.TokenHasher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,12 +26,11 @@ import java.util.Optional;
  * @since 2024-11-17
  */
 @Service
+@RequiredArgsConstructor
 public class RefreshTokenService {
 
     private static final Logger log = LoggerFactory.getLogger(RefreshTokenService.class);
-
-    @Autowired
-    private RefreshTokenRepository refreshTokenRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     // Tempo de expiração do refresh token (7 dias)
     private static final int EXPIRATION_DAYS = 7;

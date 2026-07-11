@@ -1,10 +1,10 @@
 package com.gestor.financeiro.controller;
 
+import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.ExportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -16,13 +16,10 @@ import java.time.LocalDate;
 @RestController
 @RequestMapping("/api/v1/exportar")
 @Tag(name = "Exportação", description = "Exportação de dados financeiros")
+@RequiredArgsConstructor
 public class ExportController {
-
-    @Autowired
-    private ExportService exportService;
-
-    @Autowired
-    private AuthenticatedUserService authenticatedUserService;
+    private final ExportService exportService;
+    private final AuthenticatedUserService authenticatedUserService;
 
     @GetMapping("/transacoes")
     @Operation(summary = "Exportar transações em CSV")

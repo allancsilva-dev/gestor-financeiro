@@ -1,5 +1,6 @@
 package com.gestor.financeiro.controller;
 
+import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.dto.TransacaoRequest;
 import com.gestor.financeiro.dto.TransacaoResponseDto;
 import com.gestor.financeiro.model.Carteira;
@@ -17,7 +18,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -26,13 +26,10 @@ import java.time.LocalDate;
 @RestController
 @RequestMapping("/api/v1/transacoes")
 @Tag(name = "Transações", description = "Gestão de receitas e despesas do usuário autenticado")
+@RequiredArgsConstructor
 public class TransacaoController {
-    
-    @Autowired
-    private TransacaoService transacaoService;
-
-    @Autowired
-    private AuthenticatedUserService authenticatedUserService;
+    private final TransacaoService transacaoService;
+    private final AuthenticatedUserService authenticatedUserService;
     
     // GET /api/transacoes/minhas - Lista transações do usuário autenticado
     @GetMapping("/minhas")

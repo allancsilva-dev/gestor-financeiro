@@ -1,5 +1,6 @@
 package com.gestor.financeiro.service;
 
+import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.dto.OnboardingFinalizarRequest;
 import com.gestor.financeiro.dto.UsuarioResponseDto;
 import com.gestor.financeiro.exception.ResourceNotFoundException;
@@ -14,7 +15,6 @@ import com.gestor.financeiro.repository.ContaFixaRepository;
 import com.gestor.financeiro.repository.MetaRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
 import com.gestor.financeiro.security.AuthenticatedUserService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,37 +23,18 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class OnboardingService {
-
-    @Autowired
-    private AuthenticatedUserService authenticatedUserService;
-
-    @Autowired
-    private UsuarioRepository usuarioRepository;
-
-    @Autowired
-    private CategoriaRepository categoriaRepository;
-
-    @Autowired
-    private ContaFixaRepository contaFixaRepository;
-
-    @Autowired
-    private MetaRepository metaRepository;
-
-    @Autowired
-    private CarteiraService carteiraService;
-
-    @Autowired
-    private ContaService contaService;
-
-    @Autowired
-    private CategoriaService categoriaService;
-
-    @Autowired
-    private ContaFixaService contaFixaService;
-
-    @Autowired
-    private MetaService metaService;
+    private final AuthenticatedUserService authenticatedUserService;
+    private final UsuarioRepository usuarioRepository;
+    private final CategoriaRepository categoriaRepository;
+    private final ContaFixaRepository contaFixaRepository;
+    private final MetaRepository metaRepository;
+    private final CarteiraService carteiraService;
+    private final ContaService contaService;
+    private final CategoriaService categoriaService;
+    private final ContaFixaService contaFixaService;
+    private final MetaService metaService;
 
     @Transactional
     public UsuarioResponseDto finalizar(OnboardingFinalizarRequest request) {

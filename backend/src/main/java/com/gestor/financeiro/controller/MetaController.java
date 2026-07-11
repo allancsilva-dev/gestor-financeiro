@@ -1,5 +1,6 @@
 package com.gestor.financeiro.controller;
 
+import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.dto.MetaRequest;
 import com.gestor.financeiro.dto.MetaResponseDto;
 import com.gestor.financeiro.dto.ValorRequest;
@@ -13,7 +14,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
@@ -23,13 +23,10 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/metas")
 @Tag(name = "Metas", description = "Gestão de metas financeiras")
+@RequiredArgsConstructor
 public class MetaController {
-    
-    @Autowired
-    private MetaService metaService;
-
-    @Autowired
-    private AuthenticatedUserService authenticatedUserService;
+    private final MetaService metaService;
+    private final AuthenticatedUserService authenticatedUserService;
     
     // GET /api/metas/minhas - Lista metas do usuário autenticado
     @GetMapping("/minhas")

@@ -1,5 +1,6 @@
 package com.gestor.financeiro.service;
 
+import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.exception.BusinessException;
 import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.exception.UnauthorizedAccessException;
@@ -18,7 +19,6 @@ import com.gestor.financeiro.repository.CategoriaRepository;
 import com.gestor.financeiro.repository.MovimentoCarteiraRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,25 +26,14 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Service
+@RequiredArgsConstructor
 public class CarteiraService {
-    
-    @Autowired
-    private CarteiraRepository carteiraRepository;
-    
-    @Autowired
-    private UsuarioRepository usuarioRepository;
-    
-    @Autowired
-    private TransacaoRepository transacaoRepository;
-    
-    @Autowired
-    private CategoriaRepository categoriaRepository;
-
-    @Autowired
-    private LedgerService ledgerService;
-
-    @Autowired
-    private MovimentoCarteiraRepository movimentoCarteiraRepository;
+    private final CarteiraRepository carteiraRepository;
+    private final UsuarioRepository usuarioRepository;
+    private final TransacaoRepository transacaoRepository;
+    private final CategoriaRepository categoriaRepository;
+    private final LedgerService ledgerService;
+    private final MovimentoCarteiraRepository movimentoCarteiraRepository;
     
     // Lista carteiras do usuário
     public Page<Carteira> listarPorUsuario(Long usuarioId, Pageable pageable) {

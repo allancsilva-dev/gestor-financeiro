@@ -1,8 +1,8 @@
 package com.gestor.financeiro.service;
 
+import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.model.*;
 import com.gestor.financeiro.repository.*;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -12,28 +12,15 @@ import java.util.List;
 import java.util.StringJoiner;
 
 @Service
+@RequiredArgsConstructor
 public class ExportService {
-
-    @Autowired
-    private TransacaoRepository transacaoRepository;
-
-    @Autowired
-    private CategoriaRepository categoriaRepository;
-
-    @Autowired
-    private ContaRepository contaRepository;
-
-    @Autowired
-    private CarteiraRepository carteiraRepository;
-
-    @Autowired
-    private MetaRepository metaRepository;
-
-    @Autowired
-    private ContaFixaRepository contaFixaRepository;
-
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    private final TransacaoRepository transacaoRepository;
+    private final CategoriaRepository categoriaRepository;
+    private final ContaRepository contaRepository;
+    private final CarteiraRepository carteiraRepository;
+    private final MetaRepository metaRepository;
+    private final ContaFixaRepository contaFixaRepository;
+    private final UsuarioRepository usuarioRepository;
 
     private static final DateTimeFormatter DF = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 

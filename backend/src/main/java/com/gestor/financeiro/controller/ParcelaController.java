@@ -1,5 +1,6 @@
 package com.gestor.financeiro.controller;
 
+import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.dto.ParcelaResponseDto;
 import com.gestor.financeiro.model.Parcela;
 import com.gestor.financeiro.security.AuthenticatedUserService;
@@ -10,20 +11,16 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/parcelas")
 @Tag(name = "Parcelas", description = "Gestão de parcelas de transações")
+@RequiredArgsConstructor
 public class ParcelaController {
-    
-    @Autowired
-    private ParcelaService parcelaService;
-
-    @Autowired
-    private AuthenticatedUserService authenticatedUserService;
+    private final ParcelaService parcelaService;
+    private final AuthenticatedUserService authenticatedUserService;
     
     // GET /api/parcelas/transacao/{transacaoId} - Lista parcelas de uma transação
     @GetMapping("/transacao/{transacaoId}")

@@ -1,5 +1,6 @@
 package com.gestor.financeiro.controller;
 
+import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.dto.ContaRequest;
 import com.gestor.financeiro.dto.ContaResponseDto;
 import com.gestor.financeiro.model.Conta;
@@ -12,20 +13,16 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/contas")
 @Tag(name = "Contas", description = "Gestão de contas bancárias e cartões")
+@RequiredArgsConstructor
 public class ContaController {
-    
-    @Autowired
-    private ContaService contaService;
-
-    @Autowired
-    private AuthenticatedUserService authenticatedUserService;
+    private final ContaService contaService;
+    private final AuthenticatedUserService authenticatedUserService;
     
     // GET /api/contas/minhas - Lista contas do usuário autenticado
     @GetMapping("/minhas")

@@ -1,5 +1,6 @@
 package com.gestor.financeiro.service;
 
+import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.exception.BusinessException;
 import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.exception.UnauthorizedAccessException;
@@ -9,19 +10,15 @@ import com.gestor.financeiro.repository.CategoriaRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import com.gestor.financeiro.security.AuthenticatedUserService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class CategoriaService {
-    
-    @Autowired
-    private CategoriaRepository categoriaRepository;
-
-    @Autowired
-    private AuthenticatedUserService authenticatedUserService;
+    private final CategoriaRepository categoriaRepository;
+    private final AuthenticatedUserService authenticatedUserService;
     
     // Lista categorias ativas do usuário LOGADO
     public Page<Categoria> listarMinhasCategorias(Pageable pageable) {

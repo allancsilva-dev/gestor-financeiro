@@ -1,18 +1,17 @@
 package com.gestor.financeiro.security;
 
+import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.exception.UnauthorizedAccessException;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.repository.UsuarioRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 @Service
+@RequiredArgsConstructor
 public class AuthenticatedUserService {
-
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    private final UsuarioRepository usuarioRepository;
 
     public Long getAuthenticatedUserId() {
         return getAuthenticatedUser().getId();

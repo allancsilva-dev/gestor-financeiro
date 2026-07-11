@@ -1,5 +1,6 @@
 package com.gestor.financeiro.service;
 
+import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.exception.UnauthorizedAccessException;
 import com.gestor.financeiro.model.Carteira;
@@ -11,7 +12,6 @@ import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.ParcelaRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
@@ -20,16 +20,11 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class ParcelaService {
-
-    @Autowired
-    private ParcelaRepository parcelaRepository;
-
-    @Autowired
-    private LedgerService ledgerService;
-
-    @Autowired
-    private CarteiraRepository carteiraRepository;
+    private final ParcelaRepository parcelaRepository;
+    private final LedgerService ledgerService;
+    private final CarteiraRepository carteiraRepository;
 
     public Page<Parcela> listarPorTransacao(Long transacaoId, Long usuarioId, Pageable pageable) {
         return parcelaRepository.findByTransacaoIdAndTransacaoUsuarioId(transacaoId, usuarioId, pageable);

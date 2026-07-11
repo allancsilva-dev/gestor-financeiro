@@ -1,5 +1,6 @@
 package com.gestor.financeiro.controller;
 
+import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.dto.ContaFixaResponseDto;
 import com.gestor.financeiro.dto.ContaFixaRequest;
 import com.gestor.financeiro.dto.ValorRequest;
@@ -14,7 +15,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
@@ -22,13 +22,10 @@ import java.math.BigDecimal;
 @RestController
 @RequestMapping("/api/v1/contas-fixas")
 @Tag(name = "Contas Fixas", description = "Gestão de despesas recorrentes")
+@RequiredArgsConstructor
 public class ContaFixaController {
-
-    @Autowired
-    private ContaFixaService contaFixaService;
-
-    @Autowired
-    private AuthenticatedUserService authenticatedUserService;
+    private final ContaFixaService contaFixaService;
+    private final AuthenticatedUserService authenticatedUserService;
 
     // GET /api/contas-fixas/minhas - Lista contas fixas do usuário autenticado
     @GetMapping("/minhas")

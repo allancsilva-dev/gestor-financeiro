@@ -1,5 +1,6 @@
 package com.gestor.financeiro.controller;
 
+import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.dto.CategoriaCreateRequest;
 import com.gestor.financeiro.dto.CategoriaResponseDto;
 import com.gestor.financeiro.dto.CategoriaUpdateRequest;
@@ -13,20 +14,16 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/categorias")
 @Tag(name = "Categorias", description = "Gestão de categorias financeiras")
+@RequiredArgsConstructor
 public class CategoriaController {
-
-    @Autowired
-    private CategoriaService categoriaService;
-
-    @Autowired
-    private AuthenticatedUserService authenticatedUserService;
+    private final CategoriaService categoriaService;
+    private final AuthenticatedUserService authenticatedUserService;
 
     // Lista categorias do usuário logado
     @GetMapping("/minhas")

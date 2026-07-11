@@ -22,7 +22,6 @@ import com.gestor.financeiro.repository.TransacaoRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
@@ -35,32 +34,35 @@ import java.util.List;
 @Service
 public class TransacaoService {
 
-    @Autowired
-    private TransacaoRepository transacaoRepository;
+    private final TransacaoRepository transacaoRepository;
+    private final ParcelaRepository parcelaRepository;
+    private final CategoriaRepository categoriaRepository;
+    private final ContaRepository contaRepository;
+    private final ContaService contaService;
+    private final UsuarioRepository usuarioRepository;
+    private final LedgerService ledgerService;
+    private final CarteiraRepository carteiraRepository;
+    private final FaturaService faturaService;
 
-    @Autowired
-    private ParcelaRepository parcelaRepository;
-
-    @Autowired
-    private CategoriaRepository categoriaRepository;
-
-    @Autowired
-    private ContaRepository contaRepository;
-
-    @Autowired
-    private ContaService contaService;
-
-    @Autowired
-    private UsuarioRepository usuarioRepository;
-
-    @Autowired
-    private LedgerService ledgerService;
-
-    @Autowired
-    private CarteiraRepository carteiraRepository;
-
-    @Autowired
-    private FaturaService faturaService;
+    public TransacaoService(TransacaoRepository transacaoRepository,
+                            ParcelaRepository parcelaRepository,
+                            CategoriaRepository categoriaRepository,
+                            ContaRepository contaRepository,
+                            ContaService contaService,
+                            UsuarioRepository usuarioRepository,
+                            LedgerService ledgerService,
+                            CarteiraRepository carteiraRepository,
+                            FaturaService faturaService) {
+        this.transacaoRepository = transacaoRepository;
+        this.parcelaRepository = parcelaRepository;
+        this.categoriaRepository = categoriaRepository;
+        this.contaRepository = contaRepository;
+        this.contaService = contaService;
+        this.usuarioRepository = usuarioRepository;
+        this.ledgerService = ledgerService;
+        this.carteiraRepository = carteiraRepository;
+        this.faturaService = faturaService;
+    }
 
     public Page<Transacao> listarPorUsuario(Long usuarioId, Pageable pageable) {
         return transacaoRepository.findByUsuarioIdAndAtivaTrue(usuarioId, pageable);

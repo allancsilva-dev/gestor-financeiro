@@ -1,8 +1,8 @@
 package com.gestor.financeiro.service;
 
+import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.*;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -11,25 +11,14 @@ import java.time.format.TextStyle;
 import java.util.*;
 
 @Service
+@RequiredArgsConstructor
 public class DashboardService {
-    
-    @Autowired
-    private TransacaoRepository transacaoRepository;
-    
-    @Autowired
-    private CategoriaRepository categoriaRepository;
-    
-    @Autowired
-    private ContaRepository contaRepository;
-    
-    @Autowired
-    private MetaRepository metaRepository;
-    
-    @Autowired
-    private ContaFixaRepository contaFixaRepository;
-    
-    @Autowired
-    private CarteiraRepository carteiraRepository;
+    private final TransacaoRepository transacaoRepository;
+    private final CategoriaRepository categoriaRepository;
+    private final ContaRepository contaRepository;
+    private final MetaRepository metaRepository;
+    private final ContaFixaRepository contaFixaRepository;
+    private final CarteiraRepository carteiraRepository;
     
     public Map<String, Object> obterResumo(Long usuarioId) {
         Map<String, Object> resumo = new HashMap<>();

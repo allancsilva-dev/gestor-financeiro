@@ -1,5 +1,6 @@
 package com.gestor.financeiro.controller;
 
+import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.dto.AjusteCarteiraRequest;
 import com.gestor.financeiro.dto.CarteiraResponseDto;
 import com.gestor.financeiro.dto.CarteiraRequest;
@@ -18,7 +19,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
@@ -27,16 +27,11 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/carteiras")
 @Tag(name = "Carteiras", description = "Gestão de carteiras e saldo")
+@RequiredArgsConstructor
 public class CarteiraController {
-    
-    @Autowired
-    private CarteiraService carteiraService;
-
-    @Autowired
-    private LedgerReconciliationService ledgerReconciliationService;
-
-    @Autowired
-    private AuthenticatedUserService authenticatedUserService;
+    private final CarteiraService carteiraService;
+    private final LedgerReconciliationService ledgerReconciliationService;
+    private final AuthenticatedUserService authenticatedUserService;
     
     @GetMapping("/minhas")
     public ResponseEntity<Page<CarteiraResponseDto>> listar(

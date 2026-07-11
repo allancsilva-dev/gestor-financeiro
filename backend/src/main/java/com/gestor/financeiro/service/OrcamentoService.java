@@ -1,5 +1,6 @@
 package com.gestor.financeiro.service;
 
+import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.dto.*;
 import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.model.Categoria;
@@ -8,7 +9,6 @@ import com.gestor.financeiro.model.OrcamentoMensal;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.*;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,22 +20,13 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class OrcamentoService {
-
-    @Autowired
-    private OrcamentoMensalRepository orcamentoMensalRepository;
-
-    @Autowired
-    private OrcamentoCategoriaRepository orcamentoCategoriaRepository;
-
-    @Autowired
-    private TransacaoRepository transacaoRepository;
-
-    @Autowired
-    private CategoriaRepository categoriaRepository;
-
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    private final OrcamentoMensalRepository orcamentoMensalRepository;
+    private final OrcamentoCategoriaRepository orcamentoCategoriaRepository;
+    private final TransacaoRepository transacaoRepository;
+    private final CategoriaRepository categoriaRepository;
+    private final UsuarioRepository usuarioRepository;
 
     public OrcamentoResponse buscarOuCriarAtual(Long usuarioId) {
         YearMonth ym = YearMonth.now();

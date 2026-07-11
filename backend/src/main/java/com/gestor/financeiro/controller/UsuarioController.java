@@ -1,5 +1,6 @@
 package com.gestor.financeiro.controller;
 
+import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.dto.AlterarSenhaRequest;
 import com.gestor.financeiro.dto.ExcluirContaRequest;
 import com.gestor.financeiro.dto.UsuarioUpdateRequest;
@@ -12,7 +13,6 @@ import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.UsuarioExclusaoService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
@@ -20,19 +20,12 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/usuarios")
 @Tag(name = "Usuários", description = "Dados do usuário autenticado")
+@RequiredArgsConstructor
 public class UsuarioController {
-
-    @Autowired
-    private UsuarioRepository usuarioRepository;
-
-    @Autowired
-    private AuthenticatedUserService authenticatedUserService;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private UsuarioExclusaoService usuarioExclusaoService;
+    private final UsuarioRepository usuarioRepository;
+    private final AuthenticatedUserService authenticatedUserService;
+    private final PasswordEncoder passwordEncoder;
+    private final UsuarioExclusaoService usuarioExclusaoService;
 
     @GetMapping("/me")
     public ResponseEntity<UsuarioResponseDto> getCurrentUser() {

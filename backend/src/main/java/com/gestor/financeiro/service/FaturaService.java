@@ -11,7 +11,6 @@ import com.gestor.financeiro.model.enums.TipoFaturaLancamento;
 import com.gestor.financeiro.model.enums.TipoMovimentoCarteira;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.*;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,26 +25,29 @@ import java.util.Optional;
 @Service
 public class FaturaService {
 
-    @Autowired
-    private FaturaCartaoRepository faturaRepository;
+    private final FaturaCartaoRepository faturaRepository;
+    private final FaturaLancamentoRepository faturaLancamentoRepository;
+    private final ContaRepository contaRepository;
+    private final TransacaoRepository transacaoRepository;
+    private final UsuarioRepository usuarioRepository;
+    private final CarteiraRepository carteiraRepository;
+    private final LedgerService ledgerService;
 
-    @Autowired
-    private FaturaLancamentoRepository faturaLancamentoRepository;
-
-    @Autowired
-    private ContaRepository contaRepository;
-
-    @Autowired
-    private TransacaoRepository transacaoRepository;
-
-    @Autowired
-    private UsuarioRepository usuarioRepository;
-
-    @Autowired
-    private CarteiraRepository carteiraRepository;
-
-    @Autowired
-    private LedgerService ledgerService;
+    public FaturaService(FaturaCartaoRepository faturaRepository,
+                         FaturaLancamentoRepository faturaLancamentoRepository,
+                         ContaRepository contaRepository,
+                         TransacaoRepository transacaoRepository,
+                         UsuarioRepository usuarioRepository,
+                         CarteiraRepository carteiraRepository,
+                         LedgerService ledgerService) {
+        this.faturaRepository = faturaRepository;
+        this.faturaLancamentoRepository = faturaLancamentoRepository;
+        this.contaRepository = contaRepository;
+        this.transacaoRepository = transacaoRepository;
+        this.usuarioRepository = usuarioRepository;
+        this.carteiraRepository = carteiraRepository;
+        this.ledgerService = ledgerService;
+    }
 
     public FaturaResponse buscarAtual(Long usuarioId, Long contaId) {
         Conta conta = validarContaCredito(usuarioId, contaId);
