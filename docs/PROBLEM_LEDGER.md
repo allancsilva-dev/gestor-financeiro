@@ -1003,4 +1003,313 @@ pelas parcelas não pagas, e a diferença sobre a parte já paga (fatura imutáv
 
 ---
 
-> Mantido pelo `docs-reporter`. Ultima atualizacao: 2026-07-09 (terceira rodada da mesma sessao — complemento mobile do modulo de fatura/cartao: PROB-0045 a PROB-0048 — ver BUGFIX_LOG BUG-0027 a BUG-0029 e relatorio `REVIEW_REPORTS/2026-07-09_backend_review_fatura-cartao-fluxo.md`).
+## PROB-0049 — Importacao CSV bypassa regras financeiras centrais
+
+- **ID:** PROB-0049
+- **Titulo:** `ImportService.importarCsv()` salva `Transacao` direto no repository, sem passar por `TransacaoService`
+- **Data:** 2026-07-10
+- **Origem:** auditoria backend/non-frontend alto nivel
+- **Severidade:** CRITICAL
+- **Status:** FECHADO (2026-07-10)
+- **Area:** backend, banco, integridade financeira
+- **Sintoma:** Transacoes importadas por CSV sao persistidas diretamente por `transacaoRepository.save(tx)`.
+- **Causa raiz:** Importacao implementada como persistencia direta, sem reutilizar o service/command financeiro que aplica ledger, fatura, categoria e conta.
+- **Impacto tecnico:** Importacao pode criar transacoes que aparecem em relatorios, mas nao atualizam saldo de carteira, movimentos de ledger, faturas de cartao, `categoria.valorGasto` ou `conta.valorGasto`.
+- **Arquivos relacionados:** `backend/src/main/java/com/gestor/financeiro/service/ImportService.java`, `TransacaoService.java`, `TransacaoRepository.java`, `ImportController.java`, `ImportResultDto.java`
+- **Solucao proposta:** Fazer importacao montar comandos e chamar o fluxo financeiro central (`TransacaoService` ou novo application service/command handler), com opcao explicita para carteira/conta/cartao e regras de deduplicacao/idempotencia.
+- **Solucao aplicada:** ImportService passou a chamar `transacaoService.criar()` por linha (ledger, fatura, `categoria.valorGasto` e `conta.valorGasto` aplicados). `@Transactional` externo removido — cada linha importa em transacao propria; linha invalida nao reverte as demais e o resultado reportado reflete o que persistiu. Deduplicacao por (usuario, data, descricao, valor, tipo) via `existsBy...AtivaTrue` — reimportacao conta como `duplicadas` no `ImportResultDto`. Coluna opcional `carteira` (por nome; inexistente = erro de linha) + param opcional `carteiraId` default no endpoint (ownership validado). Status do CSV preservado (`criar()` so forca PENDENTE quando status null); linhas CANCELADO ignoradas.
+- **Evidencias:** `ImportServiceTest` (7 testes): saldo carteira e valorGasto atualizados, movimento ledger criado, reimportacao ignora duplicatas sem alterar saldo, carteira inexistente vira erro de linha sem derrubar demais, carteira padrao de outro usuario rejeitada. Suite completa 102/102 PASS.
+- **Riscos residuais:** Dedupe por campos pode marcar como duplicata duas transacoes legitimas identicas no mesmo dia (mesma descricao/valor). Compra em cartao (conta CREDITO) importada segue fluxo de fatura normal — validar com extrato real de cartao. Frontend/mobile ainda nao expõem `carteiraId`/coluna carteira na UI de importacao.
+- **Proximo passo:** Resolvido.
+
+---
+
+## PROB-0050 — Modelo de fatura/cartao incompleto para padrao alto nivel
+
+- **ID:** PROB-0050
+- **Titulo:** Fatura nao suporta pagamento parcial, fatura com total zero/negativo nem rollover explicito de credito
+- **Data:** 2026-07-10
+- **Origem:** auditoria backend/non-frontend alto nivel
+- **Severidade:** HIGH
+- **Status:** ABERTO
+- **Area:** backend, produto financeiro
+- **Sintoma:** `pagarFatura` bloqueia total `<= 0` e exige valor exatamente igual ao total atual.
+- **Causa raiz:** Modelo atual trata pagamento de fatura como quitacao total simples; credito/estorno e parcial ainda nao tem ledger de estado proprio.
+- **Impacto tecnico:** Creditos podem ficar presos em faturas antigas; pagamento parcial real e rotativo nao existem; mensagem de erro pode ser correta tecnicamente mas insuficiente para produto financeiro robusto.
+- **Arquivos relacionados:** `backend/src/main/java/com/gestor/financeiro/service/FaturaService.java:85-145`
+- **Solucao proposta:** Formalizar modelo de fatura: `saldoDevedor`, `saldoCredor`, pagamento parcial, rollover de credito, juros/rotativo se aplicavel, e movimentos de ledger associados.
+- **Evidencias:** `FaturaService.java:109-114`; BACKLOG-0049 e BACKLOG-0054 ja registravam partes do problema.
+- **Riscos residuais:** Usuario pode perder confianca quando estorno/credito nao tem comportamento intuitivo.
+- **Proximo passo:** Especificar regra de produto antes de alterar codigo.
+
+---
+
+## PROB-0051 — Banco nao protege invariantes financeiros basicos
+
+- **ID:** PROB-0051
+- **Titulo:** Tabelas centrais aceitam valores/dias/enums invalidos sem `CHECK` constraints suficientes
+- **Data:** 2026-07-10
+- **Origem:** auditoria backend/non-frontend alto nivel
+- **Severidade:** HIGH
+- **Status:** ABERTO
+- **Area:** banco, integridade financeira
+- **Sintoma:** `transacoes.valor_total`, `parcelas.valor`, `total_parcelas`, dias de vencimento/fechamento e enums dependem majoritariamente da validacao Java.
+- **Causa raiz:** Baseline Flyway nasceu como espelho minimo do schema JPA, sem camada completa de invariantes no banco.
+- **Impacto tecnico:** Bugs, imports, scripts ou futuras rotas podem persistir estado financeiramente invalido mesmo com `ddl-auto=validate`.
+- **Arquivos relacionados:** `backend/src/main/resources/db/migration/V1__baseline_schema.sql`, migrations posteriores de fatura/investimentos/orcamento.
+- **Solucao proposta:** Adicionar migrations com `CHECK` constraints para valores positivos/nao-negativos conforme dominio, ranges de mes/dia, total de parcelas, status/tipo validos e coerencia basica.
+- **Evidencias:** `V1__baseline_schema.sql:45-75` nao tem `CHECK` para `valor_total > 0` nem parcelas validas.
+- **Riscos residuais:** Corrupcao silenciosa de dados se alguma entrada escapar da validacao da API.
+- **Proximo passo:** Criar migration de hardening e testes PostgreSQL.
+
+---
+
+## PROB-0052 — Unique de fatura_lancamentos falha para parcela NULL no PostgreSQL
+
+- **ID:** PROB-0052
+- **Titulo:** `UNIQUE(fatura_id, transacao_id, parcela_numero)` nao impede duplicidade quando `parcela_numero` e `NULL`
+- **Data:** 2026-07-10
+- **Origem:** auditoria backend/non-frontend alto nivel
+- **Severidade:** HIGH
+- **Status:** ABERTO
+- **Area:** banco, cartao, integridade financeira
+- **Sintoma:** Compras a vista usam `parcela_numero = NULL`; PostgreSQL permite multiplas linhas iguais em unique quando coluna nullable e `NULL`.
+- **Causa raiz:** Constraint unica nao considerou semantica de `NULL` em PostgreSQL.
+- **Impacto tecnico:** Duplicidade de lancamento de compra a vista pode inflar fatura e `Conta.valorGasto`.
+- **Arquivos relacionados:** `backend/src/main/resources/db/migration/V17__fatura_lancamentos.sql`
+- **Solucao proposta:** Criar unique index funcional parcial, por exemplo com `COALESCE(parcela_numero, 0)`, ou constraints separadas para compra a vista e parcelada.
+- **Evidencias:** `V17__fatura_lancamentos.sql:11`.
+- **Riscos residuais:** Idempotencia de `registrarCompraCartao` depende de codigo; banco nao garante sozinho.
+- **Proximo passo:** Migration + teste PostgreSQL cobrindo duplicidade com `NULL`.
+
+---
+
+## PROB-0053 — Relatorios e projecoes ainda fazem agregacao em memoria
+
+- **ID:** PROB-0053
+- **Titulo:** `RelatorioService` e `ProjecaoService` carregam listas completas em memoria para calculos agregados
+- **Data:** 2026-07-10
+- **Origem:** auditoria backend/non-frontend alto nivel
+- **Severidade:** HIGH
+- **Status:** ABERTO
+- **Area:** backend, performance, banco
+- **Sintoma:** Relatorio carrega transacoes do periodo para top despesas/gastos por conta; projecao carrega contas fixas, parcelas e faturas e filtra em Java.
+- **Causa raiz:** Dashboard foi otimizado para SQL, mas relatorios/projecoes mantiveram padrao antigo.
+- **Impacto tecnico:** Lentidao, alto consumo de memoria e risco de OOM com historico grande.
+- **Arquivos relacionados:** `backend/src/main/java/com/gestor/financeiro/service/RelatorioService.java`, `backend/src/main/java/com/gestor/financeiro/service/ProjecaoService.java`
+- **Solucao proposta:** Substituir por queries agregadas/paginadas no banco (`SUM`, `GROUP BY`, `ORDER BY`, `LIMIT`) e indices coerentes.
+- **Evidencias:** `RelatorioService.java:52-63`, `ProjecaoService.java:82-120`.
+- **Riscos residuais:** Produto pode degradar exatamente onde usuario espera confianca: fechamento mensal e previsao.
+- **Proximo passo:** Refatorar por repositorios agregados e adicionar testes de contrato.
+
+---
+
+## PROB-0054 — Investimentos permite posicao negativa e nao integra caixa
+
+- **ID:** PROB-0054
+- **Titulo:** `InvestimentoService` nao bloqueia venda acima da quantidade e nao movimenta carteira/caixa
+- **Data:** 2026-07-10
+- **Origem:** auditoria backend/non-frontend alto nivel
+- **Severidade:** HIGH
+- **Status:** ABERTO
+- **Area:** backend, investimentos, integridade financeira
+- **Sintoma:** Venda calcula preco medio e subtrai quantidade sem validar posicao suficiente.
+- **Causa raiz:** Modulo de investimentos foi implementado como controle isolado de posicao, nao como evento financeiro integrado ao ledger.
+- **Impacto tecnico:** Quantidade negativa, custo medio incorreto, patrimonio/investimentos desconectados do saldo real.
+- **Arquivos relacionados:** `backend/src/main/java/com/gestor/financeiro/service/InvestimentoService.java`
+- **Solucao proposta:** Validar quantidade/preco positivos, bloquear venda acima da posicao, integrar compras/vendas a carteira/ledger e registrar eventos auditaveis.
+- **Evidencias:** `InvestimentoService.java:102-110`.
+- **Riscos residuais:** Patrimonio e caixa ficam inconsistentes se usuario usar investimentos de forma real.
+- **Proximo passo:** Redesenhar fluxo de movimentacao de ativos antes de expandir o modulo.
+
+---
+
+## PROB-0055 — Rate limit em memoria nao serve para multi-instancia
+
+- **ID:** PROB-0055
+- **Titulo:** `LoginRateLimitFilter` usa `ConcurrentHashMap` local para rate limit
+- **Data:** 2026-07-10
+- **Origem:** auditoria backend/non-frontend alto nivel
+- **Severidade:** MEDIUM
+- **Status:** ABERTO
+- **Area:** backend, seguranca, infra
+- **Sintoma:** Tentativas sao contadas apenas dentro da JVM atual.
+- **Causa raiz:** Implementacao simples local, sem store distribuido.
+- **Impacto tecnico:** Em multi-instancia, atacante distribui tentativas entre replicas; reinicio limpa historico.
+- **Arquivos relacionados:** `backend/src/main/java/com/gestor/financeiro/config/LoginRateLimitFilter.java`
+- **Solucao proposta:** Migrar para Redis/Bucket4j ou outro rate limiter distribuido, com chave por rota/IP/email quando fizer sentido.
+- **Evidencias:** `LoginRateLimitFilter.java:50`.
+- **Riscos residuais:** Protecao de brute force depende da topologia.
+- **Proximo passo:** Planejar Redis ou gateway rate limit antes de escala horizontal.
+
+---
+
+## PROB-0056 — Bypass CSRF por header mobile exige threat model formal
+
+- **ID:** PROB-0056
+- **Titulo:** Requests com `X-Client-Type: mobile` pulam validacao CSRF em refresh/logout
+- **Data:** 2026-07-10
+- **Origem:** auditoria backend/non-frontend alto nivel
+- **Severidade:** MEDIUM
+- **Status:** ABERTO
+- **Area:** backend, seguranca, mobile
+- **Sintoma:** `RefreshTokenCsrfFilter` retorna sem validar CSRF quando header mobile esta presente.
+- **Causa raiz:** Cliente nativo nao usa o mesmo modelo de cookie/CSRF do navegador; backend aceita header declarativo.
+- **Impacto tecnico:** Se o backend confiar em header spoofavel sem outra garantia, o limite entre cliente web e mobile fica fraco. O risco pratico depende de CORS, cookies, storage mobile e envio de refresh token no body.
+- **Arquivos relacionados:** `backend/src/main/java/com/gestor/financeiro/config/RefreshTokenCsrfFilter.java`, `backend/src/main/java/com/gestor/financeiro/controller/AuthController.java`
+- **Solucao proposta:** Documentar threat model e separar contratos: web cookie+CSRF; mobile refresh token no body/secure storage sem cookie, ou exigir header adicional nao spoofavel por browser conforme CORS/preflight.
+- **Evidencias:** `RefreshTokenCsrfFilter.java:45-47`; `AuthController` retorna refresh token no body para header mobile.
+- **Riscos residuais:** Ambiguidade de seguranca entre web e mobile.
+- **Proximo passo:** Definir contrato oficial de sessao mobile e adicionar testes.
+
+---
+
+## PROB-0057 — Injeção por campo reduz testabilidade e imutabilidade
+
+- **ID:** PROB-0057
+- **Titulo:** Backend ainda usa `@Autowired` por campo em larga escala
+- **Data:** 2026-07-10
+- **Origem:** auditoria backend/non-frontend alto nivel
+- **Severidade:** MEDIUM
+- **Status:** ABERTO
+- **Area:** backend, qualidade
+- **Sintoma:** 135 usos de `@Autowired` em `backend/src/main/java`.
+- **Causa raiz:** Padrao historico de injecao por campo nos controllers/services/configs.
+- **Impacto tecnico:** Dificulta testes unitarios puros, construcao de objetos, imutabilidade e leitura de dependencias obrigatorias.
+- **Arquivos relacionados:** multiplos arquivos em `backend/src/main/java/com/gestor/financeiro`.
+- **Solucao proposta:** Migrar gradualmente para constructor injection, priorizando services financeiros e filtros/configuracoes.
+- **Evidencias:** `rg "@Autowired" backend/src/main/java -c`.
+- **Riscos residuais:** Baixo risco funcional, medio risco de manutencao.
+- **Proximo passo:** Aplicar por modulo durante fixes, sem refatoracao massiva isolada.
+
+---
+
+## PROB-0058 — Integration test PostgreSQL nao executa sem Docker valido
+
+- **ID:** PROB-0058
+- **Titulo:** `mvn verify -Pintegration-test` falha localmente porque Testcontainers nao encontra Docker valido
+- **Data:** 2026-07-10
+- **Origem:** auditoria backend/non-frontend alto nivel
+- **Severidade:** MEDIUM
+- **Status:** ABERTO
+- **Area:** testes, infra
+- **Sintoma:** Suite unit/slice passa, mas integration-test PostgreSQL nao roda no ambiente local auditado.
+- **Causa raiz:** Docker/Testcontainers indisponivel ou mal configurado no host.
+- **Impacto tecnico:** Validação real de Flyway/PostgreSQL fica dependente de CI ou ambiente manual.
+- **Arquivos relacionados:** `backend/src/test/java/com/gestor/financeiro/PostgresMigrationIT.java`, profile `integration-test`.
+- **Solucao proposta:** Garantir Docker funcional no ambiente de dev/CI, documentar requisito e opcionalmente marcar IT com skip explicito quando Docker indisponivel.
+- **Evidencias:** `verify -Pintegration-test` -> `Could not find a valid Docker environment`.
+- **Riscos residuais:** Schema pode passar em H2/unit e falhar em PostgreSQL real se CI nao executar.
+- **Proximo passo:** Rodar em CI ou corrigir Docker local.
+
+---
+
+## PROB-0059 — Backups sem criptografia e sem restore drill automatizado
+
+- **ID:** PROB-0059
+- **Titulo:** Scripts/compose fazem backup, mas nao ha criptografia nem teste automatizado de restore
+- **Data:** 2026-07-10
+- **Origem:** auditoria backend/non-frontend alto nivel
+- **Severidade:** MEDIUM
+- **Status:** ABERTO
+- **Area:** infra, seguranca, operacao
+- **Sintoma:** `pg_dump` gera arquivo local/volume; restore e manual com confirmacao humana.
+- **Causa raiz:** Backup implementado como rotina basica, nao como plano operacional completo.
+- **Impacto tecnico:** Vazamento de backup expõe dados financeiros; backup pode ser inutil se restore nunca for testado.
+- **Arquivos relacionados:** `scripts/backup-db.sh`, `scripts/restore-db.sh`, `docker-compose.vps.yml`
+- **Solucao proposta:** Criptografar backups, registrar retencao/local seguro, automatizar restore drill em banco descartavel e alertar falhas.
+- **Evidencias:** Scripts atuais nao usam criptografia nem job de restore validation.
+- **Riscos residuais:** Perda de dados ou vazamento de dados sensiveis em incidente.
+- **Proximo passo:** Criar runbook e automacao de restore drill.
+
+---
+
+## PROB-0060 — Build de imagem backend pula testes
+
+- **ID:** PROB-0060
+- **Titulo:** `backend/Dockerfile` usa `mvn clean package -DskipTests`
+- **Data:** 2026-07-10
+- **Origem:** auditoria backend/non-frontend alto nivel
+- **Severidade:** LOW
+- **Status:** ABERTO
+- **Area:** backend, CI/CD
+- **Sintoma:** Imagem Docker pode ser criada mesmo se testes falharem, caso build seja executado fora do CI.
+- **Causa raiz:** Dockerfile otimizado para build rapido; responsabilidade de teste delegada ao CI.
+- **Impacto tecnico:** Regressao pode ser empacotada por fluxo manual que ignore CI.
+- **Arquivos relacionados:** `backend/Dockerfile`
+- **Solucao proposta:** Manter `-DskipTests` apenas se pipeline garantir gate anterior obrigatorio; caso contrario, remover ou adicionar argumento explicito `SKIP_TESTS`.
+- **Evidencias:** `backend/Dockerfile:5`.
+- **Riscos residuais:** Baixo se todo deploy passar por CI; medio em deploy manual.
+- **Proximo passo:** Decidir politica de build/deploy.
+
+---
+
+## PROB-0061 — Onboarding mobile fora do design system e sem acessibilidade
+
+- **ID:** PROB-0061
+- **Titulo:** `onboarding.tsx` usava paleta Tailwind hard-coded, CTA final verde e inputs/chips manuais sem a11y
+- **Data:** 2026-07-10
+- **Origem:** auditoria de UI mobile (impeccable)
+- **Severidade:** MEDIUM
+- **Status:** FECHADO (BUG-0048, 2026-07-10)
+- **Area:** mobile, UI, acessibilidade
+- **Sintoma:** Categorias sugeridas com cores fora da paleta canônica (`#EF4444`, `#8B5CF6`, ...) — categoria criada no onboarding tinha cor impossível de re-selecionar no editor de categorias; botão "Começar" verde `#22C55E` violava a regra "verde é dinheiro, violeta é marca"; inputs e chips duplicavam `Field`/`Chip` com radius/labels divergentes; nenhum `accessibilityRole`/`State`/`Label` em chips, grid de categorias, checkboxes e botões.
+- **Causa raiz:** Tela construída antes da consolidação do design system (`DESIGN.md` + componentes `ui/`), sem passar por revisão de UI.
+- **Solucao proposta:** Alinhar à paleta `CATEGORY_COLORS`, CTA em `colors.brand`, reusar `Field`/`Chip`, adicionar a11y completa e alvos ≥44pt.
+- **Solucao aplicada:** `CATEGORIAS_SUGERIDAS` agora referencia `CATEGORY_COLORS` (com cinza neutro novo para "Outros"); CTA "Começar" em `brand`/`brandText`; todos os inputs viraram `Field` e chips viraram `Chip`; grid e "Pular" com role `checkbox` + `checked`; botões com role e minHeight 48; barra de progresso simplificada.
+- **Evidencias:** `mobile/app/onboarding.tsx`, `mobile/src/utils/format.ts`. `npx tsc --noEmit` PASS.
+
+---
+
+## PROB-0062 — Cores hard-coded quebrando dark mode e identidade visual
+
+- **ID:** PROB-0062
+- **Titulo:** Branco fixo em botões/splash e tiles arco-íris no hub "Mais" ignoravam tokens do tema
+- **Data:** 2026-07-10
+- **Origem:** auditoria de UI mobile (impeccable)
+- **Severidade:** MEDIUM
+- **Status:** FECHADO (BUG-0048, 2026-07-10)
+- **Area:** mobile, UI, tema
+- **Sintoma:** `perfil.tsx` com texto `#ffffff` sobre `colors.brand` (no dark, brand é lilás claro — contraste ~2:1) e botão "Sair" branco sobre `danger` (falha no dark); `app/index.tsx` com splash `#fff` fixo (flash branco no dark mode); `more/index.tsx` com uma cor por item de menu (tiles arco-íris — anti-referência declarada no PRODUCT.md).
+- **Causa raiz:** Uso de literais de cor no lugar dos tokens `brandText`/`bg`/`brandBg` do tema.
+- **Solucao proposta:** Substituir literais por tokens; hub de navegação todo em violeta (navegação é marca).
+- **Solucao aplicada:** `perfil.tsx` usa `brandText` no botão brand e `dangerBg`+`danger` no "Sair"; splash usa `colors.bg` + spinner `brand`; tiles do hub "Mais" todos em `brandBg`; badge "Em breve" de 8pt para 10pt.
+- **Evidencias:** `mobile/app/(app)/perfil.tsx`, `mobile/app/index.tsx`, `mobile/app/(app)/more/index.tsx`. `npx tsc --noEmit` PASS.
+
+---
+
+## PROB-0063 — Telas de auth sem Field, links violeta sem contraste AA e alvos de toque pequenos
+
+- **ID:** PROB-0063
+- **Titulo:** login/register/forgot/reset duplicavam inputs manuais (radius 8, label 9pt) e usavam `brand` (3.5:1) em links de texto
+- **Data:** 2026-07-10
+- **Origem:** auditoria de UI mobile (impeccable)
+- **Severidade:** MEDIUM
+- **Status:** FECHADO (BUG-0048, 2026-07-10)
+- **Area:** mobile, UI, acessibilidade
+- **Sintoma:** Inputs sem `accessibilityLabel` (label visual desvinculado); links "Esqueceu a senha?", "Criar conta", "política de privacidade" e "Entrar" em `colors.brand` (#7c5cfc sobre lavanda = ~3.5:1, falha WCAG AA para texto pequeno); "Esqueceu a senha?" com alvo de toque < 44pt; vocabulário visual divergente do resto do app.
+- **Causa raiz:** Telas de auth anteriores ao componente `Field`; token AA `brandFg` existia mas não era usado em links.
+- **Solucao proposta:** Migrar inputs para `Field`, links para `brandFg`, alvos ≥44pt, roles de botão.
+- **Solucao aplicada:** As 4 telas usam `Field` (com `autoComplete`/`textContentType` no login); links em `brandFg`; alvos de toque com minHeight 44; `accessibilityRole="button"` nos toques; botões com radius 12 unificado.
+- **Evidencias:** `mobile/app/(auth)/login.tsx`, `register.tsx`, `forgot-password.tsx`, `reset-password.tsx`. `npx tsc --noEmit` PASS.
+
+---
+
+## PROB-0064 — Categorias: FAB caseiro sem label, seletor de cor sem a11y e espaçamento duplicado
+
+- **ID:** PROB-0064
+- **Titulo:** `more/categorias.tsx` reimplementava o FAB sem `accessibilityLabel` e o seletor de cor não expunha estado
+- **Data:** 2026-07-10
+- **Origem:** auditoria de UI mobile (impeccable)
+- **Severidade:** LOW
+- **Status:** FECHADO (BUG-0048, 2026-07-10)
+- **Area:** mobile, UI, acessibilidade
+- **Sintoma:** FAB "+" manual (sem gradiente/glow do componente `Fab`, sem label para leitor de tela); swatches de cor sem role/estado/label; `gap` + `marginRight` somando espaçamento; input Nome manual com eyebrow 9pt; Cancelar/Salvar sem role e alvo < 44pt.
+- **Causa raiz:** Tela construída sem reusar `Fab`/`Field`.
+- **Solucao proposta:** Reusar componentes, adicionar a11y ao seletor de cor.
+- **Solucao aplicada:** `Fab` com label "Nova categoria"; swatches com role `radio` + `selected` + label + hitSlop; espaçamento único via `gap: 12`; Nome via `Field`; Cancelar/Salvar com role button, minHeight 44 e cor `brandFg`.
+- **Evidencias:** `mobile/app/(app)/more/categorias.tsx`. `npx tsc --noEmit` PASS.
+
+---
+
+> Mantido pelo `docs-reporter`. Ultima atualizacao: 2026-07-10 (auditoria de UI mobile: PROB-0061 a PROB-0064 registrados e fechados via BUG-0048).

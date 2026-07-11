@@ -4,6 +4,40 @@ Registro de bugs corrigidos. Mantido pelo `docs-reporter`.
 
 ---
 
+## BUG-0047 — logout-all quebrado (NPE/500) por skip do filtro JWT em /api/auth/**
+
+- **Problema relacionado:** Auditoria de segurança 2026-07-10
+- **Data:** 2026-07-10
+- **Area:** backend, segurança
+- **Sintoma:** `POST /api/auth/logout-all` sempre retornava 500. Nenhum dispositivo conseguia fazer logout global.
+- **Causa raiz:** `JwtAuthenticationFilter` fazia early-return para todo path iniciado por `/api/auth/`, nunca populando o `SecurityContext`. O endpoint `AuthController.logoutAll(Authentication authentication)` recebia `authentication == null` e estourava `NullPointerException` em `authentication.getName()`. Além disso, `/api/auth/**` estava como `permitAll`, então mesmo com token o Spring não exigia autenticação nessa rota.
+- **Correcao aplicada:**
+  1. `JwtAuthenticationFilter`: removido o early-return por prefixo `/api/auth/`. O filtro agora sempre popula o `SecurityContext` quando há Bearer token válido; ausência de token é inofensiva (rotas públicas continuam liberadas no `SecurityConfig`).
+  2. `SecurityConfig`: adicionado matcher específico `/api/auth/logout-all` → `authenticated()` **antes** do `permitAll` de `/api/auth/**` (ordem importa; match mais específico primeiro). Garante `Authentication` não-nulo no controller.
+- **Arquivos alterados:** `config/JwtAuthenticationFilter.java`, `config/SecurityConfig.java`
+- **Testes/validacoes executadas:** `mvn -o compile` — BUILD SUCCESS.
+- **Resultado:** PASS
+- **Ressalvas:** Sem teste de integração automatizado do fluxo logout-all ainda. Recomendado adicionar MockMvc cobrindo 200 com token válido e 401 sem token.
+- **Commit:** pendente
+
+---
+
+## BUG-0048 — Actuator health expunha detalhes de infra a anônimos (perfil vps)
+
+- **Problema relacionado:** Auditoria de segurança 2026-07-10
+- **Data:** 2026-07-10
+- **Area:** backend, infra, segurança
+- **Sintoma:** No perfil `vps`, `GET /actuator/health` (público via `permitAll`) retornava detalhes de componentes (status de banco, disco, etc.) para requisições anônimas.
+- **Causa raiz:** `management.endpoint.health.show-details=always` combinado com `/actuator/health` em `permitAll`.
+- **Correcao aplicada:** `application-vps.properties`: `show-details=when-authorized`. Anônimos recebem apenas `UP`/`DOWN`; detalhes só para requisições autenticadas. Perfil `prod` já usava `never` (inalterado); `dev` mantido `always` por ser ambiente local.
+- **Arquivos alterados:** `application-vps.properties`
+- **Testes/validacoes executadas:** `mvn -o compile` — BUILD SUCCESS.
+- **Resultado:** PASS
+- **Ressalvas:** Nenhuma.
+- **Commit:** pendente
+
+---
+
 ## BUG-0001 — ddl-auto=update em produção substituído por Flyway
 
 - **Problema relacionado:** PROB-0006
@@ -762,6 +796,57 @@ Registro de bugs corrigidos. Mantido pelo `docs-reporter`.
 - **Testes/validacoes executadas:** `npx tsc --noEmit` PASS no frontend.
 - **Resultado:** PASS
 - **Ressalvas:** `metaService.removerValor` foi atualizado no contrato, mas a UI web ainda não expõe "retirar valor" (paridade com mobile fica para depois). Validar fluxo E2E no browser com API rodando.
+
+---
+
+## BUG-0047 — Auditoria segurança/LGPD: itens #2, #4, #4b, #6, #8, #10, #11 implementados
+
+- **Problema relacionado:** docs/REVIEW_REPORTS/2026-07-10_full-system_security-lgpd-audit.md
+- **Data:** 2026-07-10
+- **Area:** backend
+- **Sintoma/risco por item:**
+  - **#2** Host/usuário do banco de produção commitados como default em `application-prod.properties`.
+  - **#8** `DB_PASSWORD:1234` e `jwt.secret` com default fraco no `application.properties` base.
+  - **#6** Upload de anexo sem validação de tipo (stored XSS via HTML com MIME arbitrário; filename do cliente no path).
+  - **#4** Refresh token em texto puro no banco (vazamento do DB = roubo de sessão).
+  - **#4b** Token de reset de senha idem (achado colateral do #4).
+  - **#10** LGPD art. 18: sem endpoint de eliminação; exportação incompleta (faltavam cadastro, carteiras, metas, contas fixas).
+  - **#11** LGPD: cadastro sem registro de consentimento.
+- **Correcao aplicada:**
+  - **#2/#8** Removidos todos os defaults sensíveis; env obrigatório (falha no boot se ausente). Perfil dev mantém defaults locais próprios.
+  - **#6** `AnexoService`: whitelist pdf/jpg/jpeg/png/webp + verificação de magic bytes; nome em disco = `UUID.ext`; MIME canônico da whitelist (nunca o do cliente); download com `contentTypeSeguro()` (neutraliza MIME legado) e `Content-Disposition` via builder (sem injeção de header).
+  - **#4/#4b** `TokenHasher` novo (`security/`): valor cru de 256 bits entregue uma única vez; banco guarda só SHA-256 hex. Aplicado a refresh token e reset de senha. Sem DDL; tokens antigos deixam de validar (re-login único).
+  - **#10** `DELETE /api/v1/usuarios/me` (confirmação por senha) → `UsuarioExclusaoService` apaga todos os dados do titular em transação única, em ordem de FK; arquivos de upload removidos após commit. Exportação `/api/v1/exportar/completo` ganhou dados cadastrais, carteiras, metas e contas fixas (incluindo inativas).
+  - **#11** `V19__consentimento_usuario.sql` (`politica_versao`, `consentimento_em`); register exige `aceitaTermos=true` e grava versão (`app.politica.versao`) + timestamp.
+- **Arquivos alterados:** `application.properties`, `application-prod.properties`, `AnexoService.java`, `AnexoController.java`, `TokenHasher.java` (novo), `RefreshTokenService.java`, `AuthController.java`, `UsuarioExclusaoService.java` (novo), `UsuarioController.java`, `ExcluirContaRequest.java` (novo), `ExportService.java`, `MetaRepository.java`, `ContaFixaRepository.java`, `Usuario.java`, `RegisterRequest.java`, `V19__consentimento_usuario.sql` (novo), testes: `AnexoServiceTest.java` (novo), `UsuarioExclusaoTest.java` (novo), `AuthControllerTest.java`.
+- **Testes/validacoes executadas:** suíte completa do backend PASS (95 testes, 0 falhas).
+- **Resultado:** PASS
+- **Ressalvas:**
+  - **BREAKING para clientes:** register agora exige `aceitaTermos: true` — web e mobile precisam de checkbox de consentimento antes do deploy conjunto. Upload de anexo fora da whitelist retorna 422 (HEIC do iOS não incluído; converter no app ou ampliar whitelist).
+  - **#2 parte infra pendente (só o operador pode fazer):** firewall no Postgres da VPS (porta 5433 restrita ao IP da app), trocar usuário/senha do banco. Host/user antigos permanecem no histórico Git — mitigação é rotacionar, não reescrever.
+  - Pendentes do backlog: #5 (rate limit atrás de proxy confiável), #9 (SMTP real no EmailService).
+
+---
+
+## BUG-0048 — Auditoria de UI mobile: tokens, design system e acessibilidade (PROB-0061 a PROB-0064)
+
+- **Problema relacionado:** PROB-0061, PROB-0062, PROB-0063, PROB-0064
+- **Data:** 2026-07-10
+- **Area:** mobile
+- **Sintoma/risco por item:**
+  - **PROB-0061** Onboarding com paleta Tailwind fora da canônica (categoria criada ficava com cor não re-selecionável no editor), CTA final verde `#22C55E` (viola "verde é dinheiro, violeta é marca"), inputs/chips manuais e zero a11y.
+  - **PROB-0062** `#ffffff`/`#fff` fixos em perfil e splash (contraste quebrado no dark mode) e tiles arco-íris no hub "Mais" (anti-referência do PRODUCT.md).
+  - **PROB-0063** Telas de auth com inputs manuais sem `accessibilityLabel`, links em `brand` (~3.5:1, falha AA) e alvos de toque < 44pt.
+  - **PROB-0064** Categorias com FAB caseiro sem label, swatches de cor sem role/estado e espaçamento duplicado.
+- **Correcao aplicada:**
+  - Onboarding: `CATEGORIAS_SUGERIDAS` → `CATEGORY_COLORS` (novo cinza neutro na paleta para "Outros"); CTA em `brand`/`brandText`; inputs → `Field`, chips → `Chip`; roles `checkbox`/`button` + estados + alvos ≥44pt; barra de progresso simplificada.
+  - Tema: `brandText` no botão brand do perfil; "Sair" em `dangerBg`+`danger`; splash em `colors.bg`; tiles do hub todos em `brandBg`; badge "Em breve" 8→10pt.
+  - Auth (login/register/forgot/reset): inputs → `Field` (com `autoComplete`/`textContentType`); links → `brandFg` (AA); minHeight 44 e `accessibilityRole` nos toques; radius 12 unificado.
+  - Categorias: componente `Fab` ("Nova categoria"); swatches com role `radio` + `selected` + hitSlop; Nome via `Field`; Cancelar/Salvar com role, alvo 44pt e `brandFg`.
+- **Arquivos alterados:** `mobile/app/onboarding.tsx`, `mobile/app/index.tsx`, `mobile/app/(app)/perfil.tsx`, `mobile/app/(app)/more/index.tsx`, `mobile/app/(app)/more/categorias.tsx`, `mobile/app/(auth)/login.tsx`, `mobile/app/(auth)/register.tsx`, `mobile/app/(auth)/forgot-password.tsx`, `mobile/app/(auth)/reset-password.tsx`, `mobile/src/utils/format.ts`.
+- **Testes/validacoes executadas:** `npx tsc --noEmit` PASS no mobile (script `lint`).
+- **Resultado:** PASS
+- **Ressalvas:** Mudanças visuais/a11y — validar no Expo nos dois temas (onboarding e auth). Demais telas `more/` (faturas, contas-fixas, investimentos, ...) ainda têm inputs manuais fora do `Field` — mesmo padrão, pendente de replicação. Verificações Entrance/ScreenTransition/FloatEmoji: já respeitavam Reduce Motion (nenhuma ação).
 
 ---
 

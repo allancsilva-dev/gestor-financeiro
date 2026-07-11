@@ -736,4 +736,160 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 
 ---
 
-> Mantido pelo `docs-reporter`. Ultima atualizacao: 2026-07-09 (terceira rodada da mesma sessao — complemento mobile do modulo de fatura/cartao: EditarTransacaoModal, badges de status/tipo em faturas.tsx — ver PROBLEM_LEDGER PROB-0045 a PROB-0048 e BUGFIX_LOG BUG-0027 a BUG-0029).
+## BACKLOG-0058 — Refatorar importacao CSV para usar fluxo financeiro central
+
+- **Titulo:** `ImportService` deve criar transacoes pelo mesmo caminho de `TransacaoService`
+- **Prioridade:** P0
+- **Area:** backend, banco, integridade financeira
+- **Motivo:** PROB-0049 — importacao bypassa ledger/fatura/categoria/conta.
+- **Dependencias:** Definir contrato de importacao: carteira obrigatoria/opcional, conta/cartao, deduplicacao e mapeamento de categoria.
+- **Criterio de aceite:** CSV importado gera os mesmos efeitos de uma transacao criada via API normal; testes cobrem transacao com carteira, sem carteira, cartao de credito, categoria e erro parcial; nenhuma linha e persistida por `transacaoRepository.save` direto fora do fluxo central.
+- **Risco se ficar pendente:** Dados importados podem corromper saldos e relatorios.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0059 — Formalizar modelo completo de fatura, credito e pagamento parcial
+
+- **Titulo:** Definir e implementar comportamento de fatura com pagamento parcial, credito negativo e rollover
+- **Prioridade:** P1
+- **Area:** backend, produto financeiro
+- **Motivo:** PROB-0050 — modelo atual de cartao e robusto para compra/fatura simples, mas incompleto para casos reais de credito.
+- **Dependencias:** Decisao de produto sobre rotativo/juros, saldo devedor, saldo credor, estorno e fechamento de fatura.
+- **Criterio de aceite:** Documento de regra em `SYSTEM_OVERVIEW.md`; testes para fatura parcial, fatura zerada, fatura negativa/credito, rollover para proxima fatura e pagamento total; UI/clientes conseguem exibir os estados sem ambiguidade.
+- **Risco se ficar pendente:** Creditos podem ficar presos e usuarios podem nao entender saldos do cartao.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0060 — Adicionar constraints financeiras no PostgreSQL
+
+- **Titulo:** Criar migration de hardening com `CHECK` constraints para tabelas financeiras
+- **Prioridade:** P0
+- **Area:** banco, backend
+- **Motivo:** PROB-0051 — invariantes vivem so no Java em varias tabelas centrais.
+- **Dependencias:** Levantamento de dados existentes para evitar migration quebrar banco com registros legados invalidos.
+- **Criterio de aceite:** Migrations adicionam constraints para valores positivos/nao-negativos, ranges de mes/dia, total de parcelas, enum/status valido e coerencia basica; testes PostgreSQL cobrem constraints; dados legados tratados por backfill ou migration defensiva.
+- **Risco se ficar pendente:** Qualquer bug/import/script pode persistir estado financeiro invalido.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0061 — Corrigir unicidade de fatura_lancamentos com parcela NULL
+
+- **Titulo:** Substituir unique vulneravel a `NULL` por indice funcional/parcial robusto
+- **Prioridade:** P0
+- **Area:** banco, cartao
+- **Motivo:** PROB-0052 — PostgreSQL permite duplicidade quando `parcela_numero` e `NULL`.
+- **Dependencias:** Verificar se ja existem duplicidades em dados reais antes de aplicar constraint.
+- **Criterio de aceite:** Migration impede duplicidade de compra a vista e parcelada; teste PostgreSQL tenta inserir duplicata com `parcela_numero NULL` e falha; codigo continua idempotente.
+- **Risco se ficar pendente:** Compra a vista duplicada pode inflar fatura/limite.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0062 — Otimizar RelatorioService e ProjecaoService com SQL agregado
+
+- **Titulo:** Remover agregacoes em memoria de relatorios/projecoes
+- **Prioridade:** P1
+- **Area:** backend, banco, performance
+- **Motivo:** PROB-0053 — relatorios e projecoes carregam listas completas e filtram em Java.
+- **Dependencias:** Definir DTOs/projections de repository e indices necessarios.
+- **Criterio de aceite:** Top despesas, gastos por conta, contas fixas, parcelas e faturas futuras calculadas por queries agregadas/paginadas; teste com volume representativo; endpoints mantem contrato atual.
+- **Risco se ficar pendente:** Lentidao/OOM com historico grande.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0063 — Redesenhar modulo de investimentos com integridade de posicao e caixa
+
+- **Titulo:** Bloquear venda acima da posicao e integrar compra/venda de ativos com carteira/ledger
+- **Prioridade:** P1
+- **Area:** backend, investimentos, ledger
+- **Motivo:** PROB-0054 — investimento hoje e controle isolado, com risco de quantidade negativa e caixa inconsistente.
+- **Dependencias:** Decidir se investimentos usam carteira especifica, carteira de corretora ou novo subledger.
+- **Criterio de aceite:** Quantidade/preco positivos; venda acima da posicao retorna erro; compra debita carteira; venda credita carteira; eventos de investimento auditaveis; testes cobrem compra, venda total, venda parcial e erro de venda excedente.
+- **Risco se ficar pendente:** Patrimonio reportado diverge do dinheiro real.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0064 — Migrar rate limit para store distribuido
+
+- **Titulo:** Substituir `ConcurrentHashMap` local por Redis/Bucket4j ou gateway rate limit
+- **Prioridade:** P2
+- **Area:** backend, seguranca, infra
+- **Motivo:** PROB-0055 — rate limit atual nao escala para multi-instancia.
+- **Dependencias:** Escolha de Redis/gateway e estrategia de chave por IP/email/rota.
+- **Criterio de aceite:** Rate limit consistente entre replicas; reinicio de uma instancia nao zera tentativas; testes cobrem 429 e headers; fallback operacional documentado.
+- **Risco se ficar pendente:** Brute force fica mais facil em escala horizontal.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0065 — Documentar e testar contrato de sessao mobile
+
+- **Titulo:** Separar contrato web cookie+CSRF de contrato mobile token no body/secure storage
+- **Prioridade:** P2
+- **Area:** backend, mobile, seguranca
+- **Motivo:** PROB-0056 — bypass CSRF por header mobile precisa threat model explicito.
+- **Dependencias:** Confirmar storage mobile real e comportamento CORS/preflight em producao.
+- **Criterio de aceite:** Documento de threat model; testes backend para web sem CSRF (403), web com CSRF (200), mobile com contrato oficial (200), request spoofado fora do contrato (bloqueado); clientes alinhados.
+- **Risco se ficar pendente:** Ambiguidade de seguranca entre navegador e app nativo.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0066 — Migrar services financeiros para constructor injection
+
+- **Titulo:** Reduzir `@Autowired` por campo, priorizando services/filtros financeiros
+- **Prioridade:** P3
+- **Area:** backend, qualidade
+- **Motivo:** PROB-0057 — 135 usos de field injection reduzem testabilidade.
+- **Dependencias:** Nenhuma; pode ser feito incrementalmente junto dos fixes.
+- **Criterio de aceite:** Services tocados em fixes passam para construtor; novos services nao usam field injection; padrao documentado.
+- **Risco se ficar pendente:** Manutencao e testes ficam mais dificeis, sem impacto funcional imediato.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0067 — Garantir execution real de Testcontainers/PostgreSQL
+
+- **Titulo:** Corrigir ambiente/CI para `mvn verify -Pintegration-test` rodar sempre
+- **Prioridade:** P1
+- **Area:** testes, infra
+- **Motivo:** PROB-0058 — integration-test PostgreSQL falhou localmente por Docker invalido.
+- **Dependencias:** Docker funcional no ambiente ou CI com Testcontainers habilitado.
+- **Criterio de aceite:** `PostgresMigrationIT` roda em CI e pelo menos um ambiente local documentado; falha por Docker indisponivel fica clara; migrations novas exigem teste PostgreSQL.
+- **Risco se ficar pendente:** Schema pode quebrar em PostgreSQL real apesar de testes unitarios passarem.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0068 — Criptografar backups e automatizar restore drill
+
+- **Titulo:** Transformar backup de banco em rotina operacional verificavel
+- **Prioridade:** P1
+- **Area:** infra, seguranca, operacao
+- **Motivo:** PROB-0059 — backup existe, mas sem criptografia e sem validacao automatizada de restore.
+- **Dependencias:** Definir destino seguro, chave de criptografia e retencao.
+- **Criterio de aceite:** Backups criptografados; restore periodico em banco descartavel; log/alerta de falha; runbook de recuperacao; teste de restore documentado.
+- **Risco se ficar pendente:** Vazamento de dados financeiros ou backup inutil em incidente.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0069 — Definir politica de build Docker com testes
+
+- **Titulo:** Decidir se Dockerfile deve rodar testes ou depender obrigatoriamente do CI
+- **Prioridade:** P3
+- **Area:** backend, CI/CD
+- **Motivo:** PROB-0060 — imagem backend usa `-DskipTests`.
+- **Dependencias:** Fluxo de deploy oficial.
+- **Criterio de aceite:** Politica documentada; se deploy manual for permitido, build deve barrar testes falhos ou exigir flag explicita; se CI for gate unico, pipeline deve impedir deploy de imagem sem suite verde.
+- **Risco se ficar pendente:** Imagem com regressao pode ser empacotada fora do CI.
+- **Status:** ABERTO
+
+---
+
+> Mantido pelo `docs-reporter`. Ultima atualizacao: 2026-07-10 (auditoria backend/non-frontend alto nivel: BACKLOG-0058 a BACKLOG-0069 — ver PROBLEM_LEDGER PROB-0049 a PROB-0060 e relatorio `REVIEW_REPORTS/2026-07-10_backend_nonfrontend_high-level-audit.md`).
