@@ -173,4 +173,19 @@ public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
             @Param("usuarioId") Long usuarioId,
             @Param("inicio") LocalDate inicio,
             @Param("fim") LocalDate fim);
+
+    // BACKLOG-0045: transações "órfãs" do ledger — ativas, com carteira, que NÃO são
+    // compra de cartão (SAIDA em conta CREDITO vai para fatura, não gera movimento de
+    // carteira) e que não têm MovimentoCarteira de origem TRANSACAO correspondente.
+    // Espelha scripts/diagnose-ledger-backfill.sql (consulta 2).
+    // LEFT JOIN explícito em conta: referenciar t.conta.tipo direto força inner join
+    // implícito e descartaria órfãs sem conta (dinheiro/carteira pura).
+    @EntityGraph(attributePaths = {"carteira"})
+    @Query("SELECT t FROM Transacao t LEFT JOIN t.conta c " +
+           "WHERE t.usuario.id = :usuarioId AND t.ativa = true AND t.carteira IS NOT NULL " +
+           "AND NOT (t.tipo = 'SAIDA' AND c IS NOT NULL AND c.tipo = 'CREDITO') " +
+           "AND NOT EXISTS (SELECT 1 FROM MovimentoCarteira m " +
+           "    WHERE m.origem = 'TRANSACAO' AND m.referenciaTipo = 'TRANSACAO' AND m.referenciaId = t.id) " +
+           "ORDER BY t.carteira.id, t.data, t.id")
+    List<Transacao> findOrfasSemMovimentoByUsuarioId(@Param("usuarioId") Long usuarioId);
 }

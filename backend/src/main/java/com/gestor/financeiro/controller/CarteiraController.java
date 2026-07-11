@@ -11,6 +11,8 @@ import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.MovimentoCarteira;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.CarteiraService;
+import com.gestor.financeiro.service.LedgerBackfillService;
+import com.gestor.financeiro.service.LedgerOrfaBackfillResult;
 import com.gestor.financeiro.service.LedgerReconciliationService;
 import com.gestor.financeiro.util.PaginationUtils;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,6 +33,7 @@ import java.util.List;
 public class CarteiraController {
     private final CarteiraService carteiraService;
     private final LedgerReconciliationService ledgerReconciliationService;
+    private final LedgerBackfillService ledgerBackfillService;
     private final AuthenticatedUserService authenticatedUserService;
     
     @GetMapping("/minhas")
@@ -60,6 +63,20 @@ public class CarteiraController {
     public ResponseEntity<ReconciliacaoCarteiraResponse> reconciliarCarteira(@PathVariable Long id) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         return ResponseEntity.ok(ledgerReconciliationService.reconciliarCarteira(usuarioId, id));
+    }
+
+    // BACKLOG-0045: diagnóstico (read-only, não persiste) das transações órfãs do ledger.
+    @GetMapping("/minhas/backfill-orfas/diagnostico")
+    public ResponseEntity<LedgerOrfaBackfillResult> diagnosticarOrfas() {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        return ResponseEntity.ok(ledgerBackfillService.reconciliarTransacoesOrfasUsuario(usuarioId, true));
+    }
+
+    // BACKLOG-0045: aplica o backfill nas carteiras reconciliáveis do usuário autenticado.
+    @PostMapping("/minhas/backfill-orfas")
+    public ResponseEntity<LedgerOrfaBackfillResult> reconciliarOrfas() {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        return ResponseEntity.ok(ledgerBackfillService.reconciliarTransacoesOrfasUsuario(usuarioId, false));
     }
 
     @GetMapping("/{id}/movimentos")
