@@ -89,11 +89,13 @@ api.interceptors.response.use(
       }
     }
 
-    console.error('[API Error]', {
-      url: error.config?.url,
-      status,
-      // NUNCA adicionar: body, headers com token, dados do usuário
-    });
+    if (__DEV__) {
+      console.error('[API Error]', {
+        url: error.config?.url,
+        status,
+        // NUNCA adicionar: body, headers com token, dados do usuário
+      });
+    }
 
     // Mapeia para mensagem amigável em pt-BR — UI nunca recebe erro técnico
     let userMessage = 'Erro inesperado. Tente novamente.';

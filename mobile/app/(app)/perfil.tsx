@@ -33,10 +33,19 @@ export default function Perfil() {
   }, [usuario?.nome]);
 
   const handleLogout = async () => {
-    // logout do contexto já revoga o refresh token no servidor e limpa o storage
-    await logout();
-    try { queryClient.clear(); } catch {}
-    router.replace('/(auth)/login');
+    Alert.alert('Sair da conta?', 'Você precisará entrar novamente para acessar seus dados.', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Sair',
+        style: 'destructive',
+        onPress: async () => {
+          // logout do contexto já revoga o refresh token no servidor e limpa o storage
+          await logout();
+          try { queryClient.clear(); } catch {}
+          router.replace('/(auth)/login');
+        },
+      },
+    ]);
   };
 
   const stats: Array<{ label: string; valor: number | undefined; cor: string }> = [

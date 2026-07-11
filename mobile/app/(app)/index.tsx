@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, View, Text, TouchableOpacity } from 'react-native';
+import { RefreshControl, ScrollView, View, Text, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
@@ -49,6 +49,17 @@ export default function Dashboard() {
   const mesAtual = capitalize(new Date().toLocaleDateString('pt-BR', { month: 'long' }));
   const saldo = formatCurrency(Number(resumoQuery.data?.saldoCarteiras ?? 0));
   const [saldoInt, saldoCents] = saldo.split(',');
+  const refreshing = resumoQuery.isRefetching || transacoesQuery.isRefetching
+    || projecaoQuery.isRefetching || insightsQuery.isRefetching;
+
+  const handleRefresh = async () => {
+    await Promise.all([
+      resumoQuery.refetch(),
+      transacoesQuery.refetch(),
+      projecaoQuery.refetch(),
+      insightsQuery.refetch(),
+    ]);
+  };
 
   const atalhos: Array<{ label: string; glyph: string; bg: string; fg: string; onPress: () => void }> = [
     { label: 'Contas\nfixas', glyph: '📅', bg: colors.brandBg, fg: colors.brandFg, onPress: () => router.push('/more/contas-fixas' as any) },
@@ -61,6 +72,7 @@ export default function Dashboard() {
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.bg }}
       contentContainerStyle={{ paddingTop: insets.top + 12, paddingHorizontal: 16, paddingBottom: 32 }}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={colors.brand} />}
     >
       {/* Header: Olá + avatar com anel gradiente (leva ao perfil) */}
       <Entrance delay={50} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
