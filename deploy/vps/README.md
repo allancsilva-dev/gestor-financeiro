@@ -33,6 +33,10 @@ Edite `deploy/vps/.env.vps`:
 - `DOMAIN` e `LETSENCRYPT_EMAIL`.
 - `POSTGRES_PASSWORD` e `JWT_SECRET` com valores fortes.
 - `CORS_ALLOWED_ORIGINS=https://SEU_DOMINIO`.
+- `SMTP_PASSWORD` com a senha da caixa `contato@nexostech.com.br`; mantenha o arquivo fora do Git.
+
+No Microsoft 365 Admin Center, habilite **Authenticated SMTP** para a caixa
+`contato@nexostech.com.br`. A API usa `smtp.office365.com:587` com STARTTLS.
 
 Suba banco e API para validar migrations:
 
