@@ -19,7 +19,6 @@
     },
     "android": {
       "package": "com.gestorfinanceiro.mobile",
-      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
