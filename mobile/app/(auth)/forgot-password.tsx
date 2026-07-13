@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import api from '../../src/services/api';
 import { ApiErrorWithMessage } from '../../src/types';
 import Field from '../../src/components/ui/Field';
+import { isValidEmail } from '../../src/utils/validate';
 
 export default function ForgotPassword() {
   const colors = useTheme();
@@ -16,10 +17,12 @@ export default function ForgotPassword() {
 
   const onSubmit = async () => {
     setError(null);
-    if (!email.trim()) return setError('Informe seu e-mail.');
+    const emailTrim = email.trim();
+    if (!emailTrim) return setError('Informe seu e-mail.');
+    if (!isValidEmail(emailTrim)) return setError('Informe um e-mail válido.');
     try {
       setLoading(true);
-      await api.post('/auth/forgot-password', { email: email.trim() });
+      await api.post('/auth/forgot-password', { email: emailTrim });
       setSuccess(true);
     } catch (err) {
       const e = err as ApiErrorWithMessage;

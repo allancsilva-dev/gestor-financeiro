@@ -18,3 +18,15 @@ export const isValidPhone = (phone: string): boolean =>
 
 export const isValidCEP = (cep: string): boolean =>
   /^\d{5}-\d{3}$/.test(cep);
+
+export const isValidEmail = (email: string): boolean =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+
+// Mesma regra do backend (@ValidPassword): minimo 8, ao menos 1 letra e 1 numero.
+export const isValidPassword = (password: string): boolean =>
+  password.length >= 8 && /[A-Za-z]/.test(password) && /\d/.test(password);
+
+export const isValidDayOfMonth = (value: string | number): boolean => {
+  const day = typeof value === 'number' ? value : Number(value);
+  return Number.isInteger(day) && day >= 1 && day <= 31;
+};

@@ -5,6 +5,7 @@ import { useTheme } from '../../src/theme';
 import { ApiErrorWithMessage } from '../../src/types';
 import { useRouter } from 'expo-router';
 import Field from '../../src/components/ui/Field';
+import { isValidEmail } from '../../src/utils/validate';
 
 export default function Login() {
   const colors = useTheme();
@@ -17,10 +18,12 @@ export default function Login() {
 
   const onSubmit = async () => {
     setError(null);
-    if (!email || !password) return setError('Preencha e-mail e senha.');
+    const emailTrim = email.trim();
+    if (!emailTrim || !password) return setError('Preencha e-mail e senha.');
+    if (!isValidEmail(emailTrim)) return setError('Informe um e-mail válido.');
     try {
       setLoading(true);
-      const user = await login(email, password);
+      const user = await login(emailTrim, password);
       if (!user.onboardingCompleto) {
         router.replace('/onboarding');
       } else {

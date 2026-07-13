@@ -38,9 +38,17 @@ export const parseDateBR = (dataBR: string): string => {
   return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 };
 
-// Verifica se uma string esta no formato DD/MM/AAAA
-export const isValidDateBR = (value: string): boolean =>
-  /^\d{2}\/\d{2}\/\d{4}$/.test(value);
+// Verifica formato DD/MM/AAAA e se a data existe no calendario.
+export const isValidDateBR = (value: string): boolean => {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value);
+  if (!match) return false;
+  const day = Number(match[1]);
+  const month = Number(match[2]);
+  const year = Number(match[3]);
+  if (year < 1900 || year > 2100 || month < 1 || month > 12 || day < 1) return false;
+  const date = new Date(year, month - 1, day);
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+};
 
 // Converte string monetaria BR (1.234,56) para number (1234.56)
 export const parseCurrencyBR = (value: string): number => {

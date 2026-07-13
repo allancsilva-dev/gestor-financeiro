@@ -11,6 +11,7 @@ import api from '../../src/services/api';
 import { DashboardResumo, Usuario } from '../../src/types';
 import Card from '../../src/components/ui/Card';
 import Field from '../../src/components/ui/Field';
+import { isValidPassword } from '../../src/utils/validate';
 
 export default function Perfil() {
   const colors = useTheme();
@@ -74,7 +75,7 @@ export default function Perfil() {
   const salvarSenha = async () => {
     setSenhaError(null);
     if (!senhaAtual) { setSenhaError('Informe a senha atual.'); return; }
-    if (novaSenha.length < 8 || !/\d/.test(novaSenha) || !/[A-Za-zÀ-ÿ]/.test(novaSenha)) {
+    if (!isValidPassword(novaSenha)) {
       setSenhaError('Nova senha precisa ter 8 caracteres, 1 letra e 1 número.');
       return;
     }

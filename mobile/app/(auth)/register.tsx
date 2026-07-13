@@ -6,10 +6,7 @@ import api from '../../src/services/api';
 import { ApiErrorWithMessage } from '../../src/types';
 import { useRouter } from 'expo-router';
 import Field from '../../src/components/ui/Field';
-
-// Mesma regra do backend (@ValidPassword): mínimo 8, ao menos 1 letra e 1 número
-const senhaValida = (s: string) => s.length >= 8 && /[A-Za-z]/.test(s) && /\d/.test(s);
-const emailValido = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
+import { isValidEmail, isValidPassword } from '../../src/utils/validate';
 
 export default function Register() {
   const colors = useTheme();
@@ -28,8 +25,8 @@ export default function Register() {
     const nomeTrim = nome.trim();
     const emailTrim = email.trim();
     if (nomeTrim.length < 2) return setError('Informe seu nome (mínimo 2 caracteres).');
-    if (!emailValido(emailTrim)) return setError('Informe um e-mail válido.');
-    if (!senhaValida(password)) return setError('Senha deve ter no mínimo 8 caracteres, com ao menos 1 letra e 1 número.');
+    if (!isValidEmail(emailTrim)) return setError('Informe um e-mail válido.');
+    if (!isValidPassword(password)) return setError('Senha deve ter no mínimo 8 caracteres, com ao menos 1 letra e 1 número.');
     if (password !== confirmPassword) return setError('As senhas não coincidem.');
     if (!aceitaTermos) return setError('É preciso aceitar a política de privacidade para criar a conta.');
     try {

@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { contaService } from '../../../src/services/contaService';
 import { TIPO_CONTA_LABEL, formatCurrency, parseCurrencyBR, maskCurrencyInput } from '../../../src/utils/format';
+import { isValidDayOfMonth } from '../../../src/utils/validate';
 import { Conta, ContaRequest, TipoConta } from '../../../src/types';
 import { useTheme } from '../../../src/theme';
 import BackButton from '../../../src/components/ui/BackButton';
@@ -23,6 +24,7 @@ export default function ContasScreen() {
   const [nomeError, setNomeError] = useState<string | null>(null);
   const [tipoError, setTipoError] = useState<string | null>(null);
   const [limiteError, setLimiteError] = useState<string | null>(null);
+  const [diaError, setDiaError] = useState<string | null>(null);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['contas'],
@@ -34,7 +36,7 @@ export default function ContasScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contas'] });
       setModalVisible(false);
-      setNome(''); setLimite(''); setBanco(''); setDiaFechamento(''); setDiaVencimento(''); setTipo('DEBITO'); setNomeError(null); setTipoError(null); setLimiteError(null);
+      setNome(''); setLimite(''); setBanco(''); setDiaFechamento(''); setDiaVencimento(''); setTipo('DEBITO'); setNomeError(null); setTipoError(null); setLimiteError(null); setDiaError(null);
     },
     onError: (err: any) => {
       setNomeError(err?.userMessage ?? 'Erro ao criar cartão.');
@@ -97,29 +99,33 @@ export default function ContasScreen() {
       <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet">
         <View style={{ flex: 1, backgroundColor: colors.bg }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-            <TouchableOpacity onPress={() => { setModalVisible(false); setNome(''); setLimite(''); setBanco(''); setDiaFechamento(''); setDiaVencimento(''); setTipo('DEBITO'); setNomeError(null); setTipoError(null); setLimiteError(null); }}>
+            <TouchableOpacity onPress={() => { setModalVisible(false); setNome(''); setLimite(''); setBanco(''); setDiaFechamento(''); setDiaVencimento(''); setTipo('DEBITO'); setNomeError(null); setTipoError(null); setLimiteError(null); setDiaError(null); }}>
               <Text style={{ color: colors.brand, fontSize: 15 }}>Cancelar</Text>
             </TouchableOpacity>
             <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600' }}>Novo Cartão</Text>
             <TouchableOpacity disabled={criarMutation.status === 'pending'} onPress={() => {
-              setNomeError(null); setTipoError(null); setLimiteError(null);
+              setNomeError(null); setTipoError(null); setLimiteError(null); setDiaError(null);
               let hasErr = false;
               if (!nome.trim()) { setNomeError('Nome obrigatório.'); hasErr = true; }
               if (!tipo) { setTipoError('Tipo obrigatório.'); hasErr = true; }
               if (tipo === 'CREDITO') {
                 const v = parseCurrencyBR(limite);
                 if (isNaN(v) || v <= 0) { setLimiteError('Limite total obrigatório e positivo.'); hasErr = true; }
+                if (!isValidDayOfMonth(diaFechamento) || !isValidDayOfMonth(diaVencimento)) {
+                  setDiaError('Fechamento e vencimento devem ser dias entre 1 e 31.');
+                  hasErr = true;
+                }
               }
               if (hasErr) return;
-              const fech = parseInt(diaFechamento, 10);
-              const venc = parseInt(diaVencimento, 10);
+              const fech = Number(diaFechamento);
+              const venc = Number(diaVencimento);
               criarMutation.mutate({
                 nome: nome.trim(),
                 tipo,
                 limiteTotal: tipo === 'CREDITO' ? parseCurrencyBR(limite) : undefined,
                 banco: tipo === 'CREDITO' && banco.trim() ? banco.trim() : undefined,
-                diaFechamento: tipo === 'CREDITO' && !isNaN(fech) && fech >= 1 && fech <= 31 ? fech : undefined,
-                diaVencimento: tipo === 'CREDITO' && !isNaN(venc) && venc >= 1 && venc <= 31 ? venc : undefined,
+                diaFechamento: tipo === 'CREDITO' ? fech : undefined,
+                diaVencimento: tipo === 'CREDITO' ? venc : undefined,
               });
             }}>
               <Text style={{ color: criarMutation.status === 'pending' ? colors.textMuted : colors.brand, fontSize: 15, fontWeight: '600' }}>Salvar</Text>
@@ -159,6 +165,7 @@ export default function ContasScreen() {
                     <TextInput value={diaVencimento} onChangeText={(t) => setDiaVencimento(t.replace(/\D/g, '').slice(0, 2))} keyboardType="number-pad" placeholder="Ex.: 5" placeholderTextColor={colors.textMuted} style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, color: colors.textPrimary, fontSize: 15, marginBottom: 8 }} />
                   </View>
                 </View>
+                {diaError && <Text style={{ color: colors.danger, marginBottom: 8 }}>{diaError}</Text>}
               </>
             )}
           </ScrollView>

@@ -13,7 +13,8 @@ import { useTheme } from '../src/theme';
 import { onboardingService, OnboardingFinalizarRequest } from '../src/services/onboardingService';
 import { ApiErrorWithMessage, TipoCarteira, TipoConta } from '../src/types';
 import { useAuth } from '../src/context/AuthContext';
-import { CATEGORY_COLORS, maskCurrencyInput, parseCurrencyBR } from '../src/utils/format';
+import { CATEGORY_COLORS, isValidDateBR, maskCurrencyInput, parseCurrencyBR, parseDateBR } from '../src/utils/format';
+import { isValidDayOfMonth } from '../src/utils/validate';
 import Field from '../src/components/ui/Field';
 import Chip from '../src/components/ui/Chip';
 
@@ -49,31 +50,33 @@ export default function OnboardingScreen() {
   const [meta, setMeta] = useState({ nome: '', valorTotal: '', valorMensal: '', dataPrevista: '' });
   const [pularMeta, setPularMeta] = useState(false);
 
-  const diaValido = (valor: string) => {
-    const dia = parseInt(valor || '', 10);
-    return Number.isInteger(dia) && dia >= 1 && dia <= 31;
-  };
-
   const validarPasso = (): string | null => {
     if (passo === 0) {
       if (carteira.nome.trim().length < 2) return 'Informe o nome da conta principal.';
-      if (parseCurrencyBR(carteira.saldo || '0') < 0) return 'Saldo inicial não pode ser negativo.';
+      const saldo = parseCurrencyBR(carteira.saldo || '0');
+      if (!Number.isFinite(saldo) || saldo < 0) return 'Saldo inicial deve ser zero ou positivo.';
     }
     if (passo === 1) {
       if (conta.nome.trim().length < 2) return 'Informe o nome do cartão ou conta.';
-      if (conta.tipo === 'CREDITO' && parseCurrencyBR(conta.limiteTotal || '0') < 0) return 'Limite não pode ser negativo.';
+      const limite = parseCurrencyBR(conta.limiteTotal || '0');
+      if (conta.tipo === 'CREDITO' && (!Number.isFinite(limite) || limite <= 0)) return 'Limite do cartão deve ser maior que zero.';
     }
     if (passo === 2 && categoriasSelecionadas.length === 0) {
       return 'Selecione ao menos uma categoria.';
     }
     if (passo === 3 && !pularRenda) {
       if (renda.nome.trim().length < 2) return 'Informe o nome da renda ou marque para configurar depois.';
-      if (parseCurrencyBR(renda.valor || '0') <= 0) return 'Informe um valor mensal maior que zero ou marque para configurar depois.';
-      if (!diaValido(renda.diaVencimento)) return 'Dia de recebimento deve estar entre 1 e 31.';
+      const valorRenda = parseCurrencyBR(renda.valor || '0');
+      if (!Number.isFinite(valorRenda) || valorRenda <= 0) return 'Informe um valor mensal maior que zero ou marque para configurar depois.';
+      if (!isValidDayOfMonth(renda.diaVencimento)) return 'Dia de recebimento deve estar entre 1 e 31.';
     }
     if (passo === 4 && !pularMeta) {
       if (meta.nome.trim().length < 2) return 'Informe o nome da meta ou marque para configurar depois.';
-      if (parseCurrencyBR(meta.valorTotal || '0') <= 0) return 'Informe um valor total maior que zero ou marque para configurar depois.';
+      const valorTotal = parseCurrencyBR(meta.valorTotal || '0');
+      const valorMensal = meta.valorMensal ? parseCurrencyBR(meta.valorMensal) : undefined;
+      if (!Number.isFinite(valorTotal) || valorTotal <= 0) return 'Informe um valor total maior que zero ou marque para configurar depois.';
+      if (valorMensal !== undefined && (!Number.isFinite(valorMensal) || valorMensal <= 0)) return 'Valor mensal da meta deve ser maior que zero.';
+      if (meta.dataPrevista && !isValidDateBR(meta.dataPrevista)) return 'Data da meta inválida. Use DD/MM/AAAA.';
     }
     return null;
   };
@@ -115,7 +118,7 @@ export default function OnboardingScreen() {
         nome: meta.nome.trim(),
         valorTotal: parseCurrencyBR(meta.valorTotal || '0'),
         valorMensal: meta.valorMensal ? parseCurrencyBR(meta.valorMensal) : undefined,
-        dataLimite: meta.dataPrevista || undefined,
+        dataLimite: meta.dataPrevista ? parseDateBR(meta.dataPrevista) : undefined,
       },
     };
   };

@@ -5,9 +5,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import api from '../../src/services/api';
 import { ApiErrorWithMessage } from '../../src/types';
 import Field from '../../src/components/ui/Field';
-
-// Mesma regra do backend (@ValidPassword): mínimo 8, ao menos 1 letra e 1 número
-const senhaValida = (s: string) => s.length >= 8 && /[A-Za-z]/.test(s) && /\d/.test(s);
+import { isValidPassword } from '../../src/utils/validate';
 
 // Acessível por deep link (gestorfinanceiro://reset-password?token=...) ou
 // pelo fluxo "Esqueceu a senha" com colagem manual do código do e-mail.
@@ -25,7 +23,7 @@ export default function ResetPassword() {
   const onSubmit = async () => {
     setError(null);
     if (!token.trim()) return setError('Cole o código recebido por e-mail.');
-    if (!senhaValida(novaSenha)) return setError('Senha deve ter no mínimo 8 caracteres, com ao menos 1 letra e 1 número.');
+    if (!isValidPassword(novaSenha)) return setError('Senha deve ter no mínimo 8 caracteres, com ao menos 1 letra e 1 número.');
     if (novaSenha !== confirmar) return setError('As senhas não coincidem.');
     try {
       setLoading(true);
