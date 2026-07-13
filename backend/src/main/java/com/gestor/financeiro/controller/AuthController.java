@@ -101,7 +101,7 @@ public class AuthController {
     @Transactional
     @PostMapping("/register")
     @Operation(summary = "Registrar usuário", description = "Cria uma nova conta de usuário")
-    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<AuthResponses.Register> register(@Valid @RequestBody RegisterRequest request) {
         Optional<Usuario> usuarioExistente = usuarioRepository.findByEmail(request.getEmail());
         if (usuarioExistente.isPresent()) {
             throw new BusinessException("Email já cadastrado!");
@@ -119,16 +119,13 @@ public class AuthController {
     Usuario usuarioSalvo = usuarioRepository.save(usuario);
 
     // Nunca expor a entidade (contém hash de senha e campos de lockout)
-    return ResponseEntity.ok(Map.of(
-        "id", usuarioSalvo.getId(),
-        "nome", usuarioSalvo.getNome(),
-        "email", usuarioSalvo.getEmail()
-    ));
+    return ResponseEntity.ok(new AuthResponses.Register(
+        usuarioSalvo.getId(), usuarioSalvo.getNome(), usuarioSalvo.getEmail()));
 }
 
     @PostMapping("/login")
     @Operation(summary = "Realizar login", description = "Autentica e retorna access token com refresh token em cookie HttpOnly")
-    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request, HttpServletRequest servletRequest) {
+    public ResponseEntity<AuthResponses.Session> login(@Valid @RequestBody LoginRequest request, HttpServletRequest servletRequest) {
         Optional<Usuario> usuarioOpt = usuarioRepository.findByEmail(request.getEmail());
         
         if (usuarioOpt.isEmpty()) {
@@ -151,30 +148,22 @@ public class AuthController {
 
             RefreshTokenService.TokenGerado refreshToken = refreshTokenService.criarRefreshToken(usuario);
 
-            Map<String, Object> response = new HashMap<>();
-            response.put("message", "Login realizado com sucesso!");
-            response.put("success", true);
-            response.put("accessToken", accessToken);
-            response.put("usuario", Map.of(
-                "id", usuario.getId(),
-                "nome", usuario.getNome(),
-                "email", usuario.getEmail(),
-                "onboardingCompleto", usuario.isOnboardingCompleto()
-            ));
+            AuthResponses.Usuario responseUsuario = new AuthResponses.Usuario(
+                    usuario.getId(), usuario.getNome(), usuario.getEmail(), usuario.isOnboardingCompleto());
 
             if (isMobileClient(servletRequest)) {
-                response.put("refreshToken", refreshToken.valor());
-                return ResponseEntity.ok(response);
+                return ResponseEntity.ok(new AuthResponses.Session("Login realizado com sucesso!", true,
+                        accessToken, responseUsuario, refreshToken.valor(), null));
             }
 
             String csrfToken = createCsrfToken();
-            response.put("csrfToken", csrfToken);
             ResponseCookie refreshCookie = buildRefreshTokenCookie(refreshToken.valor(), REFRESH_COOKIE_MAX_AGE_SECONDS);
             ResponseCookie csrfCookie = buildCsrfCookie(csrfToken, REFRESH_COOKIE_MAX_AGE_SECONDS);
 
             return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshCookie.toString(), csrfCookie.toString())
-                .body(response);
+                .body(new AuthResponses.Session("Login realizado com sucesso!", true,
+                        accessToken, responseUsuario, null, csrfToken));
         } else {
             incrementFailedAttempts(usuario);
             throw new BusinessException("Email ou senha incorretos");
@@ -189,7 +178,7 @@ public class AuthController {
      */
     @PostMapping("/refresh-token")
     @Operation(summary = "Renovar access token", description = "Gera novo access token com rotação de refresh token")
-    public ResponseEntity<?> refreshToken(
+    public ResponseEntity<AuthResponses.Refresh> refreshToken(
             HttpServletRequest request,
             @RequestBody(required = false) RefreshTokenRequest body
     ) {
@@ -207,21 +196,17 @@ public class AuthController {
         String novoAccessToken = jwtUtil.generateToken(refreshToken.token().getUsuario().getEmail());
 
         // Resposta
-        Map<String, Object> response = new HashMap<>();
-        response.put("accessToken", novoAccessToken);
         if (isMobileClient(request)) {
-            response.put("refreshToken", refreshToken.valor());
-            return ResponseEntity.ok(response);
+            return ResponseEntity.ok(new AuthResponses.Refresh(novoAccessToken, refreshToken.valor(), null));
         }
 
         String csrfToken = createCsrfToken();
-        response.put("csrfToken", csrfToken);
         ResponseCookie refreshCookie = buildRefreshTokenCookie(refreshToken.valor(), REFRESH_COOKIE_MAX_AGE_SECONDS);
         ResponseCookie csrfCookie = buildCsrfCookie(csrfToken, REFRESH_COOKIE_MAX_AGE_SECONDS);
 
         return ResponseEntity.ok()
             .header(HttpHeaders.SET_COOKIE, refreshCookie.toString(), csrfCookie.toString())
-            .body(response);
+            .body(new AuthResponses.Refresh(novoAccessToken, null, csrfToken));
     }
 
     /**
@@ -232,7 +217,7 @@ public class AuthController {
      */
     @PostMapping("/logout")
     @Operation(summary = "Logout atual", description = "Revoga refresh token da sessão atual")
-    public ResponseEntity<?> logout(
+    public ResponseEntity<AuthResponses.Message> logout(
             HttpServletRequest request,
             @RequestBody(required = false) RefreshTokenRequest body
     ) {
@@ -244,14 +229,14 @@ public class AuthController {
 
         if (isMobileClient(request)) {
             return ResponseEntity.ok()
-                .body(Map.of("message", "Logout realizado com sucesso"));
+                .body(new AuthResponses.Message("Logout realizado com sucesso"));
         }
 
         ResponseCookie clearCookie = buildRefreshTokenCookie("", 0);
         ResponseCookie clearCsrfCookie = buildCsrfCookie("", 0);
         return ResponseEntity.ok()
             .header(HttpHeaders.SET_COOKIE, clearCookie.toString(), clearCsrfCookie.toString())
-            .body(Map.of("message", "Logout realizado com sucesso"));
+            .body(new AuthResponses.Message("Logout realizado com sucesso"));
     }
 
     /**
@@ -262,7 +247,7 @@ public class AuthController {
      */
     @PostMapping("/logout-all")
     @Operation(summary = "Logout global", description = "Revoga todos os refresh tokens do usuário")
-    public ResponseEntity<?> logoutAll(Authentication authentication) {
+    public ResponseEntity<AuthResponses.Message> logoutAll(Authentication authentication) {
         String email = authentication.getName();
         Usuario usuario = usuarioRepository.findByEmail(email)
             .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
@@ -273,13 +258,13 @@ public class AuthController {
 
         return ResponseEntity.ok()
             .header(HttpHeaders.SET_COOKIE, clearCookie.toString(), clearCsrfCookie.toString())
-            .body(Map.of("message", "Logout realizado em todos os dispositivos"));
+            .body(new AuthResponses.Message("Logout realizado em todos os dispositivos"));
     }
 
     @Transactional
     @PostMapping("/forgot-password")
     @Operation(summary = "Solicitar recuperação de senha", description = "Gera token temporário para reset de senha")
-    public ResponseEntity<?> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+    public ResponseEntity<String> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
         Optional<Usuario> usuarioOpt = usuarioRepository.findByEmail(request.getEmail());
         
         if (usuarioOpt.isEmpty()) {
@@ -304,7 +289,7 @@ public class AuthController {
     @Transactional
     @PostMapping("/reset-password")
     @Operation(summary = "Resetar senha", description = "Aplica nova senha com token válido de recuperação")
-    public ResponseEntity<?> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+    public ResponseEntity<String> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         Optional<PasswordResetToken> tokenOpt = tokenRepository.findByToken(TokenHasher.sha256Hex(request.getToken()));
 
         if (tokenOpt.isEmpty()) {
@@ -334,7 +319,7 @@ public class AuthController {
 
     @GetMapping("/validate-token")
     @Operation(summary = "Validar token de recuperação", description = "Confere validade do token de reset de senha")
-    public ResponseEntity<?> validateToken(@RequestParam String token) {
+    public ResponseEntity<String> validateToken(@RequestParam String token) {
         Optional<PasswordResetToken> tokenOpt = tokenRepository.findByToken(TokenHasher.sha256Hex(token));
         
         if (tokenOpt.isEmpty()) {

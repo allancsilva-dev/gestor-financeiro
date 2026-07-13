@@ -3,6 +3,7 @@ package com.gestor.financeiro.controller;
 import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.dto.MetaRequest;
 import com.gestor.financeiro.dto.MetaResponseDto;
+import com.gestor.financeiro.dto.MetaProgressoResponse;
 import com.gestor.financeiro.dto.ValorRequest;
 import com.gestor.financeiro.model.Meta;
 import com.gestor.financeiro.security.AuthenticatedUserService;
@@ -49,19 +50,13 @@ public class MetaController {
     
     // GET /api/metas/{id}/progresso - Calcula progresso da meta
     @GetMapping("/{id}/progresso")
-    public ResponseEntity<Map<String, Object>> calcularProgresso(@PathVariable Long id) {
+    public ResponseEntity<MetaProgressoResponse> calcularProgresso(@PathVariable Long id) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Meta meta = metaService.buscarPorIdDoUsuario(id, usuarioId);
         BigDecimal progresso = metaService.calcularProgresso(id, usuarioId);
         
-        Map<String, Object> resultado = new HashMap<>();
-        resultado.put("metaId", id);
-        resultado.put("valorTotal", meta.getValorTotal());
-        resultado.put("valorReservado", meta.getValorReservado());
-        resultado.put("valorRestante", meta.getValorTotal().subtract(meta.getValorReservado()));
-        resultado.put("progresso", progresso); // Porcentagem
-        
-        return ResponseEntity.ok(resultado);
+        return ResponseEntity.ok(new MetaProgressoResponse(id, meta.getValorTotal(), meta.getValorReservado(),
+                meta.getValorTotal().subtract(meta.getValorReservado()), progresso));
     }
     
     // POST /api/metas - Cria nova meta

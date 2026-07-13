@@ -2,6 +2,7 @@ package com.gestor.financeiro.service;
 
 import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.model.enums.TipoTransacao;
+import com.gestor.financeiro.dto.DashboardDtos;
 import com.gestor.financeiro.repository.*;
 import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
@@ -20,9 +21,7 @@ public class DashboardService {
     private final ContaFixaRepository contaFixaRepository;
     private final CarteiraRepository carteiraRepository;
     
-    public Map<String, Object> obterResumo(Long usuarioId) {
-        Map<String, Object> resumo = new HashMap<>();
-        
+    public DashboardDtos.Resumo obterResumo(Long usuarioId) {
         LocalDate inicioMes = LocalDate.now().withDayOfMonth(1);
         LocalDate fimMes = LocalDate.now().withDayOfMonth(LocalDate.now().lengthOfMonth());
         
@@ -33,19 +32,13 @@ public class DashboardService {
         BigDecimal saldo = totalEntradas.subtract(totalSaidas);
         BigDecimal saldoCarteiras = carteiraRepository.sumSaldoByUsuarioId(usuarioId);
         
-        resumo.put("totalEntradas", totalEntradas);
-        resumo.put("totalSaidas", totalSaidas);
-        resumo.put("saldo", saldo);
-        resumo.put("totalCategorias", categoriaRepository.countByUsuarioIdAndAtivoTrue(usuarioId));
-        resumo.put("totalContas", contaRepository.countByUsuarioId(usuarioId));
-        resumo.put("totalMetas", metaRepository.countByUsuarioIdAndAtivaTrue(usuarioId));
-        resumo.put("totalContasFixas", contaFixaRepository.countByUsuarioIdAndAtivoTrue(usuarioId));
-        resumo.put("saldoCarteiras", saldoCarteiras);
-        
-        return resumo;
+        return new DashboardDtos.Resumo(totalEntradas, totalSaidas, saldo,
+                categoriaRepository.countByUsuarioIdAndAtivoTrue(usuarioId), contaRepository.countByUsuarioId(usuarioId),
+                metaRepository.countByUsuarioIdAndAtivaTrue(usuarioId), contaFixaRepository.countByUsuarioIdAndAtivoTrue(usuarioId),
+                saldoCarteiras);
     }
     
-    public List<Map<String, Object>> obterGastosPorCategoria(Long usuarioId) {
+    public List<DashboardDtos.Categoria> obterGastosPorCategoria(Long usuarioId) {
         LocalDate inicioMes = LocalDate.now().withDayOfMonth(1);
         LocalDate fimMes = LocalDate.now().withDayOfMonth(LocalDate.now().lengthOfMonth());
         
@@ -56,38 +49,30 @@ public class DashboardService {
                 .map(r -> (BigDecimal) r[1])
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         
-        List<Map<String, Object>> resultado = new ArrayList<>();
+        List<DashboardDtos.Categoria> resultado = new ArrayList<>();
         for (Object[] row : rows) {
-            Map<String, Object> item = new HashMap<>();
             String nomeCategoria = (String) row[0];
             BigDecimal valor = (BigDecimal) row[1];
             String cor = (String) row[2];
-            item.put("categoria", nomeCategoria);
-            item.put("valor", valor);
-            item.put("cor", cor);
-            
+            BigDecimal percentual;
             if (totalGastos.compareTo(BigDecimal.ZERO) > 0) {
-                BigDecimal percentual = valor
+                percentual = valor
                     .divide(totalGastos, 4, RoundingMode.HALF_UP)
                     .multiply(new BigDecimal("100"))
                     .setScale(1, RoundingMode.HALF_UP);
-                item.put("percentual", percentual);
             } else {
-                item.put("percentual", 0);
+                percentual = BigDecimal.ZERO;
             }
-            
-            resultado.add(item);
+            resultado.add(new DashboardDtos.Categoria(nomeCategoria, valor, cor, percentual));
         }
         
-        resultado.sort((a, b) -> 
-            ((BigDecimal) b.get("valor")).compareTo((BigDecimal) a.get("valor"))
-        );
+        resultado.sort((a, b) -> b.valor().compareTo(a.valor()));
         
         return resultado;
     }
     
-    public List<Map<String, Object>> obterEvolucaoMensal(Long usuarioId) {
-        List<Map<String, Object>> resultado = new ArrayList<>();
+    public List<DashboardDtos.Evolucao> obterEvolucaoMensal(Long usuarioId) {
+        List<DashboardDtos.Evolucao> resultado = new ArrayList<>();
         
         for (int i = 5; i >= 0; i--) {
             LocalDate data = LocalDate.now().minusMonths(i);
@@ -100,43 +85,35 @@ public class DashboardService {
                     usuarioId, TipoTransacao.SAIDA, inicioMes, fimMes);
             BigDecimal saldo = entradas.subtract(saidas);
             
-            Map<String, Object> mes = new HashMap<>();
-            mes.put("mes", data.getMonth().getDisplayName(TextStyle.SHORT, new Locale("pt", "BR")));
-            mes.put("entradas", entradas);
-            mes.put("saidas", saidas);
-            mes.put("saldo", saldo);
-            
-            resultado.add(mes);
+            resultado.add(new DashboardDtos.Evolucao(
+                    data.getMonth().getDisplayName(TextStyle.SHORT, new Locale("pt", "BR")),
+                    entradas, saidas, saldo));
         }
         
         return resultado;
     }
     
-    public List<Map<String, Object>> obterComparacaoMensal(Long usuarioId) {
-        List<Map<String, Object>> resultado = new ArrayList<>();
+    public List<DashboardDtos.Comparacao> obterComparacaoMensal(Long usuarioId) {
+        List<DashboardDtos.Comparacao> resultado = new ArrayList<>();
         
         LocalDate mesAnterior = LocalDate.now().minusMonths(1);
         LocalDate inicioMesAnterior = mesAnterior.withDayOfMonth(1);
         LocalDate fimMesAnterior = mesAnterior.withDayOfMonth(mesAnterior.lengthOfMonth());
         
-        Map<String, Object> anterior = new HashMap<>();
-        anterior.put("periodo", "Mês Anterior");
-        anterior.put("entradas", transacaoRepository.sumValorTotalByUsuarioIdAndTipoAndDataBetween(
-                usuarioId, TipoTransacao.ENTRADA, inicioMesAnterior, fimMesAnterior));
-        anterior.put("saidas", transacaoRepository.sumValorEfetivoByUsuarioIdAndTipoAndDataBetween(
-                usuarioId, TipoTransacao.SAIDA, inicioMesAnterior, fimMesAnterior));
-        resultado.add(anterior);
+        resultado.add(new DashboardDtos.Comparacao("Mês Anterior",
+                transacaoRepository.sumValorTotalByUsuarioIdAndTipoAndDataBetween(
+                        usuarioId, TipoTransacao.ENTRADA, inicioMesAnterior, fimMesAnterior),
+                transacaoRepository.sumValorEfetivoByUsuarioIdAndTipoAndDataBetween(
+                        usuarioId, TipoTransacao.SAIDA, inicioMesAnterior, fimMesAnterior)));
         
         LocalDate inicioMesAtual = LocalDate.now().withDayOfMonth(1);
         LocalDate fimMesAtual = LocalDate.now().withDayOfMonth(LocalDate.now().lengthOfMonth());
         
-        Map<String, Object> atual = new HashMap<>();
-        atual.put("periodo", "Mês Atual");
-        atual.put("entradas", transacaoRepository.sumValorTotalByUsuarioIdAndTipoAndDataBetween(
-                usuarioId, TipoTransacao.ENTRADA, inicioMesAtual, fimMesAtual));
-        atual.put("saidas", transacaoRepository.sumValorEfetivoByUsuarioIdAndTipoAndDataBetween(
-                usuarioId, TipoTransacao.SAIDA, inicioMesAtual, fimMesAtual));
-        resultado.add(atual);
+        resultado.add(new DashboardDtos.Comparacao("Mês Atual",
+                transacaoRepository.sumValorTotalByUsuarioIdAndTipoAndDataBetween(
+                        usuarioId, TipoTransacao.ENTRADA, inicioMesAtual, fimMesAtual),
+                transacaoRepository.sumValorEfetivoByUsuarioIdAndTipoAndDataBetween(
+                        usuarioId, TipoTransacao.SAIDA, inicioMesAtual, fimMesAtual)));
         
         return resultado;
     }
