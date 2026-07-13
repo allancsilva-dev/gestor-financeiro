@@ -10,6 +10,11 @@ import CurrencyInput from '../components/CurrencyInput';
 import { formatCurrency } from '../utils/currency';
 import { importService, ImportResult } from '../services/importService';
 import { anexoService, Anexo } from '../services/anexoService';
+import FieldError from '../components/FieldError';
+import { fieldA11y } from '../validation/fieldA11y';
+import { useZodForm } from '../hooks/useZodForm';
+import { transacaoFormSchema } from '../validation/schemas';
+import { toNullableNumber } from '../validation/numbers';
 
 export default function Transacoes() {
   const { usuario } = useAuth(); // ← ADICIONADO
@@ -39,6 +44,7 @@ export default function Transacoes() {
     parcelado: false,
     totalParcelas: ''
   });
+  const validation = useZodForm(transacaoFormSchema);
 
   useEffect(() => {
     if (usuario?.id) { // ← ADICIONADO: só carrega se tiver usuário
@@ -106,15 +112,20 @@ export default function Transacoes() {
       parcelado: false,
       totalParcelas: ''
     });
+    validation.resetValidation();
   };
 
+  const validationInput = (data: typeof formData) => ({ ...data, valor: data.valorTotal });
+
   const handleCategoriaChange = (categoria: { nome: string; cor: string; icone: string }) => {
-    setFormData({
+    const next = {
       ...formData,
       categoriaNome: categoria.nome,
       categoriaCor: categoria.cor,
       categoriaIcone: categoria.icone
-    });
+    };
+    setFormData(next);
+    validation.revalidateField('categoriaNome', validationInput(next));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -124,17 +135,14 @@ export default function Transacoes() {
       toast.error('Usuário não autenticado');
       return;
     }
-
-    if (!formData.categoriaNome) {
-      toast.error('Selecione uma categoria');
-      return;
-    }
+    const parsed = validation.validate(validationInput(formData));
+    if (!parsed) return;
 
     try {
       setLoading(true);
       
       // Primeiro, buscar ou criar a categoria
-      let categoriaId;
+      let categoriaId: number;
       try {
         const categoriasExistentes = await categoriaService.listarMinhas(0, 100);
         const categoriaExistente = categoriasExistentes.find(
@@ -159,15 +167,15 @@ export default function Transacoes() {
         return;
       }
       
-      const transacaoParaEnviar: any = {
-        descricao: formData.descricao,
-        valor: parseFloat(formData.valorTotal),
-        tipo: formData.tipo,
-        data: formData.data,
-        categoriaId,
-        contaId: parseInt(formData.contaId),
-        parcelado: formData.parcelado,
-        totalParcelas: formData.parcelado ? parseInt(formData.totalParcelas) : null
+      const transacaoParaEnviar: Omit<Transacao, 'id'> = {
+        descricao: parsed.descricao,
+        valorTotal: parsed.valor,
+        tipo: parsed.tipo,
+        data: parsed.data,
+        conta: { id: parsed.contaId },
+        categoria: { id: categoriaId },
+        parcelado: parsed.parcelado,
+        totalParcelas: parsed.parcelado ? parsed.totalParcelas : undefined,
       };
       
       if (editando) {
@@ -247,7 +255,7 @@ export default function Transacoes() {
     }
   };
 
-  const valorTotalNumerico = formData.valorTotal ? parseFloat(formData.valorTotal) : null;
+  const valorTotalNumerico = toNullableNumber(formData.valorTotal);
   const contasPorTipo = contas.filter((conta) => conta.tipo === formData.tipoConta);
   const tipoContaLabels: Record<Conta['tipo'], string> = {
     CREDITO: 'Cartão de Crédito',
@@ -296,32 +304,37 @@ export default function Transacoes() {
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">Descrição</label>
                   <input
+                    {...fieldA11y('descricao', validation.errors.descricao)}
                     type="text"
                     value={formData.descricao}
-                    onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                    onChange={(e) => { const next = { ...formData, descricao: e.target.value }; setFormData(next); validation.revalidateField('descricao', validationInput(next)); }}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 aria-invalid:border-red-500"
                     placeholder="Ex: Compra no mercado"
                     required
                   />
+                  <FieldError name="descricao" error={validation.errors.descricao} />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">Valor Total (R$)</label>
                     <CurrencyInput
+                      {...fieldA11y('valor', validation.errors.valor)}
                       value={valorTotalNumerico}
-                      onValueChange={(value) => setFormData({ ...formData, valorTotal: value === null ? '' : value.toString() })}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                      onValueChange={(value) => { const next = { ...formData, valorTotal: value === null ? '' : value.toString() }; setFormData(next); validation.revalidateField('valor', validationInput(next)); }}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 aria-invalid:border-red-500"
                       placeholder="R$ 0,00"
                       required
                     />
+                    <FieldError name="valor" error={validation.errors.valor} />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">Tipo</label>
                     <select
+                      {...fieldA11y('tipo', validation.errors.tipo)}
                       value={formData.tipo}
-                      onChange={(e) => setFormData({ ...formData, tipo: e.target.value as any })}
+                      onChange={(e) => { const next = { ...formData, tipo: e.target.value as 'ENTRADA' | 'SAIDA' }; setFormData(next); validation.revalidateField('tipo', validationInput(next)); }}
                       className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="SAIDA">💸 Saída</option>
@@ -334,14 +347,17 @@ export default function Transacoes() {
                   <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">Categoria</label>
                     <CategoriaDropdown
+                      {...fieldA11y('categoriaNome', validation.errors.categoriaNome)}
                       value={formData.categoriaNome}
                       onChange={handleCategoriaChange}
                     />
+                    <FieldError name="categoriaNome" error={validation.errors.categoriaNome} />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">Tipo de Conta</label>
                     <select
+                      name="tipoConta"
                       value={formData.tipoConta}
                       onChange={(e) => setFormData({ ...formData, tipoConta: e.target.value as Conta['tipo'], contaId: '' })}
                       className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
@@ -357,9 +373,10 @@ export default function Transacoes() {
                 <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">Conta</label>
                     <select
+                      {...fieldA11y('contaId', validation.errors.contaId)}
                       value={formData.contaId}
-                      onChange={(e) => setFormData({ ...formData, contaId: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                      onChange={(e) => { const next = { ...formData, contaId: e.target.value }; setFormData(next); validation.revalidateField('contaId', validationInput(next)); }}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 aria-invalid:border-red-500"
                       required
                     >
                       <option value="">Selecione...</option>
@@ -369,6 +386,7 @@ export default function Transacoes() {
                         </option>
                       ))}
                     </select>
+                    <FieldError name="contaId" error={validation.errors.contaId} />
                     {contasPorTipo.length === 0 && (
                       <p className="text-xs text-gray-500 mt-1">
                         Nenhuma conta do tipo {tipoContaLabels[formData.tipoConta]} cadastrada.
@@ -379,22 +397,25 @@ export default function Transacoes() {
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">Data</label>
                   <input
+                    {...fieldA11y('data', validation.errors.data)}
                     type="date"
                     value={formData.data}
-                    onChange={(e) => setFormData({ ...formData, data: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                    onChange={(e) => { const next = { ...formData, data: e.target.value }; setFormData(next); validation.revalidateField('data', validationInput(next)); }}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 aria-invalid:border-red-500"
                     required
                   />
+                  <FieldError name="data" error={validation.errors.data} />
                 </div>
 
                 {!editando && (
                   <>
                     <div className="flex items-center gap-2">
                       <input
+                        name="parcelado"
                         type="checkbox"
                         id="parcelado"
                         checked={formData.parcelado}
-                        onChange={(e) => setFormData({ ...formData, parcelado: e.target.checked })}
+                        onChange={(e) => { const next = { ...formData, parcelado: e.target.checked }; setFormData(next); validation.revalidateField('totalParcelas', validationInput(next)); }}
                         className="w-4 h-4"
                       />
                       <label htmlFor="parcelado" className="text-sm font-medium text-gray-700">
@@ -406,18 +427,20 @@ export default function Transacoes() {
                       <div>
                         <label className="block text-sm font-medium mb-1 text-gray-700">Número de Parcelas</label>
                         <input
+                          {...fieldA11y('totalParcelas', validation.errors.totalParcelas)}
                           type="number"
                           min="2"
                           max="48"
                           value={formData.totalParcelas}
-                          onChange={(e) => setFormData({ ...formData, totalParcelas: e.target.value })}
-                          className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                          onChange={(e) => { const next = { ...formData, totalParcelas: e.target.value }; setFormData(next); validation.revalidateField('totalParcelas', validationInput(next)); }}
+                          className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 aria-invalid:border-red-500"
                           placeholder="12"
                           required={formData.parcelado}
                         />
+                        <FieldError name="totalParcelas" error={validation.errors.totalParcelas} />
                         {formData.totalParcelas && formData.valorTotal && (
                           <p className="text-sm text-gray-600 mt-1">
-                            {formData.totalParcelas}x de {formatCurrency(parseFloat(formData.valorTotal) / parseInt(formData.totalParcelas))}
+                            {formData.totalParcelas}x de {formatCurrency((toNullableNumber(formData.valorTotal) ?? 0) / (toNullableNumber(formData.totalParcelas) ?? 1))}
                           </p>
                         )}
                       </div>

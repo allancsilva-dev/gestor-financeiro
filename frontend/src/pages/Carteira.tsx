@@ -6,6 +6,11 @@ import { toast } from 'react-hot-toast';
 import { Wallet, Banknote, PiggyBank, Plus, Trash2, Edit2, ArrowDownCircle, ArrowUpCircle, Building2 } from 'lucide-react';
 import CurrencyInput from '../components/CurrencyInput';
 import { formatCurrency } from '../utils/currency';
+import FieldError from '../components/FieldError';
+import { fieldA11y } from '../validation/fieldA11y';
+import { useZodForm } from '../hooks/useZodForm';
+import { carteiraSchema, movimentacaoCarteiraSchema } from '../validation/schemas';
+import { toNullableNumber } from '../validation/numbers';
 
 const LISTA_BANCOS = [
   'Agibank',
@@ -53,8 +58,10 @@ const CarteiraPage = () => {
   const [tipoMovimentacao, setTipoMovimentacao] = useState<'adicionar' | 'remover'>('adicionar');
   const [movimentando, setMovimentando] = useState(false);
   const movimentandoRef = useRef(false);
-  const saldoNumerico = saldo ? parseFloat(saldo) : null;
-  const valorMovimentacaoNumerico = valorMovimentacao ? parseFloat(valorMovimentacao) : null;
+  const carteiraValidation = useZodForm(carteiraSchema);
+  const movimentoValidation = useZodForm(movimentacaoCarteiraSchema);
+  const saldoNumerico = toNullableNumber(saldo);
+  const valorMovimentacaoNumerico = toNullableNumber(valorMovimentacao);
 
   useEffect(() => {
     if (usuario?.id) {
@@ -99,6 +106,7 @@ const CarteiraPage = () => {
     setTipo('DINHEIRO');
     setSaldo('');
     setBanco('');
+    carteiraValidation.resetValidation();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -108,13 +116,13 @@ const CarteiraPage = () => {
       toast.error('Usuário não autenticado');
       return;
     }
+    const parsed = carteiraValidation.validate({ nome, tipo, saldo, banco: banco || undefined });
+    if (!parsed) return;
 
     try {
       const carteiraData = {
-        nome,
-        tipo,
-        saldo: parseFloat(saldo) || 0,
-        banco: tipo === 'CONTA_BANCARIA' ? banco : undefined,
+        ...parsed,
+        banco: parsed.tipo === 'CONTA_BANCARIA' ? parsed.banco : undefined,
         usuario: { id: usuario.id }
       };
 
@@ -150,26 +158,24 @@ const CarteiraPage = () => {
     e.preventDefault();
     if (movimentandoRef.current) return;
     
-    if (!carteiraSelecionada || !valorMovimentacao) {
-      toast.error('Preencha todos os campos');
-      return;
-    }
+    if (!carteiraSelecionada) return;
+    const parsed = movimentoValidation.validate({ valor: valorMovimentacao });
+    if (!parsed) return;
 
     try {
       movimentandoRef.current = true;
       setMovimentando(true);
-      const valor = parseFloat(valorMovimentacao);
-      
       if (tipoMovimentacao === 'adicionar') {
-        await carteiraService.adicionarDinheiro(carteiraSelecionada, valor);
+        await carteiraService.adicionarDinheiro(carteiraSelecionada, parsed.valor);
         toast.success('Dinheiro adicionado com sucesso!');
       } else {
-        await carteiraService.removerDinheiro(carteiraSelecionada, valor);
+        await carteiraService.removerDinheiro(carteiraSelecionada, parsed.valor);
         toast.success('Dinheiro removido com sucesso!');
       }
 
       setCarteiraSelecionada(null);
       setValorMovimentacao('');
+      movimentoValidation.resetValidation();
       carregarCarteiras();
     } catch (error) {
       toast.error('Erro ao movimentar dinheiro');
@@ -264,13 +270,15 @@ const CarteiraPage = () => {
                     Nome *
                   </label>
                   <input
+                    {...fieldA11y('nome', carteiraValidation.errors.nome)}
                     type="text"
                     value={nome}
-                    onChange={(e) => setNome(e.target.value)}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
+                    onChange={(e) => { setNome(e.target.value); carteiraValidation.revalidateField('nome', { nome: e.target.value, tipo, saldo, banco }); }}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition aria-invalid:border-red-500"
                     placeholder="Salário"
                     required
                   />
+                  <FieldError name="nome" error={carteiraValidation.errors.nome} />
                 </div>
 
                 <div>
@@ -278,8 +286,9 @@ const CarteiraPage = () => {
                     Tipo *
                   </label>
                   <select
+                    {...fieldA11y('tipo', carteiraValidation.errors.tipo)}
                     value={tipo}
-                    onChange={(e) => setTipo(e.target.value as any)}
+                    onChange={(e) => { const value = e.target.value as typeof tipo; setTipo(value); carteiraValidation.revalidateField('tipo', { nome, tipo: value, saldo, banco }); }}
                     className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
                     required
                   >
@@ -294,12 +303,14 @@ const CarteiraPage = () => {
                     Saldo Inicial *
                   </label>
                   <CurrencyInput
+                    {...fieldA11y('saldo', carteiraValidation.errors.saldo)}
                     value={saldoNumerico}
-                    onValueChange={(value) => setSaldo(value === null ? '' : value.toString())}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
+                    onValueChange={(value) => { const next = value === null ? '' : value.toString(); setSaldo(next); carteiraValidation.revalidateField('saldo', { nome, tipo, saldo: next, banco }); }}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition aria-invalid:border-red-500"
                     placeholder="R$ 0,00"
                     required
                   />
+                  <FieldError name="saldo" error={carteiraValidation.errors.saldo} />
                 </div>
 
                 {tipo === 'CONTA_BANCARIA' && (
@@ -310,8 +321,9 @@ const CarteiraPage = () => {
                     <div className="relative">
                       <Building2 className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-5 h-5" />
                       <select
+                        {...fieldA11y('banco', carteiraValidation.errors.banco)}
                         value={banco}
-                        onChange={(e) => setBanco(e.target.value)}
+                        onChange={(e) => { setBanco(e.target.value); carteiraValidation.revalidateField('banco', { nome, tipo, saldo, banco: e.target.value }); }}
                         className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-12 pr-4 py-3 text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
                         required
                       >
@@ -322,6 +334,7 @@ const CarteiraPage = () => {
                           </option>
                         ))}
                       </select>
+                      <FieldError name="banco" error={carteiraValidation.errors.banco} />
                     </div>
                   </div>
                 )}
@@ -452,14 +465,16 @@ const CarteiraPage = () => {
                     Valor (R$)
                   </label>
                   <CurrencyInput
+                    {...fieldA11y('valor', movimentoValidation.errors.valor)}
                     value={valorMovimentacaoNumerico}
-                    onValueChange={(value) => setValorMovimentacao(value === null ? '' : value.toString())}
+                    onValueChange={(value) => { const next = value === null ? '' : value.toString(); setValorMovimentacao(next); movimentoValidation.revalidateField('valor', { valor: next }); }}
                     disabled={movimentando}
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:ring-2 focus:ring-orange-500 focus:border-transparent transition aria-invalid:border-red-500"
                     placeholder="R$ 0,00"
                     required
                     autoFocus
                   />
+                  <FieldError name="valor" error={movimentoValidation.errors.valor} />
                 </div>
                 <div className="flex gap-3 justify-end">
                   <button
@@ -468,6 +483,7 @@ const CarteiraPage = () => {
                     onClick={() => {
                       setCarteiraSelecionada(null);
                       setValorMovimentacao('');
+                      movimentoValidation.resetValidation();
                     }}
                     className="px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white hover:bg-slate-600 transition disabled:opacity-50"
                   >

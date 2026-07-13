@@ -1,18 +1,21 @@
 import { useState } from 'react';
-import { CATEGORIAS_PRE_DEFINIDAS } from '../data/categoriasPreDefinidas';
+import { CATEGORIAS_PRE_DEFINIDAS, type CategoriaPreDefinida } from '../data/categoriasPreDefinidas';
 import { Plus, Check, X } from 'lucide-react';
 
 interface CategoriaDropdownProps {
   value: string;
   onChange: (categoria: { nome: string; cor: string; icone: string }) => void;
+  name?: string;
+  'aria-invalid'?: boolean;
+  'aria-describedby'?: string;
 }
 
-export default function CategoriaDropdown({ value, onChange }: CategoriaDropdownProps) {
+export default function CategoriaDropdown({ value, onChange, name, ...ariaProps }: CategoriaDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customNome, setCustomNome] = useState('');
 
-  const handleSelect = (categoria: any) => {
+  const handleSelect = (categoria: CategoriaPreDefinida) => {
     onChange({
       nome: categoria.nome,
       cor: categoria.cor,
@@ -39,6 +42,8 @@ export default function CategoriaDropdown({ value, onChange }: CategoriaDropdown
   return (
     <div className="relative">
       <button
+        name={name}
+        {...ariaProps}
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         className="w-full text-left px-4 py-2 border border-gray-300 rounded-lg hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all bg-white"

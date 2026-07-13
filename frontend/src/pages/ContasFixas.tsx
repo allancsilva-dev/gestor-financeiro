@@ -1,18 +1,23 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import contaFixaService, { ContaFixa } from '../services/contaFixaService';
-import { categoriaService } from '../services/categoriaService';
+import { categoriaService, Categoria } from '../services/categoriaService';
 import carteiraService, { Carteira } from '../services/carteiraService';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import { Plus, Edit2, Trash2, Check, X, Calendar, DollarSign, Tag, SkipForward } from 'lucide-react';
 import CurrencyInput from '../components/CurrencyInput';
 import { formatCurrency } from '../utils/currency';
+import FieldError from '../components/FieldError';
+import { fieldA11y } from '../validation/fieldA11y';
+import { useZodForm } from '../hooks/useZodForm';
+import { contaFixaSchema, pagamentoSchema } from '../validation/schemas';
+import { toNullableNumber } from '../validation/numbers';
 
 export default function ContasFixas() {
   const { usuario } = useAuth();
   const [contasFixas, setContasFixas] = useState<ContaFixa[]>([]);
-  const [categorias, setCategorias] = useState<any[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [editando, setEditando] = useState<ContaFixa | null>(null);
   const [loading, setLoading] = useState(false);
@@ -29,6 +34,8 @@ export default function ContasFixas() {
     categoriaId: '',
     observacoes: ''
   });
+  const formValidation = useZodForm(contaFixaSchema);
+  const paymentValidation = useZodForm(pagamentoSchema);
 
   useEffect(() => {
     if (usuario?.id) {
@@ -81,6 +88,7 @@ export default function ContasFixas() {
       categoriaId: '',
       observacoes: ''
     });
+    formValidation.resetValidation();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -90,16 +98,18 @@ export default function ContasFixas() {
       toast.error('Usuário não autenticado');
       return;
     }
+    const parsed = formValidation.validate(formData);
+    if (!parsed) return;
 
     try {
       setLoading(true);
 
       const contaData = {
-        nome: formData.nome,
-        valorPlanejado: parseFloat(formData.valorPlanejado),
-        diaVencimento: parseInt(formData.diaVencimento),
-        observacoes: formData.observacoes,
-        categoria: { id: parseInt(formData.categoriaId) },
+        nome: parsed.nome,
+        valorPlanejado: parsed.valorPlanejado,
+        diaVencimento: parsed.diaVencimento,
+        observacoes: parsed.observacoes,
+        categoria: { id: parsed.categoriaId },
         usuario: { id: usuario.id }
       };
 
@@ -136,22 +146,17 @@ export default function ContasFixas() {
   const handleMarcarComoPaga = async (id: number) => {
     const actionKey = `pagar:${id}`;
     if (acaoFinanceiraId) return;
-    if (!valorPagamento) {
-      toast.error('Informe o valor pago');
-      return;
-    }
-    if (!carteiraPagamento) {
-      toast.error('Selecione a conta de onde sai o pagamento');
-      return;
-    }
+    const payment = paymentValidation.validate({ valor: valorPagamento, carteiraId: carteiraPagamento });
+    if (!payment) return;
 
     try {
       setAcaoFinanceiraId(actionKey);
-      await contaFixaService.marcarComoPaga(id, parseFloat(valorPagamento), parseInt(carteiraPagamento, 10));
+      await contaFixaService.marcarComoPaga(id, payment.valor, payment.carteiraId);
       toast.success('Conta marcada como paga!');
       setPagandoConta(null);
       setValorPagamento('');
       setCarteiraPagamento('');
+      paymentValidation.resetValidation();
       carregarDados();
     } catch (error: any) {
       toast.error(error?.response?.data?.message ?? 'Erro ao marcar como paga');
@@ -187,8 +192,8 @@ export default function ContasFixas() {
       .reduce((total, c) => total + (c.valorReal || c.valorPlanejado), 0);
   };
 
-  const valorPlanejadoNumerico = formData.valorPlanejado ? parseFloat(formData.valorPlanejado) : null;
-  const valorPagamentoNumerico = valorPagamento ? parseFloat(valorPagamento) : null;
+  const valorPlanejadoNumerico = toNullableNumber(formData.valorPlanejado);
+  const valorPagamentoNumerico = toNullableNumber(valorPagamento);
 
   if (loading && contasFixas.length === 0) {
     return (
@@ -280,13 +285,15 @@ export default function ContasFixas() {
                       Nome da Conta *
                     </label>
                     <input
+                      {...fieldA11y('nome', formValidation.errors.nome)}
                       type="text"
                       value={formData.nome}
-                      onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      onChange={(e) => { const next = { ...formData, nome: e.target.value }; setFormData(next); formValidation.revalidateField('nome', next); }}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent aria-invalid:border-red-500"
                       placeholder="Ex: Aluguel"
                       required
                     />
+                    <FieldError name="nome" error={formValidation.errors.nome} />
                   </div>
 
                   <div>
@@ -294,12 +301,14 @@ export default function ContasFixas() {
                       Valor Planejado (R$) *
                     </label>
                     <CurrencyInput
+                      {...fieldA11y('valorPlanejado', formValidation.errors.valorPlanejado)}
                       value={valorPlanejadoNumerico}
-                      onValueChange={(value) => setFormData({ ...formData, valorPlanejado: value === null ? '' : value.toString() })}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      onValueChange={(value) => { const next = { ...formData, valorPlanejado: value === null ? '' : value.toString() }; setFormData(next); formValidation.revalidateField('valorPlanejado', next); }}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent aria-invalid:border-red-500"
                       placeholder="R$ 0,00"
                       required
                     />
+                    <FieldError name="valorPlanejado" error={formValidation.errors.valorPlanejado} />
                   </div>
 
                   <div>
@@ -307,9 +316,10 @@ export default function ContasFixas() {
                       Dia do Vencimento *
                     </label>
                     <select
+                      {...fieldA11y('diaVencimento', formValidation.errors.diaVencimento)}
                       value={formData.diaVencimento}
-                      onChange={(e) => setFormData({ ...formData, diaVencimento: e.target.value })}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      onChange={(e) => { const next = { ...formData, diaVencimento: e.target.value }; setFormData(next); formValidation.revalidateField('diaVencimento', next); }}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent aria-invalid:border-red-500"
                       required
                     >
                       <option value="">Selecione...</option>
@@ -317,6 +327,7 @@ export default function ContasFixas() {
                         <option key={dia} value={dia}>Todo dia {dia}</option>
                       ))}
                     </select>
+                    <FieldError name="diaVencimento" error={formValidation.errors.diaVencimento} />
                   </div>
 
                   <div>
@@ -324,9 +335,10 @@ export default function ContasFixas() {
                       Categoria *
                     </label>
                     <select
+                      {...fieldA11y('categoriaId', formValidation.errors.categoriaId)}
                       value={formData.categoriaId}
-                      onChange={(e) => setFormData({ ...formData, categoriaId: e.target.value })}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      onChange={(e) => { const next = { ...formData, categoriaId: e.target.value }; setFormData(next); formValidation.revalidateField('categoriaId', next); }}
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-orange-500 focus:border-transparent aria-invalid:border-red-500"
                       required
                     >
                       <option value="">Selecione...</option>
@@ -334,6 +346,7 @@ export default function ContasFixas() {
                         <option key={cat.id} value={cat.id}>{cat.nome}</option>
                       ))}
                     </select>
+                    <FieldError name="categoriaId" error={formValidation.errors.categoriaId} />
                   </div>
                 </div>
 
@@ -459,16 +472,19 @@ export default function ContasFixas() {
                     pagandoConta === conta.id ? (
                       <div className="space-y-2">
                         <CurrencyInput
+                          {...fieldA11y('valor', paymentValidation.errors.valor)}
                           value={valorPagamentoNumerico}
-                          onValueChange={(value) => setValorPagamento(value === null ? '' : value.toString())}
-                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white"
+                          onValueChange={(value) => { const next = value === null ? '' : value.toString(); setValorPagamento(next); paymentValidation.revalidateField('valor', { valor: next, carteiraId: carteiraPagamento }); }}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white aria-invalid:border-red-500"
                           placeholder="R$ 0,00"
                           autoFocus
                         />
+                        <FieldError name="valor" error={paymentValidation.errors.valor} />
                         <select
+                          {...fieldA11y('carteiraId', paymentValidation.errors.carteiraId)}
                           value={carteiraPagamento}
-                          onChange={(e) => setCarteiraPagamento(e.target.value)}
-                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white"
+                          onChange={(e) => { setCarteiraPagamento(e.target.value); paymentValidation.revalidateField('carteiraId', { valor: valorPagamento, carteiraId: e.target.value }); }}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-white aria-invalid:border-red-500"
                         >
                           <option value="">Pagar com qual conta?</option>
                           {carteiras.map((c) => (
@@ -477,6 +493,7 @@ export default function ContasFixas() {
                             </option>
                           ))}
                         </select>
+                        <FieldError name="carteiraId" error={paymentValidation.errors.carteiraId} />
                         <div className="flex gap-2">
                         <button
                             disabled={acaoFinanceiraId !== null}
@@ -491,6 +508,7 @@ export default function ContasFixas() {
                               setPagandoConta(null);
                               setValorPagamento('');
                               setCarteiraPagamento('');
+                              paymentValidation.resetValidation();
                             }}
                             className="flex-1 bg-slate-700 text-white py-2 rounded-xl hover:bg-slate-600 transition disabled:opacity-50"
                           >

@@ -3,39 +3,38 @@ import { useNavigate, Link } from 'react-router-dom';
 import { authService } from '../services/authService';
 import toast from 'react-hot-toast';
 import { Wallet, Mail, Lock, User } from 'lucide-react';
+import { registerSchema } from '../validation/schemas';
+import axios from 'axios';
 
 export default function Register() {
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
+  const [aceitaTermos, setAceitaTermos] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
-    if (senha !== confirmarSenha) {
-      toast.error('As senhas não coincidem!');
-      return;
-    }
-
-    if (senha.length < 6) {
-      toast.error('A senha deve ter no mínimo 6 caracteres!');
+    const parsed = registerSchema.safeParse({ nome, email, senha, confirmarSenha, aceitaTermos });
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0].message);
       return;
     }
 
     setLoading(true);
 
     try {
-      await authService.register({ nome, email, senha, confirmPassword: confirmarSenha });
+      await authService.register({ nome, email, senha, confirmPassword: confirmarSenha, aceitaTermos });
       toast.success('Cadastro realizado com sucesso! Faça login.');
       navigate('/login');
-    } catch (error: any) {
-      const message = 
-        error.response?.data?.message || 
-        error.response?.data || 
-        'Erro ao cadastrar. Tente novamente.';
+    } catch (error: unknown) {
+      const payload = axios.isAxiosError(error) ? error.response?.data : null;
+      const message = typeof payload === 'string' ? payload
+        : payload && typeof payload === 'object' && 'message' in payload ? String(payload.message)
+        : 'Erro ao cadastrar. Tente novamente.';
       
       toast.error(typeof message === 'string' ? message : 'Erro ao cadastrar');
     } finally {
@@ -135,6 +134,10 @@ export default function Register() {
             </div>
 
             {/* Botão de Cadastro */}
+            <label className="flex items-start gap-3 text-sm text-gray-300">
+              <input type="checkbox" checked={aceitaTermos} onChange={e => setAceitaTermos(e.target.checked)} className="mt-1" />
+              Li e aceito a política de privacidade.
+            </label>
             <button
               type="submit"
               disabled={loading}

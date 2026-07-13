@@ -2,6 +2,8 @@ import { useState, FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Wallet, Mail, Lock } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { loginSchema } from '../validation/schemas';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -12,12 +14,17 @@ export default function Login() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    const parsed = loginSchema.safeParse({ email, senha });
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0].message);
+      return;
+    }
     setLoading(true);
 
     try {
       await login(email, senha);
       navigate('/dashboard');
-    } catch (error) {
+    } catch {
       toast.error('Email ou senha incorretos');
     } finally {
       setLoading(false);

@@ -14,12 +14,13 @@ export const authService = {
     return response.data;
   },
 
-  async register(data: { nome: string; email: string; senha: string; confirmPassword: string }): Promise<Usuario> {
+  async register(data: { nome: string; email: string; senha: string; confirmPassword: string; aceitaTermos: boolean }): Promise<Usuario> {
     const registerData: RegisterRequest = {
       nome: data.nome,
       email: data.email,
       password: data.senha,
       confirmPassword: data.confirmPassword,
+      aceitaTermos: data.aceitaTermos,
     };
 
     const response = await api.post<Usuario>('/auth/register', registerData);

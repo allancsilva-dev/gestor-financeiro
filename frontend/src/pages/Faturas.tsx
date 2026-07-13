@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import Layout from '../components/Layout';
 import toast from 'react-hot-toast';
 import faturaService, { FaturaResponse, FaturaLancamento } from '../services/faturaService';
@@ -8,6 +8,10 @@ import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/currency';
 import CurrencyInput from '../components/CurrencyInput';
 import { CreditCard, Calendar, DollarSign, CheckCircle, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import FieldError from '../components/FieldError';
+import { fieldA11y } from '../validation/fieldA11y';
+import { useZodForm } from '../hooks/useZodForm';
+import { faturaPagamentoSchema } from '../validation/schemas';
 
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
@@ -25,6 +29,9 @@ export default function Faturas() {
   const now = new Date();
   const [mes, setMes] = useState(now.getMonth() + 1);
   const [ano, setAno] = useState(now.getFullYear());
+  const saldoRestante = Math.max((fatura?.valorTotal ?? 0) - (fatura?.valorPago ?? 0), 0);
+  const paymentSchema = useMemo(() => faturaPagamentoSchema(saldoRestante), [saldoRestante]);
+  const validation = useZodForm(paymentSchema);
 
   useEffect(() => {
     if (usuario?.id) {
@@ -89,28 +96,18 @@ export default function Faturas() {
   const handlePagar = async () => {
     if (payingRef.current) return;
     if (!fatura || saldoRestante <= 0) return;
-    if (!carteiraPagamentoId) {
-      toast.error('Selecione a carteira de pagamento');
-      return;
-    }
-    const valor = valorPagamento ?? 0;
-    if (valor <= 0) {
-      toast.error('Informe um valor de pagamento válido');
-      return;
-    }
-    if (valor > saldoRestante) {
-      toast.error(`Valor máximo: ${formatCurrency(saldoRestante)}`);
-      return;
-    }
+    const payment = validation.validate({ valor: valorPagamento, carteiraId: carteiraPagamentoId });
+    if (!payment) return;
     payingRef.current = true;
     setPaying(true);
     try {
       const key = `${fatura.id}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
-      const result = await faturaService.pagarFatura(fatura.id, valor, carteiraPagamentoId, key);
+      const result = await faturaService.pagarFatura(fatura.id, payment.valor, payment.carteiraId, key);
       setFatura(result);
       carregarCarteiras();
       carregarContas();
       toast.success('Fatura paga com sucesso!');
+      validation.resetValidation();
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Erro ao pagar fatura');
     } finally {
@@ -121,8 +118,6 @@ export default function Faturas() {
 
   const mesAnterior = () => { if (mes === 1) { setMes(12); setAno(ano - 1); } else setMes(mes - 1); };
   const mesProximo = () => { if (mes === 12) { setMes(1); setAno(ano + 1); } else setMes(mes + 1); };
-  const saldoRestante = Math.max((fatura?.valorTotal ?? 0) - (fatura?.valorPago ?? 0), 0);
-
   return (
     <Layout>
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8">
@@ -205,23 +200,27 @@ export default function Faturas() {
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-2">Pagar com</label>
                         <select
+                          {...fieldA11y('carteiraId', validation.errors.carteiraId)}
                           value={carteiraPagamentoId ?? ''}
-                          onChange={(e) => setCarteiraPagamentoId(e.target.value ? Number(e.target.value) : null)}
-                          className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white"
+                          onChange={(e) => { const value = e.target.value ? Number(e.target.value) : null; setCarteiraPagamentoId(value); validation.revalidateField('carteiraId', { valor: valorPagamento, carteiraId: value }); }}
+                          className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white aria-invalid:border-red-500"
                         >
                           <option value="">Selecione uma carteira</option>
                           {carteiras.map((c) => (
                             <option key={c.id} value={c.id}>{c.nome}</option>
                           ))}
                         </select>
+                        <FieldError name="carteiraId" error={validation.errors.carteiraId} />
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-2">Valor a pagar</label>
                         <CurrencyInput
+                          {...fieldA11y('valor', validation.errors.valor)}
                           value={valorPagamento}
-                          onValueChange={setValorPagamento}
-                          className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white"
+                          onValueChange={(value) => { setValorPagamento(value); validation.revalidateField('valor', { valor: value, carteiraId: carteiraPagamentoId }); }}
+                          className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white aria-invalid:border-red-500"
                         />
+                        <FieldError name="valor" error={validation.errors.valor} />
                       </div>
                       <button
                         onClick={handlePagar}

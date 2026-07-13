@@ -17,6 +17,7 @@ export interface RegisterRequest {
   email: string;
   password: string;
   confirmPassword: string;
+  aceitaTermos: boolean;
 }
 
 export interface LoginResponse {

@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import toast from 'react-hot-toast';
-import orcamentoService, { OrcamentoResponse, OrcamentoCategoriaItem, OrcamentoRequest } from '../services/orcamentoService';
+import orcamentoService, { OrcamentoResponse, OrcamentoCategoriaItem } from '../services/orcamentoService';
 import { categoriaService, Categoria } from '../services/categoriaService';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/currency';
 import { TrendingDown, TrendingUp, Plus, Trash2, Save, ChevronLeft, ChevronRight } from 'lucide-react';
+import FieldError from '../components/FieldError';
+import { fieldA11y } from '../validation/fieldA11y';
+import { useZodForm } from '../hooks/useZodForm';
+import { orcamentoSchema } from '../validation/schemas';
 
 const MESES = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -36,7 +40,8 @@ export default function Orcamentos() {
   const [mes, setMes] = useState(now.getMonth() + 1);
   const [ano, setAno] = useState(now.getFullYear());
 
-  const [limites, setLimites] = useState<Map<number, number>>(new Map());
+  const [limites, setLimites] = useState<Map<number, string>>(new Map());
+  const validation = useZodForm(orcamentoSchema);
 
   const carregar = async (m: number, a: number) => {
     setLoading(true);
@@ -66,33 +71,31 @@ export default function Orcamentos() {
   }, [usuario?.id, mes, ano]);
 
   const iniciarEdicao = () => {
-    const map = new Map<number, number>();
+    const map = new Map<number, string>();
     if (orcamento) {
-      orcamento.categorias.forEach((c) => map.set(c.categoriaId, c.valorLimite));
+      orcamento.categorias.forEach((c) => map.set(c.categoriaId, c.valorLimite.toString()));
     }
     // Add all categories that don't have limits yet
     categorias.forEach((c) => {
-      if (c.id && !map.has(c.id)) map.set(c.id, 0);
+      if (c.id && !map.has(c.id)) map.set(c.id, '');
     });
     setLimites(map);
     setEditando(true);
   };
 
   const handleSalvar = async () => {
-    const cats = Array.from(limites.entries())
-      .filter(([_, valor]) => valor > 0)
+    const catsInput = Array.from(limites.entries())
+      .filter(([, valor]) => valor.trim() !== '')
       .map(([categoriaId, valorLimite]) => ({ categoriaId, valorLimite }));
-
-    if (cats.length === 0) {
-      toast.error('Adicione pelo menos uma categoria com valor limite');
-      return;
-    }
+    const payload = validation.validate({ mes, ano, categorias: catsInput });
+    if (!payload) return;
 
     setSaving(true);
     try {
-      const data = await orcamentoService.criarOuAtualizar({ mes, ano, categorias: cats });
+      const data = await orcamentoService.criarOuAtualizar(payload);
       setOrcamento(data);
       setEditando(false);
+      validation.resetValidation();
       toast.success('Orçamento salvo!');
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Erro ao salvar');
@@ -160,7 +163,9 @@ export default function Orcamentos() {
               <p className="text-sm text-slate-400 mb-6">Informe o valor máximo que deseja gastar em cada categoria</p>
               <div className="space-y-3">
                 {categorias.map((cat) => {
-                  const valor = limites.get(cat.id!) || 0;
+                  const valor = limites.get(cat.id!) || '';
+                  const entryIndex = Array.from(limites.entries()).filter(([, item]) => item.trim() !== '').findIndex(([id]) => id === cat.id);
+                  const fieldName = entryIndex >= 0 ? `categorias.${entryIndex}.valorLimite` : `limite-${cat.id}`;
                   return (
                     <div key={cat.id} className="flex items-center gap-3 p-3 bg-slate-900/50 rounded-lg border border-slate-700">
                       <span className="text-lg w-8">{cat.icone || '📌'}</span>
@@ -168,26 +173,32 @@ export default function Orcamentos() {
                       <div className="relative">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">R$</span>
                         <input
+                          {...fieldA11y(fieldName, validation.errors[fieldName])}
                           type="number"
                           step="0.01"
                           min="0"
-                          value={valor || ''}
+                          value={valor}
                           onChange={(e) => {
                             const novo = new Map(limites);
-                            novo.set(cat.id!, parseFloat(e.target.value) || 0);
+                            novo.set(cat.id!, e.target.value);
                             setLimites(novo);
+                            const nextEntries = Array.from(novo.entries()).filter(([, item]) => item.trim() !== '').map(([categoriaId, valorLimite]) => ({ categoriaId, valorLimite }));
+                            const nextIndex = nextEntries.findIndex(item => item.categoriaId === cat.id);
+                            if (nextIndex >= 0) validation.revalidateField(`categorias.${nextIndex}.valorLimite`, { mes, ano, categorias: nextEntries });
                           }}
-                          className="w-32 bg-slate-800 border border-slate-600 rounded-lg pl-10 pr-3 py-2 text-white text-right focus:outline-none focus:border-orange-500"
+                          className="w-32 bg-slate-800 border border-slate-600 rounded-lg pl-10 pr-3 py-2 text-white text-right focus:outline-none focus:border-orange-500 aria-invalid:border-red-500"
                           placeholder="0,00"
                         />
+                        <FieldError name={fieldName} error={validation.errors[fieldName]} />
                       </div>
                     </div>
                   );
                 })}
               </div>
+              <FieldError name="categorias" error={validation.errors.categorias} />
               <div className="flex gap-3 mt-6">
                 <button
-                  onClick={() => setEditando(false)}
+                  onClick={() => { setEditando(false); validation.resetValidation(); }}
                   className="px-4 py-2.5 border border-slate-600 text-slate-300 rounded-lg hover:bg-slate-700/50 transition-colors"
                 >
                   Cancelar

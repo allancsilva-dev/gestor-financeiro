@@ -5,6 +5,11 @@ import toast from 'react-hot-toast';
 import Layout from '../components/Layout';
 import CurrencyInput from '../components/CurrencyInput';
 import { formatCurrency } from '../utils/currency';
+import FieldError from '../components/FieldError';
+import { fieldA11y } from '../validation/fieldA11y';
+import { useZodForm } from '../hooks/useZodForm';
+import { contaSchema } from '../validation/schemas';
+import { toNullableNumber } from '../validation/numbers';
 
 export default function Contas() {
   const { usuario } = useAuth();
@@ -21,6 +26,7 @@ export default function Contas() {
     diaVencimento: '',
     cor: '#8B10AE'
   });
+  const validation = useZodForm(contaSchema);
 
   useEffect(() => {
     if (usuario?.id) {
@@ -73,6 +79,7 @@ export default function Contas() {
       diaVencimento: '',
       cor: '#8B10AE'
     });
+    validation.resetValidation();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -82,19 +89,11 @@ export default function Contas() {
       toast.error('Usuário não autenticado');
       return;
     }
+    const contaParaEnviar = validation.validate(formData);
+    if (!contaParaEnviar) return;
 
     try {
       setLoading(true);
-      
-      const contaParaEnviar: any = {
-        usuario: { id: usuario.id },
-        nome: formData.nome,
-        tipo: 'CREDITO',
-        cor: formData.cor,
-        limiteTotal: parseFloat(formData.limiteTotal) || 0,
-        diaFechamento: parseInt(formData.diaFechamento) || 1,
-        diaVencimento: parseInt(formData.diaVencimento) || 1
-      };
       
       if (editando) {
         // Atualizar
@@ -128,7 +127,7 @@ export default function Contas() {
     }
   };
 
-  const limiteTotalNumerico = formData.limiteTotal ? parseFloat(formData.limiteTotal) : null;
+  const limiteTotalNumerico = toNullableNumber(formData.limiteTotal);
 
   return (
     <Layout>
@@ -159,20 +158,23 @@ export default function Contas() {
                   <label className="block text-sm font-medium mb-1 text-gray-700">Nome do Cartão</label>
                   <input
                     type="text"
+                    {...fieldA11y('nome', validation.errors.nome)}
                     value={formData.nome}
-                    onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                    onChange={(e) => { const next = { ...formData, nome: e.target.value }; setFormData(next); validation.revalidateField('nome', next); }}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 aria-invalid:border-red-500"
                     placeholder="Ex: Nubank, Inter, C6 Bank"
                     required
                   />
+                  <FieldError name="nome" error={validation.errors.nome} />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">Cor</label>
                   <input
                     type="color"
+                    {...fieldA11y('cor', validation.errors.cor)}
                     value={formData.cor}
-                    onChange={(e) => setFormData({ ...formData, cor: e.target.value })}
+                    onChange={(e) => { const next = { ...formData, cor: e.target.value }; setFormData(next); validation.revalidateField('cor', next); }}
                     className="w-full h-10 border border-gray-300 rounded-lg cursor-pointer"
                   />
                 </div>
@@ -180,12 +182,14 @@ export default function Contas() {
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">Limite Total (R$)</label>
                   <CurrencyInput
+                    {...fieldA11y('limiteTotal', validation.errors.limiteTotal)}
                     value={limiteTotalNumerico}
-                    onValueChange={(value) => setFormData({ ...formData, limiteTotal: value === null ? '' : value.toString() })}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                    onValueChange={(value) => { const next = { ...formData, limiteTotal: value === null ? '' : value.toString() }; setFormData(next); validation.revalidateField('limiteTotal', next); }}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 aria-invalid:border-red-500"
                     placeholder="R$ 0,00"
                     required
                   />
+                  <FieldError name="limiteTotal" error={validation.errors.limiteTotal} />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -195,12 +199,14 @@ export default function Contas() {
                       type="number"
                       min="1"
                       max="31"
+                      {...fieldA11y('diaFechamento', validation.errors.diaFechamento)}
                       value={formData.diaFechamento}
-                      onChange={(e) => setFormData({ ...formData, diaFechamento: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                      onChange={(e) => { const next = { ...formData, diaFechamento: e.target.value }; setFormData(next); validation.revalidateField('diaFechamento', next); }}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 aria-invalid:border-red-500"
                       placeholder="10"
                       required
                     />
+                    <FieldError name="diaFechamento" error={validation.errors.diaFechamento} />
                     <p className="text-xs text-gray-500 mt-1">Dia que a fatura fecha</p>
                   </div>
                   <div>
@@ -209,12 +215,14 @@ export default function Contas() {
                       type="number"
                       min="1"
                       max="31"
+                      {...fieldA11y('diaVencimento', validation.errors.diaVencimento)}
                       value={formData.diaVencimento}
-                      onChange={(e) => setFormData({ ...formData, diaVencimento: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                      onChange={(e) => { const next = { ...formData, diaVencimento: e.target.value }; setFormData(next); validation.revalidateField('diaVencimento', next); }}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 aria-invalid:border-red-500"
                       placeholder="17"
                       required
                     />
+                    <FieldError name="diaVencimento" error={validation.errors.diaVencimento} />
                     <p className="text-xs text-gray-500 mt-1">Dia do vencimento da fatura</p>
                   </div>
                 </div>

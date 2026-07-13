@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Wallet, Mail, ArrowLeft, CheckCircle } from 'lucide-react';
 import api from '../services/api';
 import toast from 'react-hot-toast';
+import { emailSchema } from '../validation/schemas';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -11,13 +12,18 @@ export default function ForgotPassword() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    const parsed = emailSchema.safeParse(email);
+    if (!parsed.success) {
+      toast.error(parsed.error.issues[0].message);
+      return;
+    }
     setLoading(true);
 
     try {
       await api.post('/auth/forgot-password', { email });
       setEnviado(true);
       toast.success('Email de recuperação enviado!');
-    } catch (error: any) {
+    } catch {
       toast.error('Erro ao solicitar recuperação de senha');
     } finally {
       setLoading(false);

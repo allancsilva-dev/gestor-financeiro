@@ -313,7 +313,10 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Nenhuma
 - **Criterio de aceite:** Email validado com regex; campos numericos validados (min, max, positivo); datas validadas; feedback visual de erro
 - **Risco se ficar pendente:** Erros de API evitaveis; UX ruim
-- **Status:** ABERTO
+- **Atualizacao 2026-07-11:** frente mobile parcialmente concluida: validação centralizada de email/senha/dia, datas `DD/MM/AAAA` agora validam calendario real, auth mobile valida email antes de login/reset, perfil usa regra de senha do backend, onboarding valida numeros finitos/dia/data e cartões exigem dias de fechamento/vencimento validos. `cd mobile && npm run lint` PASS. Frontend web segue fora do escopo desta correção.
+- **Atualizacao 2026-07-13:** web recebeu schemas Zod tipados e auth integrado, incluindo regra real de senha e aceite da politica. Formularios financeiros web ainda precisam migrar para os schemas antes do fechamento.
+- **Atualizacao 2026-07-13:** formularios financeiros web migrados para schemas Zod centralizados: transacoes, carteiras, categorias, contas fixas, cartoes, investimentos, metas, orcamentos, faturas e onboarding. Payloads usam dados normalizados do `safeParse`; erros por campo incluem foco e atributos ARIA. `npm test`, `npm run lint`, `npm run build` e `npx tsc --noEmit` PASS.
+- **Status:** FECHADO
 
 ---
 

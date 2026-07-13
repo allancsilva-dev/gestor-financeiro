@@ -8,6 +8,11 @@ import Layout from '../components/Layout';
 import CurrencyInput from '../components/CurrencyInput';
 import { formatCurrency } from '../utils/currency';
 import IconPicker from '../components/IconPicker';
+import FieldError from '../components/FieldError';
+import { fieldA11y } from '../validation/fieldA11y';
+import { useZodForm } from '../hooks/useZodForm';
+import { aporteMetaSchema, metaSchema } from '../validation/schemas';
+import { toNullableNumber } from '../validation/numbers';
 
 export default function Metas() {
   const { usuario } = useAuth();
@@ -33,11 +38,13 @@ export default function Metas() {
   const [valorAdicionar, setValorAdicionar] = useState('');
   const [carteiras, setCarteiras] = useState<Carteira[]>([]);
   const [carteiraOrigem, setCarteiraOrigem] = useState('');
-  const valorTotalNumerico = formData.valorTotal ? parseFloat(formData.valorTotal) : null;
-  const valorMensalNumerico = formData.valorMensal ? parseFloat(formData.valorMensal) : null;
-  const valorAdicionarNumerico = valorAdicionar ? parseFloat(valorAdicionar) : null;
+  const valorTotalNumerico = toNullableNumber(formData.valorTotal);
+  const valorMensalNumerico = toNullableNumber(formData.valorMensal);
+  const valorAdicionarNumerico = toNullableNumber(valorAdicionar);
   const [previsaoMesesManual, setPrevisaoMesesManual] = useState('');
   const [usarPrevisaoManual, setUsarPrevisaoManual] = useState(false);
+  const formValidation = useZodForm(metaSchema);
+  const aporteValidation = useZodForm(aporteMetaSchema);
 
   const previsaoCalculada =
     valorTotalNumerico && valorMensalNumerico && valorMensalNumerico > 0
@@ -45,7 +52,7 @@ export default function Metas() {
       : null;
 
   const previsaoMeses = usarPrevisaoManual
-    ? (previsaoMesesManual ? parseInt(previsaoMesesManual, 10) : null)
+    ? toNullableNumber(previsaoMesesManual)
     : previsaoCalculada;
 
   const {
@@ -129,6 +136,7 @@ export default function Metas() {
     });
     setUsarPrevisaoManual(false);
     setPrevisaoMesesManual('');
+    formValidation.resetValidation();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -138,18 +146,19 @@ export default function Metas() {
       toast.error('Usuário não autenticado');
       return;
     }
+    const parsed = formValidation.validate(formData);
+    if (!parsed) return;
 
     try {
       setLoading(true);
       
       const metaParaEnviar = {
-        usuario: { id: usuario.id },
-        nome: formData.nome,
-        valorTotal: parseFloat(formData.valorTotal),
-        valorMensal: parseFloat(formData.valorMensal),
-        cor: formData.cor,
-        icone: formData.icone,
-        descricao: formData.descricao
+        nome: parsed.nome,
+        valorTotal: parsed.valorTotal,
+        valorMensal: parsed.valorMensal,
+        cor: parsed.cor,
+        icone: parsed.icone,
+        descricao: parsed.descricao,
       };
       
       if (editando) {
@@ -175,19 +184,17 @@ export default function Metas() {
   const handleAdicionarValor = async (metaId: number) => {
     const actionKey = `adicionar:${metaId}`;
     if (acaoFinanceiraId) return;
-    if (!valorAdicionar) return;
-    if (!carteiraOrigem) {
-      toast.error('Selecione de qual conta o valor sai');
-      return;
-    }
+    const aporte = aporteValidation.validate({ valor: valorAdicionar, carteiraId: carteiraOrigem });
+    if (!aporte) return;
 
     try {
       setAcaoFinanceiraId(actionKey);
-      await metaService.adicionarValor(metaId, parseFloat(valorAdicionar), parseInt(carteiraOrigem, 10));
+      await metaService.adicionarValor(metaId, aporte.valor, aporte.carteiraId);
       toast.success('Valor adicionado!');
       setValorAdicionar('');
       setCarteiraOrigem('');
       setMostrarAdicionar(null);
+      aporteValidation.resetValidation();
       carregarMetas();
     } catch (error: any) {
       toast.error(error?.response?.data?.message ?? 'Erro ao adicionar valor');
@@ -245,36 +252,42 @@ export default function Metas() {
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">Nome da Meta</label>
                   <input
+                    {...fieldA11y('nome', formValidation.errors.nome)}
                     type="text"
                     value={formData.nome}
-                    onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                    onChange={(e) => { const next = { ...formData, nome: e.target.value }; setFormData(next); formValidation.revalidateField('nome', next); }}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 aria-invalid:border-red-500"
                     placeholder="Ex: Viagem para Europa"
                     required
                   />
+                  <FieldError name="nome" error={formValidation.errors.nome} />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">Valor Total (R$)</label>
                     <CurrencyInput
+                      {...fieldA11y('valorTotal', formValidation.errors.valorTotal)}
                       value={valorTotalNumerico}
-                      onValueChange={(value) => setFormData({ ...formData, valorTotal: value === null ? '' : value.toString() })}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                      onValueChange={(value) => { const next = { ...formData, valorTotal: value === null ? '' : value.toString() }; setFormData(next); formValidation.revalidateField('valorTotal', next); }}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 aria-invalid:border-red-500"
                       placeholder="R$ 0,00"
                       required
                     />
+                    <FieldError name="valorTotal" error={formValidation.errors.valorTotal} />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">Valor Mensal (R$)</label>
                     <CurrencyInput
+                      {...fieldA11y('valorMensal', formValidation.errors.valorMensal)}
                       value={valorMensalNumerico}
-                      onValueChange={(value) => setFormData({ ...formData, valorMensal: value === null ? '' : value.toString() })}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                      onValueChange={(value) => { const next = { ...formData, valorMensal: value === null ? '' : value.toString() }; setFormData(next); formValidation.revalidateField('valorMensal', next); }}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 aria-invalid:border-red-500"
                       placeholder="R$ 0,00"
                       required
                     />
+                    <FieldError name="valorMensal" error={formValidation.errors.valorMensal} />
                   </div>
                 </div>
 
@@ -282,6 +295,7 @@ export default function Metas() {
                   <label className="block text-sm font-medium mb-1 text-gray-700">Previsão de Conclusão (meses)</label>
                   <div className="flex flex-col md:flex-row md:items-center gap-3">
                     <input
+                      {...fieldA11y('cor', formValidation.errors.cor)}
                       type="number"
                       min="1"
                       value={usarPrevisaoManual ? previsaoMesesManual : (previsaoMeses ?? '')}
@@ -316,7 +330,7 @@ export default function Metas() {
                     <input
                       type="color"
                       value={formData.cor}
-                      onChange={(e) => setFormData({ ...formData, cor: e.target.value })}
+                      onChange={(e) => { const next = { ...formData, cor: e.target.value }; setFormData(next); formValidation.revalidateField('cor', next); }}
                       className="w-full h-10 border border-gray-300 rounded-lg cursor-pointer"
                     />
                   </div>
@@ -333,12 +347,14 @@ export default function Metas() {
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">Descrição</label>
                   <textarea
+                    {...fieldA11y('descricao', formValidation.errors.descricao)}
                     value={formData.descricao}
-                    onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                    onChange={(e) => { const next = { ...formData, descricao: e.target.value }; setFormData(next); formValidation.revalidateField('descricao', next); }}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 aria-invalid:border-red-500"
                     placeholder="Ex: Viagem de 15 dias para Paris, Londres e Roma"
                     rows={3}
                   />
+                  <FieldError name="descricao" error={formValidation.errors.descricao} />
                 </div>
 
                 <div className="flex gap-3">
@@ -450,15 +466,18 @@ export default function Metas() {
                   {mostrarAdicionar === meta.id ? (
                     <div className="space-y-2">
                       <CurrencyInput
+                        {...fieldA11y('valor', aporteValidation.errors.valor)}
                         value={valorAdicionarNumerico}
-                        onValueChange={(value) => setValorAdicionar(value === null ? '' : value.toString())}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                        onValueChange={(value) => { const next = value === null ? '' : value.toString(); setValorAdicionar(next); aporteValidation.revalidateField('valor', { valor: next, carteiraId: carteiraOrigem }); }}
+                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 aria-invalid:border-red-500"
                         placeholder="R$ 0,00"
                       />
+                      <FieldError name="valor" error={aporteValidation.errors.valor} />
                       <select
+                        {...fieldA11y('carteiraId', aporteValidation.errors.carteiraId)}
                         value={carteiraOrigem}
-                        onChange={(e) => setCarteiraOrigem(e.target.value)}
-                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
+                        onChange={(e) => { setCarteiraOrigem(e.target.value); aporteValidation.revalidateField('carteiraId', { valor: valorAdicionar, carteiraId: e.target.value }); }}
+                        className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 aria-invalid:border-red-500"
                       >
                         <option value="">Sai de qual conta?</option>
                         {carteiras.map((c) => (
@@ -467,6 +486,7 @@ export default function Metas() {
                           </option>
                         ))}
                       </select>
+                      <FieldError name="carteiraId" error={aporteValidation.errors.carteiraId} />
                       <div className="flex gap-2">
                         <button
                           disabled={acaoFinanceiraId !== null}
@@ -481,6 +501,7 @@ export default function Metas() {
                             setMostrarAdicionar(null);
                             setValorAdicionar('');
                             setCarteiraOrigem('');
+                            aporteValidation.resetValidation();
                           }}
                           className="flex-1 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400 transition disabled:opacity-50"
                         >

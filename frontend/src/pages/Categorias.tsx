@@ -3,6 +3,10 @@ import { categoriaService, Categoria } from '../services/categoriaService';
 import { useApi } from '../hooks/useApi';
 import toast from 'react-hot-toast';
 import Layout from '../components/Layout';
+import FieldError from '../components/FieldError';
+import { fieldA11y } from '../validation/fieldA11y';
+import { useZodForm } from '../hooks/useZodForm';
+import { categoriaSchema } from '../validation/schemas';
 
 export default function Categorias() {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
@@ -16,9 +20,10 @@ export default function Categorias() {
   const [formData, setFormData] = useState({
     nome: '',
     cor: '#FF5733',
-    icone: 'shopping-cart',
+    icone: 'cart',
     valorEsperado: ''
   });
+  const validation = useZodForm(categoriaSchema);
 
   const {
     data: categoriasPaginadas,
@@ -53,21 +58,17 @@ export default function Categorias() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const categoriaParaEnviar = validation.validate(formData);
+    if (!categoriaParaEnviar) return;
     
     try {
       setLoading(true);
       
-      const categoriaParaEnviar: Categoria = {
-        nome: formData.nome,
-        cor: formData.cor,
-        icone: formData.icone,
-        valorEsperado: parseFloat(formData.valorEsperado) || 0
-      };
-      
       await categoriaService.criar(categoriaParaEnviar);
       toast.success('Categoria criada com sucesso!');
       
-      setFormData({ nome: '', cor: '#FF5733', icone: 'shopping-cart', valorEsperado: '' });
+      setFormData({ nome: '', cor: '#FF5733', icone: 'cart', valorEsperado: '' });
+      validation.resetValidation();
       setMostrarForm(false);
       carregarCategorias();
     } catch (error: any) {
@@ -131,12 +132,14 @@ export default function Categorias() {
                   <label className="block text-sm font-medium mb-1 text-gray-700">Nome</label>
                   <input
                     type="text"
+                    {...fieldA11y('nome', validation.errors.nome)}
                     value={formData.nome}
-                    onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    onChange={(e) => { const next = { ...formData, nome: e.target.value }; setFormData(next); validation.revalidateField('nome', next); }}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent aria-invalid:border-red-500"
                     placeholder="Ex: Mercado"
                     required
                   />
+                  <FieldError name="nome" error={validation.errors.nome} />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -144,8 +147,9 @@ export default function Categorias() {
                     <label className="block text-sm font-medium mb-1 text-gray-700">Cor</label>
                     <input
                       type="color"
+                      {...fieldA11y('cor', validation.errors.cor)}
                       value={formData.cor}
-                      onChange={(e) => setFormData({ ...formData, cor: e.target.value })}
+                      onChange={(e) => { const next = { ...formData, cor: e.target.value }; setFormData(next); validation.revalidateField('cor', next); }}
                       className="w-full h-10 border border-gray-300 rounded-lg cursor-pointer"
                     />
                   </div>
@@ -154,11 +158,13 @@ export default function Categorias() {
                     <label className="block text-sm font-medium mb-1 text-gray-700">Ícone</label>
                     <input
                       type="text"
+                      {...fieldA11y('icone', validation.errors.icone)}
                       value={formData.icone}
-                      onChange={(e) => setFormData({ ...formData, icone: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      onChange={(e) => { const next = { ...formData, icone: e.target.value }; setFormData(next); validation.revalidateField('icone', next); }}
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent aria-invalid:border-red-500"
                       placeholder="shopping-cart"
                     />
+                    <FieldError name="icone" error={validation.errors.icone} />
                   </div>
                 </div>
 
@@ -168,12 +174,14 @@ export default function Categorias() {
                     type="number"
                     step="0.01"
                     min="0"
+                    {...fieldA11y('valorEsperado', validation.errors.valorEsperado)}
                     value={formData.valorEsperado}
-                    onChange={(e) => setFormData({ ...formData, valorEsperado: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    onChange={(e) => { const next = { ...formData, valorEsperado: e.target.value }; setFormData(next); validation.revalidateField('valorEsperado', next); }}
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent aria-invalid:border-red-500"
                     placeholder="500.00"
                     required
                   />
+                  <FieldError name="valorEsperado" error={validation.errors.valorEsperado} />
                 </div>
 
                 <button
