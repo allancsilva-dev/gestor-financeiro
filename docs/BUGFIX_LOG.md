@@ -4,6 +4,51 @@ Registro de bugs corrigidos. Mantido pelo `docs-reporter`.
 
 ---
 
+## BUG-0056 — Build nativo Expo 54 desbloqueado
+
+- **Problema relacionado:** BACKLOG-0071
+- **Data:** 2026-07-13
+- **Area:** mobile, release, CI
+- **Sintoma:** `expo-doctor` falhava 2/18 grupos de checks e Android não compilava: Reanimated `4.5.1` exigia RN `0.83–0.86`, mas Expo SDK 54 usa RN `0.81.5`; Worklets `0.10.2` acompanhava a versão incompatível. App config também declarava `android.usesCleartextTraffic` fora do schema Expo.
+- **Causa raiz:** `nativewind` estava declarado sem Babel/Metro/Tailwind config e sem qualquer `className`; seu peer `react-native-reanimated >=3.6.2` ficou indireto e npm escolheu latest incompatível. Expo Router também resolveu `react-dom@19.2.7` contra React `19.1.0` por falta do peer web direto.
+- **Correcao aplicada:** stack NativeWind/Tailwind dormente e import CSS removidos; Expo `54.0.35`, Linking `8.0.12`, Router `6.0.24`, React DOM `19.1.0`, React Native Web `0.21.x`, Reanimated `4.1.x` e Worklets `0.5.1` alinhados à matriz do SDK 54; `expo-system-ui` instalado; `usesCleartextTraffic` removido do app config; `expo-doctor` adicionado ao job mobile do CI. Produção Android não permite cleartext; permissão permanece somente nos manifests debug gerados pelo Expo.
+- **Arquivos alterados:** `mobile/package.json`, `mobile/package-lock.json`, `mobile/app.json`, `mobile/app/_layout.tsx`, remoção de `mobile/src/global.css`, `.github/workflows/ci.yml`, `docs/BACKLOG.md`, `docs/BUGFIX_LOG.md`.
+- **Testes/validacoes executadas:** `npm ci` PASS; `expo-doctor` 18/18; TypeScript PASS; Jest 11/11; export web PASS; prebuild limpo PASS; Android debug/release PASS; iOS Release arm64 para destino genérico + Release para Simulator PASS; smoke iPhone 17 Simulator abriu login sem crash; Android release sem `usesCleartextTraffic`; iOS `NSAllowsArbitraryLoads=false`.
+- **Resultado:** PASS_COM_RESSALVA
+- **Ressalvas:** BACKLOG-0071 não foi fechado: nenhum hardware físico Android/iOS estava conectado para o smoke obrigatório. `npm audit --omit=dev` ainda reporta 1 critical e 4 high; tratamento pertence ao BACKLOG-0072 e não foi iniciado.
+- **Commits:** `af6f2be` (stack Expo/Jest), `17b6246` (gates CI)
+
+---
+
+## BUG-0055 — Cronograma canonico, seguranca e gates finais
+
+- **Data:** 2026-07-13
+- **Area:** backend, web, mobile, banco, seguranca
+- **Correcao aplicada:** Cartao usa somente `FaturaLancamento`; projecao calcula saldo restante sem duplicidade/rollover; novo `/api/v1/transacoes/{id}/cronograma`; mobile migrado; JJWT 0.13.0; secrets sem defaults; auth/dashboard tipados; manutencao removida da API; SMTP, ArchUnit, JaCoCo e Jest adicionados.
+- **Compatibilidade:** `/api/v1/parcelas/**` continua para nao-cartao; leitura legada anuncia depreciacao e mutacao de cartao retorna 410. V27 permanece staged ate Release B.
+- **Validacoes:** backend `mvn verify` PASS (151 testes; 74% linhas elegiveis; criticos >=85%); Flyway PostgreSQL 16 PASS; frontend lint (0 erros), build + 8 testes PASS; mobile TypeScript + 11 testes PASS.
+- **Ressalvas:** Frontend ainda reporta 98 warnings ESLint historicos. Operacao VPS e V27 nao executadas.
+- **Resultado:** PASS_COM_RESSALVA
+- **Commits:** `74b643a` (cronograma), `311f293` (JWT/secrets), `7e4c34a` (DTOs), `279a92f` (maintenance), `db463dd` (cobertura)
+
+---
+
+## BUG-0054 — Backfill de resíduo de arredondamento em parcelas/faturas antigas
+
+- **Problema relacionado:** BACKLOG-0051
+- **Data:** 2026-07-11
+- **Area:** backend, banco, integridade financeira
+- **Sintoma:** Compras parceladas criadas antes da correção de arredondamento (BUG-0017/PROB-0038) podiam ter `SUM(parcelas.valor)` ou `SUM(fatura_lancamentos.valor)` diferente de `transacao.valor_total`, deixando centavos residuais em históricos de parcelas/faturas.
+- **Causa raiz:** Antes da correção, o valor arredondado da parcela era replicado em todas as parcelas/lançamentos; a última parcela não absorvia o resto para fechar exatamente o total.
+- **Correcao aplicada:** Novo diagnóstico SQL read-only `scripts/diagnose-rounding-residue-backfill.sql`; novo `ParcelamentoRoundingBackfillService` com dry-run/correção idempotente por usuário, exposto somente pelo runner offline `maintenance`. A correção ajusta somente casos seguros: última `Parcela` e último `FaturaLancamento` `COMPRA`, recalculando `FaturaCartao.valorTotal` pela diferença e ajustando `Conta.valorGasto` apenas quando a fatura ainda não está `PAGA`. Transações com `AJUSTE`/`ESTORNO`/rollover ficam fora da correção automática.
+- **Arquivos alterados:** `ParcelaRepository.java`, `FaturaLancamentoRepository.java`, `ParcelamentoRoundingBackfillService.java`, `ParcelamentoRoundingBackfillResult.java`, `TransacaoController.java`, `scripts/diagnose-rounding-residue-backfill.sql`, `ParcelamentoRoundingBackfillServiceTest.java`, `docs/BACKLOG.md`, `docs/BUGFIX_LOG.md`.
+- **Testes/validacoes executadas:** `./mvnw -q -Dtest=ParcelamentoRoundingBackfillServiceTest test` PASS (fora do sandbox por exigência do Mockito/ByteBuddy). Diagnóstico read-only no Postgres local (`docker compose exec -T postgres psql -U postgres -d gestor_financeiro < scripts/diagnose-rounding-residue-backfill.sql`) retornou 0 resíduos em `parcelas`, 0 em faturas seguras e 0 casos manuais.
+- **Resultado:** PASS
+- **Ressalvas:** Diagnóstico local não representa produção/staging. Rodar job offline `rounding-residue` antes de `--apply`.
+- **Commit:** `61e18f5`
+
+---
+
 ## BUG-0052 — Fechamento de P3 baixo em fatura, mobile UX e Docker
 
 - **Problema relacionado:** BACKLOG-0034, BACKLOG-0035, BACKLOG-0046, BACKLOG-0049, BACKLOG-0053, BACKLOG-0055, BACKLOG-0057, BACKLOG-0069, PROB-0060

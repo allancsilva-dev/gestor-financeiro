@@ -165,14 +165,14 @@ Registro central de problemas encontrados no sistema. Mantido pelo `docs-reporte
 - **Data:** 2026-07-06
 - **Origem:** auditoria completa do sistema
 - **Severidade:** HIGH
-- **Status:** PARCIAL (PR-FOUNDATION-05, 2026-07-07)
+- **Status:** FECHADO (2026-07-13)
 - **Area:** backend, seguranca
 - **Sintoma:** Se variaveis de ambiente nao forem setadas, aplicacao usa senha DB 1234 e JWT secret fraco
 - **Solucao proposta:** Remover defaults ou lancar excecao na inicializacao se variaveis ausentes
-- **Solucao aplicada:** Producao ja exige secrets sem defaults. Dev mantem defaults para desenvolvimento local. Documentacao atualizada.
+- **Solucao aplicada:** Perfis exigem URL/usuario/senha DB e JWT via ambiente; perfil dev implicito removido. Credenciais locais ficam somente no Docker/exemplo.
 - **Evidencias:** application-prod.properties ja usa `${DATABASE_URL}` e `${JWT_SECRET}` sem fallback.
-- **Riscos residuais:** Dev com defaults fracos — aceitavel para ambiente local.
-- **Proximo passo:** Nenhum imediato.
+- **Riscos residuais:** Nenhum default de secret na aplicacao.
+- **Proximo passo:** Nenhum.
 
 ---
 
@@ -424,17 +424,17 @@ Registro central de problemas encontrados no sistema. Mantido pelo `docs-reporte
 - **Data:** 2026-07-06
 - **Origem:** auditoria completa do sistema
 - **Severidade:** MEDIUM
-- **Status:** FECHADO (PR-FASE2-02, 2026-07-08)
+- **Status:** FECHADO (2026-07-13; evidencia corrigida)
 - **Area:** backend
 - **Sintoma:** `parserBuilder()`, `setSigningKey()`, `parseClaimsJws()` sao deprecated desde JJWT 0.12.x
 - **Causa raiz:** API antiga usada com jjwt 0.11.5
 - **Impacto tecnico:** Sem correcoes de seguranca da API nova. Bloqueia upgrade do jjwt.
 - **Arquivos relacionados:** `backend/.../config/JwtUtil.java:74-79`
 - **Solucao proposta:** Migrar para `Jwts.parser().verifyWith(key).build().parseSignedClaims(token)`
-- **Solucao aplicada:** Entry points zumbis removidos/neutralizados conforme PR-FASE2-02; `expo-router/entry` permanece como entrada real.
-- **Evidencias:** Uso de parserBuilder() e setSigningKey()
-- **Riscos residuais:** Necessario testar todos os fluxos de autenticacao apos migracao
-- **Proximo passo:** Upgrade do jjwt para 0.12.x e migracao da API
+- **Solucao aplicada:** JJWT 0.13.0; emissao HS256 explicita e parser `verifyWith(...).parseSignedClaims(...)` rejeitando outro algoritmo.
+- **Evidencias:** `JwtUtil`, testes auth/security e `mvn verify`.
+- **Riscos residuais:** Nenhum conhecido.
+- **Proximo passo:** Nenhum.
 
 ---
 
@@ -1094,7 +1094,7 @@ pelas parcelas não pagas, e a diferença sobre a parte já paga (fatura imutáv
 - **Data:** 2026-07-10
 - **Origem:** auditoria backend/non-frontend alto nivel
 - **Severidade:** HIGH
-- **Status:** RESOLVIDO (2026-07-11)
+- **Status:** FECHADO (2026-07-11)
 - **Area:** backend, performance, banco
 - **Sintoma:** Relatorio carrega transacoes do periodo para top despesas/gastos por conta; projecao carrega contas fixas, parcelas e faturas e filtra em Java.
 - **Causa raiz:** Dashboard foi otimizado para SQL, mas relatorios/projecoes mantiveram padrao antigo.

@@ -3,6 +3,10 @@
 Registro de proximos passos e itens nao tratados agora, descobertos em revisoes, auditorias e
 implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.md`.
 
+## Padrao obrigatorio de implementacao
+
+Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquitetura, contrato explicito, migracao segura quando aplicavel, testes proporcionais ao risco e observabilidade. Nao aceitar como conclusao: `--force` sem analise, bypass de seguranca, suppressions para esconder erro, pin arbitrario de dependencia, duplicacao de regra financeira, estado inconsistente temporario ou ajuste exclusivo para fazer teste/build passar. Excecao tecnica exige decisao registrada, risco residual, mitigacao, prazo e responsavel.
+
 ---
 
 ## BACKLOG-0001 — Migrar para migrations versionadas (Flyway)
@@ -144,7 +148,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** PROB-0009 parcial
 - **Criterio de aceite:** Decidir se ambiente dev deve falhar sem DB_PASSWORD/JWT_SECRET ou manter defaults locais documentados
 - **Risco se ficar pendente:** Seguranca comprometida em configuracao padrao
-- **Status:** ABERTO
+- **Status:** FECHADO (2026-07-13)
 
 ---
 
@@ -248,7 +252,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Resolver PROB-0022
 - **Criterio de aceite:** jjwt 0.12.x; `Jwts.parser().verifyWith(key).build().parseSignedClaims(token)`
 - **Risco se ficar pendente:** Sem patches de seguranca do jjwt
-- **Status:** ABERTO
+- **Status:** FECHADO (JJWT 0.13.0, 2026-07-13)
 
 ---
 
@@ -342,7 +346,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Configurar Jest/RNTL no package.json mobile
 - **Criterio de aceite:** Testes para auth store, api service, componentes principais; scripts test e lint no package.json
 - **Risco se ficar pendente:** Bugs de regressao nao detectados
-- **Status:** ABERTO
+- **Status:** FECHADO (Jest/RNTL, 11 testes iniciais e CI, 2026-07-13)
 
 ---
 
@@ -351,11 +355,11 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Titulo:** Escrever testes unitarios e de integracao para services e controllers
 - **Prioridade:** P2
 - **Area:** backend
-- **Motivo:** Apenas 6 arquivos de teste cobrindo auth, transacoes, security
+- **Motivo:** Cobertura precisava de gate mensuravel; descricao antiga de seis arquivos estava obsoleta.
 - **Dependencias:** Nenhuma
 - **Criterio de aceite:** Testes para todos os services (Carteira, Meta, Dashboard, Conta, ContaFixa, Categoria, Parcela); coverage > 70%
 - **Risco se ficar pendente:** Bugs em regras de negocio nao detectados
-- **Status:** ABERTO
+- **Status:** FECHADO (JaCoCo 74% global elegivel; servicos criticos >=85%; CI bloqueante, 2026-07-13)
 
 ---
 
@@ -394,7 +398,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Configuracao SMTP; PROB-0011 resolvido primeiro (remover token do log)
 - **Criterio de aceite:** Email enviado via SMTP configurado; fallback para log em dev
 - **Risco se ficar pendente:** Usuarios nao conseguem resetar senha
-- **Status:** ABERTO
+- **Status:** FECHADO (SMTP validado com GreenMail e fallback seguro, 2026-07-13)
 
 ---
 
@@ -581,7 +585,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
   - **Cenário B** (saldo NÃO reflete a órfã): hoje `OK` mas subestimado, `saldoMaterializado - saldoLedger == 0` com `impactoOrfas != 0`. Corrigir exigiria mexer no saldo (decisão de produto) → deixado para **revisão manual**, nunca automático.
   - Regra do automático: só age quando `S - L == O` por carteira; qualquer outro caso é reportado como `REVISAO_MANUAL` e não é alterado. Backfill cego (mexer em todas) corromperia um dos dois cenários.
 - **Solucao aplicada (parcial, 2026-07-11):** (1) `scripts/diagnose-ledger-backfill.sql` — levantamento read-only (5 consultas). (2) `TransacaoRepository.findOrfasSemMovimentoByUsuarioId` (LEFT JOIN em conta p/ não descartar órfãs sem conta). (3) `LedgerBackfillService.reconciliarTransacoesOrfasUsuario(usuarioId, dryRun)` — scenario-aware, idempotente (idempotency key `ledger-backfill-transacao-{id}` + naturalmente idempotente pela própria query). (4) Endpoints self-scoped: `GET /api/v1/carteiras/minhas/backfill-orfas/diagnostico` (dry-run) e `POST /api/v1/carteiras/minhas/backfill-orfas` (aplica). (5) `LedgerBackfillOrfasTest` (6 testes: cenário A entrada/saída, cenário B manual, idempotência, compra-cartão excluída, isolamento por usuário) — reconciliação retorna `OK` após backfill do cenário A.
-- **Pendente:** Executar o diagnóstico contra o PostgreSQL real da VPS (dados de produção não acessíveis do ambiente de dev), registrar os números e, se houver carteiras `RECONCILIAVEL`, aplicar. Carteiras `REVISAO_MANUAL`/órfãs sem carteira (consulta 4 do SQL) continuam decisão manual.
+- **Pendente:** Executar o diagnóstico contra o PostgreSQL real da VPS (dados de produção não acessíveis do ambiente de dev), registrar os números e, se houver carteiras `RECONCILIAVEL`, aplicar. Carteiras `REVISAO_MANUAL`/órfãs sem carteira (consulta 4 do SQL) continuam decisão manual. Antes de qualquer `--apply`, exigir backup criptografado, restore drill, relatório dry-run versionado e reconciliação final `OK`, conforme auditoria `REVIEW_REPORTS/2026-07-13_full-system_mvp-high-level-readiness-audit.md`.
 - **Status:** PARCIAL (código, decisão e testes concluídos em 2026-07-11; execução operacional na VPS pendente)
 
 ---
@@ -608,7 +612,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Nenhuma
 - **Criterio de aceite:** Levantamento de todos os `ResponseEntity.ok(entidade)` no código de `controller/`; endpoints que retornam entidade JPA com campos sensíveis (senha, tokens, lockout) convertidos para DTO.
 - **Risco se ficar pendente:** Possível vazamento adicional de dados sensíveis (PII/segurança) em endpoints não revisados.
-- **Status:** ABERTO
+- **Status:** FECHADO (DTOs tipados + ArchUnit recursivo, 2026-07-13)
 
 ---
 
@@ -649,9 +653,9 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Area:** backend, banco
 - **Motivo:** Revisão de 2026-07-09 (BUG-0017/BUG-0018) identificou que compras de cartão geram registros redundantes em duas tabelas: `Parcela` (modelo legado, vencimento começando 1 mês após a compra) e `FaturaLancamento` (modelo atual usado pelo cálculo de fatura desde a migration V17). Ambas precisaram ser corrigidas separadamente para o mesmo bug de arredondamento (`valorParcelaOuResto` em `TransacaoService` e lógica equivalente em `FaturaService`), aumentando a superfície de manutenção e risco de dessincronia futura.
 - **Dependencias:** Levantamento de quem consome `Parcela` hoje (endpoints, telas mobile/frontend, relatórios) antes de qualquer remoção; migration de dados se decidido migrar histórico existente.
-- **Criterio de aceite:** Decisão documentada — manter as duas tabelas (com justificativa) ou depreciar `Parcela` para compras de cartão em favor exclusivo de `FaturaLancamento`, com plano de migração se aplicável.
+- **Criterio de aceite:** Decisão documentada — manter as duas tabelas (com justificativa) ou depreciar `Parcela` para compras de cartão em favor exclusivo de `FaturaLancamento`, com plano de migração se aplicável. Para promover a V27: backup e restore drill aprovados, maintenance job `card-schedule` com zero `sem_lancamento_canonico`, relatório versionado e validação pós-migration no PostgreSQL da VPS.
 - **Risco se ficar pendente:** Bugs que afetam o cálculo de parcelas (como arredondamento) precisam ser corrigidos em dois lugares distintos; risco de corrigir um e esquecer o outro em manutenções futuras.
-- **Status:** ABERTO
+- **Status:** PARCIAL (Release A concluida; V27 staged para Release B apos auditoria VPS, 2026-07-13)
 
 ---
 
@@ -664,7 +668,9 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Confirmar se há dados reais em produção anteriores a esta correção (o ambiente local de desenvolvimento não representa produção).
 - **Criterio de aceite:** Levantamento de compras parceladas existentes com `SUM(parcelas.valor) != transacao.valorTotal`; script de reconciliação ajustando a última parcela/lançamento de cada compra afetada, se necessário.
 - **Risco se ficar pendente:** Usuários com compras parceladas antigas podem ver limite de cartão com centavos residuais que nunca zeram mesmo após pagar tudo.
-- **Status:** ABERTO
+- **Diagnostico local (2026-07-11):** `scripts/diagnose-rounding-residue-backfill.sql` rodado no Postgres local (`gestor_financeiro`) retornou 0 transações com resíduo em `parcelas`, 0 em `fatura_lancamentos` seguros e 0 casos manuais com `AJUSTE`/`ESTORNO`/rollover.
+- **Solucao aplicada (2026-07-11):** `ParcelamentoRoundingBackfillService` com diagnóstico dry-run e correção idempotente self-scoped (`GET /api/v1/transacoes/minhas/backfill-arredondamento/diagnostico`, `POST /api/v1/transacoes/minhas/backfill-arredondamento`). A correção ajusta a última `Parcela` e o último `FaturaLancamento` `COMPRA` seguro; recalcula `FaturaCartao.valorTotal` pela diferença; ajusta `Conta.valorGasto` somente se a fatura não estiver `PAGA`; pula faturas com lançamentos não-`COMPRA` para revisão manual.
+- **Status:** FECHADO (BUG-0054, 2026-07-11)
 
 ---
 
@@ -756,7 +762,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Definir contrato de importacao: carteira obrigatoria/opcional, conta/cartao, deduplicacao e mapeamento de categoria.
 - **Criterio de aceite:** CSV importado gera os mesmos efeitos de uma transacao criada via API normal; testes cobrem transacao com carteira, sem carteira, cartao de credito, categoria e erro parcial; nenhuma linha e persistida por `transacaoRepository.save` direto fora do fluxo central.
 - **Risco se ficar pendente:** Dados importados podem corromper saldos e relatorios.
-- **Status:** FEITO (PROB-0049, 2026-07-10) — `ImportService` chama `transacaoService.criar()` por linha; entrada defasada no backlog.
+- **Status:** FECHADO (PROB-0049, 2026-07-10) — `ImportService` chama `transacaoService.criar()` por linha.
 
 ---
 
@@ -782,7 +788,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Levantamento de dados existentes para evitar migration quebrar banco com registros legados invalidos.
 - **Criterio de aceite:** Migrations adicionam constraints para valores positivos/nao-negativos, ranges de mes/dia, total de parcelas, enum/status valido e coerencia basica; testes PostgreSQL cobrem constraints; dados legados tratados por backfill ou migration defensiva.
 - **Risco se ficar pendente:** Qualquer bug/import/script pode persistir estado financeiro invalido.
-- **Status:** FEITO (PROB-0051, 2026-07-11) — `V20__hardening_check_constraints.sql`; validado em PostgreSQL 16 real + testes em `PostgresMigrationIT`.
+- **Status:** FECHADO (PROB-0051, 2026-07-11) — `V20__hardening_check_constraints.sql`; validado em PostgreSQL 16 real + testes em `PostgresMigrationIT`.
 
 ---
 
@@ -795,7 +801,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Verificar se ja existem duplicidades em dados reais antes de aplicar constraint.
 - **Criterio de aceite:** Migration impede duplicidade de compra a vista e parcelada; teste PostgreSQL tenta inserir duplicata com `parcela_numero NULL` e falha; codigo continua idempotente.
 - **Risco se ficar pendente:** Compra a vista duplicada pode inflar fatura/limite.
-- **Status:** FEITO (PROB-0052, 2026-07-11) — `V21__fatura_lancamentos_unique_null_safe.sql` com indice funcional `COALESCE(parcela_numero, 0)`; validado em PostgreSQL 16 real.
+- **Status:** FECHADO (PROB-0052, 2026-07-11) — `V21__fatura_lancamentos_unique_null_safe.sql` com indice funcional `COALESCE(parcela_numero, 0)`; validado em PostgreSQL 16 real.
 
 ---
 
@@ -808,7 +814,7 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Dependencias:** Definir DTOs/projections de repository e indices necessarios.
 - **Criterio de aceite:** Top despesas, gastos por conta, contas fixas, parcelas e faturas futuras calculadas por queries agregadas/paginadas; teste com volume representativo; endpoints mantem contrato atual.
 - **Risco se ficar pendente:** Lentidao/OOM com historico grande.
-- **Status:** CONCLUIDO (2026-07-11) — `RelatorioService`/`ProjecaoService` migrados para queries agregadas (`SUM`/`GROUP BY`/`ORDER BY`/`Pageable`); contrato dos endpoints mantido; indices de suporte na `V23__relatorio_projecao_support_indexes.sql`; testes `RelatorioServiceTest` + `ProjecaoServiceTest`. Ver PROB-0053.
+- **Status:** FECHADO (2026-07-11) — `RelatorioService`/`ProjecaoService` migrados para queries agregadas (`SUM`/`GROUP BY`/`ORDER BY`/`Pageable`); contrato dos endpoints mantido; indices de suporte na `V23__relatorio_projecao_support_indexes.sql`; testes `RelatorioServiceTest` + `ProjecaoServiceTest`. Ver PROB-0053.
 
 ---
 
@@ -911,5 +917,99 @@ implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.
 - **Motivo:** Suspeita registrada durante BUG-0053 indicava ~36 erros pre-existentes, mas revalidacao direta nesta rodada mostrou que o build atual fecha.
 - **Evidencia:** `frontend npm run build --silent` PASS em 2026-07-11.
 - **Status:** FECHADO (falso positivo, 2026-07-11)
+
+---
+
+## BACKLOG-0071 — Liberar build nativo e alinhar Expo
+
+- **Prioridade:** P0
+- **Area:** mobile, release
+- **Motivo:** Android falha com React Native 0.81.5, Reanimated 4.5.1 e Worklets 0.10.2 incompatíveis; `expo-doctor` aprova apenas 16/18 checks.
+- **Criterio de aceite:** `expo-doctor` 18/18; `tsc`, Jest, Android debug/release e iOS release PASS; `usesCleartextTraffic` removido do schema Expo e proibido em produção; smoke em device real documentado.
+- **Atualizacao 2026-07-13:** causa raiz corrigida sem bypass: `nativewind` estava declarado sem configuração/uso e seu peer amplo resolveu Reanimated `4.5.1`/Worklets `0.10.2`, incompatíveis com RN `0.81.5`. Stack CSS dormente removida; Expo/Router/Linking e peers React web alinhados ao SDK 54; Reanimated `4.1.7` + Worklets `0.5.1` declarados nas versões suportadas; `expo-system-ui` adicionado para cumprir `userInterfaceStyle`; `usesCleartextTraffic` removido do app config. CI mobile agora executa `expo-doctor`.
+- **Evidencias 2026-07-13:** instalação limpa `npm ci` PASS; `expo-doctor` 18/18; TypeScript PASS; Jest 11/11; export web PASS; prebuild limpo PASS; Android `assembleDebug` + `assembleRelease` PASS; iOS Release arm64 para destino genérico e Release para Simulator PASS; app Release abriu no iPhone 17 Simulator sem crash e exibiu login. Manifest release Android não contém `usesCleartextTraffic`; somente manifests debug gerados permitem HTTP local. ATS iOS mantém `NSAllowsArbitraryLoads=false`.
+- **Pendente:** smoke em hardware Android/iOS físico. Nenhum device estava conectado ao host (`adb devices` vazio; Xcode listou apenas Mac e simuladores). Vulnerabilidades runtime permanecem isoladas no BACKLOG-0072 e não foram tratadas nesta etapa.
+- **Status:** PARCIAL — correção e gates automatizados concluídos; hardware físico ainda impede satisfazer integralmente o critério de aceite.
+
+---
+
+## BACKLOG-0072 — Eliminar vulnerabilidades de dependencias
+
+- **Prioridade:** P0
+- **Area:** frontend, mobile, backend, seguranca
+- **Motivo:** `npm audit --omit=dev` reportou 5 vulnerabilidades web e 24 mobile, incluindo high em dependências diretas e critical transitiva.
+- **Criterio de aceite:** zero critical/high de runtime; exceções exclusivamente de toolchain possuem análise, mitigação, prazo e owner; `axios`/router corrigidos; SCA npm e Maven bloqueante no CI; builds/testes continuam verdes.
+- **Status:** ABERTO — auditoria MVP 2026-07-13.
+
+---
+
+## BACKLOG-0073 — Consolidar main, CI e proveniencia do release
+
+- **Prioridade:** P0
+- **Area:** repositorio, CI/CD, release
+- **Motivo:** baseline aprovada localmente contém 41 arquivos modificados e 18 untracked; CI remoto não foi confirmado.
+- **Criterio de aceite:** working tree limpa; commits revisáveis; CI remoto verde no SHA candidato; imagens/APKs/IPAs identificam o mesmo SHA; deploy registra versão, migration e rollback.
+- **Status:** ABERTO — auditoria MVP 2026-07-13.
+
+---
+
+## BACKLOG-0074 — Corrigir drift e exposicao do Actuator na VPS
+
+- **Prioridade:** P1
+- **Area:** backend, infra, seguranca
+- **Motivo:** health anônimo implantado retornou banco, disco e componentes apesar da configuração esperada `when-authorized`/`never`.
+- **Criterio de aceite:** identificar profile/config efetivos; health anônimo retorna somente status; detalhes exigem autenticação ou rede interna; teste automatizado e smoke externo comprovam; deploy/runbook documentam profile ativo.
+- **Status:** ABERTO — auditoria MVP 2026-07-13.
+
+---
+
+## BACKLOG-0075 — Automatizar jornadas criticas web e mobile
+
+- **Prioridade:** P1
+- **Area:** testes, frontend, mobile, backend
+- **Motivo:** backend possui cobertura forte, mas 15 testes web e 11 mobile não validam jornadas financeiras completas.
+- **Criterio de aceite:** E2E de cadastro/onboarding, transação/saldo, fatura, conta fixa, meta, sessão/refresh/logout/reset, importação/exportação e anexo; smoke Android/iOS; execução bloqueante no CI e contra staging.
+- **Status:** ABERTO — auditoria MVP 2026-07-13.
+
+---
+
+## BACKLOG-0076 — Validar recuperacao de senha ponta a ponta
+
+- **Prioridade:** P1
+- **Area:** backend, mobile, frontend, operacao
+- **Motivo:** SMTP e deep link possuem código/testes isolados, mas entrega real no ambiente implantado não foi comprovada.
+- **Criterio de aceite:** provedor SMTP configurado; SPF/DKIM verificados; reset web/mobile em staging/produção controlada; token expira, é single-use e não aparece em logs; falha de entrega gera alerta sem enumeração de usuário.
+- **Status:** ABERTO — auditoria MVP 2026-07-13.
+
+---
+
+## BACKLOG-0077 — Publicar politica de privacidade e fechar direitos LGPD
+
+- **Prioridade:** P1
+- **Area:** produto, frontend, mobile, backend, LGPD
+- **Motivo:** consentimento versionado, exportação e exclusão existem, mas cadastro não oferece acesso real ao texto da política aceita.
+- **Criterio de aceite:** política versionada e publicada; links acessíveis web/mobile antes do aceite; versão registrada corresponde ao documento; exportação/exclusão testadas ponta a ponta; revisão jurídica registrada.
+- **Status:** ABERTO — auditoria MVP 2026-07-13.
+
+---
+
+## BACKLOG-0078 — Fechar acessibilidade e polimento de release
+
+- **Prioridade:** P1
+- **Area:** mobile, frontend, UX, acessibilidade
+- **Motivo:** inputs sem labels explícitas, controles abaixo de 44pt, falta de VoiceOver/TalkBack e acabamento web de scaffold.
+- **Criterio de aceite:** WCAG AA nos fluxos críticos; toque >=44pt; labels/erros/estados anunciados; VoiceOver, TalkBack, fonte ampliada e teclado web aprovados; título/favicon web corretos; warnings relevantes zerados; auditoria `impeccable` repetida.
+- **Status:** ABERTO — auditoria MVP 2026-07-13.
+
+---
+
+## BACKLOG-0079 — Automatizar observabilidade e coerencia documental
+
+- **Prioridade:** P2
+- **Area:** operacao, qualidade, documentacao
+- **Motivo:** ausência de crash reporting/SCA comprovados e drift entre código, produção, contagens de testes e documentos.
+- **Criterio de aceite:** alertas de indisponibilidade/5xx; crash reporting web/mobile sem PII financeira; métricas e SLO mínimos; CI valida IDs/links/status e publica contagens reais; overview, deploy, backlog e bugfix log referenciam SHA/ambiente.
+- **Status:** ABERTO — auditoria MVP 2026-07-13.
+
 >
 > Atualizacao anterior: 2026-07-10 (auditoria backend/non-frontend alto nivel: BACKLOG-0058 a BACKLOG-0069 — ver PROBLEM_LEDGER PROB-0049 a PROB-0060 e relatorio `REVIEW_REPORTS/2026-07-10_backend_nonfrontend_high-level-audit.md`).
