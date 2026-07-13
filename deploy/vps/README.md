@@ -2,69 +2,66 @@
 
 Arquivos:
 
-- `docker-compose.vps.yml`: stack Docker Compose para teste em VPS.
+- `docker-compose.production.yml`: stack de producao usando PostgreSQL existente e Nginx Proxy Manager.
+- `docker-compose.vps.yml`: stack completa com PostgreSQL/Nginx/Certbot, util para ambiente isolado/homolog.
 - `deploy/vps/Dockerfile.nginx`: build do frontend Vite e imagem Nginx.
+- `deploy/vps/Dockerfile.nginx-npm`: build do frontend Vite para uso atras do Nginx Proxy Manager.
 - `deploy/vps/nginx.conf.template`: HTTPS, SPA fallback e proxy `/api` para Spring Boot.
+- `deploy/vps/nginx.npm.conf`: SPA fallback e proxy `/api` para a API na rede Docker `proxy`.
 - `deploy/vps/.env.vps.example`: modelo de variaveis e secrets.
+- `deploy/vps/.env.vps.production.example`: modelo de producao.
 - `deploy/vps/init-letsencrypt.sh`: emissao inicial do certificado TLS.
 
-## Containers
+## Producao com Nginx Proxy Manager
 
-- `gf-postgres`: PostgreSQL 17, volume `gf_postgres_data`.
-- `gf-api`: Spring Boot, porta interna `8080`; Flyway roda no startup.
-- `gf-nginx`: entrada publica `80`/`443`, serve frontend e proxy para API.
-- `gf-certbot`: renovacao automatica do certificado Let's Encrypt.
-- `gf-postgres-backup`: `pg_dump -Fc` diario em `./backups/postgres`.
+Containers:
 
-## DNS
+- `GestorFinanceiro-API`: Spring Boot, porta interna `8080`; Flyway roda no startup.
+- `GestorFinanceiro-Web`: Nginx interno na rede `proxy`; serve frontend e proxy `/api`.
+- `GestorFinanceiro-Backup`: `pg_dump -Fc` diario em `./backups/postgres`.
 
-Aponte registro `A` de `DOMAIN` para o IP publico da VPS antes de emitir certificado.
-Sem DNS resolvendo, desafio ACME falha.
+Redes externas esperadas:
 
-## Primeira subida
+- `proxy`: rede do Nginx Proxy Manager.
+- `dbnexos-gestor-financeiro_default`: rede do PostgreSQL existente.
+
+## Primeira Subida Em Producao
 
 ```sh
-cp deploy/vps/.env.vps.example deploy/vps/.env.vps
-chmod 600 deploy/vps/.env.vps
+cp deploy/vps/.env.vps.production.example deploy/vps/.env.vps.production
+chmod 600 deploy/vps/.env.vps.production
 ```
 
-Edite `deploy/vps/.env.vps`:
+Edite `deploy/vps/.env.vps.production`:
 
-- `DOMAIN` e `LETSENCRYPT_EMAIL`.
-- `POSTGRES_PASSWORD` e `JWT_SECRET` com valores fortes.
-- `CORS_ALLOWED_ORIGINS=https://SEU_DOMINIO`.
+- `DB_PASSWORD` com a senha real do PostgreSQL existente.
+- `JWT_SECRET` com valor forte.
+- `CORS_ALLOWED_ORIGINS=https://financas.nexostech.com.br`.
 - `SMTP_PASSWORD` com a senha da caixa `contato@nexostech.com.br`; mantenha o arquivo fora do Git.
 
 No Microsoft 365 Admin Center, habilite **Authenticated SMTP** para a caixa
 `contato@nexostech.com.br`. A API usa `smtp.office365.com:587` com STARTTLS.
 
-Suba banco e API para validar migrations:
+Suba aplicacao:
 
 ```sh
-docker compose --env-file deploy/vps/.env.vps -f docker-compose.vps.yml up -d --build postgres api
-docker compose --env-file deploy/vps/.env.vps -f docker-compose.vps.yml ps
+docker compose --env-file deploy/vps/.env.vps.production -f docker-compose.production.yml up -d --build
+docker compose --env-file deploy/vps/.env.vps.production -f docker-compose.production.yml ps
 ```
 
-Emita HTTPS e suba Nginx:
+No Nginx Proxy Manager, crie/edite o Proxy Host:
 
-```sh
-COMPOSE_ENV_FILE=deploy/vps/.env.vps sh deploy/vps/init-letsencrypt.sh
-```
-
-Teste sem gastar cota do Let's Encrypt:
-
-```sh
-STAGING=1 COMPOSE_ENV_FILE=deploy/vps/.env.vps sh deploy/vps/init-letsencrypt.sh
-```
-
-Depois rode sem `STAGING` para certificado valido.
+- Domain Names: `financas.nexostech.com.br`
+- Scheme: `http`
+- Forward Hostname / IP: `GestorFinanceiro-Web`
+- Forward Port: `80`
+- SSL: emitir/usar certificado Let's Encrypt, Force SSL ativo.
 
 ## Verificacao
 
 ```sh
-docker compose --env-file deploy/vps/.env.vps -f docker-compose.vps.yml ps
-curl -i https://SEU_DOMINIO/actuator/health
-curl -i https://SEU_DOMINIO/api/auth/validate-token
+curl -i https://financas.nexostech.com.br/actuator/health
+curl -i https://financas.nexostech.com.br/api/auth/validate-token
 ```
 
 `/api/auth/validate-token` deve responder `401` sem token. Isto confirma proxy ate API.
@@ -76,8 +73,8 @@ Backups ficam em `./backups/postgres/*.dump`.
 Restore em banco vazio:
 
 ```sh
-docker compose --env-file deploy/vps/.env.vps -f docker-compose.vps.yml exec -T postgres \
-  sh -lc 'pg_restore --clean --if-exists -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
+docker compose --env-file deploy/vps/.env.vps.production -f docker-compose.production.yml exec -T postgres-backup \
+  sh -lc 'pg_restore --clean --if-exists -U "$PGUSER" -d "$PGDATABASE"' \
   < backups/postgres/ARQUIVO.dump
 ```
 

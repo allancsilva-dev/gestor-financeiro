@@ -11,6 +11,7 @@ frontend/.env
 # Deployment (VPS)
 backups/
 deploy/vps/.env.vps
+deploy/vps/.env.vps.production
 deploy/vps/certbot/conf/
 deploy/vps/certbot/www/
 

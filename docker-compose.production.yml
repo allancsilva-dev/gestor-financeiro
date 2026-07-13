@@ -1,0 +1,73 @@
+services:
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: GestorFinanceiro-API
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: vps
+      DATABASE_URL: ${DATABASE_URL}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      PORT: ${API_PORT:-8080}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      APP_DOCS_PUBLIC: ${APP_DOCS_PUBLIC:-false}
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${API_PORT:-8080}/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+    networks:
+      - proxy
+      - gestor_financeiro_db
+
+  web:
+    build:
+      context: .
+      dockerfile: deploy/vps/Dockerfile.nginx-npm
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
+    container_name: GestorFinanceiro-Web
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - proxy
+
+  postgres-backup:
+    image: postgres:17-alpine
+    container_name: GestorFinanceiro-Backup
+    restart: unless-stopped
+    environment:
+      PGHOST: ${POSTGRES_HOST:-dbnexos-gestor-financeiro}
+      PGPORT: ${POSTGRES_PORT:-5432}
+      PGDATABASE: ${POSTGRES_DB}
+      PGUSER: ${DB_USERNAME}
+      PGPASSWORD: ${DB_PASSWORD}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
+    volumes:
+      - ./backups/postgres:/backups
+    command:
+      - sh
+      - -c
+      - |
+        while true; do
+          file="/backups/$${PGDATABASE}_$$(date +%Y%m%d_%H%M%S).dump"
+          pg_dump -Fc -f "$$file"
+          find /backups -type f -name "$${PGDATABASE}_*.dump" -mtime +"$${BACKUP_RETENTION_DAYS}" -delete
+          sleep 86400
+        done
+    networks:
+      - gestor_financeiro_db
+
+networks:
+  proxy:
+    external: true
+  gestor_financeiro_db:
+    external: true
+    name: dbnexos-gestor-financeiro_default

@@ -4,7 +4,7 @@
 # Rode uma vez depois que DNS A do DOMAIN apontar para a VPS.
 set -eu
 
-COMPOSE_ENV_FILE="${COMPOSE_ENV_FILE:-deploy/vps/.env.vps}"
+COMPOSE_ENV_FILE="${COMPOSE_ENV_FILE:-deploy/vps/.env.vps.production}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.vps.yml}"
 DATA_PATH="./deploy/vps/certbot"
 STAGING="${STAGING:-0}"   # STAGING=1 usa ambiente de teste do Let's Encrypt.
