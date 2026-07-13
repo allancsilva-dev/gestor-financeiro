@@ -37,10 +37,12 @@ Edite `deploy/vps/.env.vps.production`:
 - `DB_PASSWORD` com a senha real do PostgreSQL existente.
 - `JWT_SECRET` com valor forte.
 - `CORS_ALLOWED_ORIGINS=https://financas.nexostech.com.br`.
-- `SMTP_PASSWORD` com a senha da caixa `contato@nexostech.com.br`; mantenha o arquivo fora do Git.
+- `SMTP_USERNAME=allan@nexostech.com.br` para autenticar na caixa principal.
+- `SMTP_PASSWORD` com a senha da caixa `allan@nexostech.com.br`; mantenha o arquivo fora do Git.
+- `MAIL_FROM=contato@nexostech.com.br` para enviar usando o alias.
 
 No Microsoft 365 Admin Center, habilite **Authenticated SMTP** para a caixa
-`contato@nexostech.com.br`. A API usa `smtp.office365.com:587` com STARTTLS.
+`allan@nexostech.com.br`. A API usa `smtp.office365.com:587` com STARTTLS.
 
 Suba aplicacao:
 
