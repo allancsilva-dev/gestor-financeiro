@@ -61,7 +61,9 @@ public class EmailService {
             mailSender.send(message);
             log.info("Email de recuperação enviado para {}", maskedEmail);
         } catch (org.springframework.mail.MailException e) {
-            log.error("Falha ao enviar email de recuperação para {}: {}", maskedEmail, e.getMessage());
+            // Mensagem da excecao SMTP pode ecoar destinatario/comando; registrar so tipo.
+            log.error("Falha ao enviar email de recuperação para {} (tipo={})",
+                    maskedEmail, e.getClass().getSimpleName());
         }
     }
 
