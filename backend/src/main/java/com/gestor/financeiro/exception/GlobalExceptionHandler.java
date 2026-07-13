@@ -61,6 +61,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(apiError);
     }
 
+    @ExceptionHandler(CardParcelDeprecatedException.class)
+    public ResponseEntity<ApiError> handleCardParcelDeprecated(CardParcelDeprecatedException ex, HttpServletRequest request) {
+        Map<String, String> details = Map.of("successor",
+                "/api/v1/transacoes/" + ex.getTransacaoId() + "/cronograma");
+        ApiError apiError = buildError("CARD_PARCEL_DEPRECATED", ex.getMessage(), details, request);
+        return ResponseEntity.status(HttpStatus.GONE).body(apiError);
+    }
+
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiError> handleNotReadable(HttpMessageNotReadableException ex, HttpServletRequest request) {
         ApiError apiError = buildError("INVALID_REQUEST", "JSON inválido ou malformado", null, request);

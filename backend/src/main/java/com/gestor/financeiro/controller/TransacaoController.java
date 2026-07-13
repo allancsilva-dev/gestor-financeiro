@@ -3,6 +3,7 @@ package com.gestor.financeiro.controller;
 import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.dto.TransacaoRequest;
 import com.gestor.financeiro.dto.TransacaoResponseDto;
+import com.gestor.financeiro.dto.CronogramaItemResponse;
 import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.model.Conta;
@@ -10,6 +11,7 @@ import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.TransacaoService;
+import com.gestor.financeiro.service.CronogramaService;
 import com.gestor.financeiro.util.PaginationUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,6 +24,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/transacoes")
@@ -29,6 +32,7 @@ import java.time.LocalDate;
 @RequiredArgsConstructor
 public class TransacaoController {
     private final TransacaoService transacaoService;
+    private final CronogramaService cronogramaService;
     private final AuthenticatedUserService authenticatedUserService;
     
     // GET /api/transacoes/minhas - Lista transações do usuário autenticado
@@ -42,7 +46,7 @@ public class TransacaoController {
         Page<Transacao> transacoes = transacaoService.listarPorUsuario(usuarioId, cappedPageable);
         return ResponseEntity.ok(transacoes.map(TransacaoResponseDto::fromEntity));
     }
-    
+
     // GET /api/transacoes/periodo - Lista transações por período
     @GetMapping("/periodo")
     @Operation(summary = "Listar por período", description = "Retorna transações paginadas filtradas por intervalo de datas")
@@ -66,6 +70,13 @@ public class TransacaoController {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Transacao transacao = transacaoService.buscarPorIdDoUsuario(id, usuarioId);
         return ResponseEntity.ok(TransacaoResponseDto.fromEntity(transacao));
+    }
+
+    @GetMapping("/{id}/cronograma")
+    @Operation(summary = "Listar cronograma canônico da transação")
+    public ResponseEntity<List<CronogramaItemResponse>> cronograma(@PathVariable Long id) {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        return ResponseEntity.ok(cronogramaService.listar(id, usuarioId));
     }
     
     // POST /api/transacoes - Cria nova transação

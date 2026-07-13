@@ -3,11 +3,14 @@ package com.gestor.financeiro.service;
 import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.exception.UnauthorizedAccessException;
+import com.gestor.financeiro.exception.CardParcelDeprecatedException;
 import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Parcela;
 import com.gestor.financeiro.model.enums.OrigemMovimentoCarteira;
 import com.gestor.financeiro.model.enums.StatusPagamento;
 import com.gestor.financeiro.model.enums.TipoMovimentoCarteira;
+import com.gestor.financeiro.model.enums.TipoConta;
+import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.ParcelaRepository;
 import org.springframework.data.domain.Page;
@@ -33,6 +36,7 @@ public class ParcelaService {
     @Transactional
     public Parcela marcarComoPaga(Long parcelaId, Long usuarioId) {
         Parcela parcela = buscarPorIdDoUsuario(parcelaId, usuarioId);
+        rejeitarCartao(parcela);
 
         parcela.setStatus(StatusPagamento.PAGO);
         parcela.setDataPagamento(LocalDate.now());
@@ -47,6 +51,7 @@ public class ParcelaService {
     @Transactional
     public Parcela marcarComoPendente(Long parcelaId, Long usuarioId) {
         Parcela parcela = buscarPorIdDoUsuario(parcelaId, usuarioId);
+        rejeitarCartao(parcela);
 
         if (parcela.getStatus() != StatusPagamento.PAGO) {
             return parcela;
@@ -113,5 +118,13 @@ public class ParcelaService {
                 LocalDateTime.now(),
                 false
         ));
+    }
+
+    private void rejeitarCartao(Parcela parcela) {
+        if (parcela.getTransacao().getTipo() == TipoTransacao.SAIDA
+                && parcela.getTransacao().getConta() != null
+                && parcela.getTransacao().getConta().getTipo() == TipoConta.CREDITO) {
+            throw new CardParcelDeprecatedException(parcela.getTransacao().getId());
+        }
     }
 }

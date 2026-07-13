@@ -12,6 +12,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpHeaders;
+import com.gestor.financeiro.model.enums.TipoConta;
+import com.gestor.financeiro.model.enums.TipoTransacao;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -31,7 +34,16 @@ public class ParcelaController {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Pageable cappedPageable = PaginationUtils.enforceMaxSize(pageable, 100);
         Page<Parcela> parcelas = parcelaService.listarPorTransacao(transacaoId, usuarioId, cappedPageable);
-        return ResponseEntity.ok(parcelas.map(ParcelaResponseDto::fromEntity));
+        boolean cartaoLegado = parcelas.stream().findFirst().map(p -> p.getTransacao().getTipo() == TipoTransacao.SAIDA
+                && p.getTransacao().getConta() != null && p.getTransacao().getConta().getTipo() == TipoConta.CREDITO)
+                .orElse(false);
+        ResponseEntity.BodyBuilder response = ResponseEntity.ok();
+        if (cartaoLegado) {
+            response.header("Deprecation", "true")
+                    .header("Sunset", "release-b")
+                    .header(HttpHeaders.LINK, "</api/v1/transacoes/" + transacaoId + "/cronograma>; rel=successor-version");
+        }
+        return response.body(parcelas.map(ParcelaResponseDto::fromEntity));
     }
     
     // GET /api/parcelas/{id} - Busca parcela por ID

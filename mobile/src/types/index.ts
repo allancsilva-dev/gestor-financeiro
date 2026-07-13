@@ -433,6 +433,16 @@ export interface Parcela {
   dataPagamento: string | null;
 }
 
+export interface CronogramaItem {
+  id: number;
+  origem: 'CARTAO' | 'PARCELA';
+  numero: number;
+  total: number;
+  valor: number;
+  vencimento: string;
+  status: 'PENDENTE' | 'PARCIAL' | 'PAGO' | 'ATRASADO' | 'CANCELADO';
+}
+
 // ── Investimentos ─────────────────────────────────────────────────
 export type TipoAtivo = 'ACAO' | 'FII' | 'RENDA_FIXA' | 'CRIPTO' | 'OUTRO';
 export type TipoMovimentacaoAtivo = 'COMPRA' | 'VENDA' | 'DIVIDENDO' | 'BONIFICACAO';

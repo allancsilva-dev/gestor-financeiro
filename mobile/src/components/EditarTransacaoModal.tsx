@@ -72,8 +72,8 @@ export default function EditarTransacaoModal({ visible, transacao, onClose }: Ed
   });
 
   const parcelasQuery = useQuery({
-    queryKey: ['parcelas', transacao?.id],
-    queryFn: () => parcelaService.listarPorTransacao(transacao!.id),
+    queryKey: ['cronograma', transacao?.id],
+    queryFn: () => transacaoService.cronograma(transacao!.id),
     enabled: visible && Boolean(transacao?.parcelado && transacao?.id),
   });
 
@@ -323,27 +323,27 @@ export default function EditarTransacaoModal({ visible, transacao, onClose }: Ed
                     <Text style={{ color: colors.brandFg, fontSize: 13, fontWeight: '600' }}>Tentar novamente</Text>
                   </TouchableOpacity>
                 </View>
-              ) : parcelasQuery.data?.content.length === 0 ? (
+              ) : parcelasQuery.data?.length === 0 ? (
                 <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 12 }}>Nenhuma parcela encontrada.</Text>
               ) : (
                 <View style={{ marginTop: 10, gap: 8 }}>
-                  {parcelasQuery.data?.content.map(p => {
+                  {parcelasQuery.data?.map(p => {
                     const paga = p.status === 'PAGO';
                     return (
                       <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.border }}>
                         <View style={{ flex: 1, minWidth: 0 }}>
                           <Text style={{ color: colors.textPrimary, fontSize: 13, fontWeight: '600' }}>
-                            {p.numeroParcela}/{p.totalParcelas} · R$ {Number(p.valor ?? 0).toFixed(2).replace('.', ',')}
+                            {p.numero}/{p.total} · R$ {Number(p.valor ?? 0).toFixed(2).replace('.', ',')}
                           </Text>
                           <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 2 }}>
-                            Vence {isoToBR(p.dataVencimento)} · {paga ? 'Paga' : p.status === 'ATRASADO' ? 'Atrasada' : 'Pendente'}
+                            Vence {isoToBR(p.vencimento)} · {paga ? 'Paga' : p.status === 'PARCIAL' ? 'Parcial' : p.status === 'ATRASADO' ? 'Atrasada' : 'Pendente'}
                           </Text>
                         </View>
-                        <TouchableOpacity
+                        {p.origem === 'PARCELA' && <TouchableOpacity
                           onPress={() => handleToggleParcela(p.id, paga)}
                           disabled={parcelaActionId != null}
                           accessibilityRole="button"
-                          accessibilityLabel={paga ? `Desfazer pagamento da parcela ${p.numeroParcela}` : `Pagar parcela ${p.numeroParcela}`}
+                          accessibilityLabel={paga ? `Desfazer pagamento da parcela ${p.numero}` : `Pagar parcela ${p.numero}`}
                           style={{
                             minHeight: 36,
                             borderRadius: 999,
@@ -360,7 +360,7 @@ export default function EditarTransacaoModal({ visible, transacao, onClose }: Ed
                               {paga ? 'Desfazer' : 'Pagar'}
                             </Text>
                           )}
-                        </TouchableOpacity>
+                        </TouchableOpacity>}
                       </View>
                     );
                   })}

@@ -5,6 +5,8 @@ import com.gestor.financeiro.dto.ProjecaoMensalDto;
 import com.gestor.financeiro.dto.ProjecaoResponse;
 import com.gestor.financeiro.model.enums.FaturaStatus;
 import com.gestor.financeiro.model.enums.StatusPagamento;
+import com.gestor.financeiro.model.enums.TipoConta;
+import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.*;
 import org.springframework.stereotype.Service;
 
@@ -76,13 +78,13 @@ public class ProjecaoService {
 
     private BigDecimal somarParcelasNoMes(Long usuarioId, LocalDate inicio, LocalDate fim) {
         BigDecimal total = parcelaRepository.somarValorNoPeriodo(
-                usuarioId, inicio, fim, StatusPagamento.PAGO);
+                usuarioId, inicio, fim, StatusPagamento.PAGO, TipoTransacao.SAIDA, TipoConta.CREDITO);
         return total != null ? total : BigDecimal.ZERO;
     }
 
     private BigDecimal somarFaturasEmAberto(Long usuarioId, LocalDate inicio, LocalDate fim) {
-        BigDecimal total = faturaCartaoRepository.somarValorTotalPorStatusNoPeriodo(
-                usuarioId, FaturaStatus.ABERTA, inicio, fim);
+        BigDecimal total = faturaCartaoRepository.somarSaldoRestanteNoPeriodo(
+                usuarioId, FaturaStatus.PAGA, inicio, fim);
         return total != null ? total : BigDecimal.ZERO;
     }
 }

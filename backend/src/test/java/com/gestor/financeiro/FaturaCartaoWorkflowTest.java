@@ -11,6 +11,8 @@ import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.*;
 import com.gestor.financeiro.service.FaturaService;
 import com.gestor.financeiro.service.TransacaoService;
+import com.gestor.financeiro.service.CronogramaService;
+import com.gestor.financeiro.service.ProjecaoService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,6 +62,10 @@ class FaturaCartaoWorkflowTest {
     @Autowired
     private FaturaLancamentoRepository faturaLancamentoRepository;
 
+    @Autowired private ParcelaRepository parcelaRepository;
+    @Autowired private CronogramaService cronogramaService;
+    @Autowired private ProjecaoService projecaoService;
+
     @Autowired
     private PasswordEncoder passwordEncoder;
 
@@ -105,6 +111,9 @@ class FaturaCartaoWorkflowTest {
 
         transacaoService.criar(compra, usuario.getId());
 
+        assertEquals(0, parcelaRepository.findByTransacaoId(compra.getId()).size());
+        assertEquals(3, cronogramaService.listar(compra.getId(), usuario.getId()).size());
+
         assertEquals(0, new BigDecimal("1000.00").compareTo(
                 carteiraRepository.findById(carteira.getId()).orElseThrow().getSaldo()));
         assertEquals(0, new BigDecimal("120.00").compareTo(
@@ -126,6 +135,40 @@ class FaturaCartaoWorkflowTest {
         assertEquals(1, response.lancamentos().get(0).parcelaAtual());
         assertEquals(3, response.lancamentos().get(0).totalParcelas());
         assertEquals(0, new BigDecimal("40.00").compareTo(response.valorTotal()));
+    }
+
+    @Test
+    void projecaoUsaSomenteSaldoRestanteDaFaturaSemParcelaDuplicada() {
+        Transacao compra = compraCartao("Notebook", new BigDecimal("120.00"), LocalDate.of(2026, 7, 29));
+        compra.setParcelado(true);
+        compra.setTotalParcelas(3);
+        transacaoService.criar(compra, usuario.getId());
+
+        FaturaCartao agosto = faturaCartaoRepository
+                .findByContaIdAndMesAndAno(cartao.getId(), 8, 2026).orElseThrow();
+        agosto.setValorPago(new BigDecimal("10.00"));
+        faturaCartaoRepository.save(agosto);
+
+        var vencimentoProjetado = projecaoService.projetar(usuario.getId(), 3).meses().stream()
+                .filter(m -> m.mes() == 9 && m.ano() == 2026).findFirst().orElseThrow();
+        assertEquals(0, new BigDecimal("30.00").compareTo(vencimentoProjetado.totalFaturas()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(vencimentoProjetado.totalParcelas()));
+    }
+
+    @Test
+    void parcelamentoForaDoCartaoContinuaEmParcelaComRestoNaUltima() {
+        Conta debito = contaRepository.save(TestDataFactory.conta(usuario, "Débito", TipoConta.DEBITO));
+        Transacao compra = TestDataFactory.transacao(usuario, categoria, "Curso", new BigDecimal("100.00"));
+        compra.setConta(debito);
+        compra.setParcelado(true);
+        compra.setTotalParcelas(3);
+        transacaoService.criar(compra, usuario.getId());
+
+        List<Parcela> parcelas = parcelaRepository.findByTransacaoId(compra.getId());
+        assertEquals(3, parcelas.size());
+        assertEquals(0, new BigDecimal("100.00").compareTo(
+                parcelas.stream().map(Parcela::getValor).reduce(BigDecimal.ZERO, BigDecimal::add)));
+        assertEquals(0, new BigDecimal("33.34").compareTo(parcelas.get(2).getValor()));
     }
 
     @Test

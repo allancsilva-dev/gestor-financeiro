@@ -27,12 +27,15 @@ public interface FaturaCartaoRepository extends JpaRepository<FaturaCartao, Long
 
     List<FaturaCartao> findByUsuarioId(Long usuarioId);
 
-    // Projecao: soma das faturas com o status informado (ABERTA) vencendo no periodo.
-    @Query("SELECT COALESCE(SUM(f.valorTotal), 0) FROM FaturaCartao f " +
-           "WHERE f.usuario.id = :usuarioId AND f.status = :status " +
-           "AND f.dataVencimento BETWEEN :inicio AND :fim")
-    BigDecimal somarValorTotalPorStatusNoPeriodo(@Param("usuarioId") Long usuarioId,
-                                                  @Param("status") FaturaStatus status,
-                                                  @Param("inicio") LocalDate inicio,
-                                                  @Param("fim") LocalDate fim);
+    // Saldo exigivel: pagamento parcial reduz a projecao. Fatura cujo saldo ja foi
+    // rolado aparece somente no destino, evitando dupla cobranca.
+    @Query("SELECT COALESCE(SUM(CASE WHEN COALESCE(f.valorTotal, 0) > COALESCE(f.valorPago, 0) " +
+           "THEN COALESCE(f.valorTotal, 0) - COALESCE(f.valorPago, 0) ELSE 0 END), 0) " +
+           "FROM FaturaCartao f WHERE f.usuario.id = :usuarioId AND f.status <> :statusPago " +
+           "AND f.dataVencimento BETWEEN :inicio AND :fim " +
+           "AND NOT EXISTS (SELECT 1 FROM FaturaLancamento fl WHERE fl.faturaOrigem = f)")
+    BigDecimal somarSaldoRestanteNoPeriodo(@Param("usuarioId") Long usuarioId,
+                                            @Param("statusPago") FaturaStatus statusPago,
+                                            @Param("inicio") LocalDate inicio,
+                                            @Param("fim") LocalDate fim);
 }

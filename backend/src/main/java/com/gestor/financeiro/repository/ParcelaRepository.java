@@ -2,6 +2,8 @@ package com.gestor.financeiro.repository;
 
 import com.gestor.financeiro.model.Parcela;
 import com.gestor.financeiro.model.enums.StatusPagamento;
+import com.gestor.financeiro.model.enums.TipoConta;
+import com.gestor.financeiro.model.enums.TipoTransacao;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -58,9 +60,13 @@ public interface ParcelaRepository extends JpaRepository<Parcela, Long> {
     // Projecao: soma das parcelas vencendo no periodo, excluindo status informado (PAGO).
     @Query("SELECT COALESCE(SUM(p.valor), 0) FROM Parcela p " +
            "WHERE p.transacao.usuario.id = :usuarioId AND p.status <> :statusExcluido " +
+           "AND NOT (p.transacao.tipo = :tipoSaida AND p.transacao.conta IS NOT NULL " +
+           "AND p.transacao.conta.tipo = :tipoCredito) " +
            "AND p.dataVencimento BETWEEN :inicio AND :fim")
     BigDecimal somarValorNoPeriodo(@Param("usuarioId") Long usuarioId,
                                     @Param("inicio") LocalDate inicio,
                                     @Param("fim") LocalDate fim,
-                                    @Param("statusExcluido") StatusPagamento statusExcluido);
+                                    @Param("statusExcluido") StatusPagamento statusExcluido,
+                                    @Param("tipoSaida") TipoTransacao tipoSaida,
+                                    @Param("tipoCredito") TipoConta tipoCredito);
 }

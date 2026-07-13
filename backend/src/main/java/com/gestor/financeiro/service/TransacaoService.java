@@ -141,7 +141,9 @@ public class TransacaoService {
             transacao.setCarteira(carteira);
         }
 
-        if (transacao.getParcelado() && transacao.getTotalParcelas() > 1) {
+        // Cartao tem cronograma canonico em FaturaLancamento. Parcela existe somente
+        // para parcelamentos fora do cartao.
+        if (!compraCartao && transacao.getParcelado() && transacao.getTotalParcelas() > 1) {
             criarParcelas(transacao);
         }
 

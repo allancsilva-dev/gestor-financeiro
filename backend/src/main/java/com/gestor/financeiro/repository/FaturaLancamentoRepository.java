@@ -20,6 +20,10 @@ public interface FaturaLancamentoRepository extends JpaRepository<FaturaLancamen
 
     List<FaturaLancamento> findByTransacaoId(Long transacaoId);
 
+    @EntityGraph(attributePaths = {"fatura"})
+    List<FaturaLancamento> findByTransacaoIdAndTipoOrderByParcelaNumeroAscIdAsc(
+            Long transacaoId, TipoFaturaLancamento tipo);
+
     Optional<FaturaLancamento> findTopByTransacaoIdAndTipoOrderByParcelaNumeroDescIdDesc(
             Long transacaoId, TipoFaturaLancamento tipo);
 

@@ -1,5 +1,5 @@
 import api from './api';
-import { TipoTransacao, Transacao, TransacaoRequest, PagedResponse } from '../types';
+import { TipoTransacao, Transacao, TransacaoRequest, PagedResponse, CronogramaItem } from '../types';
 
 export interface FiltroPeriodo {
   inicio: string;
@@ -27,6 +27,9 @@ export const transacaoService = {
 
   buscarPorId: (id: number) =>
     api.get<Transacao>(`/v1/transacoes/${id}`).then(r => r.data),
+
+  cronograma: (id: number) =>
+    api.get<CronogramaItem[]>(`/v1/transacoes/${id}/cronograma`).then(r => r.data),
 
   criar: (data: TransacaoRequest) =>
     api.post<Transacao>('/v1/transacoes', data).then(r => r.data),
