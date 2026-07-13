@@ -30,6 +30,19 @@ public interface ParcelaRepository extends JpaRepository<Parcela, Long> {
     @EntityGraph(attributePaths = {"transacao"})
     Optional<Parcela> findByIdAndTransacaoUsuarioId(Long id, Long usuarioId);
 
+    Optional<Parcela> findTopByTransacaoIdOrderByNumeroParcelaDescIdDesc(Long transacaoId);
+
+    @Query("SELECT p.transacao.id FROM Parcela p " +
+           "WHERE p.transacao.usuario.id = :usuarioId AND p.transacao.ativa = true " +
+           "AND p.transacao.parcelado = true AND p.transacao.totalParcelas > 1 " +
+           "GROUP BY p.transacao.id, p.transacao.valorTotal " +
+           "HAVING SUM(p.valor) <> p.transacao.valorTotal " +
+           "ORDER BY p.transacao.id")
+    List<Long> findTransacaoIdsComResiduoArredondamentoByUsuarioId(@Param("usuarioId") Long usuarioId);
+
+    @Query("SELECT COALESCE(SUM(p.valor), 0) FROM Parcela p WHERE p.transacao.id = :transacaoId")
+    BigDecimal somarValorByTransacaoId(@Param("transacaoId") Long transacaoId);
+
     @Modifying
     @Query("UPDATE Parcela p SET p.status = :novoStatus WHERE p.status = :status AND p.dataVencimento < :data")
     int atualizarStatusParcelasAtrasadas(@Param("status") StatusPagamento status,
