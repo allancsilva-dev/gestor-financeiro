@@ -939,7 +939,9 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Area:** frontend, mobile, backend, seguranca
 - **Motivo:** `npm audit --omit=dev` reportou 5 vulnerabilidades web e 24 mobile, incluindo high em dependências diretas e critical transitiva.
 - **Criterio de aceite:** zero critical/high de runtime; exceções exclusivamente de toolchain possuem análise, mitigação, prazo e owner; `axios`/router corrigidos; SCA npm e Maven bloqueante no CI; builds/testes continuam verdes.
-- **Status:** ABERTO — auditoria MVP 2026-07-13.
+- **Atualizacao 2026-07-13:** frontend confirmado com zero vulnerabilidades; mobile atualizou `axios` e transitivas compatíveis, reduzindo de 1 critical/4 high para zero critical/high. Os 14 moderate e 1 low restantes pertencem ao toolchain Expo/RN e foram analisados em `docs/SECURITY_DEPENDENCY_RISK_REGISTER.md`; correção automática exigiria upgrade major para Expo 57 e reabriria a matriz nativa estabilizada no BACKLOG-0071. Backend atualizou Spring Boot `3.5.7 -> 3.5.16`, PostgreSQL JDBC `42.7.8 -> 42.7.13`, Tomcat `10.1.48 -> 10.1.57` e Log4j2 API/bridge `2.24.3 -> 2.25.5`; Spring Framework, Security e Jackson acompanham a matriz gerenciada do Boot. CI agora bloqueia npm runtime em high/critical e Maven em CVSS >= 7 via OWASP Dependency-Check 12.2.2, com erro do scanner também bloqueante.
+- **Evidencias 2026-07-13:** `npm audit --omit=dev --audit-level=high` PASS web/mobile; web lint/build/test PASS; mobile `expo-doctor`, TypeScript e Jest PASS; backend `clean verify` PASS; OWASP Dependency-Check contra NVD atualizada PASS com zero dependências em CVSS >= 7. `NVD_API_KEY` permanece recomendada para acelerar a primeira sincronização, não sendo requisito funcional do scanner. CI remoto e proveniência do SHA pertencem ao BACKLOG-0073.
+- **Status:** FECHADO — zero critical/high de runtime, risco exclusivo de toolchain formalizado e gates SCA bloqueantes implementados.
 
 ---
 

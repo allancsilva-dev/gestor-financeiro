@@ -4,6 +4,20 @@ Registro de bugs corrigidos. Mantido pelo `docs-reporter`.
 
 ---
 
+## BUG-0057 — Dependencias runtime e gates SCA corrigidos
+
+- **Problema relacionado:** BACKLOG-0072
+- **Data:** 2026-07-13
+- **Area:** backend, frontend, mobile, seguranca, CI
+- **Sintoma:** auditorias de runtime reportavam vulnerabilidades high/critical no mobile e o backend nao possuia SCA Maven bloqueante. Primeira execucao do OWASP Dependency-Check confirmou CVEs em Spring Boot/Framework/Security, Jackson, PostgreSQL JDBC, Tomcat e Log4j2.
+- **Causa raiz:** lock mobile mantinha `axios` e transitivas vulneraveis; backend permanecia na matriz Spring Boot 3.5.7 de 2025; CI executava testes/builds sem bloquear dependencias vulneraveis.
+- **Correcao aplicada:** `axios` e transitivas mobile atualizados sem upgrade major do Expo; Spring Boot atualizado para 3.5.16 com patches PostgreSQL JDBC 42.7.13, Tomcat 10.1.57 e Log4j2 2.25.5; OWASP Dependency-Check 12.2.2 adicionado em profile Maven com limite CVSS 7 e `failOnError=true`; CI ganhou cache NVD semanal, relatorio como artifact e `npm audit --omit=dev --audit-level=high` web/mobile.
+- **Risco residual:** 14 moderate e 1 low no grafo npm mobile pertencem ao toolchain Expo/RN e exigem upgrade major para Expo 57. Excecao temporaria, mitigacao, responsavel e prazo registrados em `docs/SECURITY_DEPENDENCY_RISK_REGISTER.md`. Zero critical/high permanece aceito.
+- **Testes/validacoes executadas:** npm audit web/mobile PASS no limite high; web lint/build/test PASS; mobile Expo Doctor 18/18, TypeScript e Jest 11/11 PASS; backend `clean verify` PASS; OWASP Dependency-Check/NVD PASS com zero dependencias CVSS >= 7.
+- **Resultado:** PASS
+
+---
+
 ## BUG-0056 — Build nativo Expo 54 desbloqueado
 
 - **Problema relacionado:** BACKLOG-0071
