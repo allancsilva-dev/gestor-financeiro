@@ -107,57 +107,102 @@ export default function Dashboard() {
         </TouchableOpacity>
       </Entrance>
 
-      <Entrance delay={100}>
+      {/* Saldo principal: destaque visual canônico do dashboard */}
+      <Entrance kind="pop" delay={100}>
       <View
         style={{
-          borderRadius: 16,
-          paddingVertical: 18,
           marginBottom: 16,
-          borderBottomWidth: 1,
-          borderBottomColor: colors.border,
+          borderRadius: 22,
+          shadowColor: colors.brandDeep,
+          shadowOpacity: 0.32,
+          shadowRadius: 12,
+          shadowOffset: { width: 0, height: 8 },
+          elevation: 6,
         }}
       >
+      <LinearGradient
+        colors={[colors.brand, colors.brandDeep]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{ borderRadius: 22, padding: 22, minHeight: 158, overflow: 'hidden' }}
+      >
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute', inset: 0,
+            backgroundColor: 'rgba(15,8,35,0.24)',
+          }}
+        />
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute', top: -54, right: -36, width: 156, height: 156,
+            borderRadius: 78, backgroundColor: 'rgba(255,255,255,0.08)',
+          }}
+        />
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute', bottom: -74, left: -48, width: 176, height: 176,
+            borderRadius: 88, backgroundColor: 'rgba(255,255,255,0.05)',
+          }}
+        />
         {resumoQuery.isLoading ? (
-          <SkeletonBox width="100%" height={110} />
+          <View style={{ gap: 12 }} accessibilityLabel="Carregando saldo total">
+            <SkeletonBox width={88} height={16} borderRadius={8} tone="inverse" />
+            <SkeletonBox width="72%" height={43} borderRadius={10} tone="inverse" />
+            <SkeletonBox width="88%" height={28} borderRadius={14} tone="inverse" />
+          </View>
         ) : resumoQuery.isError ? (
-          <View>
-            <Text style={{ color: colors.danger }}>Erro ao carregar o saldo</Text>
-            <TouchableOpacity accessibilityRole="button" onPress={() => resumoQuery.refetch()} style={{ marginTop: 8, minHeight: 44, justifyContent: 'center' }}>
-              <Text style={{ color: colors.brandFg, fontWeight: '600' }}>Tentar novamente</Text>
+          <View style={{ minHeight: 114, justifyContent: 'center', alignItems: 'flex-start' }}>
+            <Text style={{ color: '#ffffff', fontSize: 15, fontWeight: '700' }}>Saldo indisponível</Text>
+            <Text style={{ color: '#ffffff', fontSize: 13, marginTop: 4 }}>Não foi possível atualizar seus valores.</Text>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Tentar carregar saldo novamente"
+              activeOpacity={0.78}
+              onPress={() => resumoQuery.refetch()}
+              style={{ marginTop: 12, minHeight: 44, paddingHorizontal: 14, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center' }}
+            >
+              <Text style={{ color: '#ffffff', fontWeight: '700' }}>Tentar novamente</Text>
             </TouchableOpacity>
           </View>
         ) : resumoQuery.data ? (
           <>
-            <Text style={{ color: colors.textSecondary, fontSize: 14, fontWeight: '500' }}>
+            <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '600' }}>
               Saldo total
             </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 6 }}>
-              <Text style={{ color: colors.textPrimary, fontSize: 36, fontWeight: '800', letterSpacing: -1, fontVariant: ['tabular-nums'] }}>
-                {saldoInt}
-              </Text>
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.68}
+              style={{ color: '#ffffff', fontSize: 40, lineHeight: 48, fontWeight: '800', letterSpacing: -1, marginTop: 2, fontVariant: ['tabular-nums'] }}
+            >
+              {saldoInt}
               {saldoCents != null && (
-                <Text style={{ color: colors.textPrimary, fontSize: 21, fontWeight: '800', fontVariant: ['tabular-nums'] }}>
+                <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 23, fontWeight: '800', fontVariant: ['tabular-nums'] }}>
                   ,{saldoCents}
                 </Text>
               )}
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, gap: 10 }}>
-              <View style={{ backgroundColor: colors.successBg, borderRadius: 999, paddingHorizontal: 11, paddingVertical: 5 }}>
-                <Text style={{ color: colors.success, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginTop: 12, gap: 8 }}>
+              <View accessibilityLabel={`Entradas no mês: ${formatCurrency(Number(resumoQuery.data.totalEntradas ?? 0))}`} style={{ backgroundColor: 'rgba(255,255,255,0.94)', borderRadius: 999, paddingHorizontal: 11, paddingVertical: 6 }}>
+                <Text style={{ color: colors.successOnLight, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
                   ↑ {formatCurrency(Number(resumoQuery.data.totalEntradas ?? 0))}
                 </Text>
               </View>
-              <View style={{ backgroundColor: colors.dangerBg, borderRadius: 999, paddingHorizontal: 11, paddingVertical: 5 }}>
-                <Text style={{ color: colors.danger, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
+              <View accessibilityLabel={`Saídas no mês: ${formatCurrency(Number(resumoQuery.data.totalSaidas ?? 0))}`} style={{ backgroundColor: 'rgba(255,255,255,0.94)', borderRadius: 999, paddingHorizontal: 11, paddingVertical: 6 }}>
+                <Text style={{ color: colors.dangerOnLight, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
                   ↓ {formatCurrency(Number(resumoQuery.data.totalSaidas ?? 0))}
                 </Text>
               </View>
-              <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '500' }}>
+              <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '600' }}>
                 em {mesAtual}
               </Text>
             </View>
           </>
         ) : null}
+      </LinearGradient>
       </View>
       </Entrance>
 

@@ -6,9 +6,10 @@ interface Props {
   width: number | `${number}%` | 'auto';
   height: number;
   borderRadius?: number;
+  tone?: 'default' | 'inverse';
 }
 
-export const SkeletonBox: React.FC<Props> = ({ width, height, borderRadius = 8 }) => {
+export const SkeletonBox: React.FC<Props> = ({ width, height, borderRadius = 8, tone = 'default' }) => {
   const colors = useTheme();
   const anim = useRef(new Animated.Value(0)).current;
 
@@ -26,7 +27,9 @@ export const SkeletonBox: React.FC<Props> = ({ width, height, borderRadius = 8 }
 
   const backgroundColor = anim.interpolate({
     inputRange: [0, 1],
-    outputRange: [colors.skeletonBase, colors.skeletonHighlight],
+    outputRange: tone === 'inverse'
+      ? ['rgba(255,255,255,0.14)', 'rgba(255,255,255,0.28)']
+      : [colors.skeletonBase, colors.skeletonHighlight],
   }) as unknown as string;
 
   const style: ViewStyle = {

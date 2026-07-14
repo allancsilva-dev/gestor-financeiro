@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "mobile",
+    "name": "Nexos Finanças",
     "slug": "mobile",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./public/icon.png",
     "userInterfaceStyle": "automatic",
     "scheme": "gestorfinanceiro",
     "newArchEnabled": true,
@@ -18,11 +18,11 @@
       "bundleIdentifier": "com.gestorfinanceiro.mobile"
     },
     "android": {
-      "versionCode": 2,
+      "versionCode": 3,
       "package": "com.gestorfinanceiro.mobile",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./public/icon.png",
+        "backgroundColor": "#180024"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
