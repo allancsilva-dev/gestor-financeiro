@@ -219,6 +219,9 @@ export interface ContaFixa {
   ativo: boolean;
   observacoes?: string;
   categoria?: CategoriaResumo;
+  tipo: TipoTransacao;
+  execucaoAutomatica: boolean;
+  carteira?: { id: number; nome: string };
 }
 
 export interface ContaFixaRequest {
@@ -228,6 +231,17 @@ export interface ContaFixaRequest {
   categoriaId: number; // obrigatório pelo backend
   recorrente?: boolean;
   observacoes?: string;
+  tipo?: TipoTransacao;
+  execucaoAutomatica?: boolean;
+  carteiraId?: number;
+}
+
+export interface FalhaRecorrencia {
+  id: number;
+  dataVencimento: string;
+  status: 'FALHA_SALDO';
+  mensagemFalha?: string;
+  recorrencia: ContaFixa;
 }
 
 // ── Metas ──────────────────────────────────────────────────────────
@@ -323,6 +337,8 @@ export interface ProjecaoMensal {
   saldoInicial: number;
   totalContasFixas: number;
   totalParcelas: number;
+  totalFaturas: number;
+  totalEntradas: number;
   totalSaidas: number;
   saldoFinal: number;
 }

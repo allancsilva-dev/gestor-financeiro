@@ -1,5 +1,5 @@
 import api from './api';
-import { ContaFixa, ContaFixaRequest, PagedResponse } from '../types';
+import { ContaFixa, ContaFixaRequest, FalhaRecorrencia, PagedResponse } from '../types';
 
 export const contaFixaService = {
   listar: () =>
@@ -15,7 +15,10 @@ export const contaFixaService = {
 
   // pagamento debita a carteira informada (obrigatória no backend)
   marcarComoPaga: (id: number, valor: number, carteiraId: number) =>
-    api.put<ContaFixa>(`/v1/contas-fixas/${id}/pagar`, { valor, carteiraId }).then(r => r.data),
+    api.put<ContaFixa>(`/v1/contas-fixas/${id}/realizar`, { valor, carteiraId }).then(r => r.data),
+
+  listarFalhasPendentes: () =>
+    api.get<FalhaRecorrencia[]>('/v1/contas-fixas/falhas-pendentes').then(r => r.data),
 
   pularMes: (id: number) =>
     api.put<ContaFixa>(`/v1/contas-fixas/${id}/pular`).then(r => r.data),

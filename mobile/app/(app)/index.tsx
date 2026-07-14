@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import api from '../../src/services/api';
 import insightsService from '../../src/services/insightsService';
-import { DashboardResumo, Transacao, PagedResponse, ProjecaoResponse, InsightsResponse } from '../../src/types';
+import { DashboardResumo, Transacao, PagedResponse, ProjecaoResponse, InsightsResponse, FalhaRecorrencia } from '../../src/types';
 import { useTheme } from '../../src/theme';
 import { useAuth } from '../../src/context/AuthContext';
 import SkeletonBox from '../../src/components/ui/SkeletonBox';
@@ -42,6 +42,11 @@ export default function Dashboard() {
     queryFn: () => insightsService.buscar(),
   });
 
+  const falhasQuery = useQuery<FalhaRecorrencia[]>({
+    queryKey: ['recorrencias-falhas'],
+    queryFn: () => api.get<FalhaRecorrencia[]>('/v1/contas-fixas/falhas-pendentes').then(r => r.data),
+  });
+
   const { usuario } = useAuth();
   const insets = useSafeAreaInsets();
 
@@ -50,7 +55,7 @@ export default function Dashboard() {
   const saldo = formatCurrency(Number(resumoQuery.data?.saldoCarteiras ?? 0));
   const [saldoInt, saldoCents] = saldo.split(',');
   const refreshing = resumoQuery.isRefetching || transacoesQuery.isRefetching
-    || projecaoQuery.isRefetching || insightsQuery.isRefetching;
+    || projecaoQuery.isRefetching || insightsQuery.isRefetching || falhasQuery.isRefetching;
 
   const handleRefresh = async () => {
     await Promise.all([
@@ -58,11 +63,12 @@ export default function Dashboard() {
       transacoesQuery.refetch(),
       projecaoQuery.refetch(),
       insightsQuery.refetch(),
+      falhasQuery.refetch(),
     ]);
   };
 
   const atalhos: Array<{ label: string; glyph: string; bg: string; fg: string; onPress: () => void }> = [
-    { label: 'Contas\nfixas', glyph: '📅', bg: colors.brandBg, fg: colors.brandFg, onPress: () => router.push('/more/contas-fixas' as any) },
+    { label: 'Recorrências', glyph: '📅', bg: colors.brandBg, fg: colors.brandFg, onPress: () => router.push('/more/contas-fixas' as any) },
     { label: 'Cartão', glyph: '💳', bg: colors.dangerBg, fg: colors.danger, onPress: () => router.push('/more/faturas' as any) },
     { label: 'Metas', glyph: '◎', bg: colors.brandBg, fg: colors.brandFg, onPress: () => router.push('/(app)/metas') },
     { label: 'Relatórios', glyph: '📊', bg: colors.infoBg, fg: colors.info, onPress: () => router.push('/more/relatorios' as any) },
@@ -288,6 +294,22 @@ export default function Dashboard() {
         </Entrance>
       )}
 
+      {!!falhasQuery.data?.length && (
+        <TouchableOpacity
+          onPress={() => router.push('/more/contas-fixas' as any)}
+          accessibilityRole="button"
+          accessibilityLabel={`${falhasQuery.data.length} recorrências aguardando saldo`}
+          style={{ backgroundColor: colors.warningBg, borderRadius: 14, padding: 14, marginBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 10 }}
+        >
+          <Text style={{ fontSize: 20 }}>⚠️</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: colors.warning, fontSize: 14, fontWeight: '700' }}>Recorrência aguardando saldo</Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>Abra para escolher outra conta ou realizar manualmente.</Text>
+          </View>
+          <Text style={{ color: colors.warning, fontSize: 18 }}>›</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Atalhos rápidos */}
       <Entrance delay={200} style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
         {atalhos.map(a => (
@@ -299,11 +321,11 @@ export default function Dashboard() {
             accessibilityLabel={a.label.replace('\n', ' ')}
             style={{ flex: 1 }}
           >
-            <Card padded={false} radius={16} style={{ alignItems: 'center', gap: 9, paddingVertical: 16, paddingHorizontal: 4 }}>
+            <Card padded={false} radius={16} style={{ alignItems: 'center', gap: 9, paddingVertical: 14, paddingHorizontal: 4, minHeight: 104 }}>
               <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: a.bg, alignItems: 'center', justifyContent: 'center' }}>
                 <Text style={{ color: a.fg, fontSize: 20, fontWeight: '500' }}>{a.glyph}</Text>
               </View>
-              <Text style={{ color: colors.textSecondary, fontSize: 11.5, fontWeight: '500', textAlign: 'center', lineHeight: 14 }}>
+              <Text numberOfLines={2} style={{ color: colors.textSecondary, fontSize: 11.5, fontWeight: '500', textAlign: 'center', lineHeight: 14, minHeight: 28 }}>
                 {a.label}
               </Text>
             </Card>
@@ -374,6 +396,12 @@ export default function Dashboard() {
                 </Text>
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ color: colors.textSecondary, fontSize: 11 }}>Entradas</Text>
+                    <Text style={{ color: colors.success, fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] }}>
+                      {formatCurrency(m.totalEntradas ?? 0)}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}>
                     <Text style={{ color: colors.textSecondary, fontSize: 11 }}>Saídas</Text>
                     <Text style={{ color: colors.danger, fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] }}>
                       {formatCurrency(m.totalSaidas)}

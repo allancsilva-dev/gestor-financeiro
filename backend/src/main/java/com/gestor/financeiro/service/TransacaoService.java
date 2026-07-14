@@ -89,6 +89,11 @@ public class TransacaoService {
 
     @Transactional
     public Transacao criar(Transacao transacao, Long usuarioId) {
+        return criar(transacao, usuarioId, null);
+    }
+
+    @Transactional
+    public Transacao criar(Transacao transacao, Long usuarioId, String ledgerIdempotencyKey) {
         Usuario usuario = usuarioRepository.findById(usuarioId)
             .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
@@ -149,7 +154,7 @@ public class TransacaoService {
 
         Transacao salva = transacaoRepository.save(transacao);
 
-        registrarMovimentoCriacao(salva, usuarioId);
+        registrarMovimentoCriacao(salva, usuarioId, ledgerIdempotencyKey);
         if (compraCartao) {
             faturaService.registrarCompraCartao(salva, usuarioId);
         }
@@ -333,7 +338,7 @@ public class TransacaoService {
             .orElseThrow(() -> new ResourceNotFoundException("Transação não encontrada"));
     }
 
-    private void registrarMovimentoCriacao(Transacao transacao, Long usuarioId) {
+    private void registrarMovimentoCriacao(Transacao transacao, Long usuarioId, String idempotencyKey) {
         if (transacao.getCarteira() == null || transacao.getCarteira().getId() == null) {
             return;
         }
@@ -358,7 +363,7 @@ public class TransacaoService {
                 "TRANSACAO",
                 transacao.getId(),
                 transacao.getDescricao(),
-                null,
+                idempotencyKey,
                 LocalDateTime.now(),
                 false
         ));

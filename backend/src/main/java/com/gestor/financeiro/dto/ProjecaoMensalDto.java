@@ -10,6 +10,7 @@ public record ProjecaoMensalDto(
     BigDecimal totalContasFixas,
     BigDecimal totalParcelas,
     BigDecimal totalFaturas,
+    BigDecimal totalEntradas,
     BigDecimal totalSaidas,
     BigDecimal saldoFinal,
     boolean saldoRealizado

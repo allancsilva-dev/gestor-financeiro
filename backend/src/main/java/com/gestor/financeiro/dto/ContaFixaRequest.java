@@ -9,6 +9,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
 import java.math.BigDecimal;
+import com.gestor.financeiro.model.enums.TipoTransacao;
 
 public class ContaFixaRequest {
 
@@ -33,6 +34,12 @@ public class ContaFixaRequest {
     private Boolean recorrente;
 
     private String observacoes;
+
+    private TipoTransacao tipo = TipoTransacao.SAIDA;
+
+    private Boolean execucaoAutomatica = false;
+
+    private Long carteiraId;
 
     public String getDescricao() {
         return descricao;
@@ -84,6 +91,18 @@ public class ContaFixaRequest {
 
     public String getObservacoes() {
         return observacoes;
+    }
+
+    public TipoTransacao getTipo() { return tipo == null ? TipoTransacao.SAIDA : tipo; }
+    public void setTipo(TipoTransacao tipo) { this.tipo = tipo; }
+    public Boolean getExecucaoAutomatica() { return Boolean.TRUE.equals(execucaoAutomatica); }
+    public void setExecucaoAutomatica(Boolean execucaoAutomatica) { this.execucaoAutomatica = execucaoAutomatica; }
+    public Long getCarteiraId() { return carteiraId; }
+    public void setCarteiraId(Long carteiraId) { this.carteiraId = carteiraId; }
+
+    @AssertTrue(message = "Carteira é obrigatória para execução automática")
+    public boolean isCarteiraAutomaticaInformada() {
+        return !Boolean.TRUE.equals(execucaoAutomatica) || carteiraId != null;
     }
 
     public void setObservacoes(String observacoes) {

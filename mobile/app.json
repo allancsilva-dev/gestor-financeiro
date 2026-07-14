@@ -2,23 +2,18 @@
   "expo": {
     "name": "Nexos Finanças",
     "slug": "mobile",
-    "version": "1.0.2",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./public/icon.png",
     "userInterfaceStyle": "automatic",
     "scheme": "gestorfinanceiro",
     "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.gestorfinanceiro.mobile"
     },
     "android": {
-      "versionCode": 3,
+      "versionCode": 4,
       "package": "com.gestorfinanceiro.mobile",
       "adaptiveIcon": {
         "foregroundImage": "./public/icon-foreground.png",
@@ -33,7 +28,26 @@
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Permita que o Nexos Finanças use o Face ID para proteger seus dados financeiros."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain",
+          "backgroundColor": "#f0f2f8",
+          "dark": {
+            "image": "./assets/splash-icon.png",
+            "backgroundColor": "#0b0d14"
+          }
+        }
+      ]
     ],
     "extra": {
       "apiBaseUrl": "https://financas.nexostech.com.br/api"

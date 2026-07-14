@@ -5,6 +5,7 @@ import com.gestor.financeiro.dto.AlterarSenhaRequest;
 import com.gestor.financeiro.dto.ExcluirContaRequest;
 import com.gestor.financeiro.dto.UsuarioUpdateRequest;
 import com.gestor.financeiro.dto.UsuarioResponseDto;
+import com.gestor.financeiro.dto.ValidarSenhaRequest;
 import com.gestor.financeiro.exception.BusinessException;
 import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.model.Usuario;
@@ -59,6 +60,16 @@ public class UsuarioController {
 
         usuario.setSenha(passwordEncoder.encode(request.getNovaSenha()));
         usuarioRepository.save(usuario);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/me/validar-senha")
+    public ResponseEntity<Void> validarSenha(@Valid @RequestBody ValidarSenhaRequest request) {
+        Usuario usuario = usuarioRepository.findById(authenticatedUserService.getAuthenticatedUserId())
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+        if (!passwordEncoder.matches(request.getSenha(), usuario.getSenha())) {
+            throw new BusinessException("Senha incorreta");
+        }
         return ResponseEntity.noContent().build();
     }
 

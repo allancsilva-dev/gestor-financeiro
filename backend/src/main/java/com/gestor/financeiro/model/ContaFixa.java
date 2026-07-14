@@ -1,6 +1,7 @@
 package com.gestor.financeiro.model;
 
 import com.gestor.financeiro.model.enums.StatusPagamento;
+import com.gestor.financeiro.model.enums.TipoTransacao;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.math.BigDecimal;
@@ -22,6 +23,17 @@ public class ContaFixa {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "categoria_id")
     private Categoria categoria;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "carteira_id")
+    private Carteira carteira;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 10)
+    private TipoTransacao tipo = TipoTransacao.SAIDA;
+
+    @Column(name = "execucao_automatica", nullable = false)
+    private Boolean execucaoAutomatica = false;
     
     @Column(nullable = false)
     private String nome;

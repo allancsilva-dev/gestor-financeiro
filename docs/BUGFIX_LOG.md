@@ -1140,5 +1140,22 @@ Registro de bugs corrigidos. Mantido pelo `docs-reporter`.
 
 ---
 
+## BUG-0066 — Recorrências invertiam salário e não protegiam execução automática
+
+- **Data:** 2026-07-14
+- **Area:** backend, banco, mobile, segurança, projeção e release Android
+- **Sintoma:** toda conta fixa era tratada como saída, fazendo salário reduzir a projeção; não existia execução automática segura, histórico por ocorrência ou bloqueio local dos dados financeiros.
+- **Causa raiz:** `ContaFixa` não possuía tipo, carteira ou modo de execução; a projeção subtraía todas as recorrências; a navegação duplicava animação e a sessão persistida não tinha uma camada de desbloqueio local.
+- **Correcao aplicada:** tipo `ENTRADA/SAIDA`, execução manual/automática, carteira obrigatória na automação, scheduler com timezone, recuperação após reinício, ocorrência única por recorrência/vencimento, chave `RECORRENCIA:{id}:{data}`, lock pessimista, falha por saldo sem débito, endpoint `/realizar`, aviso no Dashboard, projeção com entradas e bloqueio mobile por biometria/credencial/senha.
+- **Migration:** `V29__recorrencias_automaticas.sql`; registros existentes permanecem `SAIDA` e manuais.
+- **Compatibilidade:** `/pagar` foi preservado; campos anteriores do DTO de projeção permanecem e `totalEntradas` foi adicionado.
+- **Testes/validacoes executadas:** migrations PostgreSQL PASS; Maven 164/164 PASS; testes focados 6/6 PASS; Jest 11/11; ESLint e TypeScript PASS; Expo export PASS; Android Release PASS; iOS Simulator Release PASS; `git diff --check` PASS.
+- **Release:** mobile `1.1.0` (`versionCode 4`), APK interno com SHA-256 `931f6754c9056239f3db9508dc2c47731317ac3eef29abf78d26ba2c65e47fc9`.
+- **Resultado:** PASS_COM_RESSALVA
+- **Ressalvas:** APK local usa a chave debug do template Expo; assinatura definitiva, CI remoto, smoke em hardware físico e publicação na store não foram executados.
+- **Commit:** este commit
+
+---
+
 > Este arquivo e mantido pelo `docs-reporter`. Bugs corrigidos devem ser registrados com o proximo ID
 > sequencial (BUG-0002, BUG-0003, ...). Para historico de versoes, consulte `docs/CHANGELOG.md`.

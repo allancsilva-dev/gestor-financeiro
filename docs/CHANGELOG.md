@@ -7,6 +7,27 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ---
 
+## [Mobile 1.1.0] - 2026-07-14
+
+### Recorrências e projeção
+- Contas fixas foram generalizadas para recorrências de entrada ou saída, manuais ou automáticas.
+- Execuções automáticas ocorrem às 00:05 em `America/Sao_Paulo` e recuperam vencimentos perdidos após reinício.
+- Cada ocorrência possui chave idempotente, bloqueio no banco e histórico de realização, salto ou falha por saldo.
+- Saídas sem saldo permanecem pendentes e não geram transação nem saldo negativo.
+- Projeção mensal passa a calcular `saldo inicial + entradas - saídas` e expõe `totalEntradas`.
+
+### Segurança e experiência mobile
+- Sessão continua salva no SecureStore, mas dados ficam protegidos por biometria, credencial do aparelho ou senha da conta.
+- App bloqueia na abertura e após um minuto em segundo plano; valores são ocultados imediatamente no seletor de apps.
+- Navegação usa crossfade nativo com suporte a Reduce Motion e splash claro/escuro.
+- Atalhos do Dashboard foram alinhados e Perfil foi removido da tela Mais.
+
+### Release Android
+- Versão mobile `1.1.0`, `versionCode 4`.
+- APK Release interno: `nexos-financas-1.1.0.apk`.
+- SHA-256: `931f6754c9056239f3db9508dc2c47731317ac3eef29abf78d26ba2c65e47fc9`.
+- O APK local usa a chave debug do template Expo; assinatura de distribuição continua responsabilidade do CI/store.
+
 ## [1.4.0] - 2025-11-30
 
 ### 🔐 Segurança

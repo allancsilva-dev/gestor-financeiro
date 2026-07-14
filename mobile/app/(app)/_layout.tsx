@@ -5,8 +5,8 @@ import { Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import NovaTransacaoModal from '../../src/components/NovaTransacaoModal';
-import ScreenTransition from '../../src/components/ui/ScreenTransition';
 import { useAuth } from '../../src/context/AuthContext';
+import { useReducedMotion } from 'react-native-reanimated';
 
 // Ícones funcionais em Views — sem dependência externa de ícones
 const IconInicio = ({ color }: { color: string }) => (
@@ -70,13 +70,17 @@ export default function AppLayout() {
   const router = useRouter();
   const { needsOnboarding } = useAuth();
   const [novaTransacaoVisible, setNovaTransacaoVisible] = useState(false);
+  const reduceMotion = useReducedMotion();
 
   if (needsOnboarding) return <Redirect href="/onboarding" />;
 
   return (
     <>
-      <Tabs screenLayout={({ children }) => <ScreenTransition>{children}</ScreenTransition>} screenOptions={{
+      <Tabs screenOptions={{
         headerShown: false,
+        animation: reduceMotion ? 'none' : 'fade',
+        transitionSpec: reduceMotion ? undefined : { animation: 'timing', config: { duration: 150 } },
+        sceneStyle: { backgroundColor: colors.bg },
         tabBarStyle: {
           backgroundColor: colors.navBg,
           borderTopColor: colors.navBorder,

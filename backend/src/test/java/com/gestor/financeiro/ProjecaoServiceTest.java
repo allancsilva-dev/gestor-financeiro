@@ -5,6 +5,7 @@ import com.gestor.financeiro.dto.ProjecaoResponse;
 import com.gestor.financeiro.model.ContaFixa;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.StatusPagamento;
+import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.ContaFixaRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
@@ -77,6 +78,21 @@ class ProjecaoServiceTest {
         ProjecaoMensalDto mes0 = r.meses().get(0);
         assertEquals(0, BigDecimal.ZERO.compareTo(mes0.totalSaidas()));
         assertEquals(0, new BigDecimal("1000.00").compareTo(mes0.saldoFinal()));
+    }
+
+    @Test
+    void salarioRecorrenteSomaEmTodosOsMeses() {
+        ContaFixa salario = contaFixa("Salário", "2500.00", LocalDate.now().withDayOfMonth(15), StatusPagamento.PENDENTE);
+        salario.setTipo(TipoTransacao.ENTRADA);
+        salario.setRecorrente(true);
+        contaFixaRepository.save(salario);
+
+        ProjecaoResponse r = projecaoService.projetar(usuario.getId(), 3);
+
+        assertEquals(0, new BigDecimal("2500.00").compareTo(r.meses().get(0).totalEntradas()));
+        assertEquals(0, new BigDecimal("3500.00").compareTo(r.meses().get(0).saldoFinal()));
+        assertEquals(0, new BigDecimal("6000.00").compareTo(r.meses().get(1).saldoFinal()));
+        assertEquals(0, new BigDecimal("8500.00").compareTo(r.meses().get(2).saldoFinal()));
     }
 
     private ContaFixa contaFixa(String nome, String valor, LocalDate vencimento, StatusPagamento status) {

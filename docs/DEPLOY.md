@@ -546,6 +546,27 @@ Criar `vercel.json`:
 
 ## 📱 Testes em Produção
 
+### Release Android local
+
+O release mobile é gerado a partir de `mobile/` após atualizar `expo.version` e
+`android.versionCode`:
+
+```bash
+npx expo prebuild --no-install
+cd android
+ANDROID_HOME="$HOME/Library/Android/sdk" ./gradlew assembleRelease --no-daemon
+```
+
+Saída padrão: `mobile/android/app/build/outputs/apk/release/app-release.apk`.
+Para o release 1.1.0, a cópia identificada é
+`nexos-financas-1.1.0.apk`, SHA-256
+`931f6754c9056239f3db9508dc2c47731317ac3eef29abf78d26ba2c65e47fc9`.
+
+O `build.gradle` local ainda assina `release` com `signingConfigs.debug`, útil
+somente para distribuição interna. Publicação externa deve usar o artifact do
+workflow `.github/workflows/mobile-release.yml` e uma chave de distribuição
+protegida; nunca versionar keystore ou senha no repositório.
+
 ### **Checklist:**
 
 - [ ] Acessar URL do frontend

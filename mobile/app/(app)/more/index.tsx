@@ -13,14 +13,13 @@ import Card from '../../../src/components/ui/Card';
 // Grid 2 colunas (DESIGN.md) — tile 44 violeta (navegação é marca, nunca arco-íris), label + subtítulo
 const itens = [
   { label: 'Contas',       sub: 'Saldos e dinheiro', rota: '/more/carteiras',    icone: '₿' },
-  { label: 'Contas Fixas', sub: 'Mensais',          rota: '/more/contas-fixas', icone: '📅' },
+  { label: 'Recorrências', sub: 'Entradas e saídas', rota: '/more/contas-fixas', icone: '📅' },
   { label: 'Orçamentos',   sub: 'Por categoria',    rota: '/more/orcamentos',   icone: '📊' },
   { label: 'Cartão',       sub: 'Faturas',          rota: '/more/faturas',      icone: '💳' },
   { label: 'Relatórios',   sub: 'Gráficos',         rota: '/more/relatorios',   icone: '📋' },
   { label: 'Categorias',   sub: 'Organizar',        rota: '/more/categorias',   icone: '🏷' },
   { label: 'Cartões',      sub: 'Crédito e débito', rota: '/more/contas',       icone: '💳' },
   { label: 'Investimentos', sub: 'Carteira',         rota: '/more/investimentos', icone: '◈' },
-  { label: 'Perfil',       sub: 'Nome e segurança', rota: '/(app)/perfil',      icone: '👤' },
   { label: 'Entrada por IA', sub: 'Em breve',       rota: null,                 icone: '🤖', desabilitado: true },
   { label: 'Importar CSV', sub: 'Extrato',           rota: null,                 icone: '⇪', acao: 'importar' },
   { label: 'Exportar Dados', sub: 'CSV',            rota: null,                 icone: '📥', acao: 'exportar' },

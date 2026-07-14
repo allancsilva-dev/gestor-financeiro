@@ -7,12 +7,16 @@ import com.gestor.financeiro.exception.UnauthorizedAccessException;
 import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.model.ContaFixa;
+import com.gestor.financeiro.model.ExecucaoRecorrencia;
 import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.StatusPagamento;
 import com.gestor.financeiro.model.enums.TipoTransacao;
+import com.gestor.financeiro.model.enums.StatusExecucaoRecorrencia;
 import com.gestor.financeiro.repository.CategoriaRepository;
+import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.ContaFixaRepository;
+import com.gestor.financeiro.repository.ExecucaoRecorrenciaRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -20,6 +24,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.YearMonth;
 import java.util.List;
 
 @Service
@@ -29,6 +36,10 @@ public class ContaFixaService {
     private final UsuarioRepository usuarioRepository;
     private final CategoriaRepository categoriaRepository;
     private final TransacaoService transacaoService;
+    private final CarteiraRepository carteiraRepository;
+    private final ExecucaoRecorrenciaRepository execucaoRepository;
+
+    private static final ZoneId ZONE = ZoneId.of("America/Sao_Paulo");
     
     // Lista contas fixas ativas do usuário
     public Page<ContaFixa> listarPorUsuario(Long usuarioId, Pageable pageable) {
@@ -55,6 +66,9 @@ public class ContaFixaService {
         if (contaFixa.getAtivo() == null) contaFixa.setAtivo(true);
         if (contaFixa.getRecorrente() == null) contaFixa.setRecorrente(true);
         if (contaFixa.getStatus() == null) contaFixa.setStatus(StatusPagamento.PENDENTE);
+        if (contaFixa.getTipo() == null) contaFixa.setTipo(TipoTransacao.SAIDA);
+        if (contaFixa.getExecucaoAutomatica() == null) contaFixa.setExecucaoAutomatica(false);
+        resolverCarteira(contaFixa, usuarioId);
         
         // Calcula próximo vencimento
         calcularProximoVencimento(contaFixa);
@@ -64,7 +78,7 @@ public class ContaFixaService {
     
     // Calcula data do próximo vencimento
     private void calcularProximoVencimento(ContaFixa contaFixa) {
-        LocalDate hoje = LocalDate.now();
+        LocalDate hoje = LocalDate.now(ZONE);
         int diaVencimento = contaFixa.getDiaVencimento();
         
         // Próximo vencimento no mês atual
@@ -88,57 +102,104 @@ public class ContaFixaService {
     // ✅ CORRIGIDO: Mantém como PAGO e só avança o vencimento
     @Transactional
     public ContaFixa marcarComoPaga(Long id, BigDecimal valorPago, Long carteiraId, Long usuarioId) {
-        ContaFixa conta = buscarPorIdDoUsuario(id, usuarioId);
+        return realizar(id, valorPago, carteiraId, usuarioId, false);
+    }
 
-        // ✅ VERIFICA SE JÁ ESTÁ PAGA ESTE MÊS
-        if (conta.getStatus() == StatusPagamento.PAGO) {
-            throw new BusinessException("Esta conta já foi paga este mês!");
+    @Transactional
+    public ContaFixa realizar(Long id, BigDecimal valor, Long carteiraId, Long usuarioId, boolean automatico) {
+        ContaFixa conta = contaFixaRepository.findByIdAndUsuarioIdForUpdate(id, usuarioId)
+                .orElseThrow(() -> new ResourceNotFoundException("Recorrência não encontrada"));
+        LocalDate vencimento = conta.getDataProximoVencimento();
+        if (!automatico && YearMonth.from(vencimento).isAfter(YearMonth.now(ZONE))) {
+            throw new BusinessException("A próxima ocorrência ainda não está disponível");
+        }
+        ExecucaoRecorrencia execucao = execucaoRepository
+                .findByContaFixaIdAndDataVencimento(id, vencimento).orElse(null);
+        if (execucao != null && (execucao.getStatus() == StatusExecucaoRecorrencia.REALIZADA
+                || execucao.getStatus() == StatusExecucaoRecorrencia.PULADA)) {
+            throw new BusinessException("Esta recorrência já foi realizada ou pulada");
         }
 
-        // Sem carteira o pagamento não debita saldo nenhum — dinheiro sumiria do nada
-        if (carteiraId == null) {
-            throw new BusinessException("Informe a carteira de pagamento");
+        Long carteiraEfetiva = carteiraId != null ? carteiraId
+                : conta.getCarteira() == null ? null : conta.getCarteira().getId();
+        if (carteiraEfetiva == null) throw new BusinessException("Informe a carteira");
+        Carteira carteira = carteiraRepository.findByIdAndUsuarioIdForUpdate(carteiraEfetiva, usuarioId)
+                .orElseThrow(() -> new ResourceNotFoundException("Carteira não encontrada"));
+
+        BigDecimal valorEfetivo = valor == null ? conta.getValorPlanejado() : valor;
+        if (conta.getTipo() == TipoTransacao.SAIDA && carteira.getSaldo().compareTo(valorEfetivo) < 0) {
+            if (automatico) registrarFalhaSaldo(conta, execucao, vencimento);
+            if (!automatico) throw new BusinessException("Saldo insuficiente");
+            return conta;
         }
 
-        // 1. Cria a transação de saída
+        String chave = "RECORRENCIA:" + conta.getId() + ":" + vencimento;
         Transacao transacao = new Transacao();
-        transacao.setDescricao("Pagamento: " + conta.getNome());
-        transacao.setData(LocalDate.now());
-        transacao.setTipo(TipoTransacao.SAIDA);
-        transacao.setValorTotal(valorPago);
+        transacao.setDescricao((conta.getTipo() == TipoTransacao.ENTRADA ? "Recebimento: " : "Pagamento: ") + conta.getNome());
+        transacao.setData(automatico ? vencimento : LocalDate.now(ZONE));
+        transacao.setTipo(conta.getTipo());
+        transacao.setValorTotal(valorEfetivo);
         transacao.setParcelado(false);
         transacao.setCategoria(conta.getCategoria());
-        transacao.setUsuario(conta.getUsuario());
         transacao.setContaFixa(conta);
-        transacao.setObservacoes("Pagamento automático de conta fixa");
-
-        // TransacaoService valida ownership da carteira e registra o débito no ledger
-        Carteira carteira = new Carteira();
-        carteira.setId(carteiraId);
+        transacao.setObservacoes(automatico ? "Execução automática de recorrência" : "Execução manual de recorrência");
         transacao.setCarteira(carteira);
+        Transacao salva = transacaoService.criar(transacao, usuarioId, chave);
 
-        transacaoService.criar(transacao, conta.getUsuario().getId());
-        
-        // 2. Marca como PAGA
-        conta.setStatus(StatusPagamento.PAGO);
-        conta.setValorReal(valorPago);
-        
-        // 3. ✅ Se é recorrente, apenas AVANÇA o vencimento (mantém como PAGO)
-        if (conta.getRecorrente()) {
-            LocalDate proximoVencimento = conta.getDataProximoVencimento().plusMonths(1);
-            proximoVencimento = proximoVencimento.withDayOfMonth(
-                Math.min(conta.getDiaVencimento(), proximoVencimento.lengthOfMonth())
-            );
-            conta.setDataProximoVencimento(proximoVencimento);
-            // ✅ NÃO reseta o status aqui!
+        if (execucao == null) {
+            execucao = novaExecucao(conta, vencimento);
         }
-        
+        execucao.setStatus(StatusExecucaoRecorrencia.REALIZADA);
+        execucao.setTentadoEm(LocalDateTime.now(ZONE));
+        execucao.setMensagemFalha(null);
+        execucao.setTransacao(salva);
+        execucaoRepository.save(execucao);
+
+        conta.setValorReal(valorEfetivo);
+        avancarOcorrencia(conta);
         return contaFixaRepository.save(conta);
     }
 
     @Transactional
+    public ContaFixa realizarAutomatica(Long id) {
+        ContaFixa conta = contaFixaRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Recorrência não encontrada"));
+        return realizar(id, conta.getValorPlanejado(),
+                conta.getCarteira() == null ? null : conta.getCarteira().getId(),
+                conta.getUsuario().getId(), true);
+    }
+
+    private void registrarFalhaSaldo(ContaFixa conta, ExecucaoRecorrencia execucao, LocalDate vencimento) {
+        if (execucao == null) execucao = novaExecucao(conta, vencimento);
+        execucao.setStatus(StatusExecucaoRecorrencia.FALHA_SALDO);
+        execucao.setTentadoEm(LocalDateTime.now(ZONE));
+        execucao.setMensagemFalha("Saldo insuficiente na carteira selecionada");
+        execucaoRepository.save(execucao);
+    }
+
+    private ExecucaoRecorrencia novaExecucao(ContaFixa conta, LocalDate vencimento) {
+        ExecucaoRecorrencia e = new ExecucaoRecorrencia();
+        e.setContaFixa(conta);
+        e.setUsuario(conta.getUsuario());
+        e.setDataVencimento(vencimento);
+        return e;
+    }
+
+    private void avancarOcorrencia(ContaFixa conta) {
+        if (Boolean.TRUE.equals(conta.getRecorrente())) {
+            LocalDate proxima = conta.getDataProximoVencimento().plusMonths(1);
+            conta.setDataProximoVencimento(proxima.withDayOfMonth(Math.min(conta.getDiaVencimento(), proxima.lengthOfMonth())));
+            conta.setStatus(StatusPagamento.PENDENTE);
+        } else {
+            conta.setStatus(StatusPagamento.PAGO);
+            conta.setAtivo(false);
+        }
+    }
+
+    @Transactional
     public ContaFixa pularMes(Long id, Long usuarioId) {
-        ContaFixa conta = buscarPorIdDoUsuario(id, usuarioId);
+        ContaFixa conta = contaFixaRepository.findByIdAndUsuarioIdForUpdate(id, usuarioId)
+                .orElseThrow(() -> new ResourceNotFoundException("Recorrência não encontrada"));
 
         if (!conta.getRecorrente()) {
             throw new BusinessException("Apenas contas recorrentes podem pular mês");
@@ -148,14 +209,15 @@ public class ContaFixaService {
             throw new BusinessException("Conta fixa está inativa");
         }
 
-        LocalDate proximoVencimento = conta.getDataProximoVencimento().plusMonths(1);
-        proximoVencimento = proximoVencimento.withDayOfMonth(
-                Math.min(conta.getDiaVencimento(), proximoVencimento.lengthOfMonth()));
-        conta.setDataProximoVencimento(proximoVencimento);
-
-        if (conta.getStatus() == StatusPagamento.PAGO) {
-            conta.setStatus(StatusPagamento.PENDENTE);
-        }
+        LocalDate vencimento = conta.getDataProximoVencimento();
+        if (LocalDate.now(ZONE).isAfter(vencimento)) throw new BusinessException("O vencimento já passou");
+        if (execucaoRepository.findByContaFixaIdAndDataVencimento(id, vencimento).isPresent())
+            throw new BusinessException("Esta ocorrência já foi processada");
+        ExecucaoRecorrencia execucao = novaExecucao(conta, vencimento);
+        execucao.setStatus(StatusExecucaoRecorrencia.PULADA);
+        execucao.setTentadoEm(LocalDateTime.now(ZONE));
+        execucaoRepository.save(execucao);
+        avancarOcorrencia(conta);
 
         return contaFixaRepository.save(conta);
     }
@@ -183,6 +245,9 @@ public class ContaFixaService {
         conta.setNome(contaAtualizada.getNome());
         conta.setValorPlanejado(contaAtualizada.getValorPlanejado());
         conta.setDiaVencimento(contaAtualizada.getDiaVencimento());
+        conta.setTipo(contaAtualizada.getTipo() == null ? TipoTransacao.SAIDA : contaAtualizada.getTipo());
+        conta.setExecucaoAutomatica(Boolean.TRUE.equals(contaAtualizada.getExecucaoAutomatica()));
+        conta.setCarteira(contaAtualizada.getCarteira());
         
         if (contaAtualizada.getCategoria() != null && contaAtualizada.getCategoria().getId() != null) {
             Categoria categoria = categoriaRepository.findByIdAndUsuarioId(
@@ -192,6 +257,7 @@ public class ContaFixaService {
         }
         
         conta.setObservacoes(contaAtualizada.getObservacoes());
+        resolverCarteira(conta, usuarioId);
         
         // Recalcula próximo vencimento
         calcularProximoVencimento(conta);
@@ -228,8 +294,22 @@ public class ContaFixaService {
     
     @Transactional
     public void atualizarContasAtrasadas() {
-        LocalDate hoje = LocalDate.now();
+        LocalDate hoje = LocalDate.now(ZONE);
         contaFixaRepository.resetarContasPagasVencidas(StatusPagamento.PAGO, StatusPagamento.PENDENTE, hoje);
         contaFixaRepository.atualizarStatusContasAtrasadas(StatusPagamento.PENDENTE, StatusPagamento.ATRASADO, hoje);
+    }
+
+    public List<ExecucaoRecorrencia> listarFalhasPendentes(Long usuarioId) {
+        return execucaoRepository.findByUsuarioIdAndStatusAndContaFixaAtivoTrueOrderByDataVencimentoAsc(
+                usuarioId, StatusExecucaoRecorrencia.FALHA_SALDO);
+    }
+
+    private void resolverCarteira(ContaFixa conta, Long usuarioId) {
+        Long carteiraId = conta.getCarteira() == null ? null : conta.getCarteira().getId();
+        if (Boolean.TRUE.equals(conta.getExecucaoAutomatica()) && carteiraId == null)
+            throw new BusinessException("Carteira é obrigatória para execução automática");
+        if (carteiraId != null) conta.setCarteira(carteiraRepository.findByIdAndUsuarioId(carteiraId, usuarioId)
+                .orElseThrow(() -> new ResourceNotFoundException("Carteira não encontrada")));
+        else conta.setCarteira(null);
     }
 }

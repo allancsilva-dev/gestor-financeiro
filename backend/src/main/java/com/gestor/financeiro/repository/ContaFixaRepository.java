@@ -7,6 +7,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -30,6 +32,17 @@ public interface ContaFixaRepository extends JpaRepository<ContaFixa, Long> {
 
     @EntityGraph(attributePaths = {"categoria"})
     Optional<ContaFixa> findByIdAndUsuarioId(Long id, Long usuarioId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT c FROM ContaFixa c LEFT JOIN FETCH c.categoria LEFT JOIN FETCH c.carteira WHERE c.id = :id AND c.usuario.id = :usuarioId")
+    Optional<ContaFixa> findByIdAndUsuarioIdForUpdate(@Param("id") Long id, @Param("usuarioId") Long usuarioId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT c FROM ContaFixa c LEFT JOIN FETCH c.categoria LEFT JOIN FETCH c.carteira LEFT JOIN FETCH c.usuario WHERE c.id = :id")
+    Optional<ContaFixa> findByIdForUpdate(@Param("id") Long id);
+
+    @Query("SELECT c.id FROM ContaFixa c WHERE c.ativo = true AND c.execucaoAutomatica = true AND c.dataProximoVencimento <= :data ORDER BY c.dataProximoVencimento")
+    List<Long> findIdsAutomaticasVencidas(@Param("data") LocalDate data);
 
     long countByUsuarioIdAndAtivoTrue(Long usuarioId);
 

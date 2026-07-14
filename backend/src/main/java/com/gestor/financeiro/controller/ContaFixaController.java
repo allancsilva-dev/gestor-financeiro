@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.dto.ContaFixaResponseDto;
 import com.gestor.financeiro.dto.ContaFixaRequest;
 import com.gestor.financeiro.dto.ValorRequest;
+import com.gestor.financeiro.dto.ExecucaoRecorrenciaDto;
+import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.model.ContaFixa;
 import com.gestor.financeiro.security.AuthenticatedUserService;
@@ -18,6 +20,7 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.math.BigDecimal;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/contas-fixas")
@@ -84,6 +87,21 @@ public class ContaFixaController {
         return ResponseEntity.ok(ContaFixaResponseDto.fromEntity(contaPaga));
     }
 
+    @PutMapping("/{id}/realizar")
+    public ResponseEntity<ContaFixaResponseDto> realizar(
+            @PathVariable Long id, @Valid @RequestBody ValorRequest request) {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        return ResponseEntity.ok(ContaFixaResponseDto.fromEntity(
+                contaFixaService.realizar(id, request.getValor(), request.getCarteiraId(), usuarioId, false)));
+    }
+
+    @GetMapping("/falhas-pendentes")
+    public ResponseEntity<List<ExecucaoRecorrenciaDto>> listarFalhasPendentes() {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        return ResponseEntity.ok(contaFixaService.listarFalhasPendentes(usuarioId).stream()
+                .map(ExecucaoRecorrenciaDto::fromEntity).toList());
+    }
+
     @PutMapping("/{id}/pular")
     public ResponseEntity<ContaFixaResponseDto> pularMes(@PathVariable Long id) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
@@ -105,6 +123,13 @@ public class ContaFixaController {
         contaFixa.setDiaVencimento(request.getDiaVencimento());
         contaFixa.setRecorrente(request.getRecorrente());
         contaFixa.setObservacoes(request.getObservacoes());
+        contaFixa.setTipo(request.getTipo());
+        contaFixa.setExecucaoAutomatica(request.getExecucaoAutomatica());
+        if (request.getCarteiraId() != null) {
+            Carteira carteira = new Carteira();
+            carteira.setId(request.getCarteiraId());
+            contaFixa.setCarteira(carteira);
+        }
 
         Categoria categoria = new Categoria();
         categoria.setId(request.getCategoriaIdNormalizada());
