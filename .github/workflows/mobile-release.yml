@@ -1,0 +1,93 @@
+name: Mobile release gates
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android-release:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      APP_RELEASE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      APP_ENV: production
+      NODE_ENV: production
+      EXPO_PUBLIC_API_BASE_URL: https://financas.nexostech.com.br/api
+      EXPO_PUBLIC_SENTRY_DSN: ${{ secrets.SENTRY_MOBILE_DSN }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+      SENTRY_PROJECT: ${{ vars.SENTRY_MOBILE_PROJECT }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Validate release observability
+        run: test -n "$EXPO_PUBLIC_SENTRY_DSN" && test -n "$SENTRY_AUTH_TOKEN" && test -n "$SENTRY_ORG" && test -n "$SENTRY_PROJECT"
+      - working-directory: mobile
+        run: |
+          npm ci
+          npx expo prebuild --clean --platform android --no-install
+          cd android && ./gradlew assembleRelease --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-release-${{ env.RELEASE_SHA }}
+          path: |
+            mobile/android/app/build/outputs/apk/release/*.apk
+            mobile/android/app/build/outputs/mapping/release/mapping.txt
+          retention-days: 30
+
+  ios-release:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main')
+    runs-on: macos-latest
+    env:
+      RELEASE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      APP_RELEASE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      APP_ENV: production
+      NODE_ENV: production
+      EXPO_PUBLIC_API_BASE_URL: https://financas.nexostech.com.br/api
+      EXPO_PUBLIC_SENTRY_DSN: ${{ secrets.SENTRY_MOBILE_DSN }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+      SENTRY_PROJECT: ${{ vars.SENTRY_MOBILE_PROJECT }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_SHA }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Validate release observability
+        run: test -n "$EXPO_PUBLIC_SENTRY_DSN" && test -n "$SENTRY_AUTH_TOKEN" && test -n "$SENTRY_ORG" && test -n "$SENTRY_PROJECT"
+      - working-directory: mobile
+        run: |
+          npm ci
+          npx expo prebuild --clean --platform ios --no-install
+          cd ios && pod install
+          xcodebuild -workspace mobile.xcworkspace -scheme mobile -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build CODE_SIGNING_ALLOWED=NO
+      - run: ditto -c -k --sequesterRsrc --keepParent mobile/ios/build/Build/Products/Release-iphonesimulator/mobile.app mobile-ios-simulator.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-release-simulator-${{ env.RELEASE_SHA }}
+          path: mobile-ios-simulator.zip
+          retention-days: 30

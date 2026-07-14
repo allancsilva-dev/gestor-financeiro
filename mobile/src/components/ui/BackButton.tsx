@@ -16,7 +16,7 @@ export default function BackButton() {
       accessibilityRole="button"
       accessibilityLabel="Voltar"
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginBottom: 8, minHeight: 32 }}
+      style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginBottom: 8, minHeight: 44 }}
     >
       <Text style={{ color: colors.textSecondary, fontSize: 22, lineHeight: 22, marginRight: 4 }}>‹</Text>
       <Text style={{ color: colors.textSecondary, fontSize: 15, fontWeight: '600' }}>Voltar</Text>

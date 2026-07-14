@@ -229,14 +229,14 @@ function DetalheAtivoModal({ ativo, onClose, onEdit }: { ativo: Ativo | null; on
                 </View>
               </View>
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-                <TouchableOpacity onPress={() => setMovimentoVisible(true)} accessibilityRole="button" style={{ flex: 1, minHeight: 42, borderRadius: 999, backgroundColor: colors.brandBg, alignItems: 'center', justifyContent: 'center' }}>
+                <TouchableOpacity onPress={() => setMovimentoVisible(true)} accessibilityRole="button" style={{ flex: 1, minHeight: 44, borderRadius: 999, backgroundColor: colors.brandBg, alignItems: 'center', justifyContent: 'center' }}>
                   <Text style={{ color: colors.brandFg, fontSize: 13, fontWeight: '700' }}>Movimentar</Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => onEdit(ativo)} accessibilityRole="button" style={{ flex: 1, minHeight: 42, borderRadius: 999, backgroundColor: colors.infoBg, alignItems: 'center', justifyContent: 'center' }}>
+                <TouchableOpacity onPress={() => onEdit(ativo)} accessibilityRole="button" style={{ flex: 1, minHeight: 44, borderRadius: 999, backgroundColor: colors.infoBg, alignItems: 'center', justifyContent: 'center' }}>
                   <Text style={{ color: colors.info, fontSize: 13, fontWeight: '700' }}>Editar</Text>
                 </TouchableOpacity>
               </View>
-              <TouchableOpacity onPress={excluir} disabled={excluindo} accessibilityRole="button" style={{ marginTop: 10, minHeight: 42, borderRadius: 999, backgroundColor: colors.dangerBg, alignItems: 'center', justifyContent: 'center' }}>
+              <TouchableOpacity onPress={excluir} disabled={excluindo} accessibilityRole="button" style={{ marginTop: 10, minHeight: 44, borderRadius: 999, backgroundColor: colors.dangerBg, alignItems: 'center', justifyContent: 'center' }}>
                 {excluindo ? <ActivityIndicator color={colors.danger} size="small" /> : <Text style={{ color: colors.danger, fontSize: 13, fontWeight: '700' }}>Excluir ativo</Text>}
               </TouchableOpacity>
             </Card>

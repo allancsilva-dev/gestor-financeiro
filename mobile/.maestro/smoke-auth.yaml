@@ -1,0 +1,17 @@
+appId: com.gestorfinanceiro.mobile
+tags:
+  - smoke
+---
+- launchApp:
+    clearState: true
+- assertVisible: "Gestor Financeiro"
+- tapOn: "E-mail"
+- inputText: ${E2E_EMAIL}
+- tapOn: "Senha"
+- inputText: ${E2E_PASSWORD}
+- hideKeyboard
+- tapOn: "ENTRAR"
+- assertVisible: "Início"
+- assertVisible: "Transações"
+- assertVisible: "Planejamento"
+- assertVisible: "Mais"

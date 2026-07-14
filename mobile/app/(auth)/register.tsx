@@ -59,21 +59,28 @@ export default function Register() {
 
         <Field label="Confirmar senha" value={confirmPassword} onChangeText={setConfirmPassword} placeholder="Repita a senha" secureTextEntry textContentType="newPassword" />
 
-        <TouchableOpacity
-          onPress={() => setAceitaTermos((v) => !v)}
-          accessibilityRole="checkbox"
-          accessibilityState={{ checked: aceitaTermos }}
-          style={styles.termosRow}
-        >
-          <View style={[styles.checkbox, { borderColor: aceitaTermos ? colors.brand : colors.border, backgroundColor: aceitaTermos ? colors.brand : 'transparent' }]}>
-            {aceitaTermos ? <Text style={{ color: colors.brandText, fontSize: 12, fontWeight: '700' }}>✓</Text> : null}
-          </View>
+        <View style={styles.termosRow}>
+          <TouchableOpacity
+            onPress={() => setAceitaTermos((v) => !v)}
+            accessibilityRole="checkbox"
+            accessibilityLabel="Aceito a política de privacidade"
+            accessibilityState={{ checked: aceitaTermos }}
+            style={styles.checkboxTarget}
+          >
+            <View style={[styles.checkbox, { borderColor: aceitaTermos ? colors.brand : colors.border, backgroundColor: aceitaTermos ? colors.brand : 'transparent' }]}>
+              {aceitaTermos ? <Text style={{ color: colors.brandText, fontSize: 12, fontWeight: '700' }}>✓</Text> : null}
+            </View>
+          </TouchableOpacity>
           <Text style={{ color: colors.textSecondary, fontSize: 13, flex: 1 }}>
-            Li e aceito a <Text style={{ color: colors.brandFg, fontWeight: '600' }}>política de privacidade</Text> e o tratamento dos meus dados conforme a LGPD.
+            Li e aceito a{' '}
+            <Text accessibilityRole="link" onPress={() => router.push('/(auth)/privacidade')} style={{ color: colors.brandFg, fontWeight: '600', textDecorationLine: 'underline' }}>
+              política de privacidade
+            </Text>{' '}
+            e o tratamento dos meus dados conforme a LGPD.
           </Text>
-        </TouchableOpacity>
+        </View>
 
-        {error ? <Text style={{ color: colors.danger, marginTop: 8 }}>{error}</Text> : null}
+        {error ? <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={{ color: colors.danger, marginTop: 8 }}>{error}</Text> : null}
 
         <TouchableOpacity onPress={onSubmit} disabled={loading} accessibilityRole="button" style={[styles.button, { backgroundColor: colors.brand, opacity: loading ? 0.8 : 1 }]}>
           {loading ? <ActivityIndicator color={colors.brandText} /> : <Text style={{ color: colors.brandText, fontWeight: '700', letterSpacing: 1 }}>CRIAR CONTA</Text>}
@@ -94,7 +101,8 @@ const styles = StyleSheet.create({
   logoInner: { width: 22, height: 22, borderRadius: 6 },
   title: { fontSize: 24, fontWeight: '700', marginTop: 16 },
   subtitle: { fontSize: 13, marginBottom: 32 },
-  termosRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 2, minHeight: 44 },
+  termosRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2, minHeight: 44 },
+  checkboxTarget: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   button: { marginTop: 24, borderRadius: 12, height: 48, alignItems: 'center', justifyContent: 'center' },
 });

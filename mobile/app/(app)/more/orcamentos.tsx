@@ -95,6 +95,7 @@ export default function OrcamentoScreen() {
               <Text style={{ fontSize: 16, width: 28 }}>{cat.icone || '📌'}</Text>
               <Text style={{ flex: 1, color: colors.textPrimary, fontSize: 14 }}>{cat.nome}</Text>
               <TextInput
+                accessibilityLabel={`Limite para ${cat.nome}`}
                 style={[styles.editInput, { backgroundColor: colors.bg, borderColor: colors.border, color: colors.textPrimary }]}
                 value={limites.get(cat.id!) || ''}
                 onChangeText={(t) => { const n = new Map(limites); n.set(cat.id!, maskCurrencyInput(t)); setLimites(n); }}

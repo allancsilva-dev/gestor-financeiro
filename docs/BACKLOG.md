@@ -951,7 +951,9 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Area:** repositorio, CI/CD, release
 - **Motivo:** baseline aprovada localmente contém 41 arquivos modificados e 18 untracked; CI remoto não foi confirmado.
 - **Criterio de aceite:** working tree limpa; commits revisáveis; CI remoto verde no SHA candidato; imagens/APKs/IPAs identificam o mesmo SHA; deploy registra versão, migration e rollback.
-- **Status:** ABERTO — auditoria MVP 2026-07-13.
+- **Atualizacao mobile 2026-07-13:** criado `mobile-release.yml`, acionado somente apos CI verde em `main` ou manualmente, com checkout do SHA aprovado, Android Release, iOS Simulator Release, nomes de artefato contendo SHA e validação obrigatória dos secrets Sentry. Build local confirmou Android `assembleRelease` e iOS Simulator Release. Registro completo em `REVIEW_REPORTS/2026-07-13_mobile-release-hardening-implementation.md`.
+- **Pendente:** commit revisavel, CI remoto verde, artefatos publicados pelo GitHub Actions, assinatura/store e smoke em hardware. Deploy/backend/web não pertencem a esta implementação mobile.
+- **Status:** PARCIAL — proveniencia e gates mobile implementados localmente; evidencia remota e working tree limpa pendentes.
 
 ---
 
@@ -971,7 +973,9 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Area:** testes, frontend, mobile, backend
 - **Motivo:** backend possui cobertura forte, mas 15 testes web e 11 mobile não validam jornadas financeiras completas.
 - **Criterio de aceite:** E2E de cadastro/onboarding, transação/saldo, fatura, conta fixa, meta, sessão/refresh/logout/reset, importação/exportação e anexo; smoke Android/iOS; execução bloqueante no CI e contra staging.
-- **Status:** ABERTO — auditoria MVP 2026-07-13.
+- **Atualizacao mobile 2026-07-13:** workflow protegido `mobile-maestro.yml` executa Android e iOS contra staging no SHA informado. Flows nativos cobrem login, navegação para recuperação e política/consentimento antes do cadastro. CLI Maestro fixada com checksum do instalador; resultados JUnit e diagnosticos são artifacts.
+- **Pendente:** executar o workflow com staging/secrets reais e ampliar cobertura para onboarding, transação/saldo, fatura, conta fixa, meta, sessão/logout, importação/exportação e anexo. Web fora do escopo desta rodada.
+- **Status:** PARCIAL — infraestrutura e smokes mobile implementados; jornadas financeiras e execução remota pendentes.
 
 ---
 
@@ -981,7 +985,9 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Area:** backend, mobile, frontend, operacao
 - **Motivo:** SMTP e deep link possuem código/testes isolados, mas entrega real no ambiente implantado não foi comprovada.
 - **Criterio de aceite:** provedor SMTP configurado; SPF/DKIM verificados; reset web/mobile em staging/produção controlada; token expira, é single-use e não aparece em logs; falha de entrega gera alerta sem enumeração de usuário.
-- **Status:** ABERTO — auditoria MVP 2026-07-13.
+- **Atualizacao mobile 2026-07-13:** Maestro agora prova que a recuperação é acessível a partir do login e renderiza o campo de e-mail. Erros de login, solicitação e redefinição passaram a ser anunciados por leitor de tela.
+- **Pendente:** entrega SMTP real, abertura do deep link, expiração/single-use e login com nova senha em staging/produção controlada.
+- **Status:** PARCIAL — navegação e acessibilidade mobile automatizadas; recuperação ponta a ponta não comprovada.
 
 ---
 
@@ -991,7 +997,9 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Area:** produto, frontend, mobile, backend, LGPD
 - **Motivo:** consentimento versionado, exportação e exclusão existem, mas cadastro não oferece acesso real ao texto da política aceita.
 - **Criterio de aceite:** política versionada e publicada; links acessíveis web/mobile antes do aceite; versão registrada corresponde ao documento; exportação/exclusão testadas ponta a ponta; revisão jurídica registrada.
-- **Status:** ABERTO — auditoria MVP 2026-07-13.
+- **Atualizacao mobile 2026-07-13:** política versão `2026-07` virou tela nativa acessível antes do aceite. Checkbox possui alvo de 44pt, role/state explícitos e link independente. Maestro valida abertura, versão, direitos e retorno ao cadastro.
+- **Pendente:** revisão jurídica/identidade do controlador e E2E real de exportação/exclusão. Publicação web não foi alterada porque a rodada é exclusivamente mobile.
+- **Status:** PARCIAL — acesso e consentimento mobile implementados; validação jurídica e direitos E2E pendentes.
 
 ---
 
@@ -1001,7 +1009,9 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Area:** mobile, frontend, UX, acessibilidade
 - **Motivo:** inputs sem labels explícitas, controles abaixo de 44pt, falta de VoiceOver/TalkBack e acabamento web de scaffold.
 - **Criterio de aceite:** WCAG AA nos fluxos críticos; toque >=44pt; labels/erros/estados anunciados; VoiceOver, TalkBack, fonte ampliada e teclado web aprovados; título/favicon web corretos; warnings relevantes zerados; auditoria `impeccable` repetida.
-- **Status:** ABERTO — auditoria MVP 2026-07-13.
+- **Atualizacao mobile 2026-07-13:** corrigidos controles interativos abaixo de 44pt, labels de inputs diretos, checkbox de consentimento, estados/erros anunciados e dashboard com hierarquia mais sóbria, sem hero promocional. Adicionado ESLint a11y bloqueante com `--max-warnings=0`; CI preserva gate TypeScript separado. Typecheck, lint e 11 testes PASS.
+- **Pendente:** auditoria manual VoiceOver/TalkBack, fonte ampliada e contraste renderizado em hardware Android/iOS. Web fora do escopo.
+- **Status:** PARCIAL — correções estáticas e gates mobile concluídos; validação assistiva em devices físicos pendente.
 
 ---
 
@@ -1011,7 +1021,9 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Area:** operacao, qualidade, documentacao
 - **Motivo:** ausência de crash reporting/SCA comprovados e drift entre código, produção, contagens de testes e documentos.
 - **Criterio de aceite:** alertas de indisponibilidade/5xx; crash reporting web/mobile sem PII financeira; métricas e SLO mínimos; CI valida IDs/links/status e publica contagens reais; overview, deploy, backlog e bugfix log referenciam SHA/ambiente.
-- **Status:** ABERTO — auditoria MVP 2026-07-13.
+- **Atualizacao mobile 2026-07-13:** integrado `@sentry/react-native` com release SHA/ambiente, `sendDefaultPii=false`, tracing desativado e remoção defensiva de user/request/extra/dados de breadcrumbs. Upload de source maps só é configurado quando token, organização e projeto existem; release CI falha se esses valores estiverem ausentes. Este backlog, bugfix log e relatório de implementação registram a mesma baseline `807e777`.
+- **Pendente:** configurar projeto/DSN/secrets externos, executar release CI e comprovar evento sem PII; alertas/SLO e observabilidade web permanecem fora desta rodada.
+- **Status:** PARCIAL — instrumentação mobile implementada; operação externa não comprovada.
 
 >
 > Atualizacao anterior: 2026-07-10 (auditoria backend/non-frontend alto nivel: BACKLOG-0058 a BACKLOG-0069 — ver PROBLEM_LEDGER PROB-0049 a PROB-0060 e relatorio `REVIEW_REPORTS/2026-07-10_backend_nonfrontend_high-level-audit.md`).

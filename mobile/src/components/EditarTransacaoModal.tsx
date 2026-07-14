@@ -319,7 +319,7 @@ export default function EditarTransacaoModal({ visible, transacao, onClose }: Ed
               {parcelasQuery.isError ? (
                 <View style={{ paddingTop: 12 }}>
                   <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Erro ao carregar parcelas.</Text>
-                  <TouchableOpacity onPress={() => parcelasQuery.refetch()} accessibilityRole="button" style={{ marginTop: 6, minHeight: 36, justifyContent: 'center' }}>
+                  <TouchableOpacity onPress={() => parcelasQuery.refetch()} accessibilityRole="button" style={{ marginTop: 6, minHeight: 44, justifyContent: 'center' }}>
                     <Text style={{ color: colors.brandFg, fontSize: 13, fontWeight: '600' }}>Tentar novamente</Text>
                   </TouchableOpacity>
                 </View>
@@ -345,7 +345,7 @@ export default function EditarTransacaoModal({ visible, transacao, onClose }: Ed
                           accessibilityRole="button"
                           accessibilityLabel={paga ? `Desfazer pagamento da parcela ${p.numero}` : `Pagar parcela ${p.numero}`}
                           style={{
-                            minHeight: 36,
+                            minHeight: 44,
                             borderRadius: 999,
                             paddingHorizontal: 12,
                             alignItems: 'center',
@@ -383,7 +383,7 @@ export default function EditarTransacaoModal({ visible, transacao, onClose }: Ed
                 onPress={handleTirarFoto}
                 disabled={anexoAction != null}
                 accessibilityRole="button"
-                style={{ flex: 1, minHeight: 40, borderRadius: 999, backgroundColor: colors.brandBg, alignItems: 'center', justifyContent: 'center' }}
+                style={{ flex: 1, minHeight: 44, borderRadius: 999, backgroundColor: colors.brandBg, alignItems: 'center', justifyContent: 'center' }}
               >
                 {anexoAction === 'camera' ? <ActivityIndicator color={colors.brandFg} size="small" /> : <Text style={{ color: colors.brandFg, fontSize: 13, fontWeight: '700' }}>Câmera</Text>}
               </TouchableOpacity>
@@ -391,7 +391,7 @@ export default function EditarTransacaoModal({ visible, transacao, onClose }: Ed
                 onPress={handleSelecionarArquivo}
                 disabled={anexoAction != null}
                 accessibilityRole="button"
-                style={{ flex: 1, minHeight: 40, borderRadius: 999, backgroundColor: colors.infoBg, alignItems: 'center', justifyContent: 'center' }}
+                style={{ flex: 1, minHeight: 44, borderRadius: 999, backgroundColor: colors.infoBg, alignItems: 'center', justifyContent: 'center' }}
               >
                 {anexoAction === 'arquivo' ? <ActivityIndicator color={colors.info} size="small" /> : <Text style={{ color: colors.info, fontSize: 13, fontWeight: '700' }}>Arquivo</Text>}
               </TouchableOpacity>
@@ -400,7 +400,7 @@ export default function EditarTransacaoModal({ visible, transacao, onClose }: Ed
             {anexosQuery.isError ? (
               <View style={{ paddingTop: 12 }}>
                 <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Erro ao carregar comprovantes.</Text>
-                <TouchableOpacity onPress={() => anexosQuery.refetch()} accessibilityRole="button" style={{ marginTop: 6, minHeight: 36, justifyContent: 'center' }}>
+                <TouchableOpacity onPress={() => anexosQuery.refetch()} accessibilityRole="button" style={{ marginTop: 6, minHeight: 44, justifyContent: 'center' }}>
                   <Text style={{ color: colors.brandFg, fontSize: 13, fontWeight: '600' }}>Tentar novamente</Text>
                 </TouchableOpacity>
               </View>
@@ -421,7 +421,7 @@ export default function EditarTransacaoModal({ visible, transacao, onClose }: Ed
                       disabled={anexoAction != null}
                       accessibilityRole="button"
                       accessibilityLabel={`Excluir comprovante ${a.nome}`}
-                      style={{ minHeight: 36, borderRadius: 999, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.dangerBg }}
+                      style={{ minHeight: 44, borderRadius: 999, paddingHorizontal: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.dangerBg }}
                     >
                       {anexoAction === a.id ? <ActivityIndicator color={colors.danger} size="small" /> : <Text style={{ color: colors.danger, fontSize: 12, fontWeight: '700' }}>Excluir</Text>}
                     </TouchableOpacity>

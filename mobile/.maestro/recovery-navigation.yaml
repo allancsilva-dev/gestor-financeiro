@@ -1,0 +1,9 @@
+appId: com.gestorfinanceiro.mobile
+tags:
+  - smoke
+---
+- launchApp:
+    clearState: true
+- tapOn: "Esqueceu a senha?"
+- assertVisible: "Recuperar senha"
+- assertVisible: "E-mail"

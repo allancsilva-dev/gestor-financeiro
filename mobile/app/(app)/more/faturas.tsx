@@ -267,6 +267,7 @@ export default function FaturasScreen() {
                     ))}
                   </View>
                   <TextInput
+                    accessibilityLabel="Valor do pagamento"
                     value={valorPagamento}
                     onChangeText={(t) => setValorPagamento(maskCurrencyInput(t))}
                     keyboardType="number-pad"
@@ -345,22 +346,22 @@ export default function FaturasScreen() {
           </View>
           <ScrollView contentContainerStyle={{ padding: 16 }}>
             <Text style={[styles.label, { color: colors.textSecondary }]}>Nome do cartão</Text>
-            <TextInput value={nome} onChangeText={setNome} placeholder="Ex.: Nubank Roxinho" placeholderTextColor={colors.textMuted} style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]} />
+            <TextInput accessibilityLabel="Nome do cartão" value={nome} onChangeText={setNome} placeholder="Ex.: Nubank Roxinho" placeholderTextColor={colors.textMuted} style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]} />
 
             <Text style={[styles.label, { color: colors.textSecondary }]}>Banco</Text>
-            <TextInput value={banco} onChangeText={setBanco} placeholder="Ex.: Nubank, Itaú, Inter" placeholderTextColor={colors.textMuted} style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]} />
+            <TextInput accessibilityLabel="Banco do cartão" value={banco} onChangeText={setBanco} placeholder="Ex.: Nubank, Itaú, Inter" placeholderTextColor={colors.textMuted} style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]} />
 
             <Text style={[styles.label, { color: colors.textSecondary }]}>Limite total</Text>
-            <TextInput value={limite} onChangeText={(t) => setLimite(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" placeholderTextColor={colors.textMuted} style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]} />
+            <TextInput accessibilityLabel="Limite total" value={limite} onChangeText={(t) => setLimite(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" placeholderTextColor={colors.textMuted} style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]} />
 
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.label, { color: colors.textSecondary }]}>Dia de fechamento</Text>
-                <TextInput value={diaFechamento} onChangeText={(t) => setDiaFechamento(t.replace(/\D/g, '').slice(0, 2))} keyboardType="number-pad" placeholder="Ex.: 28" placeholderTextColor={colors.textMuted} style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]} />
+                <TextInput accessibilityLabel="Dia de fechamento" value={diaFechamento} onChangeText={(t) => setDiaFechamento(t.replace(/\D/g, '').slice(0, 2))} keyboardType="number-pad" placeholder="Ex.: 28" placeholderTextColor={colors.textMuted} style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.label, { color: colors.textSecondary }]}>Dia de vencimento</Text>
-                <TextInput value={diaVencimento} onChangeText={(t) => setDiaVencimento(t.replace(/\D/g, '').slice(0, 2))} keyboardType="number-pad" placeholder="Ex.: 5" placeholderTextColor={colors.textMuted} style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]} />
+                <TextInput accessibilityLabel="Dia de vencimento" value={diaVencimento} onChangeText={(t) => setDiaVencimento(t.replace(/\D/g, '').slice(0, 2))} keyboardType="number-pad" placeholder="Ex.: 5" placeholderTextColor={colors.textMuted} style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]} />
               </View>
             </View>
 

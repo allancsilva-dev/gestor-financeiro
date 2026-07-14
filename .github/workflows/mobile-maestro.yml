@@ -1,0 +1,114 @@
+name: Mobile Maestro staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_sha:
+        description: Approved SHA deployed to staging
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  android-maestro:
+    runs-on: ubuntu-latest
+    environment: staging
+    env:
+      APP_RELEASE_SHA: ${{ inputs.release_sha }}
+      APP_ENV: staging
+      NODE_ENV: development
+      EXPO_PUBLIC_API_BASE_URL: ${{ vars.MOBILE_API_BASE_URL }}
+      E2E_EMAIL: ${{ secrets.MOBILE_E2E_EMAIL }}
+      E2E_PASSWORD: ${{ secrets.MOBILE_E2E_PASSWORD }}
+      MAESTRO_VERSION: 2.3.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_sha }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Install pinned Maestro CLI
+        run: |
+          curl -sSL https://get.maestro.mobile.dev -o /tmp/install-maestro.sh
+          echo '40115b628eb491f29d02275bc7e3db5334024ba4fdff7210a334fd3cf4a8f306  /tmp/install-maestro.sh' | sha256sum --check
+          bash /tmp/install-maestro.sh
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - working-directory: mobile
+        run: |
+          npm ci
+          npx expo prebuild --clean --platform android --no-install
+          cd android && ./gradlew assembleDebug --no-daemon
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          script: |
+            adb install -r mobile/android/app/build/outputs/apk/debug/app-debug.apk
+            maestro test mobile/.maestro --format JUNIT --output mobile/maestro-android.xml -e E2E_EMAIL="$E2E_EMAIL" -e E2E_PASSWORD="$E2E_PASSWORD"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: maestro-android-${{ inputs.release_sha }}
+          path: |
+            mobile/maestro-android.xml
+            ~/.maestro/tests
+          if-no-files-found: ignore
+          retention-days: 14
+
+  ios-maestro:
+    runs-on: macos-latest
+    environment: staging
+    env:
+      APP_RELEASE_SHA: ${{ inputs.release_sha }}
+      APP_ENV: staging
+      NODE_ENV: development
+      EXPO_PUBLIC_API_BASE_URL: ${{ vars.MOBILE_API_BASE_URL }}
+      E2E_EMAIL: ${{ secrets.MOBILE_E2E_EMAIL }}
+      E2E_PASSWORD: ${{ secrets.MOBILE_E2E_PASSWORD }}
+      MAESTRO_VERSION: 2.3.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Install pinned Maestro CLI
+        run: |
+          curl -sSL https://get.maestro.mobile.dev -o /tmp/install-maestro.sh
+          echo '40115b628eb491f29d02275bc7e3db5334024ba4fdff7210a334fd3cf4a8f306  /tmp/install-maestro.sh' | shasum -a 256 --check
+          bash /tmp/install-maestro.sh
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - working-directory: mobile
+        run: |
+          npm ci
+          npx expo prebuild --clean --platform ios --no-install
+          cd ios && pod install
+          xcodebuild -workspace mobile.xcworkspace -scheme mobile -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build CODE_SIGNING_ALLOWED=NO
+      - name: Boot simulator and run flows
+        run: |
+          DEVICE="$(xcrun simctl list devices available | sed -n 's/^[[:space:]]*\(iPhone[^()]*) ([0-9A-F-]*) (Shutdown)$/\1/p' | head -1 | xargs)"
+          test -n "$DEVICE"
+          xcrun simctl boot "$DEVICE"
+          xcrun simctl bootstatus "$DEVICE" -b
+          xcrun simctl install booted mobile/ios/build/Build/Products/Debug-iphonesimulator/mobile.app
+          maestro test mobile/.maestro --format JUNIT --output mobile/maestro-ios.xml -e E2E_EMAIL="$E2E_EMAIL" -e E2E_PASSWORD="$E2E_PASSWORD"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: maestro-ios-${{ inputs.release_sha }}
+          path: |
+            mobile/maestro-ios.xml
+            ~/.maestro/tests
+          if-no-files-found: ignore
+          retention-days: 14

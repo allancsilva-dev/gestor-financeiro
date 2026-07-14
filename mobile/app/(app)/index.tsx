@@ -107,70 +107,58 @@ export default function Dashboard() {
         </TouchableOpacity>
       </Entrance>
 
-      {/* Card de saldo (hero): gradiente violeta, centavos menores */}
-      <Entrance kind="pop" delay={100}>
-      <LinearGradient
-        colors={['#6f60d4', '#5546b8', '#3f3596']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0.9, y: 1 }}
+      <Entrance delay={100}>
+      <View
         style={{
-          borderRadius: 24,
-          padding: 22,
+          borderRadius: 16,
+          paddingVertical: 18,
           marginBottom: 16,
-          overflow: 'hidden',
-          shadowColor: '#5546b8',
-          shadowOpacity: 0.45,
-          shadowRadius: 20,
-          shadowOffset: { width: 0, height: 12 },
-          elevation: 6,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border,
         }}
       >
-        {/* Círculos decorativos translúcidos (protótipo) */}
-        <View style={{ position: 'absolute', top: -30, right: -20, width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.06)' }} />
-        <View style={{ position: 'absolute', bottom: -60, left: -30, width: 160, height: 160, borderRadius: 80, backgroundColor: 'rgba(255,255,255,0.05)' }} />
-
         {resumoQuery.isLoading ? (
           <SkeletonBox width="100%" height={110} />
         ) : resumoQuery.isError ? (
           <View>
-            <Text style={{ color: '#ffffff' }}>Erro ao carregar o saldo</Text>
-            <TouchableOpacity onPress={() => resumoQuery.refetch()} style={{ marginTop: 8 }}>
-              <Text style={{ color: 'rgba(255,255,255,0.85)', fontWeight: '600' }}>Tentar novamente</Text>
+            <Text style={{ color: colors.danger }}>Erro ao carregar o saldo</Text>
+            <TouchableOpacity accessibilityRole="button" onPress={() => resumoQuery.refetch()} style={{ marginTop: 8, minHeight: 44, justifyContent: 'center' }}>
+              <Text style={{ color: colors.brandFg, fontWeight: '600' }}>Tentar novamente</Text>
             </TouchableOpacity>
           </View>
         ) : resumoQuery.data ? (
           <>
-            <Text style={{ color: 'rgba(255,255,255,0.82)', fontSize: 14, fontWeight: '500' }}>
+            <Text style={{ color: colors.textSecondary, fontSize: 14, fontWeight: '500' }}>
               Saldo total
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 6 }}>
-              <Text style={{ color: '#ffffff', fontSize: 40, fontWeight: '800', letterSpacing: -1, fontVariant: ['tabular-nums'] }}>
+              <Text style={{ color: colors.textPrimary, fontSize: 36, fontWeight: '800', letterSpacing: -1, fontVariant: ['tabular-nums'] }}>
                 {saldoInt}
               </Text>
               {saldoCents != null && (
-                <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 23, fontWeight: '800', fontVariant: ['tabular-nums'] }}>
+                <Text style={{ color: colors.textPrimary, fontSize: 21, fontWeight: '800', fontVariant: ['tabular-nums'] }}>
                   ,{saldoCents}
                 </Text>
               )}
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12, gap: 10 }}>
-              <View style={{ backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 999, paddingHorizontal: 11, paddingVertical: 5 }}>
-                <Text style={{ color: '#ffffff', fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
+              <View style={{ backgroundColor: colors.successBg, borderRadius: 999, paddingHorizontal: 11, paddingVertical: 5 }}>
+                <Text style={{ color: colors.success, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
                   ↑ {formatCurrency(Number(resumoQuery.data.totalEntradas ?? 0))}
                 </Text>
               </View>
-              <View style={{ backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 999, paddingHorizontal: 11, paddingVertical: 5 }}>
-                <Text style={{ color: '#ffffff', fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
+              <View style={{ backgroundColor: colors.dangerBg, borderRadius: 999, paddingHorizontal: 11, paddingVertical: 5 }}>
+                <Text style={{ color: colors.danger, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
                   ↓ {formatCurrency(Number(resumoQuery.data.totalSaidas ?? 0))}
                 </Text>
               </View>
-              <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, fontWeight: '500' }}>
+              <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '500' }}>
                 em {mesAtual}
               </Text>
             </View>
           </>
         ) : null}
-      </LinearGradient>
+      </View>
       </Entrance>
 
       {/* Faixa KPI: Receitas · Despesas · Disponível */}

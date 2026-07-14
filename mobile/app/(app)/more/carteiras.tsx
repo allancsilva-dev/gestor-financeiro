@@ -257,7 +257,7 @@ export default function CarteirasScreen() {
           </View>
           <ScrollView contentContainerStyle={{ padding: 16 }}>
             <Text style={{ color: colors.textSecondary, fontSize: 9, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Nome</Text>
-            <TextInput value={nome} onChangeText={setNome} placeholderTextColor={colors.textMuted} style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, color: colors.textPrimary, fontSize: 15, marginBottom: 8 }} />
+            <TextInput accessibilityLabel="Nome da carteira" value={nome} onChangeText={setNome} placeholderTextColor={colors.textMuted} style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, color: colors.textPrimary, fontSize: 15, marginBottom: 8 }} />
             {nomeError && <Text style={{ color: colors.danger, marginBottom: 8 }}>{nomeError}</Text>}
 
             <Text style={{ color: colors.textSecondary, fontSize: 9, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Tipo</Text>
@@ -271,7 +271,7 @@ export default function CarteirasScreen() {
             {tipoError && <Text style={{ color: colors.danger, marginBottom: 8 }}>{tipoError}</Text>}
 
             <Text style={{ color: colors.textSecondary, fontSize: 9, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Saldo inicial</Text>
-            <TextInput value={saldo} onChangeText={(t) => setSaldo(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" placeholderTextColor={colors.textMuted} style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, color: colors.textPrimary, fontSize: 15, marginBottom: 8 }} />
+            <TextInput accessibilityLabel="Saldo inicial" value={saldo} onChangeText={(t) => setSaldo(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" placeholderTextColor={colors.textMuted} style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, color: colors.textPrimary, fontSize: 15, marginBottom: 8 }} />
             {saldoError && <Text style={{ color: colors.danger, marginBottom: 8 }}>{saldoError}</Text>}
           </ScrollView>
         </View>

@@ -54,7 +54,7 @@ export default function Login() {
           <Text style={{ color: colors.brandFg, fontSize: 13 }}>Esqueceu a senha?</Text>
         </TouchableOpacity>
 
-        {error ? <Text style={{ color: colors.danger, marginTop: 8 }}>{error}</Text> : null}
+        {error ? <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={{ color: colors.danger, marginTop: 8 }}>{error}</Text> : null}
 
         <TouchableOpacity onPress={onSubmit} disabled={loading} accessibilityRole="button" style={[styles.button, { backgroundColor: colors.brand, opacity: loading ? 0.8 : 1 }] }>
           {loading ? <ActivityIndicator color={colors.brandText} /> : <Text style={{ color: colors.brandText, fontWeight: '700', letterSpacing: 1 }}>ENTRAR</Text>}

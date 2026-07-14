@@ -136,7 +136,7 @@ export default function ContasFixasScreen() {
                   disabled={pulandoId != null || pagarMutation.status === 'pending'}
                   accessibilityRole="button"
                   accessibilityLabel={`Pular ${cf.nome} este mês`}
-                  style={{ minHeight: 36, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1, borderColor: colors.border, justifyContent: 'center' }}
+                  style={{ minHeight: 44, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1, borderColor: colors.border, justifyContent: 'center' }}
                 >
                   {pulandoId === cf.id
                     ? <ActivityIndicator size="small" color={colors.textSecondary} />
@@ -148,7 +148,7 @@ export default function ContasFixasScreen() {
                 onPress={() => { setSelecionada(cf); setValorPago(formatNumber(Number(cf.valorPlanejado ?? 0))); setErroPagar(null); setErroCarteira(null); setCarteiraPagamentoId(carteiras.length === 1 ? carteiras[0].id : null); setModalPagarVisible(true); }}
                 accessibilityRole="button"
                 accessibilityLabel={`Pagar ${cf.nome}`}
-                style={{ minHeight: 36, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 999, backgroundColor: colors.brand, justifyContent: 'center' }}
+                style={{ minHeight: 44, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 999, backgroundColor: colors.brand, justifyContent: 'center' }}
               >
                 <Text style={{ color: colors.brandText, fontSize: 12, fontWeight: '700' }}>Pagar</Text>
               </TouchableOpacity>

@@ -244,3 +244,11 @@ Congelar features grandes. Evoluir primeiro de MVP funcional para release confia
 ---
 
 > Relatorio canônico da rodada de prontidao de 2026-07-13. Reavaliacoes futuras devem referenciar este arquivo, registrar evidencias novas e manter historico das notas.
+
+## Acompanhamento mobile — 2026-07-13
+
+A implementação posterior, limitada ao app mobile, está registrada em
+`2026-07-13_mobile-release-hardening-implementation.md` e no `BUG-0058`.
+Ela avançou parcialmente BACKLOG-0073/75/76/77/78/79, sem recalcular a nota desta
+baseline e sem declarar gates externos como concluídos. Frontend web e backend não
+foram modificados nessa implementação.

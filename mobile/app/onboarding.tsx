@@ -321,7 +321,7 @@ export default function OnboardingScreen() {
         </View>
       )}
 
-      {error ? <Text style={{ color: colors.danger, marginTop: 16 }}>{error}</Text> : null}
+      {error ? <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={{ color: colors.danger, marginTop: 16 }}>{error}</Text> : null}
 
       <View style={styles.buttons}>
         {passo > 0 && (

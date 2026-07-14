@@ -110,7 +110,7 @@ export default function CategoriasScreen() {
                   accessibilityState={{ selected: corSelecionada === cor }}
                   accessibilityLabel={`Cor ${i + 1}`}
                   hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                  style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: cor, borderWidth: corSelecionada === cor ? 3 : 0, borderColor: colors.textPrimary }}
+                  style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: cor, borderWidth: corSelecionada === cor ? 3 : 0, borderColor: colors.textPrimary }}
                 />
               ))}
             </View>

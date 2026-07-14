@@ -18,7 +18,7 @@ export default function Chip({ label, selected = false, onPress }: ChipProps) {
       accessibilityRole="button"
       accessibilityState={{ selected }}
       style={{
-        minHeight: 32,
+        minHeight: 44,
         paddingHorizontal: 14,
         paddingVertical: 6,
         borderRadius: 999,

@@ -32,7 +32,11 @@ export default function Field({ label, error, style, ...rest }: FieldProps) {
         ]}
         {...rest}
       />
-      {error ? <Text style={{ color: colors.danger, fontSize: 12, marginTop: 6 }}>{error}</Text> : null}
+      {error ? (
+        <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={{ color: colors.danger, fontSize: 12, marginTop: 6 }}>
+          {error}
+        </Text>
+      ) : null}
     </View>
   );
 }
