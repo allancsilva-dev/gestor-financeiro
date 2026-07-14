@@ -952,8 +952,9 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Motivo:** baseline aprovada localmente contém 41 arquivos modificados e 18 untracked; CI remoto não foi confirmado.
 - **Criterio de aceite:** working tree limpa; commits revisáveis; CI remoto verde no SHA candidato; imagens/APKs/IPAs identificam o mesmo SHA; deploy registra versão, migration e rollback.
 - **Atualizacao mobile 2026-07-13:** criado `mobile-release.yml`, acionado somente apos CI verde em `main` ou manualmente, com checkout do SHA aprovado, Android Release, iOS Simulator Release, nomes de artefato contendo SHA e validação obrigatória dos secrets Sentry. Build local confirmou Android `assembleRelease` e iOS Simulator Release. Registro completo em `REVIEW_REPORTS/2026-07-13_mobile-release-hardening-implementation.md`.
-- **Pendente:** commit revisavel, CI remoto verde, artefatos publicados pelo GitHub Actions, assinatura/store e smoke em hardware. Deploy/backend/web não pertencem a esta implementação mobile.
-- **Status:** PARCIAL — proveniencia e gates mobile implementados localmente; evidencia remota e working tree limpa pendentes.
+- **Commit:** `2db9b58` (`feat(mobile): harden release readiness`).
+- **Pendente:** CI remoto verde, artefatos publicados pelo GitHub Actions, assinatura/store e smoke em hardware. Deploy/backend/web não pertencem a esta implementação mobile.
+- **Status:** PARCIAL — proveniencia e gates mobile implementados e commitados; evidencia remota pendente.
 
 ---
 

@@ -5,7 +5,7 @@
 **Baseline:** `main` em `807e777`
 
 **Escopo:** app mobile e automações mobile
-**Estado:** alterações locais ainda não commitadas
+**Implementação:** commit `2db9b58` (`feat(mobile): harden release readiness`)
 
 ## Objetivo
 
@@ -69,7 +69,7 @@ condicional a credenciais completas; não foi usado skip ou bypass.
 
 | Backlog | Entregue nesta rodada | Continua pendente |
 |---|---|---|
-| 0073 | build/proveniência mobile por SHA | commit, CI remoto, assinatura/store, hardware |
+| 0073 | build/proveniência mobile por SHA; commit `2db9b58` | CI remoto, assinatura/store, hardware |
 | 0075 | workflow Maestro e 3 smokes | jornadas financeiras completas e execução staging |
 | 0076 | navegação/erros acessíveis | SMTP, deep link e single-use E2E |
 | 0077 | política e consentimento nativos | revisão jurídica e direitos E2E |
@@ -85,9 +85,8 @@ condicional a credenciais completas; não foi usado skip ou bypass.
 
 ## Próximo gate
 
-1. revisar e commitar as mudanças mobile;
-2. configurar environments/secrets Sentry e staging;
-3. confirmar CI e artifacts no SHA candidato;
-4. executar Maestro Android/iOS;
-5. concluir VoiceOver/TalkBack e smoke em hardware físico;
-6. só então reavaliar status e nota.
+1. configurar environments/secrets Sentry e staging;
+2. confirmar CI e artifacts no SHA candidato;
+3. executar Maestro Android/iOS;
+4. concluir VoiceOver/TalkBack e smoke em hardware físico;
+5. só então reavaliar status e nota.

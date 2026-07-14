@@ -9,7 +9,7 @@ Registro de bugs corrigidos. Mantido pelo `docs-reporter`.
 - **Problemas relacionados:** BACKLOG-0073, BACKLOG-0075, BACKLOG-0076, BACKLOG-0077, BACKLOG-0078, BACKLOG-0079
 - **Data:** 2026-07-13
 - **Area:** mobile, release mobile, acessibilidade, LGPD, observabilidade
-- **Baseline:** `807e777`; implementação ainda não commitada.
+- **Baseline:** `807e777`; implementação em `2db9b58`.
 - **Escopo:** exclusivamente `mobile/` e passos/jobs mobile em `.github/workflows`; nenhuma alteração de frontend web ou backend.
 - **Correcao aplicada:** política de privacidade nativa versão `2026-07` antes do consentimento; alvos de toque >=44pt, labels e alertas acessíveis; dashboard sem hero/efeitos promocionais; ESLint a11y bloqueante e TypeScript independente; Sentry sem PII com release SHA/ambiente e source maps condicionais; workflows de Android/iOS Release e Maestro Android/iOS; smokes de login, recuperação e privacidade.
 - **Falha encontrada durante validação:** plugin Sentry inicialmente forçava upload sem organização/projeto e quebrava Android Release. Causa removida: plugin de build só entra com token+org+project; runtime continua disponível e CI de release exige todos os secrets.
@@ -18,6 +18,7 @@ Registro de bugs corrigidos. Mantido pelo `docs-reporter`.
 - **Resultado:** PASS_COM_RESSALVA
 - **Ressalvas:** CI remoto, secrets/projeto Sentry, Maestro contra staging, VoiceOver/TalkBack, hardware físico, assinatura e publicação em stores pendentes. Não fecha integralmente BACKLOG-0073/75/76/77/78/79.
 - **Relatorio:** `REVIEW_REPORTS/2026-07-13_mobile-release-hardening-implementation.md`
+- **Commit:** `2db9b58`
 
 ---
 
