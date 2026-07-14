@@ -39,7 +39,9 @@ services:
       SMTP_USERNAME: ${SMTP_USERNAME:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       MAIL_FROM: ${MAIL_FROM:-}
-      SERVER_FORWARD_HEADERS_STRATEGY: framework
+      # 'native' -> RemoteIpValve resolve o IP real do cliente (ver application-vps.properties).
+      # Esta env var SOBREPÕE o profile; tem que ser 'native' aqui também.
+      SERVER_FORWARD_HEADERS_STRATEGY: native
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:${API_PORT:-8080}/actuator/health || exit 1"]
       interval: 15s

@@ -17,13 +17,30 @@ Arquivos:
 Containers:
 
 - `GestorFinanceiro-API`: Spring Boot, porta interna `8080`; Flyway roda no startup.
-- `GestorFinanceiro-Web`: Nginx interno na rede `proxy`; serve frontend e proxy `/api`.
+  Fica nas redes `internal` (fala com o Web) e do banco. **Fora da rede `proxy`**: o NPM
+  nao alcanca a API diretamente, so o Web.
+- `GestorFinanceiro-Web`: Nginx interno nas redes `proxy` (NPM) e `internal` (API);
+  serve frontend e faz proxy `/api`.
 - `GestorFinanceiro-Backup`: `pg_dump -Fc` diario em `./backups/postgres`.
 
-Redes externas esperadas:
+Redes:
 
-- `proxy`: rede do Nginx Proxy Manager.
-- `dbnexos-gestor-financeiro_default`: rede do PostgreSQL existente.
+- `proxy` (externa): rede do Nginx Proxy Manager. So o `Web` participa.
+- `internal` (criada pelo compose): rede privada `Web` <-> `API`.
+- `dbnexos-gestor-financeiro_default` (externa): rede do PostgreSQL existente.
+
+## Rate limit e IP real do cliente (X-Forwarded-For)
+
+O rate limit de autenticacao (login, forgot/reset-password, register) chaveia por IP real
+do cliente. A API usa `server.forward-headers-strategy=native` (Tomcat `RemoteIpValve`), que
+resolve o IP percorrendo o `X-Forwarded-For` da direita para a esquerda e descartando os
+proxies confiaveis (loopback + faixas privadas Docker). O primeiro IP publico e o cliente.
+
+**Premissa de seguranca (obrigatoria):** o proxy frontal (NPM) DEVE *anexar* seu proprio
+`$remote_addr` ao `X-Forwarded-For`, nunca apenas repassar o header recebido do cliente. E o
+padrao do NPM. Se for reconfigurado para confiar no XFF do cliente, um atacante volta a
+forjar o IP e anular o rate limit (brute force / bomba de reset). O `nginx.npm.conf` mantem
+o XFF em modo append; o `nginx.conf.template` (standalone, 1 hop) *sobrescreve* com o peer real.
 
 ## Primeira Subida Em Producao
 
@@ -63,10 +80,12 @@ No Nginx Proxy Manager, crie/edite o Proxy Host:
 
 ```sh
 curl -i https://financas.nexostech.com.br/actuator/health
-curl -i https://financas.nexostech.com.br/api/auth/validate-token
+curl -i -X POST https://financas.nexostech.com.br/api/auth/validate-token \
+  -H 'Content-Type: application/json' -d '{"token":"x"}'
 ```
 
-`/api/auth/validate-token` deve responder `401` sem token. Isto confirma proxy ate API.
+O `POST /api/auth/validate-token` com token invalido responde erro de negocio (nao `2xx`),
+confirmando proxy ate a API. O antigo `GET` foi removido e responde `405`.
 
 ## Backup e restore
 

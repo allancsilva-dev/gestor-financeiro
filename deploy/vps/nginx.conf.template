@@ -29,7 +29,10 @@ server {
   proxy_http_version 1.1;
   proxy_set_header Host $host;
   proxy_set_header X-Real-IP $remote_addr;
-  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  # Standalone (1 hop): nginx é o único proxy e fala direto com o cliente.
+  # Sobrescreve (não anexa) o XFF com o peer real, descartando qualquer XFF
+  # que o cliente tenha enviado. O RemoteIpValve confia só em IP privado.
+  proxy_set_header X-Forwarded-For $remote_addr;
   proxy_set_header X-Forwarded-Proto $scheme;
 
   location /api/ {
@@ -40,16 +43,30 @@ server {
     proxy_pass http://api:8080/actuator/health;
   }
 
-  # SPA fallback — serve index.html para todas as rotas que nao sao arquivos
+  # SPA fallback — serve index.html para todas as rotas que nao sao arquivos.
+  # Headers de seguranca do HTML: o SecurityConfig do Spring so cobre /api/**.
   location / {
     root /usr/share/nginx/html;
     try_files $uri $uri/ /index.html;
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'" always;
   }
 
-  # Cache para assets estaticos com hash no nome
+  # Cache para assets estaticos com hash no nome.
+  # add_header proprio zera a heranca do bloco acima -> repetir os headers de seguranca.
   location /assets/ {
     root /usr/share/nginx/html;
     expires 1y;
     add_header Cache-Control "public, immutable";
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'" always;
   }
 }
