@@ -2,7 +2,7 @@
 
 Registro de diagramas do sistema. Mantido pelo `docs-reporter`.
 
-**Ultima atualizacao:** 2026-07-09
+**Ultima atualizacao:** 2026-07-14 (hardening pre-producao: item 7 de "Proximos passos opcionais" registra a pendencia de diagrama de topologia de rede/proxy e fronteira de confianca do X-Forwarded-For, PROB-0066)
 
 ---
 
@@ -269,6 +269,23 @@ Usuario (1)
    (`findWithLockByIdAndUsuarioId`) + unique index parcial `ux_fatura_rollover_origem_tipo` (banco,
    `V25__fatura_rollover.sql`). Objetivo: tornar visivel que o rollover e "lazy" (disparado na leitura,
    sem endpoint de fechamento nem scheduler) e a cadeia recursiva entre faturas do mesmo cartao.
+7. **Sugerido em 2026-07-14 (PROB-0066/BUG-0059, hardening pre-producao):** criar diagrama de topologia
+   de rede/proxy mostrando a cadeia de resolucao de IP e a fronteira de confianca do `X-Forwarded-For`
+   nas duas variantes de deploy documentadas em `deploy/vps/`:
+   - **Standalone (`nginx.conf.template`, 1 hop):** `Cliente → nginx (sobrescreve X-Forwarded-For com
+     $remote_addr) → API (Tomcat RemoteIpValve, forward-headers-strategy=native, internal-proxies =
+     loopback + faixas privadas Docker)`.
+   - **Atras do Nginx Proxy Manager (`nginx.npm.conf`, 2 hops):** `Cliente → NPM (anexa seu proprio
+     $remote_addr ao X-Forwarded-For recebido — premissa de configuracao documentada em
+     deploy/vps/README.md, nao verificavel pelo codigo do repositorio) → nginx interno (append-only) →
+     API (RemoteIpValve resolve o IP a partir da lista de proxies internos confiaveis)`.
+   - Rede Docker: `docker-compose.production.yml` isola a API numa rede interna dedicada `web<->API`,
+     removida da rede `proxy` — o NPM so alcanca o container `web`, nunca a API diretamente.
+   Objetivo: tornar visivel, para qualquer alteracao futura de deploy/proxy, qual componente e
+   responsavel por normalizar o `X-Forwarded-For` em cada topologia — se essa responsabilidade mudar de
+   lugar sem atualizar o diagrama, o contorno de rate limit corrigido em PROB-0066 pode voltar a existir
+   silenciosamente. Pendente de materializacao em `.drawio`; ver BACKLOG-0080 para o gate de validacao
+   real (`nginx -t`, redes, smoke em staging) que precede qualquer promocao para producao.
 
 ---
 

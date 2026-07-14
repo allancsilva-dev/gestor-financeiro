@@ -1028,5 +1028,117 @@ Registro de bugs corrigidos. Mantido pelo `docs-reporter`.
 
 ---
 
+## BUG-0059 — Rate limit de auth deixa de ser contornavel via X-Forwarded-For forjado
+
+- **Problema relacionado:** PROB-0066
+- **Data:** 2026-07-14
+- **Area:** backend, seguranca, infra
+- **Sintoma:** `LoginRateLimitFilter`/`AuthController` resolviam o IP do cliente via `getRemoteAddr()` com `forward-headers-strategy=framework`; combinado com nginx em modo *append-only* no `X-Forwarded-For`, o primeiro IP da lista (controlado pelo cliente) era usado como chave do rate limit de login/forgot-password/register, permitindo contornar os limites trocando o header a cada tentativa.
+- **Causa raiz:** Confianca implicita em todo o `X-Forwarded-For` recebido, sem que Tomcat/nginx normalizassem o header a partir de uma lista fechada de proxies confiaveis.
+- **Correcao aplicada:** `forward-headers-strategy` trocado de `framework` para `native` em `application-vps.properties`, com `RemoteIpValve` (`remote-ip-header=X-Forwarded-For`, `protocol-header=X-Forwarded-Proto`, `internal-proxies` cobrindo loopback e faixas privadas Docker). Env var `SERVER_FORWARD_HEADERS_STRATEGY=native` adicionada em `docker-compose.production.yml` e `docker-compose.vps.yml` (a env var sobrepoe o profile — os dois arquivos precisavam ser atualizados). `nginx.conf.template` (topologia standalone, 1 hop) passou a sobrescrever `X-Forwarded-For` com `$remote_addr`. `nginx.npm.conf` (atras do Nginx Proxy Manager, 2 hops) mantem append-only, com a premissa de que o NPM anexa seu proprio `$remote_addr` documentada em `deploy/vps/README.md`. Rede Docker interna dedicada `web<->API` criada em `docker-compose.production.yml`, com a API removida da rede `proxy` (NPM so alcanca o container `web`).
+- **Arquivos alterados:** `backend/src/main/resources/application-vps.properties`, `docker-compose.production.yml`, `docker-compose.vps.yml`, `deploy/vps/nginx.conf.template`, `deploy/vps/nginx.npm.conf`, `deploy/vps/README.md`
+- **Testes/validacoes executadas:** `./mvnw -q test` → 155/155 PASS; `./mvnw -q verify` → BUILD SUCCESS. `nginx -t` e smoke de rate limit contra `X-Forwarded-For` forjado em staging **nao executados nesta rodada** (gate de deploy pendente).
+- **Resultado:** PASS_COM_RESSALVA
+- **Ressalvas:** Validacao automatizada cobre apenas o build/testes de unidade do backend; a cadeia real de proxies (nginx standalone e/ou Nginx Proxy Manager) nao foi exercitada em staging/producao. `nginx -t` nos dois configs, recriacao das redes do compose e smoke validando que XFF forjado nao muda o bucket ficam pendentes (ver BACKLOG-0080).
+- **Commit:** `c959dfc`
+
+---
+
+## BUG-0060 — Pagamento de parcela deixa de duplicar debito na carteira
+
+- **Problema relacionado:** PROB-0067
+- **Data:** 2026-07-14
+- **Area:** backend, banco
+- **Sintoma:** `PUT /api/v1/parcelas/{id}/pagar` chamado duas vezes para a mesma parcela ja paga criava um segundo `MovimentoCarteira` de saida, debitando a carteira duas vezes pelo mesmo pagamento.
+- **Causa raiz:** `ParcelaService.marcarComoPaga` sem guard de estado (`PAGO`) e sem `@Version` na entidade `Parcela` para serializar escrita concorrente.
+- **Correcao aplicada:** Guard adicionado — `marcarComoPaga` retorna no-op (sem gerar movimento) se a parcela ja estiver `PAGO`. Campo `@Version private Long version` adicionado a `Parcela`, com coluna `version BIGINT NOT NULL DEFAULT 0` criada via migration `V28__pre_production_hardening.sql`, mesmo padrao ja usado em Carteira/Conta/Meta/Categoria (PROB-0002). Deliberadamente sem `idempotencyKey` estatica, para preservar o fluxo de produto pagar → despagar → pagar.
+- **Arquivos alterados:** `backend/src/main/java/com/gestor/financeiro/service/ParcelaService.java`, `backend/src/main/java/com/gestor/financeiro/model/Parcela.java`, `backend/src/main/resources/db/migration/V28__pre_production_hardening.sql`, `backend/src/test/java/com/gestor/financeiro/ParcelaServiceTest.java`
+- **Testes/validacoes executadas:** Novo teste `ParcelaServiceTest.pagarParcelaJaPagaEhIdempotente`; `./mvnw -q test` → 155/155 PASS; `./mvnw -q verify` → BUILD SUCCESS.
+- **Resultado:** PASS
+- **Ressalvas:** Concorrencia real (duas threads simultaneas pagando a mesma parcela ainda nao paga) depende do `@Version` gerar 409 via `OptimisticLockingFailureException`, mas nao tem teste automatizado dedicado de concorrencia com threads simultaneas.
+- **Commit:** `0d1e0c0`
+
+---
+
+## BUG-0061 — Exclusao de carteira em uso normal deixa de retornar HTTP 500
+
+- **Problema relacionado:** PROB-0068
+- **Data:** 2026-07-14
+- **Area:** backend, banco
+- **Sintoma:** `DELETE /api/v1/carteiras/{id}` numa carteira com movimentos de origem `TRANSACAO`/`PARCELA` (uso normal, o caminho mais comum) retornava HTTP 500 por violacao de FK `RESTRICT`, em vez de um erro de negocio tratado.
+- **Causa raiz:** `CarteiraService.deletar` so verificava movimentos de origem `CARTEIRA_AJUSTE`, deixando o superset de origens reais (transacoes, parcelas) sem checagem previa.
+- **Correcao aplicada:** Novo metodo `existsByCarteiraId(Long)` em `MovimentoCarteiraRepository`; `CarteiraService.deletar` bloqueia a exclusao com a `BusinessException` de negocio ja existente sempre que houver qualquer movimento associado a carteira, independentemente da origem.
+- **Arquivos alterados:** `backend/src/main/java/com/gestor/financeiro/service/CarteiraService.java`, `backend/src/main/java/com/gestor/financeiro/repository/MovimentoCarteiraRepository.java`, `backend/src/test/java/com/gestor/financeiro/CarteiraControllerTest.java`
+- **Testes/validacoes executadas:** Novos testes `CarteiraControllerTest.deletarCarteiraComMovimentoDeTransacaoRetornaErroDeNegocio` e `CarteiraControllerTest.deletarCarteiraSemMovimentoRemove`; `./mvnw -q test` → 155/155 PASS.
+- **Resultado:** PASS
+- **Ressalvas:** Nenhuma identificada.
+- **Commit:** `0d1e0c0`
+
+---
+
+## BUG-0062 — Indices adicionados para `movimentos_carteira.carteira_id` e `refresh_tokens.usuario_id`
+
+- **Problema relacionado:** PROB-0069
+- **Data:** 2026-07-14
+- **Area:** banco
+- **Sintoma:** Consulta isolada por `carteira_id` (usada por `existsByCarteiraId`, novo do BUG-0061) e consultas de auth por `usuario_id` em `refresh_tokens` (login/refresh/logout-all) sem indice dedicado, resultando em full scan.
+- **Causa raiz:** Indices nao acompanharam o crescimento de queries por esses campos; o unico indice existente em `movimentos_carteira` (V11) e composto e liderado por `usuario_id`.
+- **Correcao aplicada:** `CREATE INDEX IF NOT EXISTS idx_movimentos_carteira_carteira ON movimentos_carteira(carteira_id)` e `CREATE INDEX IF NOT EXISTS idx_refresh_tokens_usuario ON refresh_tokens(usuario_id)`, na mesma migration que adiciona a coluna `version` de `Parcela` (BUG-0060).
+- **Arquivos alterados:** `backend/src/main/resources/db/migration/V28__pre_production_hardening.sql`
+- **Testes/validacoes executadas:** `scripts/verify-postgres-migrations.sh` PASS contra PostgreSQL real via Docker, incluindo a migration V28.
+- **Resultado:** PASS_COM_RESSALVA
+- **Ressalvas:** Validacao de integracao (`PostgresMigrationIT`/`scripts/verify-postgres-migrations.sh`) contra PostgreSQL real nao foi reexecutada por este agente nesta rodada; recomenda-se confirmar antes de promover para producao.
+- **Commit:** `0d1e0c0`
+
+---
+
+## BUG-0063 — SPA passa a servir headers de seguranca (HSTS, X-Frame-Options, CSP, etc.)
+
+- **Problema relacionado:** PROB-0070
+- **Data:** 2026-07-14
+- **Area:** frontend, seguranca, infra
+- **Sintoma:** Rotas fora de `/api/**` (SPA servido pelo nginx) nao recebiam nenhum header de seguranca aplicado pelo Spring Security no backend.
+- **Causa raiz:** `SecurityConfig` (Spring) so intercepta `/api/**`; o SPA e servido por um nginx separado sem os headers configurados.
+- **Correcao aplicada:** Adicionados em `nginx.conf.template` e `nginx.npm.conf`: HSTS, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` e CSP (`default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'`), repetidos no bloco `/assets/` (add_header nao herda de blocos pai quando o filho declara o proprio).
+- **Arquivos alterados:** `deploy/vps/nginx.conf.template`, `deploy/vps/nginx.npm.conf`
+- **Testes/validacoes executadas:** `frontend npm run build` → PASS (build nao afetado pela mudanca, que e so de configuracao de proxy). `nginx -t` e carregamento manual do SPA validando ausencia de violacao de CSP no console **nao executados nesta rodada**.
+- **Resultado:** PASS_COM_RESSALVA
+- **Ressalvas:** CSP restritiva (sem `unsafe-inline`) nao foi validada contra o SPA carregado de fato em staging; risco de quebra silenciosa se algum ponto do app depender de inline script/style nao coberto pelo build. Ver BACKLOG-0080.
+- **Commit:** `c959dfc`
+
+---
+
+## BUG-0064 — Token de reset de senha deixa de trafegar na query string
+
+- **Problema relacionado:** PROB-0071
+- **Data:** 2026-07-14
+- **Area:** backend, frontend, seguranca, LGPD
+- **Sintoma:** `GET /api/auth/validate-token?token=...` expunha o token de reset de senha na query string, sujeito a access logs de proxies/CDN e historico do navegador.
+- **Causa raiz:** Endpoint de validacao implementado como `GET` com parametro de query em vez de `POST` com corpo.
+- **Correcao aplicada:** Novo endpoint `POST /api/auth/validate-token` com `ValidateTokenRequest { token }` (`@NotBlank`, `@Size(max=255)`); `GET` removido do controller (agora retorna 405 via novo handler de `HttpRequestMethodNotSupportedException` no `GlobalExceptionHandler`, que antes caia no catch-all e respondia 500). `frontend/src/pages/ResetPassword.tsx` atualizado para o novo contrato POST. Email de recuperacao (deep link mobile) nao foi alterado.
+- **Arquivos alterados:** `backend/src/main/java/com/gestor/financeiro/controller/AuthController.java`, `backend/src/main/java/com/gestor/financeiro/dto/ValidateTokenRequest.java` (novo), `backend/src/main/java/com/gestor/financeiro/exception/GlobalExceptionHandler.java`, `frontend/src/pages/ResetPassword.tsx`, `backend/API.md`, `deploy/vps/README.md`
+- **Testes/validacoes executadas:** `AuthControllerTest` atualizado, incluindo `validateToken_getRemovidoRetorna405` e conversao dos testes existentes de GET para POST; `./mvnw -q test` → 155/155 PASS; `frontend npm run build` → PASS; `frontend npm run test` → 15/15 PASS.
+- **Resultado:** PASS
+- **Ressalvas:** Mudanca de contrato de API e breaking para qualquer integrador externo que ainda dependa do `GET` antigo — sem versionamento formal de API no projeto, mitigado apenas por atualizacao de documentacao.
+- **Commit:** `5c08ce0`
+
+---
+
+## BUG-0065 — Teto de validacao adicionado a `TransacaoRequest.totalParcelas`
+
+- **Problema relacionado:** PROB-0072
+- **Data:** 2026-07-14
+- **Area:** backend
+- **Sintoma:** `totalParcelas` aceitava qualquer valor positivo sem limite superior (ex.: 999999 parcelas seria aceito pela validacao de DTO).
+- **Causa raiz:** Validacao original cobria apenas o piso, sem teto.
+- **Correcao aplicada:** `@Max(120)` adicionado ao campo `totalParcelas` em `TransacaoRequest`.
+- **Arquivos alterados:** `backend/src/main/java/com/gestor/financeiro/dto/TransacaoRequest.java`
+- **Testes/validacoes executadas:** `./mvnw -q test` → 155/155 PASS.
+- **Resultado:** PASS
+- **Ressalvas:** Nenhuma identificada.
+- **Commit:** `0d1e0c0`
+
+---
+
 > Este arquivo e mantido pelo `docs-reporter`. Bugs corrigidos devem ser registrados com o proximo ID
 > sequencial (BUG-0002, BUG-0003, ...). Para historico de versoes, consulte `docs/CHANGELOG.md`.

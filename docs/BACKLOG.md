@@ -1026,5 +1026,84 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Pendente:** configurar projeto/DSN/secrets externos, executar release CI e comprovar evento sem PII; alertas/SLO e observabilidade web permanecem fora desta rodada.
 - **Status:** PARCIAL — instrumentação mobile implementada; operação externa não comprovada.
 
+---
+
+## BACKLOG-0080 — Executar gates de deploy do hardening pre-producao (P0-1/nginx/redes/smoke)
+
+- **Prioridade:** P0
+- **Area:** infra, seguranca, backend
+- **Motivo:** o fix de PROB-0066/BUG-0059 (rate limit de auth contornavel via X-Forwarded-For forjado) e o fix de PROB-0070/BUG-0063 (headers de seguranca do SPA) foram commitados em `c959dfc`, mas nao foram validados na cadeia real de proxy/rede — mudanca de `forward-headers-strategy` (framework→native) e de rede Docker tem risco real de quebrar cookies/redirects se mal configurada em producao.
+- **Dependencias:** deploy do commit `c959dfc`; acesso a ambiente de staging equivalente a producao (nginx standalone e/ou atras do Nginx Proxy Manager).
+- **Criterio de aceite:**
+  1. `nginx -t` PASS nos dois configs (`deploy/vps/nginx.conf.template` e `deploy/vps/nginx.npm.conf`);
+  2. redes do `docker-compose.production.yml` recriadas (rede interna `web<->API` e nova) e confirmado que o Proxy Host do Nginx Proxy Manager aponta para o servico `GestorFinanceiro-Web` (nao mais direto para a API);
+  3. smoke em staging comprovando que um `X-Forwarded-For` forjado pelo cliente **nao** muda o bucket de rate limit resolvido pela API (teste com 2+ IPs declarados falsos, mesma origem real, mesmo bucket bloqueado);
+  4. smoke confirmando cookie `refreshToken` com `Secure` funcionando e **sem** loop de redirect apos a troca `forward-headers-strategy` framework→native;
+  5. carregamento do SPA em staging sem violacao de CSP no console do navegador (PROB-0070).
+- **Risco se ficar pendente:** o fix de rate limit (P0 de seguranca) e os headers de seguranca do SPA permanecem nao comprovados em ambiente real — risco de a correcao nao ter efeito pratico (ou pior, quebrar autenticacao) quando promovida a producao sem essa validacao.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0081 — Idempotencia de `InvestimentoService.adicionarMovimentacao`
+
+- **Prioridade:** P2
+- **Area:** backend
+- **Motivo:** auditoria abrangente de 2026-07-14 identificou que `InvestimentoService.adicionarMovimentacao` nao usa `Idempotency-Key`, ao contrario de outros fluxos financeiros sensiveis a duplo clique/retry (ex.: pagamento de fatura, BUG-0052; pagamento de parcela, BUG-0060) — reenvio da mesma requisicao pode duplicar compra/venda/dividendo na posicao do ativo.
+- **Dependencias:** nenhuma tecnica; decisao de produto sobre se o padrao `Idempotency-Key` ja usado em fatura deve se estender a investimentos.
+- **Criterio de aceite:** `adicionarMovimentacao` aceita e persiste `Idempotency-Key` por requisicao; reenvio da mesma key retorna o resultado original sem duplicar a movimentacao; teste automatizado cobrindo reenvio.
+- **Risco se ficar pendente:** duplo clique ou retry de rede no lancamento de uma movimentacao de investimento pode duplicar compra/venda/dividendo, distorcendo posicao e preco medio do ativo (mesma classe de risco ja corrigida em PROB-0067/BUG-0060 para parcelas).
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0082 — Paginacao na listagem de investimentos
+
+- **Prioridade:** P2
+- **Area:** backend
+- **Motivo:** auditoria abrangente de 2026-07-14 identificou que a listagem de investimentos (ativos/movimentacoes) nao e paginada, ao contrario de outras listagens do sistema — risco de payload/consulta crescer sem limite conforme o usuario acumula historico de movimentacoes.
+- **Dependencias:** nenhuma tecnica; ajuste de contrato de API (`API.md`, fora da responsabilidade deste agente de documentacao) e dos clientes (web/mobile) que consomem a listagem.
+- **Criterio de aceite:** endpoint de listagem de investimentos aceita `page`/`size` (ou equivalente ja usado em outras listagens do sistema); resposta inclui metadados de paginacao; clientes web/mobile atualizados para consumir paginado.
+- **Risco se ficar pendente:** degradacao de performance e payload crescente para usuarios com muitas movimentacoes de investimento acumuladas.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0083 — `RefreshToken.toString()` pode expor PII/segredo em logs
+
+- **Prioridade:** P2
+- **Area:** backend, seguranca, LGPD
+- **Motivo:** auditoria abrangente de 2026-07-14 identificou que a entidade `RefreshToken` nao tem `toString()` customizado (ou `@ToString.Exclude` no campo sensivel) — se a entidade for logada por engano (ex.: log de debug de uma entidade JPA completa, exception com objeto anexado), o hash/valor do token pode acabar em log.
+- **Dependencias:** nenhuma.
+- **Criterio de aceite:** `RefreshToken.toString()` (Lombok `@ToString` ou implementacao manual) exclui explicitamente o campo do token/hash; teste ou verificacao manual confirmando que `toString()` nao contem o valor sensivel.
+- **Risco se ficar pendente:** vazamento de token de refresh (equivalente a sequestro de sessao) em logs de aplicacao, caso a entidade seja logada por engano em algum ponto futuro do codigo.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0084 — Lombok `@Data` em entidades com relacionamento bidirecional
+
+- **Prioridade:** P2
+- **Area:** backend
+- **Motivo:** auditoria abrangente de 2026-07-14 identificou pares de entidades JPA com relacionamento bidirecional usando Lombok `@Data` (que gera `equals`/`hashCode`/`toString` incluindo todos os campos, inclusive os relacionamentos) — risco de recursao infinita (`StackOverflowError`) em `toString()`/`equals()`/`hashCode()` quando ambos os lados da relacao se referenciam.
+- **Dependencias:** identificar exaustivamente os pares afetados (nao levantado nesta rodada de documentacao — a auditoria original apontou o padrao de risco, sem lista fechada de entidades).
+- **Criterio de aceite:** entidades com relacionamento bidirecional usam `@ToString.Exclude`/`@EqualsAndHashCode.Exclude` (ou equivalente manual) no lado que fecha o ciclo; teste ou verificacao manual de que `toString()`/`equals()`/`hashCode()` nao estoura em nenhum par bidirecional do modelo.
+- **Risco se ficar pendente:** `StackOverflowError` em runtime se algum caminho de codigo (log, debug, comparacao) acionar `toString()`/`equals()`/`hashCode()` num objeto com ciclo bidirecional nao protegido.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0085 — Revisar defaults inseguros remanescentes em `application.properties` base
+
+- **Prioridade:** P2
+- **Area:** backend, seguranca
+- **Motivo:** auditoria abrangente de 2026-07-14 reapontou risco de defaults inseguros no `application.properties` base (perfil default, nao `-vps`/`-prod`). BACKLOG-0011 (fechado em 2026-07-13) ja tratou senha de DB `1234` e JWT secret default especificos; este item cobre uma revisao mais ampla de todo o `application.properties` base para confirmar que nenhum outro default sensivel (ex.: CORS, credenciais de terceiros, flags de debug) fica implicito sem documentacao ou sem exigir override explicito em producao.
+- **Dependencias:** BACKLOG-0011 (relacionado, ja fechado — este item e um follow-up mais amplo, nao uma reabertura).
+- **Criterio de aceite:** revisao linha a linha do `application.properties` base classificando cada default como (a) seguro para dev local, (b) exige override obrigatorio em prod (documentado), ou (c) deve ser removido; nenhum default sensivel de producao herdado silenciosamente do perfil base.
+- **Risco se ficar pendente:** configuracao insegura de producao por omissao, caso um profile futuro (`-vps`/`-prod`) deixe de sobrescrever algum default sensivel do perfil base sem que isso seja percebido.
+- **Status:** ABERTO
+
 >
 > Atualizacao anterior: 2026-07-10 (auditoria backend/non-frontend alto nivel: BACKLOG-0058 a BACKLOG-0069 — ver PROBLEM_LEDGER PROB-0049 a PROB-0060 e relatorio `REVIEW_REPORTS/2026-07-10_backend_nonfrontend_high-level-audit.md`).
+>
+> Atualizacao 2026-07-14: hardening pre-producao P0+P1 foi commitado em `main` (`5c08ce0`, `0d1e0c0`, `c959dfc`) e fechou PROB-0066 a PROB-0072 (BUG-0059 a BUG-0065); BACKLOG-0080 registra os gates de deploy pendentes (nginx/redes/smoke) e BACKLOG-0081 a BACKLOG-0085 registram os itens P2 identificados na mesma auditoria e explicitamente adiados. Ver `docs/REVIEW_REPORTS/2026-07-14_full-system_implementation_pre-production-hardening.md`.

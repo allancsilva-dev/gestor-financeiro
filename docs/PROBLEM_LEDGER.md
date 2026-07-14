@@ -1342,4 +1342,193 @@ pelas parcelas não pagas, e a diferença sobre a parte já paga (fatura imutáv
 
 ---
 
-> Mantido pelo `docs-reporter`. Ultima atualizacao: 2026-07-11 (BUG-0053 — rollover de credito/saldo devedor de fatura: PROB-0050 fechado; PROB-0065 fechado como falso positivo apos build web PASS).
+## PROB-0066 — Rate limit de login/forgot-password/register contornavel via X-Forwarded-For forjado
+
+- **ID:** PROB-0066
+- **Titulo:** `LoginRateLimitFilter`/`AuthController` usavam `getRemoteAddr()` com `forward-headers-strategy=framework`, permitindo que o cliente forjasse o IP usado como chave de rate limit via header `X-Forwarded-For`
+- **Data:** 2026-07-14
+- **Origem:** auditoria abrangente (security-auditor) sobre a stack de deploy VPS/nginx
+- **Severidade:** HIGH
+- **Status:** FECHADO (commit `c959dfc`)
+- **Area:** backend, seguranca, infra
+- **Sintoma:** Com `forward-headers-strategy=framework` (Spring interpreta o `X-Forwarded-For` recebido) e nginx configurado apenas para *append* (nao sobrescrever) o header, o primeiro IP (leftmost) da lista `X-Forwarded-For` era controlado pelo proprio cliente da requisicao. `getRemoteAddr()` em `LoginRateLimitFilter` e `AuthController` resolvia esse IP forjado como chave do bucket, permitindo que um atacante trocasse de IP declarado a cada tentativa e contornasse os limites de `login` (5/min), `forgot-password` (3/min) e `register` (5/min).
+- **Causa raiz:** Confianca implicita em todo o header `X-Forwarded-For` recebido pela aplicacao, sem que a camada de proxy (nginx) sobrescrevesse/normalizasse o header antes de repassar, e sem que o Tomcat estivesse configurado para extrair o IP real de forma confiavel a partir de uma lista de proxies internos conhecidos.
+- **Impacto tecnico:** Rate limit e account lockout de login, recuperacao de senha e registro efetivamente inoperantes contra um atacante determinado — abre caminho para brute force de senha e abuso de envio de email de recuperacao/registro em massa.
+- **Arquivos ou modulos relacionados:** `backend/src/main/resources/application-vps.properties`, `backend/src/main/java/com/gestor/financeiro/config/LoginRateLimitFilter.java`, `backend/src/main/java/com/gestor/financeiro/controller/AuthController.java`, `docker-compose.production.yml`, `docker-compose.vps.yml`, `deploy/vps/nginx.conf.template`, `deploy/vps/nginx.npm.conf`, `deploy/vps/README.md`
+- **Solucao proposta:** Trocar `forward-headers-strategy` de `framework` para `native` (Tomcat `RemoteIpValve` resolve o IP real a partir de uma lista fechada de proxies internos, em vez de confiar cegamente no header) e garantir que a camada de proxy mais externa sempre sobrescreva/normalize o `X-Forwarded-For` com o IP real de conexao.
+- **Solucao aplicada:** `forward-headers-strategy` alterado de `framework` para `native` em `application-vps.properties`, com `RemoteIpValve` configurado (`remote-ip-header=X-Forwarded-For`, `protocol-header=X-Forwarded-Proto`, `internal-proxies` cobrindo loopback e faixas privadas Docker). A env var `SERVER_FORWARD_HEADERS_STRATEGY=native` foi adicionada em `docker-compose.production.yml` e `docker-compose.vps.yml` — descoberta chave durante a correcao foi que a env var sobrepoe o profile, entao ambos precisavam ser atualizados para o valor realmente entrar em vigor. `deploy/vps/nginx.conf.template` (topologia standalone, 1 hop) passou a sobrescrever o `X-Forwarded-For` com `$remote_addr` em vez de repassar o header recebido. `deploy/vps/nginx.npm.conf` (topologia atras do Nginx Proxy Manager, 2 hops) mantem o comportamento *append-only*, mas a premissa de que o NPM sempre anexa seu proprio `$remote_addr` ao `X-Forwarded-For` (e nao repassa cegamente o header do cliente) foi documentada explicitamente em `deploy/vps/README.md`. Adicionalmente, `docker-compose.production.yml` ganhou uma rede Docker interna dedicada `web<->API`, com a API removida da rede `proxy` — o NPM so alcanca o container `web`, reduzindo a superficie de acesso direto a API.
+- **Evidencias ou comandos usados:** `./mvnw -q test` → 155/155 PASS apos a mudanca; leitura de `application-vps.properties`, `docker-compose.production.yml`, `docker-compose.vps.yml`, `deploy/vps/nginx.conf.template`, `deploy/vps/nginx.npm.conf` confirmando a alteracao (`git diff --stat` desses arquivos: 6 arquivos, 94 insercoes, 13 remocoes).
+- **Riscos residuais:** A premissa "NPM sempre anexa seu `$remote_addr` real" depende de configuracao correta e continua do Nginx Proxy Manager fora do repositorio (nao versionado no codigo) — se o NPM for reconfigurado para repassar o `X-Forwarded-For` do cliente sem anexar, o problema volta a existir silenciosamente. Nenhum teste automatizado do backend simula a cadeia real de proxies (nginx standalone e/ou NPM) validando o IP resolvido; a validacao depende de `nginx -t` + smoke manual em staging (ver BACKLOG-0080). Mudanca commitada, mas ainda nao testada em ambiente VPS real ate o momento deste registro.
+- **Proximo passo:** Executar `nginx -t` nos dois configs, recriar as redes do `docker-compose.production.yml` (rede interna e nova) e validar em staging que um `X-Forwarded-For` forjado pelo cliente nao muda o bucket de rate limit resolvido pela API (ver BACKLOG-0080).
+
+---
+
+## PROB-0067 — Pagamento de parcela duplicava debito na carteira sob reenvio/concorrencia
+
+- **ID:** PROB-0067
+- **Titulo:** `ParcelaService.marcarComoPaga` sem guard de estado nem idempotency key — duas chamadas ao mesmo endpoint criavam dois `MovimentoCarteira` de saida
+- **Data:** 2026-07-14
+- **Origem:** auditoria abrangente (security-auditor / database-engineer) sobre integridade financeira
+- **Severidade:** HIGH
+- **Status:** FECHADO (commit `0d1e0c0`)
+- **Area:** backend, banco
+- **Sintoma:** `PUT /api/v1/parcelas/{id}/pagar` chamado duas vezes (duplo clique, retry de rede, ou requisicoes concorrentes) para a mesma parcela ja paga criava um **segundo** `MovimentoCarteira` de saida, debitando a carteira do usuario duas vezes pelo mesmo pagamento e corrompendo o saldo.
+- **Causa raiz:** `marcarComoPaga` nao verificava se a parcela ja estava `PAGO` antes de gerar o movimento de carteira, e a chamada nao usava uma `idempotencyKey` estatica (decisao deliberada, ver "Solucao aplicada") nem tinha `@Version` para serializar escrita concorrente na mesma parcela.
+- **Impacto tecnico:** Corrupcao de saldo financeiro por debito duplicado — mesma classe de risco que PROB-0002 (race condition de saldo), mas neste caso tanto por reenvio sequencial (idempotencia ausente) quanto por concorrencia real (falta de lock).
+- **Arquivos ou modulos relacionados:** `backend/src/main/java/com/gestor/financeiro/service/ParcelaService.java`, `backend/src/main/java/com/gestor/financeiro/model/Parcela.java`, `backend/src/main/resources/db/migration/V28__pre_production_hardening.sql`, `backend/src/test/java/com/gestor/financeiro/ParcelaServiceTest.java`
+- **Solucao proposta:** Guard no service (retornar no-op se a parcela ja estiver `PAGO`) + `@Version` na entidade `Parcela` para que escrita concorrente sobre a mesma parcela falhe com `OptimisticLockingFailureException` (→ 409) em vez de aplicar as duas escritas.
+- **Solucao aplicada:** `ParcelaService.marcarComoPaga` agora retorna a parcela sem efeito colateral (no-op) se o status ja for `PAGO`, antes de qualquer geracao de `MovimentoCarteira`. Coluna `version BIGINT NOT NULL DEFAULT 0` adicionada a `Parcela` (anotacao `@Version`) e a tabela `parcelas` via migration `V28__pre_production_hardening.sql`, seguindo o mesmo padrao ja usado em Carteira/Conta/Meta/Categoria (V2, PROB-0002). Deliberadamente **nao** foi adotada uma `idempotencyKey` estatica por parcela, para preservar o fluxo legitimo de produto pagar → despagar → pagar (uma key estatica bloquearia o terceiro pagamento).
+- **Evidencias ou comandos usados:** Novo teste `ParcelaServiceTest.pagarParcelaJaPagaEhIdempotente`; `./mvnw -q test` → 155/155 PASS; `./mvnw -q verify` → BUILD SUCCESS.
+- **Riscos residuais:** O guard no service cobre o caminho sequencial (reenvio apos resposta); a protecao contra concorrencia real (duas threads simultaneas pagando a mesma parcela nao-paga) depende do `@Version` e do 409 gerado por `OptimisticLockingFailureException` — nao ha teste automatizado de concorrencia real com duas threads simultaneas para este fluxo especifico (mesma limitacao estrutural documentada em outros pontos do ledger, ex. PROB-0058).
+- **Proximo passo:** Nenhum bloqueante. Considerar teste de concorrencia real (2 threads) para `marcarComoPaga` em rodada futura de hardening, se o caso de uso justificar o custo de manutencao do teste.
+
+---
+
+## PROB-0068 — Exclusao de carteira em uso normal retornava HTTP 500
+
+- **ID:** PROB-0068
+- **Titulo:** `CarteiraService.deletar` so verificava movimentos de origem `CARTEIRA_AJUSTE`, deixando o caminho mais comum (carteira com `TRANSACAO`/`PARCELA`) cair em violacao de FK `RESTRICT` sem tratamento
+- **Data:** 2026-07-14
+- **Origem:** auditoria abrangente (quality-reviewer / database-engineer)
+- **Severidade:** HIGH
+- **Status:** FECHADO (commit `0d1e0c0`)
+- **Area:** backend, banco
+- **Sintoma:** `DELETE /api/v1/carteiras/{id}` numa carteira com uso normal (qualquer transacao ja lancada contra ela, origem `TRANSACAO` ou `PARCELA`) retornava HTTP 500 em vez de um erro de negocio tratado (400/409), porque o guard de aplicacao so cobria origem `CARTEIRA_AJUSTE` e a exclusao seguia ate colidir com a constraint de FK `RESTRICT` em `movimentos_carteira.carteira_id` no banco.
+- **Causa raiz:** Guard de validacao incompleto em `CarteiraService.deletar` — cobria apenas um subconjunto (`CARTEIRA_AJUSTE`) das origens possiveis de `MovimentoCarteira`, deixando os casos mais frequentes de uso real (transacoes e parcelas) sem verificacao previa, resultando em excecao de integridade de banco nao mapeada propagando como 500.
+- **Impacto tecnico:** Qualquer usuario que tentasse excluir uma carteira ja usada em transacoes normais recebia um erro 500 generico em vez de uma mensagem de negocio clara — o caminho mais comum de uso da funcionalidade estava quebrado.
+- **Arquivos ou modulos relacionados:** `backend/src/main/java/com/gestor/financeiro/service/CarteiraService.java`, `backend/src/main/java/com/gestor/financeiro/repository/MovimentoCarteiraRepository.java`, `backend/src/test/java/com/gestor/financeiro/CarteiraControllerTest.java`
+- **Solucao proposta:** Trocar a checagem restrita por origem por uma checagem generica de existencia de qualquer `MovimentoCarteira` associado a carteira, bloqueando a exclusao com a `BusinessException` de negocio ja existente no fluxo.
+- **Solucao aplicada:** Novo metodo `existsByCarteiraId(Long)` em `MovimentoCarteiraRepository`; `CarteiraService.deletar` agora bloqueia a exclusao (com a mesma `BusinessException` de negocio ja usada no fluxo) sempre que existir **qualquer** movimento associado a carteira, independentemente da origem.
+- **Evidencias ou comandos usados:** Novos testes `CarteiraControllerTest.deletarCarteiraComMovimentoDeTransacaoRetornaErroDeNegocio` e `CarteiraControllerTest.deletarCarteiraSemMovimentoRemove`; `./mvnw -q test` → 155/155 PASS.
+- **Riscos residuais:** Nenhum identificado — o guard agora cobre o superset de origens de `MovimentoCarteira`. Mensagem de negocio ao usuario final ainda depende do texto ja existente na `BusinessException` (nao revisado neste ciclo para clareza de UX).
+- **Proximo passo:** Nenhum bloqueante.
+
+---
+
+## PROB-0069 — Indices ausentes em `movimentos_carteira.carteira_id` e `refresh_tokens.usuario_id` (full scan em hot paths)
+
+- **ID:** PROB-0069
+- **Titulo:** Consulta por `carteira_id` isolado e consultas de auth por `usuario_id` em `refresh_tokens` nao tinham indice dedicado
+- **Data:** 2026-07-14
+- **Origem:** auditoria abrangente (database-engineer)
+- **Severidade:** LOW
+- **Status:** FECHADO (commit `0d1e0c0`)
+- **Area:** banco
+- **Sintoma:** `existsByCarteiraId` (novo metodo criado para PROB-0068) e a validacao de FK sobre `movimentos_carteira.carteira_id` nao tinham indice dedicado — o unico indice existente em `movimentos_carteira` (criado na migration V11) e composto e liderado por `usuario_id`, inutil para filtro isolado por `carteira_id`. Da mesma forma, `refresh_tokens.usuario_id` — usado em `findByUsuario`, `revokeAllByUsuario` e `countValidTokensByUsuario`, executado em todo login/refresh/logout-all — nao tinha indice, resultando em full table scan nesses hot paths de autenticacao.
+- **Causa raiz:** Indices nao acompanharam o crescimento de queries por esses campos ao longo do tempo.
+- **Impacto tecnico:** Degradacao de performance proporcional ao volume de dados em `movimentos_carteira` e `refresh_tokens` — sem impacto funcional/correcao, apenas latencia crescente em operacoes frequentes (exclusao de carteira, todo fluxo de autenticacao).
+- **Arquivos ou modulos relacionados:** `backend/src/main/resources/db/migration/V28__pre_production_hardening.sql`
+- **Solucao proposta:** Criar `CREATE INDEX idx_movimentos_carteira_carteira ON movimentos_carteira(carteira_id)` e `CREATE INDEX idx_refresh_tokens_usuario ON refresh_tokens(usuario_id)`.
+- **Solucao aplicada:** Ambos os indices criados via migration `V28__pre_production_hardening.sql` (`CREATE INDEX IF NOT EXISTS`), na mesma migration que adiciona a coluna `version` de `Parcela` (PROB-0067). `V27` permanece reservado em `db/contract` (nao promovido neste ciclo).
+- **Evidencias ou comandos usados:** `scripts/verify-postgres-migrations.sh` PASS contra PostgreSQL real via Docker, incluindo a migration V28.
+- **Riscos residuais:** Nenhum identificado. Migration aditiva, `IF NOT EXISTS`, sem risco de quebra de compatibilidade.
+- **Proximo passo:** Nenhum bloqueante.
+
+---
+
+## PROB-0070 — SPA (rotas fora de `/api/**`) servida sem headers de seguranca
+
+- **ID:** PROB-0070
+- **Titulo:** `SecurityConfig` cobre apenas `/api/**`; assets/HTML do frontend web servidos pelo nginx sem HSTS, X-Frame-Options, CSP e demais headers de seguranca
+- **Data:** 2026-07-14
+- **Origem:** auditoria abrangente (security-auditor)
+- **Severidade:** MEDIUM
+- **Status:** FECHADO (commit `c959dfc`)
+- **Area:** frontend, seguranca, infra
+- **Sintoma:** O SPA (HTML/JS/CSS servidos diretamente pelo nginx, fora do escopo de `/api/**`) nao recebia nenhum dos headers de seguranca aplicados pelo Spring Security no backend — sem HSTS, sem `X-Frame-Options`, sem `X-Content-Type-Options`, sem `Referrer-Policy` e sem CSP, deixando a superficie de risco de clickjacking/MIME sniffing/downgrade HTTP aberta na camada que o usuario final de fato carrega no navegador.
+- **Causa raiz:** `SecurityConfig` (Spring) so intercepta requisicoes para `/api/**`; o SPA e servido por um `nginx` separado (container `web`) que nao tinha os headers configurados.
+- **Impacto tecnico:** Risco de clickjacking (ausencia de `X-Frame-Options`/`frame-ancestors`), MIME sniffing (`X-Content-Type-Options`), vazamento de referrer entre origens e ausencia de forcamento de HTTPS via HSTS na pagina principal servida ao usuario.
+- **Arquivos ou modulos relacionados:** `deploy/vps/nginx.conf.template`, `deploy/vps/nginx.npm.conf`
+- **Solucao proposta:** Adicionar `add_header` para HSTS, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` e uma CSP explicita nos dois configs de nginx.
+- **Solucao aplicada:** Ambos os arquivos (`nginx.conf.template` e `nginx.npm.conf`) ganharam os headers: HSTS, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` e CSP (`default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'`). Os headers sao repetidos explicitamente no bloco `/assets/` porque `add_header` no nginx nao herda automaticamente de blocos pai quando o bloco filho declara seu proprio `add_header`.
+- **Evidencias ou comandos usados:** `git diff --stat deploy/vps/nginx.conf.template deploy/vps/nginx.npm.conf` → 43 insercoes, 3 remocoes; leitura direta dos dois arquivos confirmando os headers.
+- **Riscos residuais:** CSP escolhida e restritiva (`'self'` para script/style, sem `unsafe-inline`) — se o SPA atual depender de inline script/style em algum ponto nao coberto pelos testes de build, pode quebrar silenciosamente em producao; validacao recomendada via `nginx -t` + carregamento manual do SPA em staging antes do rollout (ver BACKLOG-0080). Nenhum teste automatizado verifica os headers HTTP retornados pelo nginx (fora do escopo de teste do backend/frontend).
+- **Proximo passo:** Validar em staging que o SPA carrega sem violacao de CSP no console do navegador antes de promover para producao (ver BACKLOG-0080).
+
+---
+
+## PROB-0071 — Token de reset de senha trafegava na query string (`GET /api/auth/validate-token?token=...`)
+
+- **ID:** PROB-0071
+- **Titulo:** Endpoint de validacao de token de reset de senha aceitava o token via query string, expondo-o a access logs de proxies/CDN/browser history
+- **Data:** 2026-07-14
+- **Origem:** auditoria abrangente (security-auditor / lgpd-auditor)
+- **Severidade:** MEDIUM
+- **Status:** FECHADO (commit `5c08ce0`)
+- **Area:** backend, frontend, seguranca, LGPD
+- **Sintoma:** `GET /api/auth/validate-token?token=...` trafegava o token de reset de senha (segredo de curta duracao, mas ainda assim um segredo capaz de redefinir a senha da conta) na query string da URL — dado tipicamente persistido em access logs de nginx/proxies intermediarios, historico do navegador e possivelmente em ferramentas de observabilidade/APM que capturam URLs completas.
+- **Causa raiz:** Escolha original de design usou `GET` com parametro de query para um endpoint de validacao que deveria tratar o token como segredo, mesmo padrao problematico do fluxo de "esqueci minha senha" classico quando implementado via GET.
+- **Impacto tecnico:** Exposicao de um segredo de autenticacao (token de reset) em superficies de log persistentes fora do controle direto da aplicacao — risco de LGPD/seguranca caso esses logs sejam acessados indevidamente dentro da janela de validade do token.
+- **Arquivos ou modulos relacionados:** `backend/src/main/java/com/gestor/financeiro/controller/AuthController.java`, `backend/src/main/java/com/gestor/financeiro/dto/ValidateTokenRequest.java` (novo), `backend/src/main/java/com/gestor/financeiro/exception/GlobalExceptionHandler.java`, `backend/src/test/java/com/gestor/financeiro/AuthControllerTest.java`, `frontend/src/pages/ResetPassword.tsx`, `backend/API.md`, `deploy/vps/README.md`
+- **Solucao proposta:** Trocar `GET` com query string por `POST` com o token no corpo da requisicao (`ValidateTokenRequest`), removendo o `GET` do endpoint.
+- **Solucao aplicada:** Novo endpoint `POST /api/auth/validate-token` recebendo `ValidateTokenRequest { token }` (`@NotBlank`, `@Size(max=255)`). O `GET` anterior foi removido do controller — uma chamada `GET` para o mesmo path agora retorna HTTP 405 (Method Not Allowed) por meio de um novo handler de `HttpRequestMethodNotSupportedException` no `GlobalExceptionHandler` (antes desse handler, a ausencia do metodo caia no catch-all generico e respondia 500 em vez de 405). `frontend/src/pages/ResetPassword.tsx` atualizado para chamar o novo contrato POST. O email de recuperacao de senha continua sendo um deep link mobile e nao foi alterado neste ciclo.
+- **Evidencias ou comandos usados:** Novos/ajustados testes em `AuthControllerTest` (incluindo `validateToken_getRemovidoRetorna405` e conversao dos testes existentes de GET para POST); `./mvnw -q test` → 155/155 PASS; `backend/API.md` e `deploy/vps/README.md` atualizados para refletir o novo contrato (fora do escopo de edicao deste registro — ver nota de restricao abaixo).
+- **Riscos residuais:** Qualquer client/integrador externo que ainda dependa do contrato antigo (`GET` com query string) quebra com 405 — mudanca de contrato de API breaking, mitigada por documentacao atualizada em `backend/API.md`/`deploy/vps/README.md`, mas sem versionamento de API formal no projeto.
+- **Proximo passo:** Nenhum bloqueante. Confirmar em staging que o fluxo completo de reset de senha (email → deep link mobile → POST validate-token → POST reset-password) segue funcional apos a mudanca de contrato.
+
+---
+
+## PROB-0072 — `TransacaoRequest.totalParcelas` sem teto maximo de validacao
+
+- **ID:** PROB-0072
+- **Titulo:** Campo `totalParcelas` de `TransacaoRequest` aceitava qualquer valor positivo, sem limite superior razoavel
+- **Data:** 2026-07-14
+- **Origem:** auditoria abrangente (quality-reviewer)
+- **Severidade:** LOW
+- **Status:** FECHADO (commit `0d1e0c0`)
+- **Area:** backend
+- **Sintoma:** `TransacaoRequest.totalParcelas` nao tinha teto de validacao — uma compra parcelada em, por exemplo, 999999 parcelas seria aceita pela validacao de DTO, gerando esse volume de `Parcela`/`FaturaLancamento` no banco.
+- **Causa raiz:** Validacao original cobria apenas o piso (valor minimo), sem limite superior.
+- **Impacto tecnico:** Potencial abuso (gerar volume excessivo de registros por requisicao) e caso de uso sem sentido no dominio real de parcelamento de cartao de credito (nenhum emissor real oferece centenas de parcelas).
+- **Arquivos ou modulos relacionados:** `backend/src/main/java/com/gestor/financeiro/dto/TransacaoRequest.java`
+- **Solucao proposta:** Adicionar `@Max(120)` (10 anos de parcelas mensais, teto generoso mas finito) ao campo.
+- **Solucao aplicada:** `@Max(120)` adicionado a `totalParcelas` em `TransacaoRequest`.
+- **Evidencias ou comandos usados:** `./mvnw -q test` → 155/155 PASS.
+- **Riscos residuais:** Nenhum identificado — teto generoso o suficiente para nao colidir com nenhum caso de uso real documentado no sistema.
+- **Proximo passo:** Nenhum.
+
+---
+
+## PROB-0073 — Recomendacao de auditoria rejeitada: CHECK `contas.valor_gasto >= 0`
+
+- **ID:** PROB-0073
+- **Titulo:** Auditoria recomendou constraint de banco `CHECK (valor_gasto >= 0)` em `contas`; recomendacao avaliada e rejeitada
+- **Data:** 2026-07-14
+- **Origem:** auditoria abrangente (database-engineer) — recomendacao nao implementada, registrada para rastreabilidade da decisao
+- **Severidade:** MEDIUM
+- **Status:** FECHADO (recomendacao rejeitada com justificativa, decisao registrada; nenhum codigo alterado)
+- **Area:** backend, banco
+- **Sintoma:** N/A — nao e um bug observado em producao, e uma recomendacao de hardening de banco feita durante a auditoria abrangente.
+- **Causa raiz:** N/A.
+- **Impacto tecnico:** N/A — a recomendacao, se implementada como proposta, teria **quebrado** um comportamento de produto legitimo e ja documentado.
+- **Arquivos ou modulos relacionados:** `docs/SYSTEM_OVERVIEW.md` (regra de produto "credito de fatura e saldo devedor rolado", secao R1/R2, decisao V20:5-8 sobre `valor_gasto`)
+- **Solucao proposta (pela auditoria):** Adicionar `CHECK (valor_gasto >= 0)` na tabela `contas` para impedir saldo de gasto negativo.
+- **Solucao aplicada:** Nenhuma — recomendacao **rejeitada**. `Conta.valorGasto` negativo e um estado valido e ja documentado do dominio: representa **credito de cartao** (por exemplo, estorno maior que as compras em aberto no cartao), exibido na UI como "credito disponivel" desde BUG-0052 (2026-07-11) e formalizado como principio de produto na migration `V20` (comentario nas linhas 5-8, que documenta `valor_gasto` negativo como credito legitimo de cartao). Aplicar o `CHECK` proposto teria feito o backend falhar (`DataIntegrityViolationException`) exatamente no cenario que R1 do rollover de fatura (PROB-0050/BUG-0053) foi desenhado para suportar.
+- **Evidencias ou comandos usados:** Leitura de `docs/SYSTEM_OVERVIEW.md` secao "Regra de produto: credito de fatura e saldo devedor rolado" e do item 23 de "Limitacoes conhecidas" (`Conta.valorGasto` pode ficar temporariamente negativo).
+- **Riscos residuais:** Nenhum — decisao de nao implementar preserva o comportamento correto. Risco inverso (implementar a constraint) seria quebrar o rollover de credito de fatura em producao.
+- **Proximo passo:** Nenhum. Se uma auditoria futura reabrir esta recomendacao, referenciar este registro e a migration V20 antes de qualquer implementacao.
+
+---
+
+## PROB-0074 — Recomendacao de auditoria rejeitada: piso zero + lock pessimista em `ContaService.removerGasto`
+
+- **ID:** PROB-0074
+- **Titulo:** Auditoria recomendou piso zero (`Math.max(0, ...)`) e lock pessimista em `ContaService.removerGasto`; recomendacao avaliada e rejeitada
+- **Data:** 2026-07-14
+- **Origem:** auditoria abrangente (database-engineer) — recomendacao nao implementada, registrada para rastreabilidade da decisao
+- **Severidade:** MEDIUM
+- **Status:** FECHADO (recomendacao rejeitada com justificativa, decisao registrada; nenhum codigo alterado)
+- **Area:** backend, banco
+- **Sintoma:** N/A — recomendacao de hardening feita durante a auditoria abrangente, nao um bug observado.
+- **Causa raiz:** N/A.
+- **Impacto tecnico:** N/A — a recomendacao, se implementada como proposta, teria **engolido** (zerado) credito legitimo de cartao em vez de preserva-lo.
+- **Arquivos ou modulos relacionados:** `backend/src/main/java/com/gestor/financeiro/service/ContaService.java` (`removerGasto`), `backend/src/main/java/com/gestor/financeiro/model/Conta.java` (`@Version` ja existente desde PROB-0002)
+- **Solucao proposta (pela auditoria):** Impedir `valorGasto` de ficar negativo em `removerGasto` aplicando um piso zero no calculo, e adicionar lock pessimista para serializar concorrencia.
+- **Solucao aplicada:** Nenhuma — recomendacao **rejeitada** em duas frentes: (1) o piso zero engoliria credito de cartao legitimo (mesmo principio de PROB-0073 — `valorGasto` negativo e um estado valido de dominio, nao um bug); (2) `Conta` **ja possui** `@Version` (optimistic locking, desde PROB-0002/migration V2), tornando o lock pessimista adicional redundante para o problema de concorrencia — a escrita concorrente ja falha com `OptimisticLockingFailureException` (409) em vez de aplicar as duas escritas silenciosamente.
+- **Evidencias ou comandos usados:** Leitura de `backend/src/main/java/com/gestor/financeiro/model/Conta.java` confirmando `@Version` existente; leitura de `docs/PROBLEM_LEDGER.md` PROB-0002 (optimistic locking) e PROB-0073 (credito negativo legitimo).
+- **Riscos residuais:** Nenhum — decisao de nao implementar preserva o comportamento correto de credito de cartao e evita lock pessimista redundante sobre uma entidade que ja tem optimistic locking. Se o volume de conflitos otimistas em `Conta` crescer a ponto de degradar UX (muitos 409), reavaliar lock pessimista como otimizacao de performance (nao como correcao de bug).
+- **Proximo passo:** Nenhum. Monitorar taxa de 409 em `ContaService` como sinal de que a otimizacao de lock pessimista passaria a valer a pena.
+
+---
+
+> Mantido pelo `docs-reporter`. Ultima atualizacao: 2026-07-14 (hardening pre-producao P0+P1 commitado em `main` como `5c08ce0`, `0d1e0c0` e `c959dfc`: PROB-0066 a PROB-0072 fechados; PROB-0073 e PROB-0074 fechados como recomendacoes de auditoria avaliadas e rejeitadas com justificativa documentada — ver `docs/BUGFIX_LOG.md` BUG-0059 a BUG-0065 e `docs/REVIEW_REPORTS/2026-07-14_full-system_implementation_pre-production-hardening.md`).
