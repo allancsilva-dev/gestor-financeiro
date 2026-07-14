@@ -674,19 +674,29 @@ class AuthControllerTest {
     }
 
     @Test
-    void validateToken_deveAplicarRateLimitEmGet() throws Exception {
+    void validateToken_deveAplicarRateLimit() throws Exception {
         for (int i = 0; i < 10; i++) {
-            mockMvc.perform(get("/api/auth/validate-token")
+            mockMvc.perform(post("/api/auth/validate-token")
                     .with(remoteAddr("10.0.0.50"))
-                    .param("token", "fake-token-" + i))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(Map.of("token", "fake-token-" + i))))
                 .andExpect(status().isUnprocessableEntity());
         }
 
-        mockMvc.perform(get("/api/auth/validate-token")
+        mockMvc.perform(post("/api/auth/validate-token")
                 .with(remoteAddr("10.0.0.50"))
-                .param("token", "fake-token-final"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("token", "fake-token-final"))))
             .andExpect(status().isTooManyRequests())
             .andExpect(header().string("Retry-After", "60"));
+    }
+
+    @Test
+    void validateToken_getRemovidoRetorna405() throws Exception {
+        mockMvc.perform(get("/api/auth/validate-token")
+                .with(remoteAddr("10.0.0.51"))
+                .param("token", "qualquer"))
+            .andExpect(status().isMethodNotAllowed());
     }
 
     @Test
@@ -701,9 +711,10 @@ class AuthControllerTest {
         // Valor cru não existe no banco
         assertThat(passwordResetTokenRepository.findByToken(valorCru)).isEmpty();
 
-        mockMvc.perform(get("/api/auth/validate-token")
+        mockMvc.perform(post("/api/auth/validate-token")
                 .with(remoteAddr("10.10.0.11"))
-                .param("token", valorCru))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("token", valorCru))))
             .andExpect(status().isOk());
 
         mockMvc.perform(post("/api/auth/reset-password")

@@ -14,6 +14,7 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -120,6 +121,13 @@ public class GlobalExceptionHandler {
         ApiError apiError = buildError("ACCOUNT_LOCKED", ex.getMessage(), null, request);
 
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(apiError);
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiError> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex, HttpServletRequest request) {
+        ApiError apiError = buildError("METHOD_NOT_ALLOWED", "Método HTTP não suportado neste endpoint.", null, request);
+
+        return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(apiError);
     }
 
     @ExceptionHandler(Exception.class)

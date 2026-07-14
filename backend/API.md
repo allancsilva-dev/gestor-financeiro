@@ -136,8 +136,8 @@ Solicita recuperação de senha.
 ### POST `/api/auth/reset-password`
 Redefine senha com token.
 
-### GET `/api/auth/validate-token?token=...`
-Valida token de recuperação.
+### POST `/api/auth/validate-token`
+Valida token de recuperação. Corpo: `{ "token": "..." }` (evita o token na query string / access log).
 
 ---
 

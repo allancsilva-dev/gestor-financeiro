@@ -317,10 +317,10 @@ public class AuthController {
         return ResponseEntity.ok("Senha alterada com sucesso!");
     }
 
-    @GetMapping("/validate-token")
+    @PostMapping("/validate-token")
     @Operation(summary = "Validar token de recuperação", description = "Confere validade do token de reset de senha")
-    public ResponseEntity<String> validateToken(@RequestParam String token) {
-        Optional<PasswordResetToken> tokenOpt = tokenRepository.findByToken(TokenHasher.sha256Hex(token));
+    public ResponseEntity<String> validateToken(@Valid @RequestBody ValidateTokenRequest request) {
+        Optional<PasswordResetToken> tokenOpt = tokenRepository.findByToken(TokenHasher.sha256Hex(request.getToken()));
         
         if (tokenOpt.isEmpty()) {
             throw new BusinessException("Token inválido!");

@@ -108,11 +108,7 @@ public class LoginRateLimitFilter extends OncePerRequestFilter {
     }
 
     private boolean isRateLimitedMethod(String method, String path) {
-        if ("POST".equalsIgnoreCase(method)) {
-            return true;
-        }
-
-        return "GET".equalsIgnoreCase(method) && VALIDATE_TOKEN_PATH.equals(path);
+        return "POST".equalsIgnoreCase(method);
     }
 
     private String buildClientKey(HttpServletRequest request, String path) {

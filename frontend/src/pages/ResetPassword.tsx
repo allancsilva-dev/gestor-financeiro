@@ -30,7 +30,7 @@ export default function ResetPassword() {
 
   const validarToken = async (token: string) => {
     try {
-      await api.get(`/auth/validate-token?token=${token}`);
+      await api.post('/auth/validate-token', { token });
       setTokenValido(true);
     } catch (error: any) {
       setTokenValido(false);
