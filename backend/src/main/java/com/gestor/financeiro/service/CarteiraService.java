@@ -232,12 +232,11 @@ public class CarteiraService {
     public void deletar(Long id, Long usuarioId) {
         Carteira carteira = buscarPorIdDoUsuario(id, usuarioId);
 
+        // Bloqueia exclusão de carteira com QUALQUER histórico de movimento (transação,
+        // parcela, ajuste, transferência, etc.), não só ajuste manual. Antes, movimentos de
+        // origem TRANSACAO/PARCELA passavam o guard e a FK RESTRICT gerava HTTP 500.
         boolean temMovimentos = movimentoCarteiraRepository
-                .existsByCarteiraIdAndOrigemAndReferenciaTipo(
-                        carteira.getId(),
-                        OrigemMovimentoCarteira.CARTEIRA_AJUSTE,
-                        "CARTEIRA"
-                );
+                .existsByCarteiraId(carteira.getId());
 
         if (temMovimentos) {
             throw new BusinessException(

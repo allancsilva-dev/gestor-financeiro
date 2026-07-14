@@ -38,6 +38,12 @@ public class ParcelaService {
         Parcela parcela = buscarPorIdDoUsuario(parcelaId, usuarioId);
         rejeitarCartao(parcela);
 
+        // Idempotência: parcela já paga não gera novo débito na carteira em re-submit.
+        // Concorrência real é coberta por @Version em Parcela (OptimisticLock -> 409).
+        if (parcela.getStatus() == StatusPagamento.PAGO) {
+            return parcela;
+        }
+
         parcela.setStatus(StatusPagamento.PAGO);
         parcela.setDataPagamento(LocalDate.now());
 

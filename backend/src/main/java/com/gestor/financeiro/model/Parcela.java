@@ -14,7 +14,10 @@ public class Parcela {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
+    @Version
+    private Long version;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "transacao_id", nullable = false)
     private Transacao transacao;

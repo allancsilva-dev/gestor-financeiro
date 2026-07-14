@@ -28,6 +28,8 @@ public interface MovimentoCarteiraRepository extends JpaRepository<MovimentoCart
             String referenciaTipo
     );
 
+    boolean existsByCarteiraId(Long carteiraId);
+
     @Query("""
             SELECT COALESCE(SUM(m.valorAssinado), 0)
             FROM MovimentoCarteira m

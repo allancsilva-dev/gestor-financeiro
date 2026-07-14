@@ -67,6 +67,16 @@ class ParcelaServiceTest {
     }
 
     @Test
+    void pagarParcelaJaPagaEhIdempotente() {
+        Carteira carteira = new Carteira(); carteira.setId(9L);
+        parcela.getTransacao().setCarteira(carteira);
+        parcela.setStatus(StatusPagamento.PAGO);
+        assertSame(parcela, service.marcarComoPaga(3L, 7L));
+        verify(repository, never()).save(any());
+        verify(ledger, never()).registrarMovimento(any());
+    }
+
+    @Test
     void pagamentoComCarteiraRegistraMovimento() {
         Carteira carteira = new Carteira(); carteira.setId(9L);
         parcela.getTransacao().setCarteira(carteira);

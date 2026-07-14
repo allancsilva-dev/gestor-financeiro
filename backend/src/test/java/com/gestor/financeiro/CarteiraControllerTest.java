@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.MovimentoCarteira;
 import com.gestor.financeiro.model.Usuario;
+import com.gestor.financeiro.model.enums.OrigemMovimentoCarteira;
 import com.gestor.financeiro.model.enums.TipoCarteira;
+import com.gestor.financeiro.model.enums.TipoMovimentoCarteira;
 import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.MovimentoCarteiraRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
@@ -25,6 +27,7 @@ import java.math.BigDecimal;
 import java.util.Map;
 
 import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -216,6 +219,39 @@ class CarteiraControllerTest {
         mockMvc.perform(get("/api/v1/carteiras/{id}/movimentos", carteiraA.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content", hasSize(0)));
+    }
+
+    @Test
+    @WithMockUser(username = "alice@teste.com")
+    void deletarCarteiraComMovimentoDeTransacaoRetornaErroDeNegocio() throws Exception {
+        // Movimento de origem TRANSACAO (nao CARTEIRA_AJUSTE): antes passava o guard e a
+        // FK RESTRICT gerava HTTP 500. Agora deve barrar com erro de negocio.
+        criarMovimento(usuarioA, carteiraA, OrigemMovimentoCarteira.TRANSACAO);
+
+        mockMvc.perform(delete("/api/v1/carteiras/{id}", carteiraA.getId()))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("BUSINESS_ERROR"));
+    }
+
+    @Test
+    @WithMockUser(username = "alice@teste.com")
+    void deletarCarteiraSemMovimentoRemove() throws Exception {
+        mockMvc.perform(delete("/api/v1/carteiras/{id}", carteiraA.getId()))
+                .andExpect(status().isNoContent());
+    }
+
+    private void criarMovimento(Usuario usuario, Carteira carteira, OrigemMovimentoCarteira origem) {
+        MovimentoCarteira mov = new MovimentoCarteira();
+        mov.setUsuario(usuario);
+        mov.setCarteira(carteira);
+        mov.setTipo(TipoMovimentoCarteira.SAIDA);
+        mov.setValor(new BigDecimal("10.00"));
+        mov.setValorAssinado(new BigDecimal("-10.00"));
+        mov.setOrigem(origem);
+        mov.setReferenciaTipo("TRANSACAO");
+        mov.setReferenciaId(1L);
+        mov.setSaldoResultante(carteira.getSaldo());
+        movimentoCarteiraRepository.save(mov);
     }
 
     private Carteira criarCarteira(Usuario usuario, String nome, BigDecimal saldo) {

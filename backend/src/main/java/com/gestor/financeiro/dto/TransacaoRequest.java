@@ -3,6 +3,7 @@ package com.gestor.financeiro.dto;
 import com.fasterxml.jackson.annotation.JsonAlias;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import jakarta.validation.constraints.AssertTrue;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -39,6 +40,7 @@ public class TransacaoRequest {
 
     private Boolean parcelado;
 
+    @Max(value = 120, message = "Número de parcelas deve ser no máximo 120")
     private Integer totalParcelas;
 
     private String observacoes;
