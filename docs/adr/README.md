@@ -6,9 +6,9 @@ Regras:
 
 - ADR aceito e vinculante para implementacao; mudanca exige novo ADR que o substitua.
 - Nenhum item do `PROBLEM_LEDGER.md` e marcado corrigido por ADR — correcao exige evidencia.
-- Fase 0B (antes da Fase 2) adicionara ADRs de conta financeira, ledger, investimentos,
-  orcamento, competencia, liquidez, metricas oficiais e reconciliacao. A Fase 2 nao inicia
-  antes da aprovacao desses ADRs.
+- Fase 0B concluida em 2026-07-15: ADR-0008..0015 aprovados via plano da Fase 2 rev. 3
+  (responsavel do produto). Ver `ANEXO-fase-0b-mapeamento-dados.md` para o mapeamento
+  dados atuais -> modelo futuro exigido pelo BACKLOG-0086.
 
 ## Indice
 
@@ -21,3 +21,11 @@ Regras:
 | [ADR-0005](ADR-0005-persistencia-de-anexos.md) | Persistencia de anexos: volume agora, object storage depois | Accepted |
 | [ADR-0006](ADR-0006-backup-criptografado-off-host.md) | Backup criptografado off-host com restore drill | Accepted |
 | [ADR-0007](ADR-0007-exclusao-lgpd-ordenada.md) | Exclusao LGPD por manifesto ordenado app-level | Accepted |
+| [ADR-0008](ADR-0008-conta-financeira-unificada.md) | Conta financeira unificada | Accepted |
+| [ADR-0009](ADR-0009-operacao-financeira-e-ledger.md) | Operacao financeira e ledger operacional | Accepted |
+| [ADR-0010](ADR-0010-politica-contabil-caixa-competencia.md) | Politica contabil: caixa canonica, competencia derivada | Accepted |
+| [ADR-0011](ADR-0011-investimentos-custodia-e-caixa.md) | Investimentos: custodia e vinculo com caixa | Accepted |
+| [ADR-0012](ADR-0012-metas-cofre-real-e-reserva-virtual.md) | Metas: cofre real por meta e reserva virtual | Accepted |
+| [ADR-0013](ADR-0013-metricas-oficiais.md) | Metricas oficiais do produto (9) | Accepted |
+| [ADR-0014](ADR-0014-competencia-de-orcamento.md) | Competencia de orcamento | Accepted |
+| [ADR-0015](ADR-0015-reconciliacao-e-migracao.md) | Padrao obrigatorio de reconciliacao e migracao | Accepted |

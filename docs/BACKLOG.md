@@ -1119,7 +1119,10 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Dependencias:** Fechamento dos P0 (PROB-0075..0078) e da Fase 1
 - **Criterio de aceite:** ADRs de dominio aceitos pelo responsavel do produto; glossario atualizado; mapeamento dados atuais -> modelo futuro; plano de migration reversivel com reconciliacao antes/depois
 - **Risco se ficar pendente:** Fase 2 iniciada sem modelo aprovado repete a duplicacao de verdade financeira que motivou a auditoria
-- **Status:** ABERTO — **Fase 2 nao inicia antes da aprovacao da Fase 0B**
+- **Status:** CONCLUIDO (2026-07-15) — ADR-0008..0015 aceitos pelo responsavel do produto via
+  plano da Fase 2 rev. 3 (3 rodadas de review, veredito PASS); glossario atualizado (9 metricas);
+  mapeamento e plano de migracao em `docs/adr/ANEXO-fase-0b-mapeamento-dados.md`. **Codigo da
+  Fase 2 permanece bloqueado por BACKLOG-0087 (PROB-0081: drill off-host real pendente).**
 
 ---
 

@@ -1,8 +1,7 @@
 # Glossario Financeiro — Nexos Finanças
 
-Vocabulario oficial do produto e do codigo, no estado atual do sistema. Termos novos de Fase 2+
-(FinancialAccount, LedgerEntry etc.) so entram aqui apos ADRs da Fase 0B. Mantido junto com os ADRs
-em `docs/adr/`.
+Vocabulario oficial do produto e do codigo. Fase 0B aprovada (2026-07-15): termos da Fase 2 abaixo
+seguem ADR-0008..0015. Mantido junto com os ADRs em `docs/adr/`.
 
 ## Entidades e conceitos atuais
 
@@ -38,17 +37,43 @@ em `docs/adr/`.
   caminho canonico, ADR-0002): carteira, conta, categorias, renda e meta iniciais criadas em uma
   transacao; flag `onboardingCompleto = true`.
 
-## Metricas (definicao alvo, implementacao progressiva)
+## Termos da Fase 2 (ADR-0008..0015)
 
-- **Saldo disponivel** — dinheiro liquido imediatamente utilizavel nas contas de caixa.
-- **Reservado** — parte do caixa alocada a metas/envelopes.
-- **Comprometido** — contas e faturas futuras dentro de horizonte definido.
-- **Disponivel para gastar** — disponivel menos reservado e comprometido.
-- **Resultado do mes** — receitas menos despesas por politica definida; exclui transferencias
-  internas e compra de investimento.
-- **Investido** — valor de mercado das posicoes, com data de cotacao e liquidez explicitas.
-- **Dividas** — cartoes, emprestimos e financiamentos.
-- **Patrimonio liquido** — ativos menos passivos.
+- **Conta financeira** — entidade unica de conta (fisicamente `carteiras` promovida, ADR-0008):
+  natureza ATIVO/PASSIVO, subtipo (DINHEIRO, CORRENTE, POUPANCA, PAGAMENTO, COFRE, CUSTODIA,
+  CARTAO), liquidez, origem dos dados, estado de conciliacao, moeda. Saldo derivado do ledger.
+- **Operacao financeira** — agrupador imutavel de 1..N lancamentos com idempotencia, hash do
+  request e estorno referenciando a original (ADR-0009). Correcao nunca altera operacao
+  confirmada.
+- **Lancamento** — nome de dominio do `MovimentoCarteira` vinculado a uma operacao.
+- **Transferencia interna** — operacao com dois lancamentos vinculados entre contas do mesmo
+  usuario; nunca e receita, despesa ou resultado mensal.
+- **COFRE** — conta financeira de reserva real, uma por meta (ADR-0012); invariante
+  `meta.valorReservado == saldo do COFRE`.
+- **Reserva virtual** — alocacao explicita sobre conta de caixa, sem lancamento; reduz apenas
+  "Disponivel para gastar". Exatamente uma modalidade (COFRE_REAL/RESERVA_VIRTUAL) por meta.
+- **CUSTODIA** — conta container de posicoes de investimento; saldo monetario zero tecnico, valor
+  vem de quantidade x ultima cotacao valida (ADR-0011).
+- **Snapshot EXTERNO** — posicao/movimentacao de investimento sem historico de caixa; permanece
+  explicitamente nao conciliada; importacao nunca inventa movimento de caixa.
+- **PENDENTE_CONCILIACAO** — estado de lancamento legado/importado sem movimento financeiro;
+  sempre excluido de saldos e metricas conciliadas.
+
+## Metricas oficiais (9, ADR-0013)
+
+- **Disponivel agora** — contas ATIVO com liquidez IMEDIATA; COFRE entra apenas quando sua
+  liquidez for IMEDIATA.
+- **Reservado** — COFRE real + alocacoes virtuais.
+- **Comprometido** — obrigacoes vencidas nao pagas + obrigacoes com vencimento entre a data de
+  referencia e o horizonte (default: fim do mes atual).
+- **Disponivel para gastar** — disponivel menos reservado e comprometido, sem truncar negativos.
+- **Resultado mensal** — competencia; exclui transferencias, reservas, investimento e pagamento
+  de cartao.
+- **Investido** — posicoes pela ultima cotacao valida, com data de cotacao e liquidez explicitas.
+- **Dividas** — soma de `max(passivo, 0)`; credito de cartao nao vira divida.
+- **Patrimonio liquido** — contas ativas + investimentos - passivos assinados.
+- **Variacao patrimonial** — diferenca de patrimonio inicio/fim do periodo, com decomposicao
+  (aportes, retiradas, rendimentos, preco de mercado).
 
 ## Regras de ouro (resumo executivo)
 
