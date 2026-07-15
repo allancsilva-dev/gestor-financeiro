@@ -5,11 +5,19 @@ tags:
 ---
 - launchApp:
     clearState: true
-- tapOn: "Criar conta"
+- tapOn: ".*Criar conta"
 - assertVisible: "Aceito a política de privacidade"
 - tapOn: "política de privacidade"
 - assertVisible: "Política de privacidade"
 - assertVisible: "Versão 2026-07 · Gestor Financeiro"
+- scrollUntilVisible:
+    element:
+      text: "Seus direitos"
+    direction: DOWN
 - assertVisible: "Seus direitos"
+- scrollUntilVisible:
+    element:
+      text: "Voltar"
+    direction: UP
 - tapOn: "Voltar"
-- assertVisible: "Criar conta"
+- assertVisible: ".*Criar conta"

@@ -5,5 +5,5 @@ tags:
 - launchApp:
     clearState: true
 - tapOn: "Esqueceu a senha?"
-- assertVisible: "Recuperar senha"
+- assertVisible: "Esqueceu a senha?"
 - assertVisible: "E-mail"
