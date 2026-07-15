@@ -38,6 +38,7 @@ public class FaturaService {
     private final CarteiraRepository carteiraRepository;
     private final MovimentoCarteiraRepository movimentoCarteiraRepository;
     private final LedgerService ledgerService;
+    private final java.time.Clock clock;
 
     public FaturaService(FaturaCartaoRepository faturaRepository,
                          FaturaLancamentoRepository faturaLancamentoRepository,
@@ -46,7 +47,8 @@ public class FaturaService {
                          UsuarioRepository usuarioRepository,
                          CarteiraRepository carteiraRepository,
                          MovimentoCarteiraRepository movimentoCarteiraRepository,
-                         LedgerService ledgerService) {
+                         LedgerService ledgerService,
+                         java.time.Clock clock) {
         this.faturaRepository = faturaRepository;
         this.faturaLancamentoRepository = faturaLancamentoRepository;
         this.contaRepository = contaRepository;
@@ -55,6 +57,7 @@ public class FaturaService {
         this.carteiraRepository = carteiraRepository;
         this.movimentoCarteiraRepository = movimentoCarteiraRepository;
         this.ledgerService = ledgerService;
+        this.clock = clock;
     }
 
     // Lazy na leitura (BACKLOG-0054/0059): consultar uma fatura tambem liquida o rollover
@@ -63,7 +66,7 @@ public class FaturaService {
     @Transactional
     public FaturaResponse buscarAtual(Long usuarioId, Long contaId) {
         Conta conta = validarContaCredito(usuarioId, contaId);
-        YearMonth ym = YearMonth.now();
+        YearMonth ym = YearMonth.now(clock);
 
         liquidarFaturaAnterior(usuarioId, conta, ym);
 
@@ -150,7 +153,7 @@ public class FaturaService {
         if (saldoRestante.compareTo(BigDecimal.ZERO) <= 0) {
             fatura.setStatus(FaturaStatus.PAGA);
             if (fatura.getDataPagamento() == null) {
-                fatura.setDataPagamento(LocalDate.now());
+                fatura.setDataPagamento(LocalDate.now(clock));
             }
             faturaRepository.save(fatura);
             return toResponse(fatura, usuarioId, conta);
@@ -187,7 +190,7 @@ public class FaturaService {
 
         fatura.setValorPago(novoValorPago);
         if (novoValorPago.compareTo(total) >= 0) {
-            fatura.setDataPagamento(LocalDate.now());
+            fatura.setDataPagamento(LocalDate.now(clock));
             fatura.setStatus(FaturaStatus.PAGA);
         }
         fatura.setValorTotal(total);
@@ -260,9 +263,9 @@ public class FaturaService {
         // Fatura paga é imutável: a parte já paga vira crédito (estorno) na próxima fatura aberta
         if (somaFaturasPagas.signum() != 0) {
             FaturaCartao proxima = faturaDisponivelParaLancamento(
-                    usuarioId, transacao.getConta(), YearMonth.now());
+                    usuarioId, transacao.getConta(), YearMonth.now(clock));
             criarLancamento(proxima, transacao, "Estorno: " + transacao.getDescricao(),
-                    somaFaturasPagas.negate(), LocalDate.now(), null, null,
+                    somaFaturasPagas.negate(), LocalDate.now(clock), null, null,
                     TipoFaturaLancamento.ESTORNO);
         }
     }
@@ -343,9 +346,9 @@ public class FaturaService {
         if (ajustePago.signum() != 0) {
             // Fatura paga é imutável: diferença do cronograma recalculado vira ajuste em fatura aberta.
             FaturaCartao proxima = faturaDisponivelParaLancamento(
-                    usuarioId, transacao.getConta(), YearMonth.now());
+                    usuarioId, transacao.getConta(), YearMonth.now(clock));
             criarLancamento(proxima, transacao, "Ajuste: " + transacao.getDescricao(),
-                    ajustePago, LocalDate.now(), null, null, TipoFaturaLancamento.AJUSTE);
+                    ajustePago, LocalDate.now(clock), null, null, TipoFaturaLancamento.AJUSTE);
         }
     }
 
@@ -524,7 +527,7 @@ public class FaturaService {
             return;
         }
 
-        LocalDate hoje = LocalDate.now();
+        LocalDate hoje = LocalDate.now(clock);
         if (origem.getDataFechamento() == null || !origem.getDataFechamento().isBefore(hoje)) {
             return; // fatura de origem ainda não fechou
         }
@@ -578,7 +581,7 @@ public class FaturaService {
     private boolean inserirRolloverOuNoOp(FaturaCartao destino, FaturaCartao origem, TipoFaturaLancamento tipo,
                                           BigDecimal valor, String descricao) {
         try {
-            criarLancamentoRollover(destino, origem, descricao, valor, LocalDate.now(), tipo);
+            criarLancamentoRollover(destino, origem, descricao, valor, LocalDate.now(clock), tipo);
             return true;
         } catch (DataIntegrityViolationException e) {
             log.warn("Rollover duplicado detectado para fatura origem {} (tipo {}); tratado como no-op",
@@ -704,7 +707,7 @@ public class FaturaService {
         if (fatura.getStatus() == FaturaStatus.PAGA) {
             return FaturaStatus.PAGA;
         }
-        LocalDate hoje = LocalDate.now();
+        LocalDate hoje = LocalDate.now(clock);
         if (fatura.getDataVencimento() != null && fatura.getDataVencimento().isBefore(hoje)) {
             return FaturaStatus.VENCIDA;
         }

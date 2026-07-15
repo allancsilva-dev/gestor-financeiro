@@ -14,6 +14,7 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class DashboardService {
+    private final java.time.Clock clock;
     private final TransacaoRepository transacaoRepository;
     private final CategoriaRepository categoriaRepository;
     private final ContaRepository contaRepository;
@@ -22,8 +23,8 @@ public class DashboardService {
     private final CarteiraRepository carteiraRepository;
     
     public DashboardDtos.Resumo obterResumo(Long usuarioId) {
-        LocalDate inicioMes = LocalDate.now().withDayOfMonth(1);
-        LocalDate fimMes = LocalDate.now().withDayOfMonth(LocalDate.now().lengthOfMonth());
+        LocalDate inicioMes = LocalDate.now(clock).withDayOfMonth(1);
+        LocalDate fimMes = LocalDate.now(clock).withDayOfMonth(LocalDate.now(clock).lengthOfMonth());
         
         BigDecimal totalEntradas = transacaoRepository.sumValorTotalByUsuarioIdAndTipoAndDataBetween(
                 usuarioId, TipoTransacao.ENTRADA, inicioMes, fimMes);
@@ -39,8 +40,8 @@ public class DashboardService {
     }
     
     public List<DashboardDtos.Categoria> obterGastosPorCategoria(Long usuarioId) {
-        LocalDate inicioMes = LocalDate.now().withDayOfMonth(1);
-        LocalDate fimMes = LocalDate.now().withDayOfMonth(LocalDate.now().lengthOfMonth());
+        LocalDate inicioMes = LocalDate.now(clock).withDayOfMonth(1);
+        LocalDate fimMes = LocalDate.now(clock).withDayOfMonth(LocalDate.now(clock).lengthOfMonth());
         
         List<Object[]> rows = transacaoRepository.sumValorEfetivoAgrupadoPorCategoria(
                 usuarioId, TipoTransacao.SAIDA, inicioMes, fimMes);
@@ -75,7 +76,7 @@ public class DashboardService {
         List<DashboardDtos.Evolucao> resultado = new ArrayList<>();
         
         for (int i = 5; i >= 0; i--) {
-            LocalDate data = LocalDate.now().minusMonths(i);
+            LocalDate data = LocalDate.now(clock).minusMonths(i);
             LocalDate inicioMes = data.withDayOfMonth(1);
             LocalDate fimMes = data.withDayOfMonth(data.lengthOfMonth());
             
@@ -96,7 +97,7 @@ public class DashboardService {
     public List<DashboardDtos.Comparacao> obterComparacaoMensal(Long usuarioId) {
         List<DashboardDtos.Comparacao> resultado = new ArrayList<>();
         
-        LocalDate mesAnterior = LocalDate.now().minusMonths(1);
+        LocalDate mesAnterior = LocalDate.now(clock).minusMonths(1);
         LocalDate inicioMesAnterior = mesAnterior.withDayOfMonth(1);
         LocalDate fimMesAnterior = mesAnterior.withDayOfMonth(mesAnterior.lengthOfMonth());
         
@@ -106,8 +107,8 @@ public class DashboardService {
                 transacaoRepository.sumValorEfetivoByUsuarioIdAndTipoAndDataBetween(
                         usuarioId, TipoTransacao.SAIDA, inicioMesAnterior, fimMesAnterior)));
         
-        LocalDate inicioMesAtual = LocalDate.now().withDayOfMonth(1);
-        LocalDate fimMesAtual = LocalDate.now().withDayOfMonth(LocalDate.now().lengthOfMonth());
+        LocalDate inicioMesAtual = LocalDate.now(clock).withDayOfMonth(1);
+        LocalDate fimMesAtual = LocalDate.now(clock).withDayOfMonth(LocalDate.now(clock).lengthOfMonth());
         
         resultado.add(new DashboardDtos.Comparacao("Mês Atual",
                 transacaoRepository.sumValorTotalByUsuarioIdAndTipoAndDataBetween(

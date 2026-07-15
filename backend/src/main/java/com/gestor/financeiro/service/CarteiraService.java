@@ -28,6 +28,7 @@ import java.time.LocalDate;
 @Service
 @RequiredArgsConstructor
 public class CarteiraService {
+    private final java.time.Clock clock;
     private final CarteiraRepository carteiraRepository;
     private final UsuarioRepository usuarioRepository;
     private final TransacaoRepository transacaoRepository;
@@ -203,7 +204,7 @@ public class CarteiraService {
         transacao.setDescricao(descricao);
         transacao.setValorTotal(valor);
         transacao.setTipo(tipo);
-        transacao.setData(LocalDate.now());
+        transacao.setData(LocalDate.now(clock));
         transacao.setParcelado(false);
         
         transacaoRepository.save(transacao);

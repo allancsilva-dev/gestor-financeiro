@@ -26,7 +26,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.time.YearMonth;
 import java.util.List;
 
@@ -34,6 +33,7 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 public class ContaFixaService {
+    private final java.time.Clock clock;
     private final ContaFixaRepository contaFixaRepository;
     private final UsuarioRepository usuarioRepository;
     private final CategoriaRepository categoriaRepository;
@@ -41,7 +41,6 @@ public class ContaFixaService {
     private final CarteiraRepository carteiraRepository;
     private final ExecucaoRecorrenciaRepository execucaoRepository;
 
-    private static final ZoneId ZONE = ZoneId.of("America/Sao_Paulo");
     
     // Lista contas fixas ativas do usuário
     public Page<ContaFixa> listarPorUsuario(Long usuarioId, Pageable pageable) {
@@ -84,7 +83,7 @@ public class ContaFixaService {
     
     // Calcula data do próximo vencimento
     private void calcularProximoVencimento(ContaFixa contaFixa) {
-        LocalDate hoje = LocalDate.now(ZONE);
+        LocalDate hoje = LocalDate.now(clock);
         int diaVencimento = contaFixa.getDiaVencimento();
         
         // Próximo vencimento no mês atual
@@ -116,7 +115,7 @@ public class ContaFixaService {
         ContaFixa conta = contaFixaRepository.findByIdAndUsuarioIdForUpdate(id, usuarioId)
                 .orElseThrow(() -> new ResourceNotFoundException("Recorrência não encontrada"));
         LocalDate vencimento = conta.getDataProximoVencimento();
-        if (!automatico && YearMonth.from(vencimento).isAfter(YearMonth.now(ZONE))) {
+        if (!automatico && YearMonth.from(vencimento).isAfter(YearMonth.now(clock))) {
             throw new BusinessException("A próxima ocorrência ainda não está disponível");
         }
         ExecucaoRecorrencia execucao = execucaoRepository
@@ -142,7 +141,7 @@ public class ContaFixaService {
         String chave = "RECORRENCIA:" + conta.getId() + ":" + vencimento;
         Transacao transacao = new Transacao();
         transacao.setDescricao((conta.getTipo() == TipoTransacao.ENTRADA ? "Recebimento: " : "Pagamento: ") + conta.getNome());
-        transacao.setData(automatico ? vencimento : LocalDate.now(ZONE));
+        transacao.setData(automatico ? vencimento : LocalDate.now(clock));
         transacao.setTipo(conta.getTipo());
         transacao.setValorTotal(valorEfetivo);
         transacao.setParcelado(false);
@@ -156,7 +155,7 @@ public class ContaFixaService {
             execucao = novaExecucao(conta, vencimento);
         }
         execucao.setStatus(StatusExecucaoRecorrencia.REALIZADA);
-        execucao.setTentadoEm(LocalDateTime.now(ZONE));
+        execucao.setTentadoEm(LocalDateTime.now(clock));
         execucao.setMensagemFalha(null);
         execucao.setTransacao(salva);
         execucaoRepository.save(execucao);
@@ -178,7 +177,7 @@ public class ContaFixaService {
     private void registrarFalhaSaldo(ContaFixa conta, ExecucaoRecorrencia execucao, LocalDate vencimento) {
         if (execucao == null) execucao = novaExecucao(conta, vencimento);
         execucao.setStatus(StatusExecucaoRecorrencia.FALHA_SALDO);
-        execucao.setTentadoEm(LocalDateTime.now(ZONE));
+        execucao.setTentadoEm(LocalDateTime.now(clock));
         execucao.setMensagemFalha("Saldo insuficiente na carteira selecionada");
         execucaoRepository.save(execucao);
     }
@@ -216,12 +215,12 @@ public class ContaFixaService {
         }
 
         LocalDate vencimento = conta.getDataProximoVencimento();
-        if (LocalDate.now(ZONE).isAfter(vencimento)) throw new BusinessException("O vencimento já passou");
+        if (LocalDate.now(clock).isAfter(vencimento)) throw new BusinessException("O vencimento já passou");
         if (execucaoRepository.findByContaFixaIdAndDataVencimento(id, vencimento).isPresent())
             throw new BusinessException("Esta ocorrência já foi processada");
         ExecucaoRecorrencia execucao = novaExecucao(conta, vencimento);
         execucao.setStatus(StatusExecucaoRecorrencia.PULADA);
-        execucao.setTentadoEm(LocalDateTime.now(ZONE));
+        execucao.setTentadoEm(LocalDateTime.now(clock));
         execucaoRepository.save(execucao);
         avancarOcorrencia(conta);
 
@@ -300,7 +299,7 @@ public class ContaFixaService {
     
     @Transactional
     public void atualizarContasAtrasadas() {
-        LocalDate hoje = LocalDate.now(ZONE);
+        LocalDate hoje = LocalDate.now(clock);
         contaFixaRepository.resetarContasPagasVencidas(StatusPagamento.PAGO, StatusPagamento.PENDENTE, hoje);
         contaFixaRepository.atualizarStatusContasAtrasadas(StatusPagamento.PENDENTE, StatusPagamento.ATRASADO, hoje);
     }

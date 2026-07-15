@@ -16,11 +16,12 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class RelatorioService {
+    private final java.time.Clock clock;
     private final TransacaoRepository transacaoRepository;
 
     public RelatorioResponse gerarRelatorio(Long usuarioId, LocalDate inicio, LocalDate fim) {
-        if (inicio == null) inicio = LocalDate.now().withDayOfMonth(1);
-        if (fim == null) fim = LocalDate.now();
+        if (inicio == null) inicio = LocalDate.now(clock).withDayOfMonth(1);
+        if (fim == null) fim = LocalDate.now(clock);
 
         BigDecimal totalEntradas = transacaoRepository
                 .sumValorEfetivoByUsuarioIdAndTipoAndDataBetween(usuarioId, TipoTransacao.ENTRADA, inicio, fim);

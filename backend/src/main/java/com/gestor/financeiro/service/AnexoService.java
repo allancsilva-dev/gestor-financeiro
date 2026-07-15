@@ -47,12 +47,14 @@ public class AnexoService {
     private final AnexoRepository anexoRepository;
     private final TransacaoRepository transacaoRepository;
     private final UsuarioRepository usuarioRepository;
+    private final java.time.Clock clock;
 
     public AnexoService(AnexoRepository anexoRepository, TransacaoRepository transacaoRepository,
-                        UsuarioRepository usuarioRepository) {
+                        UsuarioRepository usuarioRepository, java.time.Clock clock) {
         this.anexoRepository = anexoRepository;
         this.transacaoRepository = transacaoRepository;
         this.usuarioRepository = usuarioRepository;
+        this.clock = clock;
     }
 
     @Transactional
@@ -79,7 +81,7 @@ public class AnexoService {
         anexo.setCaminho(filePath.toString());
         anexo.setTransacao(transacao);
         anexo.setUsuario(usuario);
-        anexo.setDataUpload(LocalDateTime.now());
+        anexo.setDataUpload(LocalDateTime.now(clock));
 
         anexo = anexoRepository.save(anexo);
 

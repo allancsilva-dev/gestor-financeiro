@@ -25,6 +25,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class ParcelaService {
+    private final java.time.Clock clock;
     private final ParcelaRepository parcelaRepository;
     private final LedgerService ledgerService;
     private final CarteiraRepository carteiraRepository;
@@ -45,7 +46,7 @@ public class ParcelaService {
         }
 
         parcela.setStatus(StatusPagamento.PAGO);
-        parcela.setDataPagamento(LocalDate.now());
+        parcela.setDataPagamento(LocalDate.now(clock));
 
         Parcela salva = parcelaRepository.save(parcela);
 
@@ -91,7 +92,7 @@ public class ParcelaService {
     @Transactional
     public void atualizarParcelasAtrasadas() {
         parcelaRepository.atualizarStatusParcelasAtrasadas(
-            StatusPagamento.PENDENTE, StatusPagamento.ATRASADO, LocalDate.now());
+            StatusPagamento.PENDENTE, StatusPagamento.ATRASADO, LocalDate.now(clock));
     }
 
     private void registrarMovimentoPagamento(Parcela parcela, Long usuarioId, TipoMovimentoCarteira tipoMovimento) {
@@ -121,7 +122,7 @@ public class ParcelaService {
                 "Parcela " + parcela.getNumeroParcela() + "/" + parcela.getTotalParcelas()
                         + " - " + parcela.getTransacao().getDescricao(),
                 null,
-                LocalDateTime.now(),
+                LocalDateTime.now(clock),
                 false
         ));
     }

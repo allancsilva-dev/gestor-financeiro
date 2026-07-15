@@ -8,18 +8,18 @@ import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.List;
 
 @Component
 @RequiredArgsConstructor
 public class RecorrenciaScheduler {
-    private static final ZoneId ZONE = ZoneId.of("America/Sao_Paulo");
+    private final Clock clock;
     private final ContaFixaRepository contaFixaRepository;
     private final ContaFixaService contaFixaService;
 
-    @Scheduled(cron = "0 5 0 * * *", zone = "America/Sao_Paulo")
+    @Scheduled(cron = "0 5 0 * * *", zone = "${app.business.timezone:America/Sao_Paulo}")
     public void processarAgendadas() {
         processarPendentes();
     }
@@ -32,7 +32,7 @@ public class RecorrenciaScheduler {
     public void processarPendentes() {
         // Repete para recuperar mais de um mês perdido da mesma recorrência.
         for (int rodada = 0; rodada < 120; rodada++) {
-            List<Long> ids = contaFixaRepository.findIdsAutomaticasVencidas(LocalDate.now(ZONE));
+            List<Long> ids = contaFixaRepository.findIdsAutomaticasVencidas(LocalDate.now(clock));
             if (ids.isEmpty()) return;
             boolean avancou = false;
             for (Long id : ids) {

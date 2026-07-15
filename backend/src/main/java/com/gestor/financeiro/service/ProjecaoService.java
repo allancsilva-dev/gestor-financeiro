@@ -19,6 +19,7 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class ProjecaoService {
+    private final java.time.Clock clock;
     private final CarteiraRepository carteiraRepository;
     private final ContaFixaRepository contaFixaRepository;
     private final ParcelaRepository parcelaRepository;
@@ -28,11 +29,11 @@ public class ProjecaoService {
         BigDecimal saldoAtual = carteiraRepository.sumSaldoByUsuarioId(usuarioId);
         if (saldoAtual == null) saldoAtual = BigDecimal.ZERO;
 
-        YearMonth ymAtual = YearMonth.now();
+        YearMonth ymAtual = YearMonth.now(clock);
         List<ProjecaoMensalDto> meses = new ArrayList<>();
         BigDecimal saldoAnterior = saldoAtual;
 
-        LocalDate hoje = LocalDate.now();
+        LocalDate hoje = LocalDate.now(clock);
 
         for (int i = 0; i < mesesProjecao; i++) {
             YearMonth ym = ymAtual.plusMonths(i);

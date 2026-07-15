@@ -43,6 +43,7 @@ public class TransacaoService {
     private final LedgerService ledgerService;
     private final CarteiraRepository carteiraRepository;
     private final FaturaService faturaService;
+    private final java.time.Clock clock;
 
     public TransacaoService(TransacaoRepository transacaoRepository,
                             ParcelaRepository parcelaRepository,
@@ -52,7 +53,8 @@ public class TransacaoService {
                             UsuarioRepository usuarioRepository,
                             LedgerService ledgerService,
                             CarteiraRepository carteiraRepository,
-                            FaturaService faturaService) {
+                            FaturaService faturaService,
+                            java.time.Clock clock) {
         this.transacaoRepository = transacaoRepository;
         this.parcelaRepository = parcelaRepository;
         this.categoriaRepository = categoriaRepository;
@@ -62,6 +64,7 @@ public class TransacaoService {
         this.ledgerService = ledgerService;
         this.carteiraRepository = carteiraRepository;
         this.faturaService = faturaService;
+        this.clock = clock;
     }
 
     public Page<Transacao> listarPorUsuario(Long usuarioId, Pageable pageable) {
@@ -364,7 +367,7 @@ public class TransacaoService {
                 transacao.getId(),
                 transacao.getDescricao(),
                 idempotencyKey,
-                LocalDateTime.now(),
+                LocalDateTime.now(clock),
                 false
         ));
     }
@@ -410,7 +413,7 @@ public class TransacaoService {
                 transacao.getId(),
                 "Ajuste de valor da transação: " + transacao.getDescricao(),
                 null,
-                LocalDateTime.now(),
+                LocalDateTime.now(clock),
                 false
         ));
     }
@@ -439,7 +442,7 @@ public class TransacaoService {
                 transacao.getId(),
                 "Estorno por cancelamento: " + transacao.getDescricao(),
                 null,
-                LocalDateTime.now(),
+                LocalDateTime.now(clock),
                 false
         ));
     }

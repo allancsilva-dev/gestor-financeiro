@@ -26,6 +26,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class MetaService {
+    private final java.time.Clock clock;
     private final MetaRepository metaRepository;
     private final UsuarioRepository usuarioRepository;
     private final MovimentoMetaRepository movimentoMetaRepository;
@@ -48,7 +49,7 @@ public class MetaService {
         meta.setStatus(StatusMeta.ATIVA);
         meta.setAtiva(true);
         if (meta.getValorReservado() == null) meta.setValorReservado(BigDecimal.ZERO);
-        if (meta.getDataInicio() == null) meta.setDataInicio(LocalDate.now());
+        if (meta.getDataInicio() == null) meta.setDataInicio(LocalDate.now(clock));
 
         return metaRepository.save(meta);
     }
@@ -73,7 +74,7 @@ public class MetaService {
         meta.setValorReservado(valorAnterior.add(valor));
 
         if (meta.getValorReservado().compareTo(meta.getValorTotal()) >= 0) {
-            meta.concluir(LocalDate.now());
+            meta.concluir(LocalDate.now(clock));
         }
 
         Meta salva = metaRepository.save(meta);
@@ -206,7 +207,7 @@ public class MetaService {
                 meta.getId(),
                 descricao,
                 null,
-                LocalDateTime.now(),
+                LocalDateTime.now(clock),
                 false
         ));
     }

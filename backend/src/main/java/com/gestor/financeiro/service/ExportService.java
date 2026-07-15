@@ -14,6 +14,7 @@ import java.util.StringJoiner;
 @Service
 @RequiredArgsConstructor
 public class ExportService {
+    private final java.time.Clock clock;
     private final TransacaoRepository transacaoRepository;
     private final CategoriaRepository categoriaRepository;
     private final ContaRepository contaRepository;
@@ -26,7 +27,7 @@ public class ExportService {
 
     public String exportarTransacoesCsv(Long usuarioId, LocalDate inicio, LocalDate fim) {
         if (inicio == null) inicio = LocalDate.of(2000, 1, 1);
-        if (fim == null) fim = LocalDate.now();
+        if (fim == null) fim = LocalDate.now(clock);
 
         List<Transacao> transacoes = transacaoRepository
                 .findByUsuarioIdAndDataBetween(usuarioId, inicio, fim);

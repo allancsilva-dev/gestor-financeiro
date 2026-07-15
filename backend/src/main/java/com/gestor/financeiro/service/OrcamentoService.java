@@ -22,6 +22,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class OrcamentoService {
+    private final java.time.Clock clock;
     private final OrcamentoMensalRepository orcamentoMensalRepository;
     private final OrcamentoCategoriaRepository orcamentoCategoriaRepository;
     private final TransacaoRepository transacaoRepository;
@@ -29,7 +30,7 @@ public class OrcamentoService {
     private final UsuarioRepository usuarioRepository;
 
     public OrcamentoResponse buscarOuCriarAtual(Long usuarioId) {
-        YearMonth ym = YearMonth.now();
+        YearMonth ym = YearMonth.now(clock);
         return orcamentoMensalRepository.findByUsuarioIdAndMesAndAno(usuarioId, ym.getMonthValue(), ym.getYear())
                 .map(o -> toResponse(o, usuarioId))
                 .orElseGet(() -> criarVazio(usuarioId, ym.getMonthValue(), ym.getYear()));

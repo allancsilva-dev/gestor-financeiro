@@ -33,13 +33,16 @@ public class LedgerBackfillService {
     private final CarteiraRepository carteiraRepository;
     private final MovimentoCarteiraRepository movimentoCarteiraRepository;
     private final TransacaoRepository transacaoRepository;
+    private final java.time.Clock clock;
 
     public LedgerBackfillService(CarteiraRepository carteiraRepository,
                                  MovimentoCarteiraRepository movimentoCarteiraRepository,
-                                 TransacaoRepository transacaoRepository) {
+                                 TransacaoRepository transacaoRepository,
+                                 java.time.Clock clock) {
         this.carteiraRepository = carteiraRepository;
         this.movimentoCarteiraRepository = movimentoCarteiraRepository;
         this.transacaoRepository = transacaoRepository;
+        this.clock = clock;
     }
 
     @Transactional
@@ -166,9 +169,9 @@ public class LedgerBackfillService {
         return transacao.getTipo() == TipoTransacao.ENTRADA ? valor : valor.negate();
     }
 
-    private static MovimentoCarteira criarMovimentoOrfa(Carteira carteira,
-                                                        Transacao transacao,
-                                                        BigDecimal saldoMaterializado) {
+    private MovimentoCarteira criarMovimentoOrfa(Carteira carteira,
+                                                 Transacao transacao,
+                                                 BigDecimal saldoMaterializado) {
         boolean entrada = transacao.getTipo() == TipoTransacao.ENTRADA;
         BigDecimal valor = transacao.getValorTotal();
 
@@ -184,7 +187,7 @@ public class LedgerBackfillService {
         movimento.setDescricao(truncar("Backfill retroativo (BACKLOG-0045): "
                 + (transacao.getDescricao() == null ? "" : transacao.getDescricao()), 500));
         movimento.setDataMovimento(transacao.getData() == null
-                ? LocalDateTime.now()
+                ? LocalDateTime.now(clock)
                 : transacao.getData().atStartOfDay());
         // Movimento-only: o saldo materializado já reflete esta transação; usa o saldo
         // final como saldoResultante (coluna NOT NULL), coerente com o backfill lump-sum.
@@ -197,9 +200,9 @@ public class LedgerBackfillService {
         return value.length() <= max ? value : value.substring(0, max);
     }
 
-    private static MovimentoCarteira criarMovimentoBackfill(Carteira carteira,
-                                                            BigDecimal valorBackfill,
-                                                            BigDecimal saldoMaterializado) {
+    private MovimentoCarteira criarMovimentoBackfill(Carteira carteira,
+                                                     BigDecimal valorBackfill,
+                                                     BigDecimal saldoMaterializado) {
         MovimentoCarteira movimento = new MovimentoCarteira();
         movimento.setUsuario(carteira.getUsuario());
         movimento.setCarteira(carteira);
@@ -210,7 +213,7 @@ public class LedgerBackfillService {
         movimento.setReferenciaTipo(REFERENCIA_TIPO_CARTEIRA);
         movimento.setReferenciaId(carteira.getId());
         movimento.setDescricao("Backfill inicial da carteira");
-        movimento.setDataMovimento(LocalDateTime.now());
+        movimento.setDataMovimento(LocalDateTime.now(clock));
         movimento.setSaldoResultante(saldoMaterializado);
         movimento.setIdempotencyKey(IDEMPOTENCY_KEY_PREFIX + carteira.getId());
         return movimento;

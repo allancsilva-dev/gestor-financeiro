@@ -24,6 +24,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class CronogramaService {
+    private final java.time.Clock clock;
     private final TransacaoService transacaoService;
     private final ParcelaRepository parcelaRepository;
     private final FaturaLancamentoRepository faturaLancamentoRepository;
@@ -59,7 +60,7 @@ public class CronogramaService {
         BigDecimal pago = fatura.getValorPago() == null ? BigDecimal.ZERO : fatura.getValorPago();
         if (pago.signum() > 0) return CronogramaItemResponse.Status.PARCIAL;
         if (fatura.getStatus() == FaturaStatus.VENCIDA
-                || fatura.getDataVencimento() != null && fatura.getDataVencimento().isBefore(LocalDate.now())) {
+                || fatura.getDataVencimento() != null && fatura.getDataVencimento().isBefore(LocalDate.now(clock))) {
             return CronogramaItemResponse.Status.ATRASADO;
         }
         return CronogramaItemResponse.Status.PENDENTE;

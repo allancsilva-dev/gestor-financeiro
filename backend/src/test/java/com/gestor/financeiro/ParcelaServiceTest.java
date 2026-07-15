@@ -33,7 +33,7 @@ class ParcelaServiceTest {
         repository = mock(ParcelaRepository.class);
         ledger = mock(LedgerService.class);
         carteiraRepository = mock(CarteiraRepository.class);
-        service = new ParcelaService(repository, ledger, carteiraRepository);
+        service = new ParcelaService(java.time.Clock.systemDefaultZone(), repository, ledger, carteiraRepository);
         Usuario usuario = new Usuario(); usuario.setId(7L);
         Transacao transacao = new Transacao(); transacao.setId(11L); transacao.setUsuario(usuario);
         transacao.setTipo(TipoTransacao.SAIDA);

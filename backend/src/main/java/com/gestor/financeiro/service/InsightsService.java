@@ -15,12 +15,13 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class InsightsService {
+    private final java.time.Clock clock;
     private final TransacaoRepository transacaoRepository;
     private final CategoriaRepository categoriaRepository;
     private final CarteiraRepository carteiraRepository;
 
     public InsightsResponse gerarInsights(Long usuarioId) {
-        LocalDate hoje = LocalDate.now();
+        LocalDate hoje = LocalDate.now(clock);
         LocalDate inicioMesAtual = hoje.withDayOfMonth(1);
         LocalDate fimMesAtual = hoje.withDayOfMonth(hoje.lengthOfMonth());
         LocalDate inicioMesAnterior = inicioMesAtual.minusMonths(1);
