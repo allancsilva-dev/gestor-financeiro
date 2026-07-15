@@ -11,6 +11,7 @@ import com.gestor.financeiro.repository.ContaRepository;
 import com.gestor.financeiro.repository.MetaRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
 import com.gestor.financeiro.service.OnboardingService;
+import com.gestor.financeiro.service.ProjecaoService;
 import com.gestor.financeiro.service.UsuarioExclusaoService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -51,6 +52,7 @@ class OnboardingAtomicidadeTest {
     @Autowired ContaFixaRepository contaFixaRepository;
     @Autowired MetaRepository metaRepository;
     @Autowired PasswordEncoder passwordEncoder;
+    @Autowired ProjecaoService projecaoService;
 
     private Usuario usuario;
 
@@ -100,6 +102,9 @@ class OnboardingAtomicidadeTest {
         assertEquals(1, carteiraRepository.findByUsuarioId(id).size());
         assertEquals(1, contaFixaRepository.findByUsuarioIdAndAtivoTrue(id).size());
         assertTrue(usuarioRepository.findById(id).orElseThrow().isOnboardingCompleto());
+        assertTrue(projecaoService.projetar(id, 2).meses().stream()
+                .anyMatch(mes -> mes.totalEntradas().compareTo(BigDecimal.ZERO) > 0),
+                "a renda criada no onboarding deve aparecer positivamente na projeção");
     }
 
     @Test
@@ -109,6 +114,7 @@ class OnboardingAtomicidadeTest {
         CountDownLatch prontos = new CountDownLatch(threads);
         CountDownLatch largada = new CountDownLatch(1);
         AtomicInteger sucessos = new AtomicInteger();
+        AtomicInteger falhas = new AtomicInteger();
 
         for (int i = 0; i < threads; i++) {
             executor.submit(() -> {
@@ -119,7 +125,7 @@ class OnboardingAtomicidadeTest {
                     onboardingService.finalizar(request(null));
                     sucessos.incrementAndGet();
                 } catch (Exception ignored) {
-                    // contenda de lock pode falhar; o que importa é não duplicar
+                    falhas.incrementAndGet();
                 } finally {
                     SecurityContextHolder.clearContext();
                 }
@@ -132,7 +138,8 @@ class OnboardingAtomicidadeTest {
         assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS));
 
         Long id = usuario.getId();
-        assertTrue(sucessos.get() >= 1);
+        assertEquals(threads, sucessos.get());
+        assertEquals(0, falhas.get());
         assertEquals(1, carteiraRepository.findByUsuarioId(id).size());
         assertEquals(1, contaRepository.findByUsuarioIdAndAtivoTrue(id).size());
         assertEquals(1, contaFixaRepository.findByUsuarioIdAndAtivoTrue(id).size());

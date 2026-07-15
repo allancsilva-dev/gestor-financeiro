@@ -16,9 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
- * Valida o backfill de V30__meta_status.sql contra PostgreSQL real (ADR-0004):
- * migra até V29, insere metas legadas nos três estados possíveis, aplica V30+
- * e confere o status resultante e a constraint.
+ * Valida V30 e a correção V31 contra PostgreSQL real.
  */
 class MetaStatusBackfillIT {
 
@@ -82,6 +80,7 @@ class MetaStatusBackfillIT {
         Flyway.configure()
                 .dataSource(url, user, password)
                 .locations("classpath:db/migration")
+                .target("30")
                 .load()
                 .migrate();
 
@@ -92,15 +91,28 @@ class MetaStatusBackfillIT {
             assertEquals("ARQUIVADA", statusDe(st, "arquivada"));
             assertEquals("ATIVA", statusDe(st, "ativa_nula"));
 
-            // `ativa` legada NULL foi sincronizada com o status
-            try (ResultSet rs = st.executeQuery("SELECT ativa FROM metas WHERE nome = 'ativa_nula'")) {
-                rs.next();
-                assertEquals(true, rs.getBoolean(1));
-            }
+            // Simula escrita inconsistente ocorrida depois da V30.
+            st.execute("UPDATE metas SET ativa = FALSE WHERE nome = 'ativa'");
+            st.execute("UPDATE metas SET ativa = TRUE WHERE nome = 'concluida'");
+        }
 
-            // constraint rejeita status fora do ciclo de vida
+        Flyway.configure()
+                .dataSource(url, user, password)
+                .locations("classpath:db/migration")
+                .load()
+                .migrate();
+
+        try (Connection conn = DriverManager.getConnection(url, user, password);
+             Statement st = conn.createStatement()) {
+            assertEquals(true, ativaDe(st, "ativa"));
+            assertEquals(false, ativaDe(st, "concluida"));
+            assertEquals(true, ativaDe(st, "ativa_nula"));
+
+            // V31 impede nova divergência entre os dois campos.
             assertThrows(SQLException.class, () -> st.execute(
-                    "INSERT INTO metas (usuario_id, nome, valor_total, status) VALUES (1, 'invalida', 10, 'PAUSADA')"));
+                    "UPDATE metas SET ativa = TRUE WHERE nome = 'arquivada'"));
+            assertThrows(SQLException.class, () -> st.execute(
+                    "INSERT INTO metas (usuario_id, nome, valor_total, status, ativa) VALUES (1, 'invalida', 10, 'PAUSADA', FALSE)"));
         }
     }
 
@@ -108,6 +120,14 @@ class MetaStatusBackfillIT {
         try (ResultSet rs = st.executeQuery("SELECT status FROM metas WHERE nome = '" + nome + "'")) {
             rs.next();
             return rs.getString(1);
+        }
+    }
+
+
+    private boolean ativaDe(Statement st, String nome) throws SQLException {
+        try (ResultSet rs = st.executeQuery("SELECT ativa FROM metas WHERE nome = '" + nome + "'")) {
+            rs.next();
+            return rs.getBoolean(1);
         }
     }
 }

@@ -136,7 +136,7 @@ public class ExportService {
         List<Meta> metas = metaRepository.findByUsuarioId(usuarioId);
 
         StringBuilder csv = new StringBuilder();
-        csv.append("ID,Nome,Descrição,Valor Total,Valor Reservado,Valor Mensal,Data Início,Data Prevista,Data Conclusão,Ativa\n");
+        csv.append("ID,Nome,Descrição,Valor Total,Valor Reservado,Valor Mensal,Data Início,Data Prevista,Data Conclusão,Status,Ativa\n");
 
         for (Meta m : metas) {
             csv.append(m.getId()).append(",");
@@ -148,6 +148,7 @@ public class ExportService {
             csv.append(m.getDataInicio() != null ? m.getDataInicio().format(DF) : "").append(",");
             csv.append(m.getDataPrevista() != null ? m.getDataPrevista().format(DF) : "").append(",");
             csv.append(m.getDataConclusao() != null ? m.getDataConclusao().format(DF) : "").append(",");
+            csv.append(m.getStatus() != null ? m.getStatus() : "").append(",");
             csv.append(Boolean.TRUE.equals(m.getAtiva()) ? "Sim" : "Não").append("\n");
         }
 

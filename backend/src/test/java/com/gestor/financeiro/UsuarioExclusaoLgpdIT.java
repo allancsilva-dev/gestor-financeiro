@@ -41,6 +41,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Regressão LGPD (PROB-0076 / ADR-0007) contra PostgreSQL real:
@@ -186,6 +187,37 @@ class UsuarioExclusaoLgpdIT {
         assertThat(transacaoRepository.findByUsuarioId(outro.getId())).hasSize(2);
         assertThat(contaFixaRepository.findByUsuarioIdAndAtivoTrue(outro.getId())).hasSize(1);
         assertThat(metaRepository.findByUsuarioIdAndAtivaTrue(outro.getId())).hasSize(1);
+    }
+
+    @Test
+    void falhaIntermediariaFazRollbackInclusiveDosDeletesAnteriores() throws IOException {
+        Usuario titular = usuarioRepository.save(TestDataFactory.usuario("Rollback", "rollback-lgpd@teste.com", "hash"));
+        montarGrafo(titular);
+        Path arquivo = UPLOAD_DIR.resolve(titular.getId().toString()).resolve("comprovante.pdf");
+        Files.createDirectories(arquivo.getParent());
+        Files.writeString(arquivo, "conteudo");
+
+        jdbcTemplate.execute("""
+            CREATE OR REPLACE FUNCTION impedir_delete_meta_teste() RETURNS trigger AS $$
+            BEGIN RAISE EXCEPTION 'falha intermediaria de teste'; END;
+            $$ LANGUAGE plpgsql
+            """);
+        jdbcTemplate.execute("CREATE TRIGGER impedir_delete_meta_teste BEFORE DELETE ON metas FOR EACH ROW EXECUTE FUNCTION impedir_delete_meta_teste() ");
+        try {
+            assertThatThrownBy(() -> usuarioExclusaoService.excluirConta(titular.getId()))
+                    .isInstanceOf(Exception.class);
+        } finally {
+            jdbcTemplate.execute("DROP TRIGGER IF EXISTS impedir_delete_meta_teste ON metas");
+            jdbcTemplate.execute("DROP FUNCTION IF EXISTS impedir_delete_meta_teste()");
+        }
+
+        assertThat(usuarioRepository.findById(titular.getId())).isPresent();
+        assertThat(transacaoRepository.findByUsuarioId(titular.getId())).hasSize(2);
+        assertThat(metaRepository.findByUsuarioId(titular.getId())).hasSize(1);
+        assertThat(Files.exists(arquivo)).isTrue();
+
+        // Não vaza o grafo preservado para os demais métodos desta IT sem @Transactional.
+        usuarioExclusaoService.excluirConta(titular.getId());
     }
 
     /** Carteira, categoria, conta fixa recorrente com execuções nos 3 status, transação avulsa e meta. */

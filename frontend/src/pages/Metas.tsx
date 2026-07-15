@@ -13,6 +13,7 @@ import { fieldA11y } from '../validation/fieldA11y';
 import { useZodForm } from '../hooks/useZodForm';
 import { aporteMetaSchema, metaSchema } from '../validation/schemas';
 import { toNullableNumber } from '../validation/numbers';
+import { acoesDaMeta } from '../domain/metaPolicy';
 
 export default function Metas() {
   const { usuario } = useAuth();
@@ -473,7 +474,7 @@ export default function Metas() {
                         )}
                       </div>
                     </div>
-                    {meta.status !== 'ARQUIVADA' && (
+                    {acoesDaMeta(meta).editar && (
                       <div className="flex gap-2">
                         <button
                           onClick={() => abrirFormulario(meta)}
@@ -481,12 +482,14 @@ export default function Metas() {
                         >
                           Editar
                         </button>
-                        <button
-                          onClick={() => handleDeletar(meta.id!)}
-                          className="text-red-600 hover:text-red-800 text-sm"
-                        >
-                          Excluir
-                        </button>
+                        {acoesDaMeta(meta).excluir && (
+                          <button
+                            onClick={() => handleDeletar(meta.id!)}
+                            className="text-red-600 hover:text-red-800 text-sm"
+                          >
+                            Excluir
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -525,7 +528,7 @@ export default function Metas() {
                     </div>
                   </div>
 
-                  {meta.status !== 'ARQUIVADA' && (
+                  {acoesDaMeta(meta).editar && (
                     mostrarAdicionar === meta.id || mostrarResgatar === meta.id ? (
                     <div className="space-y-2">
                       <CurrencyInput
@@ -581,7 +584,7 @@ export default function Metas() {
                     </div>
                     ) : (
                     <div className="flex gap-2">
-                      {meta.status !== 'CONCLUIDA' && (
+                      {acoesDaMeta(meta).adicionar && (
                         <button
                           onClick={() => { setMostrarResgatar(null); setMostrarAdicionar(meta.id!); }}
                           className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition"
@@ -589,7 +592,7 @@ export default function Metas() {
                           💰 Adicionar Dinheiro
                         </button>
                       )}
-                      {(meta.valorReservado || 0) > 0 && (
+                      {acoesDaMeta(meta).resgatar && (
                         <button
                           onClick={() => { setMostrarAdicionar(null); setMostrarResgatar(meta.id!); }}
                           className="flex-1 bg-gray-100 text-gray-800 border border-gray-300 py-2 rounded-lg hover:bg-gray-200 transition"

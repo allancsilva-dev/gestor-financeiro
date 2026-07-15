@@ -43,6 +43,7 @@ services:
       # Esta env var SOBREPÕE o profile; tem que ser 'native' aqui também.
       SERVER_FORWARD_HEADERS_STRATEGY: native
       APP_UPLOAD_DIR: /app/uploads
+      APP_BUSINESS_TIMEZONE: ${APP_BUSINESS_TIMEZONE:-America/Sao_Paulo}
     # Anexos sobrevivem a recreate do container (ADR-0005 / PROB-0080)
     volumes:
       - backend_uploads:/app/uploads
@@ -79,8 +80,7 @@ services:
       - ./deploy/vps/certbot/www:/var/www/certbot
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
 
-  # One-shot canônico (ADR-0006): acionado por timer do host —
-  #   docker compose -f docker-compose.vps.yml --profile backup run --rm postgres-backup
+  # One-shot canônico (ADR-0006): chamado no host por scripts/run-backup.sh.
   # Fail-closed: exige BACKUP_GPG_RECIPIENT (chave privada off-host) e RCLONE_REMOTE.
   postgres-backup:
     build:
@@ -108,7 +108,7 @@ services:
       - ./backups/postgres:/backups
       - backend_uploads:/uploads:ro
       - ./deploy/backup/rclone:/root/.config/rclone:ro
-      - ./deploy/backup/backup-public.asc:/keys/backup-public.asc:ro
+      - ${BACKUP_GPG_PUBLIC_KEY_HOST_FILE:-./deploy/backup/backup-public.asc}:/keys/backup-public.asc:ro
 
 volumes:
   postgres_data:

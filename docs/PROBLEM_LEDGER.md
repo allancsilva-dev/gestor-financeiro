@@ -1638,7 +1638,8 @@ pelas parcelas não pagas, e a diferença sobre a parte já paga (fatura imutáv
 - **Data:** 2026-07-15
 - **Origem:** auditoria `docs/15 07 2026 - MetaDoNexosFinancas.md` (P1-7)
 - **Severidade:** HIGH
-- **Status:** CORRIGIDO na branch fase-1-integridade (commit 1e374ba; backup/restore drill com evidencia neste ledger)
+- **Status:** REABERTO — aguarda drill com remote externo real, API comprovadamente parada,
+  checksum remoto e download completo de anexo restaurado
 - **Area:** infra
 - **Sintoma:** Perda do host implica perda dos backups; politica de retencao e restore nao comprovados de ponta a ponta com anexos.
 - **Causa raiz:** Dois composes evoluiram separadamente; scripts existentes (`scripts/backup-db.sh`, `restore-db.sh`, `restore-drill-db.sh`) nao cobrem uploads nem envio externo.
@@ -1684,5 +1685,7 @@ pg_dump 17) contra base semeada via API (usuário, onboarding, transação, anex
 Ressalvas: (a) drill usou rclone com backend local como remote — em produção configurar remote
 externo real (`deploy/backup/rclone/rclone.conf`); (b) restore de servidor PG16 com cliente 17
 gera erro benigno `transaction_timeout` — manter major igual entre dump e restore (produção usa
-17/17); (c) janela de manutenção (`API_CONTAINER`) exige docker CLI no contexto do timer do
-host (ver RUNBOOK_BACKUP_RESTORE.md).
+17/17); (c) a tentativa histórica com `API_CONTAINER` não garantia a janela de manutenção.
+O coordenador host-side substituiu esse mecanismo, mas ainda precisa de novo drill. Por isso
+esta evidência histórica não fecha o problema;
+`PROB-0081` permanece reaberto até o drill off-host real passar com o coordenador host-side.

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Gestor Financeiro — Backup canônico (ADR-0006 / PROB-0081). One-shot: acionado por timer
-# do host (systemd/cron) ou `docker compose --profile backup run --rm postgres-backup`.
+# do host por `scripts/run-backup.sh`.
 #
 # Bundle: db.dump (pg_dump -Fc) + uploads.tar.gz + manifest.txt (sha256) -> tar -> GPG
 # assimétrico (somente chave PÚBLICA no servidor). Envio obrigatório via rclone; staging
@@ -13,7 +13,6 @@
 #   RCLONE_REMOTE             obrigatório (fail-closed), ex.: "b2:gf-backups/prod"
 #   UPLOADS_DIR               dir de anexos a incluir (default /uploads se existir)
 #   BACKUP_DIR                destino local (default ./backups)
-#   API_CONTAINER             opcional — janela de manutenção: docker stop/start via trap
 #   BACKUP_RETENTION_DAILY    default 7 | BACKUP_RETENTION_WEEKLY default 4
 #   ALLOW_UNENCRYPTED_BACKUP=true / BACKUP_SKIP_REMOTE=true  somente dev local
 
@@ -25,7 +24,6 @@ UPLOADS_DIR="${UPLOADS_DIR:-/uploads}"
 GPG_RECIPIENT="${BACKUP_GPG_RECIPIENT:-}"
 GPG_PUBKEY_FILE="${BACKUP_GPG_PUBLIC_KEY_FILE:-}"
 RCLONE_REMOTE="${RCLONE_REMOTE:-}"
-API_CONTAINER="${API_CONTAINER:-}"
 RETENTION_DAILY="${BACKUP_RETENTION_DAILY:-7}"
 RETENTION_WEEKLY="${BACKUP_RETENTION_WEEKLY:-4}"
 ALLOW_UNENCRYPTED="${ALLOW_UNENCRYPTED_BACKUP:-false}"
@@ -55,22 +53,10 @@ fi
 mkdir -p "$BACKUP_DIR"
 STAGING="$(mktemp -d "${BACKUP_DIR}/staging_XXXXXX")"
 
-API_PARADA=false
 cleanup() {
-  # religa a API mesmo em falha; staging nunca sobrevive
-  if [ "$API_PARADA" = "true" ]; then
-    docker start "$API_CONTAINER" >/dev/null 2>&1 || echo "AVISO: falha ao religar ${API_CONTAINER}" >&2
-  fi
   rm -rf "$STAGING"
 }
 trap cleanup EXIT
-
-# ── Janela de manutenção curta: pausa escrita da API durante o dump ──
-if [ -n "$API_CONTAINER" ] && command -v docker >/dev/null 2>&1; then
-  echo "Janela de manutenção: parando ${API_CONTAINER}"
-  docker stop "$API_CONTAINER" >/dev/null
-  API_PARADA=true
-fi
 
 echo "Backup iniciado: $(date)"
 
@@ -96,13 +82,6 @@ fi
   } > manifest.txt
 )
 
-# religa a API antes de criptografar/enviar (dump e tar já são consistentes)
-if [ "$API_PARADA" = "true" ]; then
-  docker start "$API_CONTAINER" >/dev/null
-  API_PARADA=false
-  echo "Janela de manutenção encerrada: ${API_CONTAINER} religada"
-fi
-
 # semanal aos domingos: entra na retenção de 4 semanas
 SUFIXO=""
 [ "$(date +%u)" = "7" ] && SUFIXO="_weekly"
@@ -126,13 +105,9 @@ echo "Bundle: $FINAL_FILE ($(du -h "$FINAL_FILE" | cut -f1))"
 # ── Envio off-host com verificação; staging some no trap ──
 if [ "$SKIP_REMOTE" != "true" ]; then
   rclone copyto "$FINAL_FILE" "$RCLONE_REMOTE/$(basename "$FINAL_FILE")"
-  TAM_LOCAL=$(wc -c < "$FINAL_FILE" | tr -d ' ')
-  TAM_REMOTO=$(rclone lsl "$RCLONE_REMOTE/$(basename "$FINAL_FILE")" | awk '{print $1}')
-  if [ "$TAM_LOCAL" != "$TAM_REMOTO" ]; then
-    echo "Erro: tamanho remoto ($TAM_REMOTO) difere do local ($TAM_LOCAL) — upload inválido." >&2
-    exit 1
-  fi
-  echo "Upload confirmado em $RCLONE_REMOTE"
+  rclone check --download --one-way "$BACKUP_DIR" "$RCLONE_REMOTE" \
+    --include "/$(basename "$FINAL_FILE")"
+  echo "Upload e checksum confirmados em $RCLONE_REMOTE"
 
   # retenção remota: diários > RETENTION_DAILY dias; semanais > RETENTION_WEEKLY semanas
   rclone delete "$RCLONE_REMOTE" --min-age "${RETENTION_DAILY}d" --exclude "*_weekly*" || true

@@ -5,6 +5,18 @@
 
 set -euo pipefail
 
+NVM_DIR="${NVM_DIR:-${HOME:-}/.nvm}"
+if ! command -v node >/dev/null 2>&1 && [ -s "$NVM_DIR/nvm.sh" ]; then
+  # shellcheck disable=SC1091
+  . "$NVM_DIR/nvm.sh"
+  nvm use >/dev/null 2>&1 || nvm use node >/dev/null 2>&1 || true
+fi
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "Erro: Node.js não encontrado. Instale a versão de .nvmrc (ou carregue o NVM)." >&2
+  exit 1
+fi
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONTAINER_NAME="gf-postgres-e2e-$$"
 DB_NAME="gestor_financeiro_e2e"
@@ -20,6 +32,11 @@ cleanup() {
   docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
+
+if [ ! -x "$ROOT_DIR/frontend/node_modules/.bin/playwright" ]; then
+  echo "Erro: Playwright ausente. Execute npm ci em frontend/." >&2
+  exit 1
+fi
 
 echo "==> Subindo PostgreSQL efêmero"
 docker run -d --name "$CONTAINER_NAME" \

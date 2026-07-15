@@ -17,7 +17,8 @@
     enviar, validar checksum e religar API via `trap`;
   - retencao: 7 diarios + 4 semanais, local e remota; staging local removido apos upload
     confirmado;
-  - production e VPS usam a mesma imagem/script, acionados por timer do host;
+  - production e VPS usam a mesma imagem/script, acionados por `scripts/run-backup.sh` no host;
+    o container de backup não recebe o socket Docker;
   - dev permanece sem backup (decisao explicita).
 - **Consequencias:** Restore drill obrigatorio e documentado com evidencia: PostgreSQL limpo,
   restauracao de volume, validacao de checksums, migrations, contagens e download real de anexo.

@@ -43,7 +43,7 @@ public class Meta {
     @Column
     private LocalDate dataConclusao;
 
-    @Column
+    @Column(nullable = false)
     private Boolean ativa = true;
 
     // Fonte canônica de estado (ADR-0004); `ativa` é mantida sincronizada para clientes antigos
@@ -78,5 +78,19 @@ public class Meta {
     public void arquivar() {
         status = StatusMeta.ARQUIVADA;
         ativa = false;
+    }
+
+    /** Mantém status, flag legada e data de conclusão como uma única transição atômica. */
+    public void recalcularEstado(LocalDate hoje) {
+        if (status == StatusMeta.ARQUIVADA) {
+            return;
+        }
+
+        BigDecimal reservado = valorReservado == null ? BigDecimal.ZERO : valorReservado;
+        if (reservado.compareTo(valorTotal) >= 0) {
+            concluir(hoje);
+        } else {
+            reativar();
+        }
     }
 }

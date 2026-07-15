@@ -9,7 +9,7 @@
   - criacao → `ATIVA`;
   - reserva atinge ou supera o objetivo → `CONCLUIDA` (permanece acessivel em historico);
   - resgate que caia abaixo do objetivo → volta a `ATIVA`;
-  - exclusao com `valorReservado > 0` → **bloqueada** com HTTP 400 instrutivo (resgatar antes);
+  - exclusao com `valorReservado > 0` → **bloqueada** com HTTP 422 instrutivo (resgatar antes);
   - exclusao sem reserva → `ARQUIVADA` (soft-delete);
   - `ARQUIVADA` nao aceita edicao nem movimentacao;
   - repetir conclusao/arquivamento nao duplica efeitos (idempotente).

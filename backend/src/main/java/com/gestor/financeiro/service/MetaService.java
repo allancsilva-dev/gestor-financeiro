@@ -73,9 +73,7 @@ public class MetaService {
         BigDecimal valorAnterior = meta.getValorReservado();
         meta.setValorReservado(valorAnterior.add(valor));
 
-        if (meta.getValorReservado().compareTo(meta.getValorTotal()) >= 0) {
-            meta.concluir(LocalDate.now(clock));
-        }
+        meta.recalcularEstado(LocalDate.now(clock));
 
         Meta salva = metaRepository.save(meta);
 
@@ -107,9 +105,7 @@ public class MetaService {
         BigDecimal valorAnterior = meta.getValorReservado();
         meta.setValorReservado(valorAnterior.subtract(valor));
 
-        if (meta.getValorReservado().compareTo(meta.getValorTotal()) < 0) {
-            meta.reativar();
-        }
+        meta.recalcularEstado(LocalDate.now(clock));
 
         Meta salva = metaRepository.save(meta);
 
@@ -132,6 +128,7 @@ public class MetaService {
         meta.setCor(metaAtualizada.getCor());
         meta.setIcone(metaAtualizada.getIcone());
         meta.setDescricao(metaAtualizada.getDescricao());
+        meta.recalcularEstado(LocalDate.now(clock));
         
         return metaRepository.save(meta);
     }

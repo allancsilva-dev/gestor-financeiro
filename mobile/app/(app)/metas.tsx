@@ -15,6 +15,7 @@ import ProgressBar from '../../src/components/ui/ProgressBar';
 import Fab from '../../src/components/ui/Fab';
 import Field from '../../src/components/ui/Field';
 import Chip from '../../src/components/ui/Chip';
+import { acoesDaMeta } from '../../src/domain/metaPolicy';
 
 export default function Metas() {
   const colors = useTheme();
@@ -25,6 +26,7 @@ export default function Metas() {
   const [modalRemoverVisible, setModalRemoverVisible] = useState(false);
   const [modalCriarVisible, setModalCriarVisible] = useState(false);
   const [modalDetalheVisible, setModalDetalheVisible] = useState(false);
+  const [retornarAoDetalheAposMovimentacao, setRetornarAoDetalheAposMovimentacao] = useState(false);
   const [editandoMeta, setEditandoMeta] = useState<Meta | null>(null);
   const [metaSelecionada, setMetaSelecionada] = useState<Meta | null>(null);
   const [erroCriar, setErroCriar] = useState<string | null>(null);
@@ -95,6 +97,40 @@ export default function Metas() {
     setModalCriarVisible(true);
   };
 
+  const abrirAdicionarValor = (meta: Meta, origemDetalhe = false) => {
+    setValorAdicionar('0');
+    setErroAdicionar(null);
+    setErroCarteira(null);
+    setCarteiraOrigemId(carteiras.length === 1 ? carteiras[0].id : null);
+    setMetaSelecionada(meta);
+    setRetornarAoDetalheAposMovimentacao(origemDetalhe);
+    if (origemDetalhe) {
+      setModalDetalheVisible(false);
+      setTimeout(() => setModalAdicionarVisible(true), 350);
+      return;
+    }
+    setModalAdicionarVisible(true);
+  };
+
+  const abrirRetirarValor = (meta: Meta) => {
+    setValorRemover('0');
+    setErroRemover(null);
+    setErroCarteiraDestino(null);
+    setCarteiraDestinoId(carteiras.length === 1 ? carteiras[0].id : null);
+    setMetaSelecionada(meta);
+    setRetornarAoDetalheAposMovimentacao(true);
+    setModalDetalheVisible(false);
+    setTimeout(() => setModalRemoverVisible(true), 350);
+  };
+
+  const fecharMovimentacao = (tipo: 'adicionar' | 'remover') => {
+    if (tipo === 'adicionar') setModalAdicionarVisible(false);
+    else setModalRemoverVisible(false);
+    const deveRetornar = retornarAoDetalheAposMovimentacao;
+    setRetornarAoDetalheAposMovimentacao(false);
+    if (deveRetornar) setTimeout(() => setModalDetalheVisible(true), 350);
+  };
+
   const montarPayloadMeta = (): MetaRequest | null => {
     setNomeError(null); setValorTotalError(null); setValorMensalError(null); setDataLimiteError(null); setErroCriar(null);
     let hasErr = false;
@@ -117,11 +153,12 @@ export default function Metas() {
   const adicionarMutation = useMutation({
     mutationFn: ({ id, valor, carteiraId }: { id: number; valor: number; carteiraId: number }) =>
       metaService.adicionarValor(id, valor, carteiraId),
-    onSuccess: () => {
+    onSuccess: (metaAtualizada) => {
+      setMetaSelecionada(metaAtualizada);
       queryClient.invalidateQueries({ queryKey: ['metas'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-resumo'] });
       queryClient.invalidateQueries({ queryKey: ['carteiras'] });
-      setModalAdicionarVisible(false);
+      fecharMovimentacao('adicionar');
     },
     onError: (err: any) => setErroAdicionar(err?.userMessage ?? 'Erro ao adicionar.'),
   });
@@ -129,19 +166,20 @@ export default function Metas() {
   const removerMutation = useMutation({
     mutationFn: ({ id, valor, carteiraId }: { id: number; valor: number; carteiraId: number }) =>
       metaService.removerValor(id, valor, carteiraId),
-    onSuccess: () => {
+    onSuccess: (metaAtualizada) => {
+      setMetaSelecionada(metaAtualizada);
       queryClient.invalidateQueries({ queryKey: ['metas'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-resumo'] });
       queryClient.invalidateQueries({ queryKey: ['carteiras'] });
-      setModalRemoverVisible(false);
-      setModalDetalheVisible(false);
+      fecharMovimentacao('remover');
     },
     onError: (err: any) => setErroRemover(err?.userMessage ?? 'Erro ao retirar.'),
   });
 
   const criarMutation = useMutation({
     mutationFn: (payload: MetaRequest) => metaService.criar(payload),
-    onSuccess: () => {
+    onSuccess: (metaAtualizada) => {
+      setMetaSelecionada(metaAtualizada);
       queryClient.invalidateQueries({ queryKey: ['metas'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-resumo'] });
       setModalCriarVisible(false);
@@ -152,7 +190,8 @@ export default function Metas() {
 
   const atualizarMutation = useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: MetaRequest }) => metaService.atualizar(id, payload),
-    onSuccess: () => {
+    onSuccess: (metaAtualizada) => {
+      setMetaSelecionada(metaAtualizada);
       queryClient.invalidateQueries({ queryKey: ['metas'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-resumo'] });
       setModalCriarVisible(false);
@@ -233,9 +272,9 @@ export default function Metas() {
           {meta.dataPrevista && <Text style={{ color: colors.textSecondary, fontSize: 11 }}>até {formatDate(meta.dataPrevista)}</Text>}
         </View>
 
-        {!arquivada && (
+        {acoesDaMeta(meta).adicionar && (
           <TouchableOpacity
-            onPress={() => { setValorAdicionar('0'); setErroAdicionar(null); setErroCarteira(null); setCarteiraOrigemId(carteiras.length === 1 ? carteiras[0].id : null); setMetaSelecionada(meta); setModalAdicionarVisible(true); }}
+            onPress={() => abrirAdicionarValor(meta)}
             accessibilityRole="button"
             accessibilityLabel={`Adicionar valor à meta ${meta.nome}`}
             style={{ marginTop: 12, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1, borderColor: colors.brand, alignSelf: 'flex-start' }}
@@ -301,12 +340,14 @@ export default function Metas() {
               <Text style={{ color: colors.brandFg, fontSize: 15 }}>Fechar</Text>
             </TouchableOpacity>
             <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700' }}>Detalhes da Meta</Text>
-            <TouchableOpacity
-              onPress={() => metaSelecionada && abrirEditarMeta(metaSelecionada)}
-              accessibilityRole="button"
-            >
-              <Text style={{ color: colors.brandFg, fontSize: 15, fontWeight: '700' }}>Editar</Text>
-            </TouchableOpacity>
+            {metaSelecionada && acoesDaMeta(metaSelecionada).editar ? (
+              <TouchableOpacity
+                onPress={() => metaSelecionada && abrirEditarMeta(metaSelecionada)}
+                accessibilityRole="button"
+              >
+                <Text style={{ color: colors.brandFg, fontSize: 15, fontWeight: '700' }}>Editar</Text>
+              </TouchableOpacity>
+            ) : <View style={{ width: 48 }} />}
           </View>
           {metaSelecionada && (
             <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
@@ -335,21 +376,27 @@ export default function Metas() {
                 ) : null}
               </Card>
 
+              {acoesDaMeta(metaSelecionada).editar && (
               <View style={{ gap: 10, marginTop: 16 }}>
+                {acoesDaMeta(metaSelecionada).adicionar && (
                 <TouchableOpacity
-                  onPress={() => { setValorAdicionar('0'); setErroAdicionar(null); setErroCarteira(null); setCarteiraOrigemId(carteiras.length === 1 ? carteiras[0].id : null); setModalAdicionarVisible(true); }}
+                  onPress={() => abrirAdicionarValor(metaSelecionada, true)}
                   accessibilityRole="button"
                   style={{ height: 48, borderRadius: 12, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' }}
                 >
                   <Text style={{ color: '#ffffff', fontSize: 15, fontWeight: '700' }}>Adicionar valor</Text>
                 </TouchableOpacity>
+                )}
+                {acoesDaMeta(metaSelecionada).resgatar && (
                 <TouchableOpacity
-                  onPress={() => { setValorRemover('0'); setErroRemover(null); setErroCarteiraDestino(null); setCarteiraDestinoId(carteiras.length === 1 ? carteiras[0].id : null); setModalRemoverVisible(true); }}
+                  onPress={() => abrirRetirarValor(metaSelecionada)}
                   accessibilityRole="button"
                   style={{ height: 48, borderRadius: 12, borderWidth: 1, borderColor: colors.brand, alignItems: 'center', justifyContent: 'center' }}
                 >
                   <Text style={{ color: colors.brandFg, fontSize: 15, fontWeight: '700' }}>Retirar valor</Text>
                 </TouchableOpacity>
+                )}
+                {acoesDaMeta(metaSelecionada).excluir && (
                 <TouchableOpacity
                   onPress={() => confirmarExcluirMeta(metaSelecionada)}
                   disabled={deletarMutation.status === 'pending'}
@@ -360,7 +407,9 @@ export default function Metas() {
                     ? <ActivityIndicator color={colors.danger} size="small" />
                     : <Text style={{ color: colors.danger, fontSize: 15, fontWeight: '700' }}>Excluir meta</Text>}
                 </TouchableOpacity>
+                )}
               </View>
+              )}
             </ScrollView>
           )}
         </View>
@@ -369,7 +418,7 @@ export default function Metas() {
       <Modal visible={modalAdicionarVisible} animationType="slide" presentationStyle="pageSheet">
         <View style={{ flex: 1, backgroundColor: colors.bg }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-            <TouchableOpacity onPress={() => { setModalAdicionarVisible(false); setValorAdicionar(''); setErroAdicionar(null); }} accessibilityRole="button">
+            <TouchableOpacity onPress={() => { fecharMovimentacao('adicionar'); setValorAdicionar(''); setErroAdicionar(null); }} accessibilityRole="button">
               <Text style={{ color: colors.brandFg, fontSize: 15 }}>Cancelar</Text>
             </TouchableOpacity>
             <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600' }}>Adicionar Valor</Text>
@@ -415,7 +464,7 @@ export default function Metas() {
       <Modal visible={modalRemoverVisible} animationType="slide" presentationStyle="pageSheet">
         <View style={{ flex: 1, backgroundColor: colors.bg }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-            <TouchableOpacity onPress={() => { setModalRemoverVisible(false); setValorRemover(''); setErroRemover(null); }} accessibilityRole="button">
+            <TouchableOpacity onPress={() => { fecharMovimentacao('remover'); setValorRemover(''); setErroRemover(null); }} accessibilityRole="button">
               <Text style={{ color: colors.brandFg, fontSize: 15 }}>Cancelar</Text>
             </TouchableOpacity>
             <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600' }}>Retirar Valor</Text>

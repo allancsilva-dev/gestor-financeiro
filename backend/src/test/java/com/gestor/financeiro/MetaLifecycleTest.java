@@ -10,6 +10,7 @@ import com.gestor.financeiro.repository.MetaRepository;
 import com.gestor.financeiro.repository.MovimentoMetaRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
 import com.gestor.financeiro.service.MetaService;
+import com.gestor.financeiro.service.ExportService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,6 +40,7 @@ class MetaLifecycleTest {
     @Autowired CarteiraRepository carteiraRepository;
     @Autowired UsuarioRepository usuarioRepository;
     @Autowired PasswordEncoder passwordEncoder;
+    @Autowired ExportService exportService;
 
     private Usuario usuario;
     private Carteira carteira;
@@ -96,6 +98,48 @@ class MetaLifecycleTest {
     }
 
     @Test
+    void reduzirObjetivoConcluiMetaPelaPrimeiraVez() {
+        Meta meta = novaMeta("Entrada", "2000.00");
+        metaService.adicionarValor(meta.getId(), new BigDecimal("1200.00"), carteira.getId(), usuario.getId());
+
+        Meta atualizacao = novaMetaDetached("Entrada");
+        atualizacao.setValorTotal(new BigDecimal("1000.00"));
+        Meta concluida = metaService.atualizar(meta.getId(), atualizacao, usuario.getId());
+
+        assertEquals(StatusMeta.CONCLUIDA, concluida.getStatus());
+        assertFalse(concluida.getAtiva());
+        assertNotNull(concluida.getDataConclusao());
+    }
+
+    @Test
+    void aumentarObjetivoReabreMetaELimpaDataDeConclusao() {
+        Meta meta = novaMeta("Carro", "1000.00");
+        metaService.adicionarValor(meta.getId(), new BigDecimal("1000.00"), carteira.getId(), usuario.getId());
+
+        Meta atualizacao = novaMetaDetached("Carro");
+        atualizacao.setValorTotal(new BigDecimal("1500.00"));
+        Meta reaberta = metaService.atualizar(meta.getId(), atualizacao, usuario.getId());
+
+        assertEquals(StatusMeta.ATIVA, reaberta.getStatus());
+        assertTrue(reaberta.getAtiva());
+        assertNull(reaberta.getDataConclusao());
+    }
+
+    @Test
+    void editarMetaAindaConcluidaPreservaDataDeConclusao() {
+        Meta meta = novaMeta("Reserva", "1000.00");
+        metaService.adicionarValor(meta.getId(), new BigDecimal("1200.00"), carteira.getId(), usuario.getId());
+        var dataConclusao = metaRepository.findById(meta.getId()).orElseThrow().getDataConclusao();
+
+        Meta atualizacao = novaMetaDetached("Reserva ajustada");
+        atualizacao.setValorTotal(new BigDecimal("1100.00"));
+        Meta concluida = metaService.atualizar(meta.getId(), atualizacao, usuario.getId());
+
+        assertEquals(StatusMeta.CONCLUIDA, concluida.getStatus());
+        assertEquals(dataConclusao, concluida.getDataConclusao());
+    }
+
+    @Test
     void exclusaoComReservaEBloqueadaSemAlterarEstado() {
         Meta meta = novaMeta("Emergência", "1000.00");
         metaService.adicionarValor(meta.getId(), new BigDecimal("400.00"), carteira.getId(), usuario.getId());
@@ -132,6 +176,19 @@ class MetaLifecycleTest {
                 () -> metaService.atualizar(meta.getId(), novaMetaDetached("Curso 2"), usuario.getId()));
 
         assertEquals(1, metaService.listarPorUsuario(usuario.getId(), StatusMeta.ARQUIVADA, Pageable.unpaged()).getTotalElements());
+    }
+
+    @Test
+    void exportacaoDistingueStatusConcluidaDeArquivadaEMantemAtivaLegada() {
+        Meta concluida = novaMeta("Concluída CSV", "100.00");
+        metaService.adicionarValor(concluida.getId(), new BigDecimal("100.00"), carteira.getId(), usuario.getId());
+        Meta arquivada = novaMeta("Arquivada CSV", "100.00");
+        metaService.deletar(arquivada.getId(), usuario.getId());
+
+        String csv = exportService.exportarCompletoCsv(usuario.getId());
+        assertTrue(csv.contains("Data Conclusão,Status,Ativa"));
+        assertTrue(csv.lines().anyMatch(l -> l.contains("Concluída CSV") && l.contains(",CONCLUIDA,Não")));
+        assertTrue(csv.lines().anyMatch(l -> l.contains("Arquivada CSV") && l.contains(",ARQUIVADA,Não")));
     }
 
     private Meta novaMeta(String nome, String valorTotal) {

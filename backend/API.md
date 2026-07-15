@@ -217,7 +217,7 @@ Formato de resposta paginada:
 - `DELETE /api/v1/contas-fixas/{id}`
 
 ##  Metas (`/api/v1/metas`)
-- `GET /api/v1/metas/minhas` (paginado)
+- `GET /api/v1/metas/minhas?status=ATIVA|CONCLUIDA|ARQUIVADA` (paginado; sem `status`, usa `ATIVA`)
 - `GET /api/v1/metas/{id}`
 - `GET /api/v1/metas/{id}/progresso`
 - `POST /api/v1/metas`
@@ -225,6 +225,11 @@ Formato de resposta paginada:
 - `PUT /api/v1/metas/{id}/adicionar`
 - `PUT /api/v1/metas/{id}/remover`
 - `DELETE /api/v1/metas/{id}`
+
+O campo canônico da resposta é `status`. O booleano `ativa` permanece apenas por
+compatibilidade e está deprecado. Excluir uma meta com valor reservado retorna HTTP 422
+(`BUSINESS_ERROR`); resgate o valor para uma carteira antes de excluir. Um valor inválido
+em `status` retorna HTTP 400 (`INVALID_PARAMETER`).
 
 ##  Parcelas (`/api/v1/parcelas`)
 - `GET /api/v1/parcelas/transacao/{transacaoId}` (paginado)
@@ -239,3 +244,4 @@ Formato de resposta paginada:
 - `StatusTransacao`: `PENDENTE`, `PAGO`, `ATRASADO`, `CANCELADO`
 - `TipoCarteira`: `DINHEIRO`, `CONTA_BANCARIA`, `POUPANCA`
 - `TipoConta`: `CREDITO`, `DEBITO`, `DINHEIRO`, `POUPANCA`
+- `StatusMeta`: `ATIVA`, `CONCLUIDA`, `ARQUIVADA`

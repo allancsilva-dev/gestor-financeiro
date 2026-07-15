@@ -2,7 +2,7 @@
 # Gestor Financeiro — Restore drill automatizado em PostgreSQL limpo (ADR-0006)
 # Uso: ./scripts/restore-drill-db.sh <ARQUIVO_BACKUP> [DRILL_DATABASE_URL]
 #
-# Sem DRILL_DATABASE_URL: sobe um postgres:16-alpine efêmero via docker e derruba no fim.
+# Sem DRILL_DATABASE_URL: sobe um postgres:17-alpine efêmero via docker e derruba no fim.
 # Valida: checksums do manifesto (via restore-db.sh), migrations Flyway, contagens de
 # tabelas-chave e presença dos anexos extraídos do bundle.
 
@@ -31,7 +31,7 @@ if [ -z "$DRILL_DB_URL" ]; then
   fi
   CONTAINER="gf-restore-drill-$$"
   docker run -d --name "$CONTAINER" -e POSTGRES_DB=gf_drill -e POSTGRES_USER=postgres \
-    -e POSTGRES_PASSWORD=postgres -p 127.0.0.1::5432 postgres:16-alpine >/dev/null
+    -e POSTGRES_PASSWORD=postgres -p 127.0.0.1::5432 postgres:17-alpine >/dev/null
   for _ in $(seq 1 40); do
     docker exec "$CONTAINER" pg_isready -U postgres -d gf_drill >/dev/null 2>&1 && break
     sleep 1
@@ -56,6 +56,8 @@ MIGRATIONS=$(psql "$DRILL_DB_URL" -v ON_ERROR_STOP=1 -tAc "select count(*) from 
 TRANSACOES=$(psql "$DRILL_DB_URL" -v ON_ERROR_STOP=1 -tAc "select count(*) from transacoes;")
 ANEXOS_DB=$(psql "$DRILL_DB_URL" -v ON_ERROR_STOP=1 -tAc "select count(*) from anexos;")
 ANEXOS_ARQUIVOS=$(find "$UPLOADS_TMP" -type f | wc -l | tr -d ' ')
+CAMINHOS_INVALIDOS=$(psql "$DRILL_DB_URL" -v ON_ERROR_STOP=1 -tAc \
+  "select count(*) from anexos where caminho is null or caminho = '' or caminho like '%..%';")
 
 echo "usuarios=$USUARIOS migrations=$MIGRATIONS transacoes=$TRANSACOES anexos_db=$ANEXOS_DB anexos_arquivos=$ANEXOS_ARQUIVOS"
 
@@ -67,5 +69,18 @@ if [ "$ANEXOS_DB" -gt 0 ] && [ "$ANEXOS_ARQUIVOS" -lt "$ANEXOS_DB" ]; then
   echo "Erro: banco referencia $ANEXOS_DB anexo(s) mas o bundle trouxe $ANEXOS_ARQUIVOS arquivo(s)." >&2
   exit 1
 fi
+if [ "$CAMINHOS_INVALIDOS" -gt 0 ]; then
+  echo "Erro: banco contém $CAMINHOS_INVALIDOS caminho(s) de anexo inválido(s)." >&2
+  exit 1
+fi
+
+while IFS= read -r caminho; do
+  [ -z "$caminho" ] && continue
+  relativo="${caminho#/app/uploads/}"
+  if [ "$relativo" = "$caminho" ] || [ ! -s "$UPLOADS_TMP/$relativo" ]; then
+    echo "Erro: anexo restaurado não está disponível no caminho esperado: $caminho" >&2
+    exit 1
+  fi
+done < <(psql "$DRILL_DB_URL" -v ON_ERROR_STOP=1 -tAc "select caminho from anexos order by id;")
 
 echo "Restore drill concluido com sucesso: $(date)"
