@@ -8,6 +8,7 @@ import com.gestor.financeiro.model.Meta;
 import com.gestor.financeiro.model.MovimentoMeta;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.OrigemMovimentoCarteira;
+import com.gestor.financeiro.model.enums.StatusMeta;
 import com.gestor.financeiro.model.enums.TipoMovimentoCarteira;
 import com.gestor.financeiro.repository.MetaRepository;
 import com.gestor.financeiro.repository.MovimentoMetaRepository;
@@ -30,9 +31,9 @@ public class MetaService {
     private final MovimentoMetaRepository movimentoMetaRepository;
     private final LedgerService ledgerService;
     
-    // Lista metas ativas do usuário
-    public Page<Meta> listarPorUsuario(Long usuarioId, Pageable pageable) {
-        return metaRepository.findByUsuarioIdAndAtivaTrue(usuarioId, pageable);
+    // Lista metas do usuário por status canônico (ausência de filtro = ATIVA, compat com clientes antigos)
+    public Page<Meta> listarPorUsuario(Long usuarioId, StatusMeta status, Pageable pageable) {
+        return metaRepository.findByUsuarioIdAndStatus(usuarioId, status == null ? StatusMeta.ATIVA : status, pageable);
     }
     
     // Cria nova meta
@@ -43,11 +44,12 @@ public class MetaService {
 
         meta.setUsuario(usuario);
 
-        // Valores padrão
-        if (meta.getAtiva() == null) meta.setAtiva(true);
+        // Valores padrão — criação sempre nasce ATIVA (ADR-0004)
+        meta.setStatus(StatusMeta.ATIVA);
+        meta.setAtiva(true);
         if (meta.getValorReservado() == null) meta.setValorReservado(BigDecimal.ZERO);
         if (meta.getDataInicio() == null) meta.setDataInicio(LocalDate.now());
-        
+
         return metaRepository.save(meta);
     }
     
@@ -55,6 +57,7 @@ public class MetaService {
     @Transactional
     public Meta adicionarValor(Long metaId, BigDecimal valor, Long carteiraId, Long usuarioId) {
         Meta meta = buscarPorIdDoUsuario(metaId, usuarioId);
+        exigirNaoArquivada(meta);
 
         // Reserva sem origem gera dupla contagem: o valor "guardado" continuaria disponível na carteira
         if (carteiraId == null) {
@@ -70,8 +73,7 @@ public class MetaService {
         meta.setValorReservado(valorAnterior.add(valor));
 
         if (meta.getValorReservado().compareTo(meta.getValorTotal()) >= 0) {
-            meta.setDataConclusao(LocalDate.now());
-            meta.setAtiva(false);
+            meta.concluir(LocalDate.now());
         }
 
         Meta salva = metaRepository.save(meta);
@@ -85,6 +87,7 @@ public class MetaService {
     @Transactional
     public Meta removerValor(Long metaId, BigDecimal valor, Long carteiraId, Long usuarioId) {
         Meta meta = buscarPorIdDoUsuario(metaId, usuarioId);
+        exigirNaoArquivada(meta);
 
         if (carteiraId == null) {
             throw new BusinessException("Informe a carteira de destino do resgate");
@@ -104,8 +107,7 @@ public class MetaService {
         meta.setValorReservado(valorAnterior.subtract(valor));
 
         if (meta.getValorReservado().compareTo(meta.getValorTotal()) < 0) {
-            meta.setDataConclusao(null);
-            meta.setAtiva(true);
+            meta.reativar();
         }
 
         Meta salva = metaRepository.save(meta);
@@ -120,7 +122,8 @@ public class MetaService {
     @Transactional
     public Meta atualizar(Long id, Meta metaAtualizada, Long usuarioId) {
         Meta meta = buscarPorIdDoUsuario(id, usuarioId);
-        
+        exigirNaoArquivada(meta);
+
         meta.setNome(metaAtualizada.getNome());
         meta.setValorTotal(metaAtualizada.getValorTotal());
         meta.setValorMensal(metaAtualizada.getValorMensal());
@@ -132,13 +135,29 @@ public class MetaService {
         return metaRepository.save(meta);
     }
     
-    // Desativa meta
+    /**
+     * Arquiva a meta (exclusão lógica, ADR-0004). Meta com valor reservado não pode ser
+     * excluída: o dinheiro sumiria da visão do usuário — resgate primeiro. Repetir o
+     * arquivamento não duplica efeitos.
+     */
     @Transactional
     public void deletar(Long id, Long usuarioId) {
         Meta meta = buscarPorIdDoUsuario(id, usuarioId);
-        
-        meta.setAtiva(false);
+
+        if (meta.getValorReservado() != null && meta.getValorReservado().compareTo(BigDecimal.ZERO) > 0) {
+            throw new BusinessException(
+                "Esta meta ainda tem R$ " + meta.getValorReservado().setScale(2, RoundingMode.HALF_UP)
+                + " reservados. Resgate o valor para uma carteira antes de excluir.");
+        }
+
+        meta.arquivar();
         metaRepository.save(meta);
+    }
+
+    private void exigirNaoArquivada(Meta meta) {
+        if (meta.getStatus() == StatusMeta.ARQUIVADA) {
+            throw new BusinessException("Meta arquivada não aceita edição ou movimentação");
+        }
     }
     
     // Busca por ID

@@ -1,6 +1,8 @@
 import api from './api';
 import type { PagedResponse } from '../types';
 
+export type StatusMeta = 'ATIVA' | 'CONCLUIDA' | 'ARQUIVADA';
+
 export interface Meta {
   id?: number;
   nome: string;
@@ -9,24 +11,28 @@ export interface Meta {
   valorMensal: number;
   dataInicio?: string;
   dataPrevista?: string;
+  dataConclusao?: string;
   cor?: string;
   icone?: string;
   descricao?: string;
+  status?: StatusMeta;
+  /** @deprecated use status */
   ativa?: boolean;
 }
 
 export const metaService = {
-  listarPorUsuario: async (_usuarioId: number, page = 0, size = 20, signal?: AbortSignal) => {
+  // ausência de status equivale a ATIVA no backend
+  listarPorUsuario: async (_usuarioId: number, page = 0, size = 20, signal?: AbortSignal, status?: StatusMeta) => {
     const response = await api.get<PagedResponse<Meta>>('/metas/minhas', {
-      params: { page, size },
+      params: { page, size, ...(status ? { status } : {}) },
       signal,
     });
     return response.data.content ?? [];
   },
 
-  listarPorUsuarioPaginado: async (page = 0, size = 20, signal?: AbortSignal) => {
+  listarPorUsuarioPaginado: async (page = 0, size = 20, signal?: AbortSignal, status?: StatusMeta) => {
     const response = await api.get<PagedResponse<Meta>>('/metas/minhas', {
-      params: { page, size },
+      params: { page, size, ...(status ? { status } : {}) },
       signal,
     });
     return response.data;

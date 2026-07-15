@@ -1,5 +1,6 @@
 package com.gestor.financeiro.model;
 
+import com.gestor.financeiro.model.enums.StatusMeta;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.math.BigDecimal;
@@ -41,16 +42,41 @@ public class Meta {
     
     @Column
     private LocalDate dataConclusao;
-    
+
     @Column
     private Boolean ativa = true;
-    
+
+    // Fonte canônica de estado (ADR-0004); `ativa` é mantida sincronizada para clientes antigos
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private StatusMeta status = StatusMeta.ATIVA;
+
     @Column
     private String cor;
-    
+
     @Column
     private String icone;
-    
+
     @Column(length = 500)
     private String descricao;
+
+    public void concluir(LocalDate data) {
+        if (status == StatusMeta.CONCLUIDA) {
+            return;
+        }
+        status = StatusMeta.CONCLUIDA;
+        ativa = false;
+        dataConclusao = data;
+    }
+
+    public void reativar() {
+        status = StatusMeta.ATIVA;
+        ativa = true;
+        dataConclusao = null;
+    }
+
+    public void arquivar() {
+        status = StatusMeta.ARQUIVADA;
+        ativa = false;
+    }
 }

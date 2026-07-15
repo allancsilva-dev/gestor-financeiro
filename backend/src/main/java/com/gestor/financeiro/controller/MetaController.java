@@ -6,6 +6,7 @@ import com.gestor.financeiro.dto.MetaResponseDto;
 import com.gestor.financeiro.dto.MetaProgressoResponse;
 import com.gestor.financeiro.dto.ValorRequest;
 import com.gestor.financeiro.model.Meta;
+import com.gestor.financeiro.model.enums.StatusMeta;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.MetaService;
 import com.gestor.financeiro.util.PaginationUtils;
@@ -29,14 +30,15 @@ public class MetaController {
     private final MetaService metaService;
     private final AuthenticatedUserService authenticatedUserService;
     
-    // GET /api/metas/minhas - Lista metas do usuário autenticado
+    // GET /api/metas/minhas?status=ATIVA|CONCLUIDA|ARQUIVADA - ausência de filtro equivale a ATIVA
     @GetMapping("/minhas")
     public ResponseEntity<Page<MetaResponseDto>> listar(
+        @RequestParam(required = false) StatusMeta status,
         @PageableDefault(size = 20, sort = "nome", direction = Sort.Direction.ASC) Pageable pageable
     ) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Pageable cappedPageable = PaginationUtils.enforceMaxSize(pageable, 100);
-        Page<Meta> metas = metaService.listarPorUsuario(usuarioId, cappedPageable);
+        Page<Meta> metas = metaService.listarPorUsuario(usuarioId, status, cappedPageable);
         return ResponseEntity.ok(metas.map(MetaResponseDto::fromEntity));
     }
     

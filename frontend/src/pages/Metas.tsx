@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { metaService, Meta } from '../services/metaService';
+import { metaService, Meta, StatusMeta } from '../services/metaService';
 import carteiraService, { Carteira } from '../services/carteiraService';
 import { useAuth } from '../context/AuthContext';
 import { useApi } from '../hooks/useApi';
@@ -19,6 +19,8 @@ export default function Metas() {
   const [metas, setMetas] = useState<Meta[]>([]);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [mostrarAdicionar, setMostrarAdicionar] = useState<number | null>(null);
+  const [mostrarResgatar, setMostrarResgatar] = useState<number | null>(null);
+  const [statusFiltro, setStatusFiltro] = useState<StatusMeta>('ATIVA');
   const [loading, setLoading] = useState(false);
   const [acaoFinanceiraId, setAcaoFinanceiraId] = useState<string | null>(null);
   const [editando, setEditando] = useState<Meta | null>(null);
@@ -65,11 +67,11 @@ export default function Metas() {
       if (!usuario?.id) {
         return Promise.resolve(null as any);
       }
-      return metaService.listarPorUsuarioPaginado(paginaAtual, tamanhoPagina, signal);
+      return metaService.listarPorUsuarioPaginado(paginaAtual, tamanhoPagina, signal, statusFiltro);
     },
     {
       immediate: !!usuario?.id,
-      deps: [usuario?.id, paginaAtual],
+      deps: [usuario?.id, paginaAtual, statusFiltro],
     }
   );
 
@@ -204,14 +206,37 @@ export default function Metas() {
   };
 
   const handleDeletar = async (id: number) => {
-    if (!window.confirm('Tem certeza que deseja deletar?')) return;
-    
+    if (!window.confirm('Tem certeza que deseja excluir? A meta vai para "Arquivadas".')) return;
+
     try {
       await metaService.deletar(id);
-      toast.success('Meta deletada!');
+      toast.success('Meta arquivada!');
       carregarMetas();
     } catch (error: any) {
-      toast.error('Erro ao deletar meta');
+      // backend bloqueia exclusão com valor reservado: resgate primeiro (ADR-0004)
+      toast.error(error?.response?.data?.message ?? 'Erro ao excluir meta');
+    }
+  };
+
+  const handleResgatarValor = async (metaId: number) => {
+    const actionKey = `resgatar:${metaId}`;
+    if (acaoFinanceiraId) return;
+    const resgate = aporteValidation.validate({ valor: valorAdicionar, carteiraId: carteiraOrigem });
+    if (!resgate) return;
+
+    try {
+      setAcaoFinanceiraId(actionKey);
+      await metaService.removerValor(metaId, resgate.valor, resgate.carteiraId);
+      toast.success('Valor resgatado para a conta!');
+      setValorAdicionar('');
+      setCarteiraOrigem('');
+      setMostrarResgatar(null);
+      aporteValidation.resetValidation();
+      carregarMetas();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message ?? 'Erro ao resgatar valor');
+    } finally {
+      setAcaoFinanceiraId(null);
     }
   };
 
@@ -240,6 +265,31 @@ export default function Metas() {
             >
               {mostrarForm ? 'Cancelar' : '+ Nova Meta'}
             </button>
+          </div>
+
+          <div className="flex gap-2 mb-6" role="tablist" aria-label="Filtro de metas por status">
+            {([
+              { valor: 'ATIVA', rotulo: 'Ativas' },
+              { valor: 'CONCLUIDA', rotulo: 'Concluídas' },
+              { valor: 'ARQUIVADA', rotulo: 'Arquivadas' },
+            ] as { valor: StatusMeta; rotulo: string }[]).map((aba) => (
+              <button
+                key={aba.valor}
+                role="tab"
+                aria-selected={statusFiltro === aba.valor}
+                onClick={() => {
+                  setStatusFiltro(aba.valor);
+                  setPaginaAtual(0);
+                }}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition ${
+                  statusFiltro === aba.valor
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                {aba.rotulo}
+              </button>
+            ))}
           </div>
 
           {mostrarForm && (
@@ -408,25 +458,37 @@ export default function Metas() {
                       </div>
                       <div>
                         <h3 className="text-xl font-bold text-gray-800">{meta.nome}</h3>
+                        {meta.status === 'CONCLUIDA' && (
+                          <span className="inline-block text-xs font-semibold text-green-700 bg-green-100 rounded-full px-2 py-0.5">
+                            ✓ Concluída{meta.dataConclusao ? ` em ${new Date(meta.dataConclusao + 'T00:00:00').toLocaleDateString('pt-BR')}` : ''}
+                          </span>
+                        )}
+                        {meta.status === 'ARQUIVADA' && (
+                          <span className="inline-block text-xs font-semibold text-gray-600 bg-gray-200 rounded-full px-2 py-0.5">
+                            Arquivada
+                          </span>
+                        )}
                         {meta.descricao && (
                           <p className="text-sm text-gray-500">{meta.descricao}</p>
                         )}
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => abrirFormulario(meta)}
-                        className="text-blue-600 hover:text-blue-800 text-sm"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => handleDeletar(meta.id!)}
-                        className="text-red-600 hover:text-red-800 text-sm"
-                      >
-                        Deletar
-                      </button>
-                    </div>
+                    {meta.status !== 'ARQUIVADA' && (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => abrirFormulario(meta)}
+                          className="text-blue-600 hover:text-blue-800 text-sm"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleDeletar(meta.id!)}
+                          className="text-red-600 hover:text-red-800 text-sm"
+                        >
+                          Excluir
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="mb-4">
@@ -463,7 +525,8 @@ export default function Metas() {
                     </div>
                   </div>
 
-                  {mostrarAdicionar === meta.id ? (
+                  {meta.status !== 'ARQUIVADA' && (
+                    mostrarAdicionar === meta.id || mostrarResgatar === meta.id ? (
                     <div className="space-y-2">
                       <CurrencyInput
                         {...fieldA11y('valor', aporteValidation.errors.valor)}
@@ -479,7 +542,9 @@ export default function Metas() {
                         onChange={(e) => { setCarteiraOrigem(e.target.value); aporteValidation.revalidateField('carteiraId', { valor: valorAdicionar, carteiraId: e.target.value }); }}
                         className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 aria-invalid:border-red-500"
                       >
-                        <option value="">Sai de qual conta?</option>
+                        <option value="">
+                          {mostrarResgatar === meta.id ? 'Vai para qual conta?' : 'Sai de qual conta?'}
+                        </option>
                         {carteiras.map((c) => (
                           <option key={c.id} value={c.id}>
                             {c.nome} · {formatCurrency(c.saldo)}
@@ -490,15 +555,20 @@ export default function Metas() {
                       <div className="flex gap-2">
                         <button
                           disabled={acaoFinanceiraId !== null}
-                          onClick={() => handleAdicionarValor(meta.id!)}
+                          onClick={() => (mostrarResgatar === meta.id
+                            ? handleResgatarValor(meta.id!)
+                            : handleAdicionarValor(meta.id!))}
                           className="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 transition disabled:opacity-50"
                         >
-                          {acaoFinanceiraId === `adicionar:${meta.id}` ? 'Processando...' : 'Confirmar'}
+                          {acaoFinanceiraId === `adicionar:${meta.id}` || acaoFinanceiraId === `resgatar:${meta.id}`
+                            ? 'Processando...'
+                            : 'Confirmar'}
                         </button>
                         <button
                           disabled={acaoFinanceiraId !== null}
                           onClick={() => {
                             setMostrarAdicionar(null);
+                            setMostrarResgatar(null);
                             setValorAdicionar('');
                             setCarteiraOrigem('');
                             aporteValidation.resetValidation();
@@ -509,13 +579,26 @@ export default function Metas() {
                         </button>
                       </div>
                     </div>
-                  ) : (
-                    <button
-                      onClick={() => setMostrarAdicionar(meta.id!)}
-                      className="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition"
-                    >
-                      💰 Adicionar Dinheiro
-                    </button>
+                    ) : (
+                    <div className="flex gap-2">
+                      {meta.status !== 'CONCLUIDA' && (
+                        <button
+                          onClick={() => { setMostrarResgatar(null); setMostrarAdicionar(meta.id!); }}
+                          className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition"
+                        >
+                          💰 Adicionar Dinheiro
+                        </button>
+                      )}
+                      {(meta.valorReservado || 0) > 0 && (
+                        <button
+                          onClick={() => { setMostrarAdicionar(null); setMostrarResgatar(meta.id!); }}
+                          className="flex-1 bg-gray-100 text-gray-800 border border-gray-300 py-2 rounded-lg hover:bg-gray-200 transition"
+                        >
+                          ↩ Resgatar
+                        </button>
+                      )}
+                    </div>
+                    )
                   )}
                 </div>
               ))

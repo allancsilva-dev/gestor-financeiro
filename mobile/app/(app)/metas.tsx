@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { metaService } from '../../src/services/metaService';
 import { carteiraService } from '../../src/services/carteiraService';
 import { formatCurrency, formatPercent, formatDate, parseDateBR, isValidDateBR, parseCurrencyBR, maskCurrencyInput, maskDateInput } from '../../src/utils/format';
-import { Meta, MetaRequest } from '../../src/types';
+import { Meta, MetaRequest, StatusMeta } from '../../src/types';
 import { useTheme } from '../../src/theme';
 import SkeletonBox from '../../src/components/ui/SkeletonBox';
 import Card from '../../src/components/ui/Card';
@@ -47,9 +47,11 @@ export default function Metas() {
   const [valorMensalError, setValorMensalError] = useState<string | null>(null);
   const [dataLimiteError, setDataLimiteError] = useState<string | null>(null);
 
+  const [statusFiltro, setStatusFiltro] = useState<StatusMeta>('ATIVA');
+
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['metas'],
-    queryFn: () => metaService.listar(),
+    queryKey: ['metas', statusFiltro],
+    queryFn: () => metaService.listar(statusFiltro),
   });
 
   const { data: carteirasData } = useQuery({
@@ -167,12 +169,24 @@ export default function Metas() {
       setModalDetalheVisible(false);
       setMetaSelecionada(null);
     },
+    onError: (error: any) => {
+      // backend bloqueia exclusão com valor reservado: resgate primeiro (ADR-0004)
+      const mensagem = error?.response?.data?.message ?? 'Não foi possível excluir a meta.';
+      Alert.alert('Meta não excluída', mensagem);
+    },
   });
 
   const confirmarExcluirMeta = (meta: Meta) => {
+    if (Number(meta.valorReservado ?? 0) > 0) {
+      Alert.alert(
+        'Meta com dinheiro reservado',
+        `"${meta.nome}" ainda tem ${formatCurrency(Number(meta.valorReservado))} reservados. Resgate o valor para uma conta antes de excluir.`,
+      );
+      return;
+    }
     Alert.alert(
       'Excluir meta',
-      `Excluir "${meta.nome}"? A meta será desativada e não aparecerá mais na lista.`,
+      `Excluir "${meta.nome}"? A meta vai para "Arquivadas" e deixa de aceitar movimentações.`,
       [
         { text: 'Cancelar', style: 'cancel' },
         { text: 'Excluir', style: 'destructive', onPress: () => deletarMutation.mutate(meta.id) },
@@ -185,7 +199,9 @@ export default function Metas() {
       ? Math.min((Number(meta.valorReservado ?? 0) / Number(meta.valorTotal ?? 0)) * 100, 100)
       : 0;
 
-    const concluida = !meta.ativa || progresso >= 100;
+    // status é canônico; fallback pela `ativa` cobre respostas de backend antigo
+    const arquivada = meta.status === 'ARQUIVADA';
+    const concluida = meta.status ? meta.status === 'CONCLUIDA' : (!meta.ativa || progresso >= 100);
 
     return (
       <TouchableOpacity
@@ -200,7 +216,9 @@ export default function Metas() {
           <View style={{ flex: 1, minWidth: 0 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
               <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '700', flex: 1 }} numberOfLines={1}>{meta.nome}</Text>
-              <Badge tone={meta.ativa ? 'brand' : 'success'}>{meta.ativa ? 'Ativa' : 'Concluída'}</Badge>
+              <Badge tone={arquivada ? 'info' : concluida ? 'success' : 'brand'}>
+                {arquivada ? 'Arquivada' : concluida ? 'Concluída' : 'Ativa'}
+              </Badge>
             </View>
             <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2, fontVariant: ['tabular-nums'] }}>
               {formatCurrency(Number(meta.valorReservado ?? 0))} de {formatCurrency(Number(meta.valorTotal ?? 0))}
@@ -215,14 +233,16 @@ export default function Metas() {
           {meta.dataPrevista && <Text style={{ color: colors.textSecondary, fontSize: 11 }}>até {formatDate(meta.dataPrevista)}</Text>}
         </View>
 
-        <TouchableOpacity
-          onPress={() => { setValorAdicionar('0'); setErroAdicionar(null); setErroCarteira(null); setCarteiraOrigemId(carteiras.length === 1 ? carteiras[0].id : null); setMetaSelecionada(meta); setModalAdicionarVisible(true); }}
-          accessibilityRole="button"
-          accessibilityLabel={`Adicionar valor à meta ${meta.nome}`}
-          style={{ marginTop: 12, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1, borderColor: colors.brand, alignSelf: 'flex-start' }}
-        >
-          <Text style={{ color: colors.brandFg, fontSize: 12, fontWeight: '600' }}>+ Adicionar</Text>
-        </TouchableOpacity>
+        {!arquivada && (
+          <TouchableOpacity
+            onPress={() => { setValorAdicionar('0'); setErroAdicionar(null); setErroCarteira(null); setCarteiraOrigemId(carteiras.length === 1 ? carteiras[0].id : null); setMetaSelecionada(meta); setModalAdicionarVisible(true); }}
+            accessibilityRole="button"
+            accessibilityLabel={`Adicionar valor à meta ${meta.nome}`}
+            style={{ marginTop: 12, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1, borderColor: colors.brand, alignSelf: 'flex-start' }}
+          >
+            <Text style={{ color: colors.brandFg, fontSize: 12, fontWeight: '600' }}>+ Adicionar</Text>
+          </TouchableOpacity>
+        )}
       </Card>
       </TouchableOpacity>
     );
@@ -233,6 +253,11 @@ export default function Metas() {
       <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 12 }}>
         <Text style={{ color: colors.textPrimary, fontSize: 23, fontWeight: '800', letterSpacing: -0.4 }}>Planejamento</Text>
         <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>Seu progresso rumo aos objetivos</Text>
+        <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+          <Chip label="Ativas" selected={statusFiltro === 'ATIVA'} onPress={() => setStatusFiltro('ATIVA')} />
+          <Chip label="Concluídas" selected={statusFiltro === 'CONCLUIDA'} onPress={() => setStatusFiltro('CONCLUIDA')} />
+          <Chip label="Arquivadas" selected={statusFiltro === 'ARQUIVADA'} onPress={() => setStatusFiltro('ARQUIVADA')} />
+        </View>
       </View>
 
       {isLoading ? (
@@ -254,8 +279,14 @@ export default function Metas() {
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 96 }}
           ListEmptyComponent={() => (
             <View style={{ alignItems: 'center', padding: 48 }}>
-              <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600' }}>Nenhuma meta ainda</Text>
-              <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>Toque no + para criar a primeira</Text>
+              <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600' }}>
+                {statusFiltro === 'ATIVA' ? 'Nenhuma meta ainda'
+                  : statusFiltro === 'CONCLUIDA' ? 'Nenhuma meta concluída'
+                  : 'Nenhuma meta arquivada'}
+              </Text>
+              {statusFiltro === 'ATIVA' && (
+                <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>Toque no + para criar a primeira</Text>
+              )}
             </View>
           )}
         />
@@ -288,7 +319,9 @@ export default function Metas() {
                       {metaSelecionada.dataPrevista ? `até ${formatDate(metaSelecionada.dataPrevista)}` : 'Sem data limite'}
                     </Text>
                   </View>
-                  <Badge tone={metaSelecionada.ativa ? 'brand' : 'success'}>{metaSelecionada.ativa ? 'Ativa' : 'Concluída'}</Badge>
+                  <Badge tone={metaSelecionada.status === 'ARQUIVADA' ? 'info' : metaSelecionada.status === 'CONCLUIDA' ? 'success' : 'brand'}>
+                    {metaSelecionada.status === 'ARQUIVADA' ? 'Arquivada' : metaSelecionada.status === 'CONCLUIDA' ? 'Concluída' : 'Ativa'}
+                  </Badge>
                 </View>
                 <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 8, fontVariant: ['tabular-nums'] }}>
                   {formatCurrency(Number(metaSelecionada.valorReservado ?? 0))} de {formatCurrency(Number(metaSelecionada.valorTotal ?? 0))}

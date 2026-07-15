@@ -245,6 +245,8 @@ export interface FalhaRecorrencia {
 }
 
 // ── Metas ──────────────────────────────────────────────────────────
+export type StatusMeta = 'ATIVA' | 'CONCLUIDA' | 'ARQUIVADA';
+
 export interface Meta {
   id: number;
   nome: string;
@@ -254,6 +256,8 @@ export interface Meta {
   dataInicio?: string;
   dataPrevista?: string;
   dataConclusao?: string;
+  status: StatusMeta;
+  /** @deprecated use status */
   ativa: boolean;
   cor?: string;
   icone?: string;

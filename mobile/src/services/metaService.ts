@@ -1,9 +1,10 @@
 import api from './api';
-import { Meta, MetaRequest, MetaProgresso, PagedResponse } from '../types';
+import { Meta, MetaRequest, MetaProgresso, PagedResponse, StatusMeta } from '../types';
 
 export const metaService = {
-  listar: () =>
-    api.get<PagedResponse<Meta>>('/v1/metas/minhas?page=0&size=20')
+  // ausência de status equivale a ATIVA no backend
+  listar: (status?: StatusMeta) =>
+    api.get<PagedResponse<Meta>>(`/v1/metas/minhas?page=0&size=20${status ? `&status=${status}` : ''}`)
        .then(r => r.data),
 
   buscarProgresso: (id: number) =>
