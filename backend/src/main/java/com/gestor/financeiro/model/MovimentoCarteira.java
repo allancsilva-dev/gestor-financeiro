@@ -74,6 +74,10 @@ public class MovimentoCarteira {
     @Column(name = "idempotency_key", length = 100)
     private String idempotencyKey;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "operacao_id")
+    private OperacaoFinanceira operacao;
+
     @JdbcTypeCode(SqlTypes.CHAR)
     @Column(nullable = false, length = 3, columnDefinition = "char(3)")
     private String moeda = "BRL";

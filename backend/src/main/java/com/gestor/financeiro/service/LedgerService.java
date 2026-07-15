@@ -4,6 +4,7 @@ import com.gestor.financeiro.exception.BusinessException;
 import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.MovimentoCarteira;
+import com.gestor.financeiro.model.OperacaoFinanceira;
 import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.MovimentoCarteiraRepository;
 import org.springframework.stereotype.Service;
@@ -26,18 +27,30 @@ public class LedgerService {
 
     @Transactional
     public MovimentoCarteira registrarMovimento(RegistrarMovimentoCommand command) {
+        return registrarMovimento(command, null);
+    }
+
+    /**
+     * Registra o movimento vinculado a uma operacao financeira (ADR-0009).
+     * A operacao agrupa 1..N lancamentos; o vinculo e metadado obrigatorio
+     * para fluxos novos da Fase 2 e opcional para caminhos legados.
+     */
+    @Transactional
+    public MovimentoCarteira registrarMovimento(RegistrarMovimentoCommand command,
+                                                OperacaoFinanceira operacao) {
         validarCommand(command);
 
         if (hasText(command.idempotencyKey())) {
             return movimentoCarteiraRepository
                     .findByUsuarioIdAndIdempotencyKey(command.usuarioId(), command.idempotencyKey())
-                    .orElseGet(() -> registrarNovoMovimento(command));
+                    .orElseGet(() -> registrarNovoMovimento(command, operacao));
         }
 
-        return registrarNovoMovimento(command);
+        return registrarNovoMovimento(command, operacao);
     }
 
-    private MovimentoCarteira registrarNovoMovimento(RegistrarMovimentoCommand command) {
+    private MovimentoCarteira registrarNovoMovimento(RegistrarMovimentoCommand command,
+                                                     OperacaoFinanceira operacao) {
         Carteira carteira = carteiraRepository
                 .findByIdAndUsuarioIdForUpdate(command.carteiraId(), command.usuarioId())
                 .orElseThrow(() -> new ResourceNotFoundException("Carteira não encontrada"));
@@ -54,6 +67,7 @@ public class LedgerService {
         carteiraRepository.save(carteira);
 
         MovimentoCarteira movimento = criarMovimento(command, carteira, valorAssinado, novoSaldo);
+        movimento.setOperacao(operacao);
         return movimentoCarteiraRepository.save(movimento);
     }
 
