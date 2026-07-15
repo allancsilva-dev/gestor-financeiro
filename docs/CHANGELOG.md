@@ -7,6 +7,17 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ---
 
+## [Mobile 1.1.1] - 2026-07-15
+
+### Android
+- Novo APK interno gerado a partir da release 1.1.0 com `versionCode 5`.
+- Metadados do pacote npm foram alinhados à versão do aplicativo.
+- Fluxos Maestro de recuperação e privacidade foram alinhados aos textos e à rolagem da interface atual.
+- Instalações assinadas por certificado diferente ainda exigem desinstalar o aplicativo anterior antes de instalar o APK interno.
+- Commit-fonte: `6be3f16aba529e9502aae541fd895d4de53cd61e`.
+- APK: `nexos-financas-1.1.1.apk` (`80.323.889` bytes).
+- SHA-256: `8e8929ecbfb4a8fabe56f8bcdd827a4124db75cd59c99d824d7797e5cc8ba485`.
+
 ## [Mobile 1.1.0] - 2026-07-14
 
 ### Recorrências e projeção
