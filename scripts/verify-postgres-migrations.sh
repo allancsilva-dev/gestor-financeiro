@@ -35,4 +35,4 @@ cd "$ROOT_DIR/backend"
 POSTGRES_IT_JDBC_URL="jdbc:postgresql://127.0.0.1:${HOST_PORT}/${DB_NAME}" \
 POSTGRES_IT_USERNAME="$DB_USER" \
 POSTGRES_IT_PASSWORD="$DB_PASSWORD" \
-./mvnw -q -Dtest=PostgresMigrationIT test
+./mvnw -q -Dtest='PostgresMigrationIT,UsuarioExclusaoLgpdIT' test

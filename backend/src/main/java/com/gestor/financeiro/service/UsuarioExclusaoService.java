@@ -37,33 +37,61 @@ public class UsuarioExclusaoService {
     @PersistenceContext
     private EntityManager entityManager;
 
-    // Filhas antes das pais. Toda entidade nova com dados do usuário precisa entrar aqui.
-    private static final List<String> DELETES_ORDENADOS = List.of(
-        "DELETE FROM Anexo a WHERE a.usuario.id = :id",
-        "DELETE FROM FaturaLancamento fl WHERE fl.fatura.id IN (SELECT f.id FROM FaturaCartao f WHERE f.usuario.id = :id)",
-        "DELETE FROM Parcela p WHERE p.transacao.id IN (SELECT t.id FROM Transacao t WHERE t.usuario.id = :id)",
-        "DELETE FROM Transacao t WHERE t.usuario.id = :id",
-        "DELETE FROM FaturaCartao f WHERE f.usuario.id = :id",
-        "DELETE FROM ContaFixa cf WHERE cf.usuario.id = :id",
-        "DELETE FROM OrcamentoCategoria oc WHERE oc.orcamento.id IN (SELECT o.id FROM OrcamentoMensal o WHERE o.usuario.id = :id)",
-        "DELETE FROM OrcamentoMensal o WHERE o.usuario.id = :id",
-        "DELETE FROM MovimentoCarteira mc WHERE mc.usuario.id = :id",
-        "DELETE FROM MovimentoMeta mm WHERE mm.usuario.id = :id",
-        "DELETE FROM Meta m WHERE m.usuario.id = :id",
-        "DELETE FROM MovimentacaoAtivo ma WHERE ma.usuario.id = :id",
-        "DELETE FROM Ativo a WHERE a.usuario.id = :id",
-        "DELETE FROM Categoria c WHERE c.usuario.id = :id",
-        "DELETE FROM Conta c WHERE c.usuario.id = :id",
-        "DELETE FROM Carteira c WHERE c.usuario.id = :id",
-        "DELETE FROM RefreshToken rt WHERE rt.usuario.id = :id",
-        "DELETE FROM PasswordResetToken pt WHERE pt.usuario.id = :id",
-        "DELETE FROM Usuario u WHERE u.id = :id"
+    /**
+     * Manifesto de exclusão do titular: tabela física + JPQL de remoção, filhas antes das pais.
+     * É a fonte única da ordem de exclusão. Toda tabela nova alcançável a partir do titular
+     * precisa entrar aqui — o teste-guardião ({@code UsuarioExclusaoLgpdIT}) compara este
+     * manifesto com o catálogo de FKs do PostgreSQL e falha se algo ficar de fora.
+     */
+    public record DeleteTitular(String tabela, String jpql) {}
+
+    public static final List<DeleteTitular> MANIFESTO_EXCLUSAO = List.of(
+        new DeleteTitular("anexos",
+            "DELETE FROM Anexo a WHERE a.usuario.id = :id"),
+        new DeleteTitular("fatura_lancamentos",
+            "DELETE FROM FaturaLancamento fl WHERE fl.fatura.id IN (SELECT f.id FROM FaturaCartao f WHERE f.usuario.id = :id)"),
+        new DeleteTitular("parcelas",
+            "DELETE FROM Parcela p WHERE p.transacao.id IN (SELECT t.id FROM Transacao t WHERE t.usuario.id = :id)"),
+        new DeleteTitular("execucoes_recorrencia",
+            "DELETE FROM ExecucaoRecorrencia er WHERE er.usuario.id = :id"),
+        new DeleteTitular("transacoes",
+            "DELETE FROM Transacao t WHERE t.usuario.id = :id"),
+        new DeleteTitular("faturas_cartao",
+            "DELETE FROM FaturaCartao f WHERE f.usuario.id = :id"),
+        new DeleteTitular("contas_fixas",
+            "DELETE FROM ContaFixa cf WHERE cf.usuario.id = :id"),
+        new DeleteTitular("orcamentos_categorias",
+            "DELETE FROM OrcamentoCategoria oc WHERE oc.orcamento.id IN (SELECT o.id FROM OrcamentoMensal o WHERE o.usuario.id = :id)"),
+        new DeleteTitular("orcamentos_mensais",
+            "DELETE FROM OrcamentoMensal o WHERE o.usuario.id = :id"),
+        new DeleteTitular("movimentos_carteira",
+            "DELETE FROM MovimentoCarteira mc WHERE mc.usuario.id = :id"),
+        new DeleteTitular("movimentos_meta",
+            "DELETE FROM MovimentoMeta mm WHERE mm.usuario.id = :id"),
+        new DeleteTitular("metas",
+            "DELETE FROM Meta m WHERE m.usuario.id = :id"),
+        new DeleteTitular("movimentacoes_ativo",
+            "DELETE FROM MovimentacaoAtivo ma WHERE ma.usuario.id = :id"),
+        new DeleteTitular("ativos",
+            "DELETE FROM Ativo a WHERE a.usuario.id = :id"),
+        new DeleteTitular("categorias",
+            "DELETE FROM Categoria c WHERE c.usuario.id = :id"),
+        new DeleteTitular("contas",
+            "DELETE FROM Conta c WHERE c.usuario.id = :id"),
+        new DeleteTitular("carteiras",
+            "DELETE FROM Carteira c WHERE c.usuario.id = :id"),
+        new DeleteTitular("refresh_tokens",
+            "DELETE FROM RefreshToken rt WHERE rt.usuario.id = :id"),
+        new DeleteTitular("password_reset_tokens",
+            "DELETE FROM PasswordResetToken pt WHERE pt.usuario.id = :id"),
+        new DeleteTitular("usuarios",
+            "DELETE FROM Usuario u WHERE u.id = :id")
     );
 
     @Transactional
     public void excluirConta(Long usuarioId) {
-        for (String jpql : DELETES_ORDENADOS) {
-            entityManager.createQuery(jpql)
+        for (DeleteTitular delete : MANIFESTO_EXCLUSAO) {
+            entityManager.createQuery(delete.jpql())
                 .setParameter("id", usuarioId)
                 .executeUpdate();
         }
