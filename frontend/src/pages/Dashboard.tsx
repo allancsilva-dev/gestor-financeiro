@@ -10,7 +10,6 @@ import GraficoGastosPorCategoria from '../components/GraficoGastosPorCategoria';
 import GraficoEvolucaoMensal from '../components/GraficoEvolucaoMensal';
 import { formatCurrency } from '../utils/currency';
 import { insightsService, InsightsResponse } from '../services/insightsService';
-import { useState } from 'react';
 
 export default function Dashboard() {
   const { usuario } = useAuth();

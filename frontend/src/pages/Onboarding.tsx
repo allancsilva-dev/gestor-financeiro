@@ -2,11 +2,6 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { onboardingService } from '../services/onboardingService';
-import carteiraService from '../services/carteiraService';
-import { contaService } from '../services/contaService';
-import { categoriaService } from '../services/categoriaService';
-import contaFixaService from '../services/contaFixaService';
-import { metaService } from '../services/metaService';
 import toast from 'react-hot-toast';
 import { Check, ChevronLeft, ChevronRight, Wallet, CreditCard, Tag, TrendingUp, Target, List } from 'lucide-react';
 import FieldError from '../components/FieldError';
@@ -38,7 +33,7 @@ const CATEGORIAS_SUGERIDAS = [
 
 export default function Onboarding() {
   const navigate = useNavigate();
-  const { usuario, refreshUser } = useAuth();
+  const { refreshUser } = useAuth();
   const [passo, setPasso] = useState(0);
   const [loading, setLoading] = useState(false);
 
@@ -66,69 +61,30 @@ export default function Onboarding() {
   const metaValidation = useZodForm(onboardingMetaSchema);
 
   const TOTAL_PASSOS = PASSOS.length;
-  const handleCriarCarteira = async () => {
-    if (!usuario?.id) return;
+
+  // Passos só validam e guardam estado local; a persistência acontece de uma vez
+  // no /finalizar transacional do backend (ADR-0002) — falha no meio não deixa dados parciais.
+  const handleValidarCarteira = () => {
     const parsed = carteiraValidation.validate(carteira);
     if (!parsed) return;
-    setLoading(true);
-    try {
-      await carteiraService.criar({
-        ...parsed,
-        usuario: { id: usuario.id },
-      });
-      setResumo((r) => ({ ...r, carteiraCriada: `${carteira.nome} (${carteira.tipo})` }));
-      setPasso(1);
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Erro ao criar carteira');
-    } finally {
-      setLoading(false);
-    }
+    setResumo((r) => ({ ...r, carteiraCriada: `${carteira.nome} (${carteira.tipo})` }));
+    setPasso(1);
   };
 
-  const handleCriarConta = async () => {
+  const handleValidarConta = () => {
     const parsed = contaValidation.validate(conta);
     if (!parsed) return;
-    setLoading(true);
-    try {
-      await contaService.criar({
-        nome: parsed.nome,
-        tipo: parsed.tipo,
-        limiteTotal: parsed.tipo === 'CREDITO' ? parsed.limiteTotal : undefined,
-      });
-      setResumo((r) => ({ ...r, contaCriada: `${conta.nome} (${conta.tipo})` }));
-      setPasso(2);
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Erro ao criar conta');
-    } finally {
-      setLoading(false);
-    }
+    setResumo((r) => ({ ...r, contaCriada: `${conta.nome} (${conta.tipo})` }));
+    setPasso(2);
   };
 
-  const handleCriarCategorias = async () => {
+  const handleValidarCategorias = () => {
     if (!categoriasValidation.validate(categoriasSelecionadas)) return;
-    setLoading(true);
-    try {
-      const nomes: string[] = [];
-      for (const nome of categoriasSelecionadas) {
-        const sugerida = CATEGORIAS_SUGERIDAS.find((c) => c.nome === nome);
-        await categoriaService.criar({
-          nome,
-          cor: sugerida?.cor || '#6B7280',
-          icone: sugerida?.icone || '📌',
-          valorEsperado: 0,
-        });
-        nomes.push(nome);
-      }
-      setResumo((r) => ({ ...r, categoriasCriadas: nomes }));
-      setPasso(3);
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Erro ao criar categorias');
-    } finally {
-      setLoading(false);
-    }
+    setResumo((r) => ({ ...r, categoriasCriadas: [...categoriasSelecionadas] }));
+    setPasso(3);
   };
 
-  const handleCriarRenda = async () => {
+  const handleValidarRenda = () => {
     if (pularRenda) {
       setResumo((r) => ({ ...r, rendaCriada: 'Pulado' }));
       setPasso(4);
@@ -136,24 +92,11 @@ export default function Onboarding() {
     }
     const parsed = rendaValidation.validate(renda);
     if (!parsed) return;
-    setLoading(true);
-    try {
-      await contaFixaService.criar({
-        nome: parsed.nome,
-        valorPlanejado: parsed.valor,
-        diaVencimento: parsed.diaVencimento,
-        recorrente: true,
-      });
-      setResumo((r) => ({ ...r, rendaCriada: `${parsed.nome} R$ ${parsed.valor.toFixed(2)}` }));
-      setPasso(4);
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Erro ao criar renda');
-    } finally {
-      setLoading(false);
-    }
+    setResumo((r) => ({ ...r, rendaCriada: `${parsed.nome} R$ ${parsed.valor.toFixed(2)}` }));
+    setPasso(4);
   };
 
-  const handleCriarMeta = async () => {
+  const handleValidarMeta = () => {
     if (pularMeta) {
       setResumo((r) => ({ ...r, metaCriada: 'Pulado' }));
       setPasso(5);
@@ -161,40 +104,80 @@ export default function Onboarding() {
     }
     const parsed = metaValidation.validate(meta);
     if (!parsed) return;
-    setLoading(true);
-    try {
-      await metaService.criar({
-        ...parsed,
-      });
-      setResumo((r) => ({ ...r, metaCriada: `${meta.nome}` }));
-      setPasso(5);
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Erro ao criar meta');
-    } finally {
-      setLoading(false);
-    }
+    setResumo((r) => ({ ...r, metaCriada: `${meta.nome}` }));
+    setPasso(5);
   };
 
   const handleFinalizar = async () => {
+    const carteiraParsed = carteiraValidation.validate(carteira);
+    const contaParsed = contaValidation.validate(conta);
+    if (!carteiraParsed || !contaParsed || categoriasSelecionadas.length === 0) {
+      toast.error('Revise os passos anteriores antes de finalizar');
+      return;
+    }
+    const rendaParsed = pularRenda ? null : rendaValidation.validate(renda);
+    if (!pularRenda && !rendaParsed) {
+      toast.error('Revise o passo de renda antes de finalizar');
+      return;
+    }
+    const metaParsed = pularMeta ? null : metaValidation.validate(meta);
+    if (!pularMeta && !metaParsed) {
+      toast.error('Revise o passo de meta antes de finalizar');
+      return;
+    }
+
     setLoading(true);
     try {
-      await onboardingService.completar();
+      await onboardingService.finalizar({
+        carteira: {
+          nome: carteiraParsed.nome,
+          tipo: carteiraParsed.tipo,
+          saldo: carteiraParsed.saldo ?? 0,
+          banco: carteiraParsed.banco || undefined,
+        },
+        conta: {
+          nome: contaParsed.nome,
+          tipo: contaParsed.tipo,
+          limiteTotal: contaParsed.tipo === 'CREDITO' ? contaParsed.limiteTotal : undefined,
+        },
+        categorias: categoriasSelecionadas.map((nome) => {
+          const sugerida = CATEGORIAS_SUGERIDAS.find((c) => c.nome === nome);
+          return {
+            nome,
+            cor: sugerida?.cor || '#6B7280',
+            icone: sugerida?.icone || '📌',
+            valorEsperado: 0,
+          };
+        }),
+        renda: rendaParsed
+          ? { nome: rendaParsed.nome, valor: rendaParsed.valor, diaVencimento: rendaParsed.diaVencimento }
+          : undefined,
+        meta: metaParsed
+          ? {
+              nome: metaParsed.nome,
+              valorTotal: metaParsed.valorTotal,
+              valorMensal: metaParsed.valorMensal,
+              dataLimite: metaParsed.dataPrevista || undefined,
+            }
+          : undefined,
+      });
       await refreshUser();
       toast.success('Configuração concluída! Bem-vindo(a) ao Gestor Financeiro!');
       navigate('/dashboard');
     } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Erro ao finalizar');
+      // transação única no backend: nada foi persistido, o reenvio é seguro
+      toast.error(err.response?.data?.message || 'Erro ao finalizar. Nada foi salvo — tente novamente.');
     } finally {
       setLoading(false);
     }
   };
 
   const handleAvancar = () => {
-    if (passo === 0) handleCriarCarteira();
-    else if (passo === 1) handleCriarConta();
-    else if (passo === 2) handleCriarCategorias();
-    else if (passo === 3) handleCriarRenda();
-    else if (passo === 4) handleCriarMeta();
+    if (passo === 0) handleValidarCarteira();
+    else if (passo === 1) handleValidarConta();
+    else if (passo === 2) handleValidarCategorias();
+    else if (passo === 3) handleValidarRenda();
+    else if (passo === 4) handleValidarMeta();
   };
 
   const toggleCategoria = (nome: string) => {

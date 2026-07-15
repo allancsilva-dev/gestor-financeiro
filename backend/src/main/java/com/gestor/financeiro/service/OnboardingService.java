@@ -42,8 +42,14 @@ public class OnboardingService {
     @Transactional
     public UsuarioResponseDto finalizar(OnboardingFinalizarRequest request) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
-        Usuario usuario = usuarioRepository.findById(usuarioId)
+        // Lock pessimista serializa finalizações concorrentes (duplo clique/duas abas, ADR-0002)
+        Usuario usuario = usuarioRepository.findByIdComLock(usuarioId)
             .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+
+        // Idempotência por usuário: onboarding já concluído retorna o estado atual sem recriar dados
+        if (usuario.isOnboardingCompleto()) {
+            return UsuarioResponseDto.fromEntity(usuario);
+        }
 
         criarCarteiraSeNaoExistir(usuarioId, request.carteira());
         criarContaSeNaoExistir(usuarioId, request.conta());
