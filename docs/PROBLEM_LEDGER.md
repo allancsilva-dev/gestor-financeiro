@@ -1644,3 +1644,23 @@ pelas parcelas não pagas, e a diferença sobre a parte já paga (fatura imutáv
 - **Causa raiz:** Dois composes evoluiram separadamente; scripts existentes (`scripts/backup-db.sh`, `restore-db.sh`, `restore-drill-db.sh`) nao cobrem uploads nem envio externo.
 - **Solucao proposta:** Politica canonica: pg_dump -Fc + tar de uploads + manifesto/checksums, GPG assimetrico (privada off-host), rclone obrigatorio fail-closed, retencao 7d+4s, drill de restore com evidencia. Ver ADR-0006.
 - **Proximo passo:** PR-7 (apos PR-6).
+
+---
+
+## Evidência do drill de anexos (PROB-0080) — 2026-07-15
+
+Drill executado localmente com a API containerizada e named volume (`APP_UPLOAD_DIR=/app/uploads`,
+volume `backend_uploads` — mesma configuração aplicada a `docker-compose.production.yml` e
+`docker-compose.vps.yml` na branch `fase-1-integridade`):
+
+1. register → login → `POST /api/v1/onboarding/finalizar` → transação → upload de PDF;
+   arquivo gravado em `/app/uploads/1/eefdb350-71cd-44ed-8cf1-701bfc4881ac.pdf`.
+2. `docker rm -f` + novo container com o mesmo volume → `GET /api/v1/anexos/1/download`
+   retornou o PDF íntegro (conteúdo conferido).
+3. `DELETE /api/v1/usuarios/me` (senha confirmada) → HTTP 204 → diretório do titular
+   removido do volume (`ls /app/uploads` vazio).
+
+Ressalva: drill local em arm64 usou `eclipse-temurin:17-jre` + jar montado (a imagem
+`17-jre-alpine` do Dockerfile não publica manifest arm64); a semântica de volume testada é a
+mesma dos composes. Falha de remoção física pós-commit permanece risco operacional registrado
+(ADR-0005) até storage durável.
