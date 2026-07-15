@@ -83,7 +83,7 @@ class PostgresMigrationIT {
                 "insert into usuarios(nome, email, senha, failed_attempts, onboarding_completo) values ('Ledger', 'ledger-it@teste.com', 'x', 0, false) returning id",
                 Long.class);
         Long carteiraId = jdbcTemplate.queryForObject(
-                "insert into carteiras(nome, tipo, saldo, usuario_id, version) values ('Principal', 'DINHEIRO', 100.00, ?, 0) returning id",
+                "insert into carteiras(nome, tipo, subtipo, saldo, usuario_id, version) values ('Principal', 'DINHEIRO', 'DINHEIRO', 100.00, ?, 0) returning id",
                 Long.class,
                 usuarioId);
 
@@ -119,7 +119,7 @@ class PostgresMigrationIT {
                 "insert into usuarios(nome, email, senha, failed_attempts, onboarding_completo) values ('Recon', 'recon-it@teste.com', 'x', 0, false) returning id",
                 Long.class);
         Long carteiraId = jdbcTemplate.queryForObject(
-                "insert into carteiras(nome, tipo, saldo, usuario_id, version) values ('Principal', 'DINHEIRO', 150.00, ?, 0) returning id",
+                "insert into carteiras(nome, tipo, subtipo, saldo, usuario_id, version) values ('Principal', 'DINHEIRO', 'DINHEIRO', 150.00, ?, 0) returning id",
                 Long.class,
                 usuarioId);
 

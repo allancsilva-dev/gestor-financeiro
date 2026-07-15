@@ -146,7 +146,7 @@ class BaselineMetricasFase2IT {
 
     private Long inserirCarteiraComLedger(Long usuarioId, String nome, BigDecimal saldo, String idemPrefix) {
         Long carteiraId = jdbcTemplate.queryForObject(
-                "insert into carteiras(nome, tipo, saldo, usuario_id, version) values (?, 'CONTA_BANCARIA', ?, ?, 0) returning id",
+                "insert into carteiras(nome, tipo, subtipo, saldo, usuario_id, version) values (?, 'CONTA_BANCARIA', 'CORRENTE', ?, ?, 0) returning id",
                 Long.class, nome, saldo, usuarioId);
         jdbcTemplate.update("""
                 insert into movimentos_carteira(
