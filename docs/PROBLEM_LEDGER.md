@@ -1532,3 +1532,115 @@ pelas parcelas não pagas, e a diferença sobre a parte já paga (fatura imutáv
 ---
 
 > Mantido pelo `docs-reporter`. Ultima atualizacao: 2026-07-14 (hardening pre-producao P0+P1 commitado em `main` como `5c08ce0`, `0d1e0c0` e `c959dfc`: PROB-0066 a PROB-0072 fechados; PROB-0073 e PROB-0074 fechados como recomendacoes de auditoria avaliadas e rejeitadas com justificativa documentada — ver `docs/BUGFIX_LOG.md` BUG-0059 a BUG-0065 e `docs/REVIEW_REPORTS/2026-07-14_full-system_implementation_pre-production-hardening.md`).
+
+---
+
+## PROB-0075 — Onboarding cadastra renda como SAIDA com categoria Alimentacao
+
+- **ID:** PROB-0075
+- **Titulo:** Renda do onboarding herda default SAIDA de ContaFixa e recebe a primeira categoria sugerida
+- **Data:** 2026-07-15
+- **Origem:** auditoria `docs/15 07 2026 - MetaDoNexosFinancas.md` (P0-1)
+- **Severidade:** CRITICAL
+- **Status:** ABERTO (plano: PR-1 Fase 1)
+- **Area:** backend, onboarding
+- **Sintoma:** Salario aparece como despesa recorrente; projecao recebe sinal invertido; web e mobile afetados.
+- **Causa raiz:** `ContaFixa.java:33` default `TipoTransacao.SAIDA`; `OnboardingService.criarRendaSeNaoExistir` (117-135) nao seta tipo e associa `categorias.get(0)` (Alimentacao); fallback SAIDA em `ContaFixaService.java:69`.
+- **Solucao proposta:** Onboarding cria renda como ENTRADA com categoria "Renda" idempotente; auditoria SQL read-only de rendas historicas suspeitas (sem UPDATE heuristico); fallback mantido com WARN. Ver ADR-0002.
+- **Proximo passo:** PR-1.
+
+---
+
+## PROB-0076 — Exclusao LGPD nao remove ExecucaoRecorrencia
+
+- **ID:** PROB-0076
+- **Titulo:** UsuarioExclusaoService nao contempla execucoes de recorrencia; FKs restritivas quebram exclusao do titular
+- **Data:** 2026-07-15
+- **Origem:** auditoria `docs/15 07 2026 - MetaDoNexosFinancas.md` (P0-2)
+- **Severidade:** CRITICAL
+- **Status:** ABERTO (plano: PR-2 Fase 1)
+- **Area:** backend, LGPD
+- **Sintoma:** Usuario com recorrencias executadas pode nao conseguir excluir a conta; direito de eliminacao incompleto.
+- **Causa raiz:** `DELETES_ORDENADOS` (`UsuarioExclusaoService.java:41-61`) sem `execucao_recorrencia`; V29 criou FKs NOT NULL sem cascade.
+- **Solucao proposta:** Manifesto de exclusao (tabela+JPQL) com ExecucaoRecorrencia antes de Transacao/ContaFixa + teste-guardiao por catalogo de FKs. Ver ADR-0007.
+- **Proximo passo:** PR-2.
+
+---
+
+## PROB-0077 — Meta concluida ou excluida oculta dinheiro reservado
+
+- **ID:** PROB-0077
+- **Titulo:** Meta a 100% recebe ativa=false e some da listagem; exclusao so desativa mesmo com valorReservado > 0
+- **Data:** 2026-07-15
+- **Origem:** auditoria `docs/15 07 2026 - MetaDoNexosFinancas.md` (P0-3)
+- **Severidade:** CRITICAL
+- **Status:** ABERTO (plano: PR-3 Fase 1)
+- **Area:** backend, frontend, mobile
+- **Sintoma:** Valor debitado da carteira deixa de ser visivel; usuario perde caminho de resgate; patrimonio incompleto.
+- **Causa raiz:** `MetaService.java:72-75` (conclusao), `:34-35` (findByUsuarioIdAndAtivaTrue), `:136-142` (soft-delete sem tratar reserva).
+- **Solucao proposta:** Status canonico ATIVA/CONCLUIDA/ARQUIVADA (V30), filtro `?status=`, exclusao com reserva bloqueada com 400 instrutivo. Ver ADR-0004.
+- **Proximo passo:** PR-3.
+
+---
+
+## PROB-0078 — Onboarding web nao atomico e divergente do mobile
+
+- **ID:** PROB-0078
+- **Titulo:** Web cria carteira/conta/categorias/renda/meta em 5 chamadas independentes e depois marca onboarding completo
+- **Data:** 2026-07-15
+- **Origem:** auditoria `docs/15 07 2026 - MetaDoNexosFinancas.md` (P0-4)
+- **Severidade:** CRITICAL
+- **Status:** ABERTO (plano: PR-4 Fase 1)
+- **Area:** frontend, backend
+- **Sintoma:** Falha intermediaria deixa cadastro parcial; retry duplica etapas; contratos divergentes entre web e mobile.
+- **Causa raiz:** `frontend/src/pages/Onboarding.tsx` persiste por etapa (linhas 75/93/114/141/166 + completar 181); `onboardingService.ts` nem expoe `finalizar`.
+- **Solucao proposta:** Web monta um unico OnboardingFinalizarRequest; backend com lock pessimista + idempotencia por `onboardingCompleto`; E2E Playwright. Ver ADR-0002.
+- **Proximo passo:** PR-4 (depende de PR-1).
+
+---
+
+## PROB-0079 — Timezone inconsistente entre scheduler e APIs financeiras
+
+- **ID:** PROB-0079
+- **Titulo:** Recorrencias fixam America/Sao_Paulo; dashboard, faturas, orcamento, relatorios e anexos usam now() no timezone da JVM
+- **Data:** 2026-07-15
+- **Origem:** auditoria `docs/15 07 2026 - MetaDoNexosFinancas.md` (P1-5)
+- **Severidade:** HIGH
+- **Status:** ABERTO (plano: PR-5 Fase 1)
+- **Area:** backend
+- **Sintoma:** Em servidor UTC, dia/mes viram adiantados; status e totais divergem na virada do periodo.
+- **Causa raiz:** `RecorrenciaScheduler.java:18,22` e `ContaFixaService.java:42` hardcoded; `DashboardService`, `FaturaService`, `OrcamentoService`, `RelatorioService`, `AnexoService` usam now() sem zona.
+- **Solucao proposta:** `app.business.timezone` + bean Clock injetado em todos os servicos financeiros + teste-guardiao contra now() sem Clock. Ver ADR-0003.
+- **Proximo passo:** PR-5 (apos fechamento dos P0).
+
+---
+
+## PROB-0080 — Anexos sem persistencia operacional segura
+
+- **ID:** PROB-0080
+- **Titulo:** Uploads gravados no filesystem do container sem volume montado em nenhum compose
+- **Data:** 2026-07-15
+- **Origem:** auditoria `docs/15 07 2026 - MetaDoNexosFinancas.md` (P1-6)
+- **Severidade:** HIGH
+- **Status:** ABERTO (plano: PR-6 Fase 1)
+- **Area:** infra, backend
+- **Sintoma:** Comprovantes somem apos recriacao do container; backup PostgreSQL nao inclui anexos.
+- **Causa raiz:** `AnexoService` grava em `app.upload.dir` local; composes production/vps sem volume de uploads.
+- **Solucao proposta:** Volume `backend_uploads:/app/uploads` em production e VPS + drill com evidencia; object storage futuro por gatilho definido. Ver ADR-0005.
+- **Proximo passo:** PR-6.
+
+---
+
+## PROB-0081 — Estrategias de backup divergentes e sem copia off-host
+
+- **ID:** PROB-0081
+- **Titulo:** production usa pg_dump -Fc sem criptografia; vps usa gzip+GPG simetrico; nenhum envia para fora do host; uploads fora do escopo
+- **Data:** 2026-07-15
+- **Origem:** auditoria `docs/15 07 2026 - MetaDoNexosFinancas.md` (P1-7)
+- **Severidade:** HIGH
+- **Status:** ABERTO (plano: PR-7 Fase 1)
+- **Area:** infra
+- **Sintoma:** Perda do host implica perda dos backups; politica de retencao e restore nao comprovados de ponta a ponta com anexos.
+- **Causa raiz:** Dois composes evoluiram separadamente; scripts existentes (`scripts/backup-db.sh`, `restore-db.sh`, `restore-drill-db.sh`) nao cobrem uploads nem envio externo.
+- **Solucao proposta:** Politica canonica: pg_dump -Fc + tar de uploads + manifesto/checksums, GPG assimetrico (privada off-host), rclone obrigatorio fail-closed, retencao 7d+4s, drill de restore com evidencia. Ver ADR-0006.
+- **Proximo passo:** PR-7 (apos PR-6).

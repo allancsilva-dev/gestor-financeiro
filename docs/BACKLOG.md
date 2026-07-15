@@ -1107,3 +1107,27 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 > Atualizacao anterior: 2026-07-10 (auditoria backend/non-frontend alto nivel: BACKLOG-0058 a BACKLOG-0069 — ver PROBLEM_LEDGER PROB-0049 a PROB-0060 e relatorio `REVIEW_REPORTS/2026-07-10_backend_nonfrontend_high-level-audit.md`).
 >
 > Atualizacao 2026-07-14: hardening pre-producao P0+P1 foi commitado em `main` (`5c08ce0`, `0d1e0c0`, `c959dfc`) e fechou PROB-0066 a PROB-0072 (BUG-0059 a BUG-0065); BACKLOG-0080 registra os gates de deploy pendentes (nginx/redes/smoke) e BACKLOG-0081 a BACKLOG-0085 registram os itens P2 identificados na mesma auditoria e explicitamente adiados. Ver `docs/REVIEW_REPORTS/2026-07-14_full-system_implementation_pre-production-hardening.md`.
+
+---
+
+## BACKLOG-0086 — Fase 0B: ADRs de dominio como bloqueio formal da Fase 2
+
+- **Titulo:** Escrever e aprovar ADRs de conta financeira, ledger, investimentos, orcamento, competencia, liquidez, metricas oficiais e reconciliacao antes de qualquer trabalho da Fase 2
+- **Prioridade:** P1
+- **Area:** arquitetura, docs
+- **Motivo:** A Fase 2 (verdade financeira: unificacao Conta/Carteira, lancamentos balanceados, parcelamento canonico, metricas oficiais) exige decisoes de dominio aprovadas. A Fase 0A (`docs/adr/ADR-0001..0007`) cobre apenas as decisoes necessarias para a Fase 1.
+- **Dependencias:** Fechamento dos P0 (PROB-0075..0078) e da Fase 1
+- **Criterio de aceite:** ADRs de dominio aceitos pelo responsavel do produto; glossario atualizado; mapeamento dados atuais -> modelo futuro; plano de migration reversivel com reconciliacao antes/depois
+- **Risco se ficar pendente:** Fase 2 iniciada sem modelo aprovado repete a duplicacao de verdade financeira que motivou a auditoria
+- **Status:** ABERTO — **Fase 2 nao inicia antes da aprovacao da Fase 0B**
+
+---
+
+## BACKLOG-0087 — Congelamento de modulos novos ate fechamento dos P0
+
+- **Titulo:** Nenhum modulo novo (Open Finance, WhatsApp, chat, features) enquanto P0 da auditoria estiver aberto
+- **Prioridade:** P0
+- **Area:** processo
+- **Motivo:** Regra da auditoria `docs/15 07 2026 - MetaDoNexosFinancas.md`; foco total em integridade (PR-0..PR-4 do plano Fase 1).
+- **Criterio de aceite:** Congelamento termina somente apos PR-4 mergeado, suites globais verdes (backend, web, mobile, E2E) e evidencias registradas no PROBLEM_LEDGER
+- **Status:** ATIVO
