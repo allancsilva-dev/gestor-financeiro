@@ -10,6 +10,7 @@ import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.ContaFixa;
 import com.gestor.financeiro.model.Meta;
 import com.gestor.financeiro.model.Usuario;
+import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.CategoriaRepository;
 import com.gestor.financeiro.repository.ContaFixaRepository;
 import com.gestor.financeiro.repository.MetaRepository;
@@ -25,6 +26,8 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class OnboardingService {
+    public static final String CATEGORIA_RENDA = "Renda";
+
     private final AuthenticatedUserService authenticatedUserService;
     private final UsuarioRepository usuarioRepository;
     private final CategoriaRepository categoriaRepository;
@@ -44,10 +47,10 @@ public class OnboardingService {
 
         criarCarteiraSeNaoExistir(usuarioId, request.carteira());
         criarContaSeNaoExistir(usuarioId, request.conta());
-        List<Categoria> categorias = criarCategoriasSeNaoExistirem(usuarioId, request.categorias());
+        criarCategoriasSeNaoExistirem(usuarioId, request.categorias());
 
         if (request.renda() != null) {
-            criarRendaSeNaoExistir(usuarioId, request.renda(), categorias);
+            criarRendaSeNaoExistir(usuarioId, request.renda());
         }
 
         if (request.meta() != null) {
@@ -116,8 +119,7 @@ public class OnboardingService {
 
     private void criarRendaSeNaoExistir(
         Long usuarioId,
-        OnboardingFinalizarRequest.RendaInicial request,
-        List<Categoria> categorias
+        OnboardingFinalizarRequest.RendaInicial request
     ) {
         if (contaFixaRepository.findByUsuarioIdAndAtivoTrue(usuarioId)
             .stream()
@@ -129,9 +131,22 @@ public class OnboardingService {
         renda.setNome(request.nome());
         renda.setValorPlanejado(request.valor());
         renda.setDiaVencimento(request.diaVencimento());
-        renda.setCategoria(categorias.isEmpty() ? null : categorias.get(0));
+        renda.setTipo(TipoTransacao.ENTRADA);
+        renda.setCategoria(criarOuReutilizarCategoriaRenda(usuarioId));
         renda.setRecorrente(true);
         contaFixaService.criar(renda, usuarioId);
+    }
+
+    private Categoria criarOuReutilizarCategoriaRenda(Long usuarioId) {
+        return categoriaRepository
+            .findByUsuarioIdAndNomeIgnoreCase(usuarioId, CATEGORIA_RENDA)
+            .orElseGet(() -> {
+                Categoria nova = new Categoria();
+                nova.setNome(CATEGORIA_RENDA);
+                nova.setCor("#22C55E");
+                nova.setIcone("💰");
+                return categoriaService.criar(nova);
+            });
     }
 
     private void criarMetaSeNaoExistir(Long usuarioId, OnboardingFinalizarRequest.MetaInicial request) {

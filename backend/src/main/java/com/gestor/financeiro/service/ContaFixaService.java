@@ -1,6 +1,7 @@
 package com.gestor.financeiro.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import com.gestor.financeiro.exception.BusinessException;
 import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.exception.UnauthorizedAccessException;
@@ -31,6 +32,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ContaFixaService {
     private final ContaFixaRepository contaFixaRepository;
     private final UsuarioRepository usuarioRepository;
@@ -66,7 +68,11 @@ public class ContaFixaService {
         if (contaFixa.getAtivo() == null) contaFixa.setAtivo(true);
         if (contaFixa.getRecorrente() == null) contaFixa.setRecorrente(true);
         if (contaFixa.getStatus() == null) contaFixa.setStatus(StatusPagamento.PENDENTE);
-        if (contaFixa.getTipo() == null) contaFixa.setTipo(TipoTransacao.SAIDA);
+        if (contaFixa.getTipo() == null) {
+            // Compatibilidade com clientes antigos que nao enviam tipo; medir uso antes de exigir @NotNull
+            log.warn("ContaFixa criada sem tipo explicito (usuarioId={}); aplicando fallback SAIDA", usuarioId);
+            contaFixa.setTipo(TipoTransacao.SAIDA);
+        }
         if (contaFixa.getExecucaoAutomatica() == null) contaFixa.setExecucaoAutomatica(false);
         resolverCarteira(contaFixa, usuarioId);
         

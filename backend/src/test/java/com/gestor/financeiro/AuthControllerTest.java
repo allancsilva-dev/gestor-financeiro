@@ -3,6 +3,8 @@ package com.gestor.financeiro;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gestor.financeiro.model.PasswordResetToken;
 import com.gestor.financeiro.model.Usuario;
+import com.gestor.financeiro.model.enums.TipoTransacao;
+import com.gestor.financeiro.service.OnboardingService;
 import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.CategoriaRepository;
 import com.gestor.financeiro.repository.ContaFixaRepository;
@@ -313,8 +315,13 @@ class AuthControllerTest {
         assertThat(usuario.isOnboardingCompleto()).isTrue();
         assertThat(carteiraRepository.findByUsuarioId(usuario.getId())).hasSize(1);
         assertThat(contaRepository.findByUsuarioIdAndAtivoTrue(usuario.getId())).hasSize(1);
-        assertThat(categoriaRepository.findByUsuarioIdAndAtivoTrue(usuario.getId())).hasSize(2);
-        assertThat(contaFixaRepository.findByUsuarioIdAndAtivoTrue(usuario.getId())).hasSize(1);
+        // 2 categorias do payload + categoria "Renda" criada automaticamente para a renda inicial
+        assertThat(categoriaRepository.findByUsuarioIdAndAtivoTrue(usuario.getId()))
+                .hasSize(3)
+                .anyMatch(c -> c.getNome().equals(OnboardingService.CATEGORIA_RENDA));
+        assertThat(contaFixaRepository.findByUsuarioIdAndAtivoTrue(usuario.getId()))
+                .hasSize(1)
+                .allMatch(c -> c.getTipo() == TipoTransacao.ENTRADA);
         assertThat(metaRepository.findByUsuarioIdAndAtivaTrue(usuario.getId())).hasSize(1);
 
         mockMvc.perform(post("/api/auth/logout")
