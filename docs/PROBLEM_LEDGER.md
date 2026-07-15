@@ -1542,7 +1542,7 @@ pelas parcelas não pagas, e a diferença sobre a parte já paga (fatura imutáv
 - **Data:** 2026-07-15
 - **Origem:** auditoria `docs/15 07 2026 - MetaDoNexosFinancas.md` (P0-1)
 - **Severidade:** CRITICAL
-- **Status:** ABERTO (plano: PR-1 Fase 1)
+- **Status:** CORRIGIDO na branch fase-1-integridade (commit 7787712; OnboardingServiceTest 4/4)
 - **Area:** backend, onboarding
 - **Sintoma:** Salario aparece como despesa recorrente; projecao recebe sinal invertido; web e mobile afetados.
 - **Causa raiz:** `ContaFixa.java:33` default `TipoTransacao.SAIDA`; `OnboardingService.criarRendaSeNaoExistir` (117-135) nao seta tipo e associa `categorias.get(0)` (Alimentacao); fallback SAIDA em `ContaFixaService.java:69`.
@@ -1558,7 +1558,7 @@ pelas parcelas não pagas, e a diferença sobre a parte já paga (fatura imutáv
 - **Data:** 2026-07-15
 - **Origem:** auditoria `docs/15 07 2026 - MetaDoNexosFinancas.md` (P0-2)
 - **Severidade:** CRITICAL
-- **Status:** ABERTO (plano: PR-2 Fase 1)
+- **Status:** CORRIGIDO na branch fase-1-integridade (commit 89e890e; UsuarioExclusaoLgpdIT 2/2 em PostgreSQL real)
 - **Area:** backend, LGPD
 - **Sintoma:** Usuario com recorrencias executadas pode nao conseguir excluir a conta; direito de eliminacao incompleto.
 - **Causa raiz:** `DELETES_ORDENADOS` (`UsuarioExclusaoService.java:41-61`) sem `execucao_recorrencia`; V29 criou FKs NOT NULL sem cascade.
@@ -1574,7 +1574,7 @@ pelas parcelas não pagas, e a diferença sobre a parte já paga (fatura imutáv
 - **Data:** 2026-07-15
 - **Origem:** auditoria `docs/15 07 2026 - MetaDoNexosFinancas.md` (P0-3)
 - **Severidade:** CRITICAL
-- **Status:** ABERTO (plano: PR-3 Fase 1)
+- **Status:** CORRIGIDO na branch fase-1-integridade (commit b9b901c; MetaLifecycleTest 5/5 + MetaStatusBackfillIT)
 - **Area:** backend, frontend, mobile
 - **Sintoma:** Valor debitado da carteira deixa de ser visivel; usuario perde caminho de resgate; patrimonio incompleto.
 - **Causa raiz:** `MetaService.java:72-75` (conclusao), `:34-35` (findByUsuarioIdAndAtivaTrue), `:136-142` (soft-delete sem tratar reserva).
@@ -1590,7 +1590,7 @@ pelas parcelas não pagas, e a diferença sobre a parte já paga (fatura imutáv
 - **Data:** 2026-07-15
 - **Origem:** auditoria `docs/15 07 2026 - MetaDoNexosFinancas.md` (P0-4)
 - **Severidade:** CRITICAL
-- **Status:** ABERTO (plano: PR-4 Fase 1)
+- **Status:** CORRIGIDO na branch fase-1-integridade (commit de64c46; OnboardingAtomicidadeTest 3/3 + E2E Playwright 1/1)
 - **Area:** frontend, backend
 - **Sintoma:** Falha intermediaria deixa cadastro parcial; retry duplica etapas; contratos divergentes entre web e mobile.
 - **Causa raiz:** `frontend/src/pages/Onboarding.tsx` persiste por etapa (linhas 75/93/114/141/166 + completar 181); `onboardingService.ts` nem expoe `finalizar`.
@@ -1606,7 +1606,7 @@ pelas parcelas não pagas, e a diferença sobre a parte já paga (fatura imutáv
 - **Data:** 2026-07-15
 - **Origem:** auditoria `docs/15 07 2026 - MetaDoNexosFinancas.md` (P1-5)
 - **Severidade:** HIGH
-- **Status:** ABERTO (plano: PR-5 Fase 1)
+- **Status:** CORRIGIDO na branch fase-1-integridade (commit d1ac0d5; BusinessClockGuardTest + TimezoneViradaTest 2/2)
 - **Area:** backend
 - **Sintoma:** Em servidor UTC, dia/mes viram adiantados; status e totais divergem na virada do periodo.
 - **Causa raiz:** `RecorrenciaScheduler.java:18,22` e `ContaFixaService.java:42` hardcoded; `DashboardService`, `FaturaService`, `OrcamentoService`, `RelatorioService`, `AnexoService` usam now() sem zona.
@@ -1622,7 +1622,7 @@ pelas parcelas não pagas, e a diferença sobre a parte já paga (fatura imutáv
 - **Data:** 2026-07-15
 - **Origem:** auditoria `docs/15 07 2026 - MetaDoNexosFinancas.md` (P1-6)
 - **Severidade:** HIGH
-- **Status:** ABERTO (plano: PR-6 Fase 1)
+- **Status:** CORRIGIDO na branch fase-1-integridade (commit d1ea7f7; drill de anexos com evidencia neste ledger)
 - **Area:** infra, backend
 - **Sintoma:** Comprovantes somem apos recriacao do container; backup PostgreSQL nao inclui anexos.
 - **Causa raiz:** `AnexoService` grava em `app.upload.dir` local; composes production/vps sem volume de uploads.
@@ -1638,7 +1638,7 @@ pelas parcelas não pagas, e a diferença sobre a parte já paga (fatura imutáv
 - **Data:** 2026-07-15
 - **Origem:** auditoria `docs/15 07 2026 - MetaDoNexosFinancas.md` (P1-7)
 - **Severidade:** HIGH
-- **Status:** ABERTO (plano: PR-7 Fase 1)
+- **Status:** CORRIGIDO na branch fase-1-integridade (commit 1e374ba; backup/restore drill com evidencia neste ledger)
 - **Area:** infra
 - **Sintoma:** Perda do host implica perda dos backups; politica de retencao e restore nao comprovados de ponta a ponta com anexos.
 - **Causa raiz:** Dois composes evoluiram separadamente; scripts existentes (`scripts/backup-db.sh`, `restore-db.sh`, `restore-drill-db.sh`) nao cobrem uploads nem envio externo.
