@@ -1,3 +1,11 @@
 FROM postgres:17-alpine
 
-RUN apk add --no-cache gnupg gzip
+# bash+coreutils: script canônico; gnupg: criptografia assimétrica; rclone: envio off-host
+RUN apk add --no-cache bash gnupg gzip tar coreutils rclone
+
+COPY scripts/backup-db.sh /usr/local/bin/backup-db.sh
+RUN chmod +x /usr/local/bin/backup-db.sh
+
+# One-shot (ADR-0006): acionado por timer do host, ex.:
+#   docker compose --profile backup run --rm postgres-backup
+ENTRYPOINT ["/usr/local/bin/backup-db.sh"]

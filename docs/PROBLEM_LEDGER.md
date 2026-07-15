@@ -1664,3 +1664,25 @@ Ressalva: drill local em arm64 usou `eclipse-temurin:17-jre` + jar montado (a im
 `17-jre-alpine` do Dockerfile não publica manifest arm64); a semântica de volume testada é a
 mesma dos composes. Falha de remoção física pós-commit permanece risco operacional registrado
 (ADR-0005) até storage durável.
+
+---
+
+## Evidência do backup/restore drill (PROB-0081) — 2026-07-15
+
+Executado com a imagem canônica (`deploy/vps/Dockerfile.postgres-backup`: bash+gnupg+rclone+
+pg_dump 17) contra base semeada via API (usuário, onboarding, transação, anexo PDF):
+
+1. **Fail-closed comprovado:** sem `BACKUP_GPG_RECIPIENT` → exit 1; sem `RCLONE_REMOTE` → exit 1;
+   falha de criptografia → exit ≠ 0 com staging removido.
+2. **Backup:** `backup-db.sh` gerou `gf_backup_20260715_185101.tar.gpg` (pg_dump -Fc +
+   uploads.tar.gz + manifest sha256, GPG assimétrico — chave privada fora do servidor),
+   enviado via rclone a remote e tamanho remoto validado; staging removido.
+3. **Restore drill:** PostgreSQL 17 limpo → `restore-db.sh` decriptou com a chave privada,
+   validou checksums do manifesto, `pg_restore --clean` OK; contagens: usuarios=1,
+   transacoes=1, anexos=1, flyway ok; anexo extraído com conteúdo íntegro (`%PDF-1.4 ...`).
+
+Ressalvas: (a) drill usou rclone com backend local como remote — em produção configurar remote
+externo real (`deploy/backup/rclone/rclone.conf`); (b) restore de servidor PG16 com cliente 17
+gera erro benigno `transaction_timeout` — manter major igual entre dump e restore (produção usa
+17/17); (c) janela de manutenção (`API_CONTAINER`) exige docker CLI no contexto do timer do
+host (ver RUNBOOK_BACKUP_RESTORE.md).

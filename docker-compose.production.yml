@@ -53,29 +53,33 @@ services:
       - proxy
       - internal
 
+  # One-shot canônico (ADR-0006), mesma imagem/script da VPS; acionado por timer do host —
+  #   docker compose -f docker-compose.production.yml --profile backup run --rm postgres-backup
+  # Fail-closed: exige BACKUP_GPG_RECIPIENT (chave privada off-host) e RCLONE_REMOTE.
   postgres-backup:
-    image: postgres:17-alpine
-    container_name: GestorFinanceiro-Backup
-    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: deploy/vps/Dockerfile.postgres-backup
+    profiles: ["backup"]
+    restart: "no"
     environment:
       PGHOST: ${POSTGRES_HOST:-dbnexos-gestor-financeiro}
       PGPORT: ${POSTGRES_PORT:-5432}
       PGDATABASE: ${POSTGRES_DB}
       PGUSER: ${DB_USERNAME}
       PGPASSWORD: ${DB_PASSWORD}
-      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
+      BACKUP_DIR: /backups
+      UPLOADS_DIR: /uploads
+      BACKUP_GPG_RECIPIENT: ${BACKUP_GPG_RECIPIENT}
+      BACKUP_GPG_PUBLIC_KEY_FILE: /keys/backup-public.asc
+      RCLONE_REMOTE: ${RCLONE_REMOTE}
+      BACKUP_RETENTION_DAILY: ${BACKUP_RETENTION_DAILY:-7}
+      BACKUP_RETENTION_WEEKLY: ${BACKUP_RETENTION_WEEKLY:-4}
     volumes:
       - ./backups/postgres:/backups
-    command:
-      - sh
-      - -c
-      - |
-        while true; do
-          file="/backups/$${PGDATABASE}_$$(date +%Y%m%d_%H%M%S).dump"
-          pg_dump -Fc -f "$$file"
-          find /backups -type f -name "$${PGDATABASE}_*.dump" -mtime +"$${BACKUP_RETENTION_DAYS}" -delete
-          sleep 86400
-        done
+      - backend_uploads:/uploads:ro
+      - ./deploy/backup/rclone:/root/.config/rclone:ro
+      - ./deploy/backup/backup-public.asc:/keys/backup-public.asc:ro
     networks:
       - gestor_financeiro_db
 

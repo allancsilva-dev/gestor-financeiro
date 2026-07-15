@@ -79,12 +79,15 @@ services:
       - ./deploy/vps/certbot/www:/var/www/certbot
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
 
+  # One-shot canônico (ADR-0006): acionado por timer do host —
+  #   docker compose -f docker-compose.vps.yml --profile backup run --rm postgres-backup
+  # Fail-closed: exige BACKUP_GPG_RECIPIENT (chave privada off-host) e RCLONE_REMOTE.
   postgres-backup:
     build:
       context: .
       dockerfile: deploy/vps/Dockerfile.postgres-backup
-    container_name: gf-postgres-backup
-    restart: unless-stopped
+    profiles: ["backup"]
+    restart: "no"
     depends_on:
       postgres:
         condition: service_healthy
@@ -94,26 +97,18 @@ services:
       PGDATABASE: ${POSTGRES_DB}
       PGUSER: ${POSTGRES_USER}
       PGPASSWORD: ${POSTGRES_PASSWORD}
-      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-7}
-      BACKUP_ENCRYPTION_PASSPHRASE: ${BACKUP_ENCRYPTION_PASSPHRASE}
+      BACKUP_DIR: /backups
+      UPLOADS_DIR: /uploads
+      BACKUP_GPG_RECIPIENT: ${BACKUP_GPG_RECIPIENT}
+      BACKUP_GPG_PUBLIC_KEY_FILE: /keys/backup-public.asc
+      RCLONE_REMOTE: ${RCLONE_REMOTE}
+      BACKUP_RETENTION_DAILY: ${BACKUP_RETENTION_DAILY:-7}
+      BACKUP_RETENTION_WEEKLY: ${BACKUP_RETENTION_WEEKLY:-4}
     volumes:
       - ./backups/postgres:/backups
-    command:
-      - sh
-      - -c
-      - |
-        while true; do
-          if [ -z "$${BACKUP_ENCRYPTION_PASSPHRASE}" ]; then
-            echo "BACKUP_ENCRYPTION_PASSPHRASE obrigatorio para backup criptografado" >&2
-            exit 1
-          fi
-          file="/backups/$${PGDATABASE}_$$(date +%Y%m%d_%H%M%S).sql.gz"
-          pg_dump --no-owner --no-acl | gzip -c > "$$file"
-          gpg --batch --yes --pinentry-mode loopback --symmetric --cipher-algo AES256 --passphrase "$${BACKUP_ENCRYPTION_PASSPHRASE}" --output "$$file.gpg" "$$file"
-          rm -f "$$file"
-          find /backups -type f -name "$${PGDATABASE}_*.sql.gz.gpg" -mtime +"$${BACKUP_RETENTION_DAYS}" -delete
-          sleep 86400
-        done
+      - backend_uploads:/uploads:ro
+      - ./deploy/backup/rclone:/root/.config/rclone:ro
+      - ./deploy/backup/backup-public.asc:/keys/backup-public.asc:ro
 
 volumes:
   postgres_data:
