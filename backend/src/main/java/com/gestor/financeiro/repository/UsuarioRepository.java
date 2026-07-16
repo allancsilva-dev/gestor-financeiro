@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import java.util.Optional;
+import java.util.List;
+import org.springframework.data.domain.Pageable;
 
 public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
@@ -16,4 +18,7 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT u FROM Usuario u WHERE u.id = :id")
     Optional<Usuario> findByIdComLock(@Param("id") Long id);
+
+    @Query("SELECT u.id FROM Usuario u WHERE u.id > :afterId ORDER BY u.id")
+    List<Long> findIdsAfter(@Param("afterId") Long afterId, Pageable pageable);
 }
