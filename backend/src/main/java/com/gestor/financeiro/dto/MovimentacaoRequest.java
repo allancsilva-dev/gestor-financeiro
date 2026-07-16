@@ -12,4 +12,10 @@ public class MovimentacaoRequest {
     private BigDecimal precoUnitario;
     // Opcional: se informado, a movimentacao debita/credita o caixa desta carteira via ledger.
     private Long carteiraId;
+
+    /**
+     * Snapshot externo (ADR-0011): registro sem movimento de caixa, marcado
+     * nao conciliado. Sem esta flag, COMPRA/VENDA/DIVIDENDO exigem carteiraId.
+     */
+    private Boolean externa;
 }

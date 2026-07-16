@@ -28,15 +28,18 @@ public class InvestimentoService {
     private final MovimentacaoAtivoRepository movimentacaoRepository;
     private final UsuarioRepository usuarioRepository;
     private final LedgerService ledgerService;
+    private final OperacaoFinanceiraService operacaoService;
 
     public InvestimentoService(AtivoRepository ativoRepository,
                                MovimentacaoAtivoRepository movimentacaoRepository,
                                UsuarioRepository usuarioRepository,
-                               LedgerService ledgerService) {
+                               LedgerService ledgerService,
+                               OperacaoFinanceiraService operacaoService) {
         this.ativoRepository = ativoRepository;
         this.movimentacaoRepository = movimentacaoRepository;
         this.usuarioRepository = usuarioRepository;
         this.ledgerService = ledgerService;
+        this.operacaoService = operacaoService;
     }
 
     @Transactional
@@ -96,6 +99,15 @@ public class InvestimentoService {
                 + ativo.getQuantidade() + ", venda solicitada " + quantidade);
         }
 
+        // Operacao real exige caixa (ADR-0011); snapshot externo e explicito e
+        // nunca inventa movimento de caixa
+        boolean externa = Boolean.TRUE.equals(request.getExterna());
+        boolean movimentaCaixa = tipo != TipoMovimentacao.BONIFICACAO && valorTotal.signum() > 0;
+        if (!externa && movimentaCaixa && request.getCarteiraId() == null) {
+            throw new BusinessException(
+                    "Informe a conta de caixa (carteiraId) ou marque a movimentação como externa");
+        }
+
         MovimentacaoAtivo mov = new MovimentacaoAtivo();
         mov.setAtivo(ativo);
         mov.setUsuario(usuario);
@@ -104,10 +116,17 @@ public class InvestimentoService {
         mov.setQuantidade(quantidade);
         mov.setPrecoUnitario(preco);
         mov.setValorTotal(valorTotal);
+        // Bonificacao nao exige caixa e permanece conciliada; EXTERNO e so o
+        // snapshot declarado sem historico de caixa
+        mov.setConciliacao(externa
+                ? com.gestor.financeiro.model.enums.ConciliacaoInvestimento.EXTERNO
+                : com.gestor.financeiro.model.enums.ConciliacaoInvestimento.CONCILIADA);
         mov = movimentacaoRepository.save(mov);
 
         updateAtivoPosicao(ativo, tipo, quantidade, valorTotal);
-        integrarCaixa(usuario, ativo, mov, tipo, valorTotal, request);
+        if (!externa) {
+            integrarCaixa(usuario, ativo, mov, tipo, valorTotal, request);
+        }
 
         return MovimentacaoResponse.builder()
             .id(mov.getId())
@@ -189,6 +208,22 @@ public class InvestimentoService {
             ? TipoMovimentoCarteira.ENTRADA
             : TipoMovimentoCarteira.SAIDA;
 
+        // Operacao INVESTIMENTO liga caixa e posicao (ADR-0009/0011): compra e
+        // conversao patrimonial, nunca despesa de consumo
+        com.gestor.financeiro.model.OperacaoFinanceira operacao = operacaoService.criar(
+            new CriarOperacaoCommand(
+                usuario.getId(),
+                com.gestor.financeiro.model.enums.TipoOperacaoFinanceira.INVESTIMENTO,
+                com.gestor.financeiro.model.enums.PoliticaOperacao.CAIXA,
+                com.gestor.financeiro.model.enums.OrigemOperacaoFinanceira.MANUAL,
+                request.getData() != null ? request.getData().atStartOfDay() : null,
+                null,
+                "investimento|mov=" + mov.getId(),
+                tipo.getDescricao() + " de " + ativo.getTicker(),
+                null));
+        mov.setOperacao(operacao);
+        movimentacaoRepository.save(mov);
+
         // A carteira precisa ser do usuario; LedgerService valida ownership com lock e
         // bloqueia saldo insuficiente na COMPRA (permitirSaldoNegativo = false).
         ledgerService.registrarMovimento(new RegistrarMovimentoCommand(
@@ -204,7 +239,7 @@ public class InvestimentoService {
             "MOV_ATIVO_" + mov.getId(),
             request.getData() != null ? request.getData().atStartOfDay() : null,
             false
-        ));
+        ), operacao);
     }
 
     public List<MovimentacaoResponse> listarMovimentacoes(Long usuarioId, Long ativoId) {

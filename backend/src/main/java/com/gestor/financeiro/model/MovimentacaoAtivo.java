@@ -38,4 +38,15 @@ public class MovimentacaoAtivo {
 
     @Column(precision = 10, scale = 2)
     private BigDecimal valorTotal;
+
+    /** CONCILIADA (caixa vinculado) ou EXTERNO/snapshot (ADR-0011, PR-F2-13). */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private com.gestor.financeiro.model.enums.ConciliacaoInvestimento conciliacao =
+            com.gestor.financeiro.model.enums.ConciliacaoInvestimento.EXTERNO;
+
+    /** Operacao financeira que liga caixa e posicao (ADR-0009). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "operacao_id")
+    private OperacaoFinanceira operacao;
 }

@@ -237,6 +237,8 @@ class InvestimentoServiceTest {
         r.setQuantidade(new BigDecimal(qtd));
         r.setPrecoUnitario(new BigDecimal(preco));
         r.setCarteiraId(carteiraId);
+        // PR-F2-13: posicao sem caixa agora e snapshot EXTERNO explicito
+        r.setExterna(carteiraId == null);
         return r;
     }
 }
