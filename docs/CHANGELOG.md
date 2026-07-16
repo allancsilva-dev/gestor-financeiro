@@ -7,6 +7,23 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ---
 
+## [Fase 2 — PR-F2-18A/18B] - 2026-07-16
+
+### Contratos finais e clientes canônicos
+- `/api/v1/contas-financeiras` usa contrato canônico sem `tipo`, aceita somente contas ATIVO
+  manuais de caixa e mantém CARTAO/COFRE/CUSTODIA somente leitura.
+- `/api/v1/cartoes` cria e consulta cartões pareados à conta financeira PASSIVO; dívida e limite
+  disponível derivam do saldo do ledger, inclusive crédito representado por saldo negativo.
+- Faturas aceitam rotas por `cartaoId`; transações aceitam `cartaoId`; onboarding aceita o objeto
+  `cartao`, preservando aliases antigos somente até o contract.
+- Web e mobile deixaram de chamar `/contas` e `/carteiras`. Dashboard mobile prioriza
+  “Disponível para gastar” e expõe as nove métricas com drill-down e estados completos.
+- Contas, cartões, faturas, transações, metas, recorrências e investimentos usam serviços e
+  seletores canônicos; operações de investimento exigem caixa real ou snapshot `EXTERNO`.
+- O stash `WIP PR-F2-20 reconciliacao global antes PR-F2-16A` permanece intacto.
+- `PROB-0081` continua reaberto: o ambiente não possui rclone, remote off-host, chave pública nem
+  variáveis operacionais. V41, remoções do PR-F2-19 e PR-F2-20 não foram iniciados.
+
 ## [Fase 2 — PR-F2-16A] - 2026-07-16
 
 ### Contratos prontos para clientes

@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { contaFixaService } from '../../../src/services/contaFixaService';
 import { categoriaService } from '../../../src/services/categoriaService';
-import { carteiraService } from '../../../src/services/carteiraService';
+import contaFinanceiraService from '../../../src/services/contaFinanceiraService';
 import Badge from '../../../src/components/ui/Badge';
 import Card from '../../../src/components/ui/Card';
 import Chip from '../../../src/components/ui/Chip';
@@ -42,10 +42,10 @@ export default function ContasFixasScreen() {
   const totalAPagar = emAberto.filter(cf => cf.tipo !== 'ENTRADA').reduce((acc, cf) => acc + Number(cf.valorPlanejado ?? 0), 0);
 
   const { data: carteirasData } = useQuery({
-    queryKey: ['carteiras'],
-    queryFn: () => carteiraService.listar(),
+    queryKey: ['contas-financeiras-caixa'],
+    queryFn: () => contaFinanceiraService.listarParaCaixa(),
   });
-  const carteiras = carteirasData?.content ?? [];
+  const carteiras = carteirasData ?? [];
 
   const pagarMutation = useMutation({
     mutationFn: ({ id, valor, carteiraId }: { id: number; valor: number; carteiraId: number }) =>

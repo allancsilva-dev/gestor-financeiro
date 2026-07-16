@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import Layout from '../components/Layout';
 import toast from 'react-hot-toast';
 import faturaService, { FaturaResponse, FaturaLancamento } from '../services/faturaService';
-import { contaService, Conta } from '../services/contaService';
+import cartaoService, { Cartao } from '../services/cartaoService';
 import contaFinanceiraService, { ContaFinanceira } from '../services/contaFinanceiraService';
 import { useAuth } from '../context/AuthContext';
 import { formatCurrency } from '../utils/currency';
@@ -17,9 +17,9 @@ const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julh
 
 export default function Faturas() {
   const { usuario } = useAuth();
-  const [contasCredito, setContasCredito] = useState<Conta[]>([]);
+  const [contasCredito, setContasCredito] = useState<Cartao[]>([]);
   const [carteiras, setCarteiras] = useState<ContaFinanceira[]>([]);
-  const [contaSelecionada, setContaSelecionada] = useState<Conta | null>(null);
+  const [contaSelecionada, setContaSelecionada] = useState<Cartao | null>(null);
   const [carteiraPagamentoId, setCarteiraPagamentoId] = useState<number | null>(null);
   const [fatura, setFatura] = useState<FaturaResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,8 +53,7 @@ export default function Faturas() {
 
   const carregarContas = async () => {
     try {
-      const contas = await contaService.listarPorUsuario(usuario!.id, 0, 50);
-      const credito = contas.filter((c: Conta) => c.tipo === 'CREDITO');
+      const credito = await cartaoService.listarTodos();
       setContasCredito(credito);
       if (credito.length > 0 && !contaSelecionada) {
         setContaSelecionada(credito[0]);

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { contaService, Conta } from '../services/contaService';
+import cartaoService, { Cartao, CartaoInput } from '../services/cartaoService';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import Layout from '../components/Layout';
@@ -13,10 +13,10 @@ import { toNullableNumber } from '../validation/numbers';
 
 export default function Contas() {
   const { usuario } = useAuth();
-  const [contas, setContas] = useState<Conta[]>([]);
+  const [contas, setContas] = useState<Cartao[]>([]);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [editando, setEditando] = useState<Conta | null>(null);
+  const [editando, setEditando] = useState<Cartao | null>(null);
   
   const [formData, setFormData] = useState({
     nome: '',
@@ -39,10 +39,7 @@ export default function Contas() {
 
     try {
       setLoading(true);
-      const data = await contaService.listarPorUsuario(usuario.id);
-      // Filtrar apenas cartões de crédito
-      const cartoes = data.filter((c: Conta) => c.tipo === 'CREDITO');
-      setContas(cartoes);
+      setContas(await cartaoService.listarTodos());
     } catch (error: any) {
       toast.error('Erro ao carregar cartoes');
     } finally {
@@ -50,7 +47,7 @@ export default function Contas() {
     }
   };
 
-  const abrirFormulario = (conta?: Conta) => {
+  const abrirFormulario = (conta?: Cartao) => {
     if (conta) {
       // Modo edição
       setEditando(conta);
@@ -91,17 +88,24 @@ export default function Contas() {
     }
     const contaParaEnviar = validation.validate(formData);
     if (!contaParaEnviar) return;
+    const cartaoParaEnviar: CartaoInput = {
+      nome: contaParaEnviar.nome,
+      limiteTotal: contaParaEnviar.limiteTotal,
+      diaFechamento: contaParaEnviar.diaFechamento,
+      diaVencimento: contaParaEnviar.diaVencimento,
+      cor: contaParaEnviar.cor,
+    };
 
     try {
       setLoading(true);
       
       if (editando) {
         // Atualizar
-        await contaService.atualizar(editando.id!, contaParaEnviar);
+        await cartaoService.atualizar(editando.id!, cartaoParaEnviar);
         toast.success('Cartão atualizado com sucesso!');
       } else {
         // Criar
-        await contaService.criar(contaParaEnviar);
+        await cartaoService.criar(cartaoParaEnviar);
         toast.success('Cartão criado com sucesso!');
       }
       
@@ -119,7 +123,7 @@ export default function Contas() {
     if (!window.confirm('Tem certeza que deseja deletar este cartão?')) return;
     
     try {
-      await contaService.deletar(id);
+      await cartaoService.deletar(id);
       toast.success('Cartão deletado!');
       carregarContas();
     } catch (error: any) {

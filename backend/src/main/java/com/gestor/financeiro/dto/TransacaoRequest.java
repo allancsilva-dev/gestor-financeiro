@@ -34,6 +34,7 @@ public class TransacaoRequest {
 
     private IdRef categoria;
 
+    @JsonAlias("cartaoId")
     private Long contaId;
 
     private IdRef conta;

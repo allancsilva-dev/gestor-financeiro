@@ -22,14 +22,14 @@ public class FaturaController {
     private final FaturaService faturaService;
     private final AuthenticatedUserService authenticatedUserService;
 
-    @GetMapping("/conta/{contaId}/atual")
+    @GetMapping({"/conta/{contaId}/atual", "/cartao/{contaId}/atual"})
     @Operation(summary = "Consulta fatura do mês atual (somente leitura)")
     public ResponseEntity<FaturaResponse> buscarAtual(@PathVariable Long contaId) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         return ResponseEntity.ok(faturaService.buscarAtual(usuarioId, contaId));
     }
 
-    @GetMapping("/conta/{contaId}")
+    @GetMapping({"/conta/{contaId}", "/cartao/{contaId}"})
     @Operation(summary = "Consulta fatura por mês e ano (somente leitura)")
     public ResponseEntity<FaturaResponse> buscarPorMes(
             @PathVariable Long contaId,
@@ -39,7 +39,7 @@ public class FaturaController {
         return ResponseEntity.ok(faturaService.buscarPorMes(usuarioId, contaId, mes, ano));
     }
 
-    @PostMapping("/conta/{contaId}")
+    @PostMapping({"/conta/{contaId}", "/cartao/{contaId}"})
     @Operation(summary = "Cria fatura explicitamente para um mês/ano")
     public ResponseEntity<FaturaResponse> criarFatura(
             @PathVariable Long contaId,

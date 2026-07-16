@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { transacaoService, Transacao } from '../services/transacaoService';
 import { categoriaService } from '../services/categoriaService';
-import { contaService, Conta } from '../services/contaService';
+import cartaoService, { Cartao } from '../services/cartaoService';
 import { useAuth } from '../context/AuthContext'; // ← ADICIONADO
 import toast from 'react-hot-toast';
 import Layout from '../components/Layout';
@@ -19,7 +19,7 @@ import { toNullableNumber } from '../validation/numbers';
 export default function Transacoes() {
   const { usuario } = useAuth(); // ← ADICIONADO
   const [transacoes, setTransacoes] = useState<any[]>([]);
-  const [contas, setContas] = useState<Conta[]>([]);
+  const [contas, setContas] = useState<Cartao[]>([]);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [mostrarImport, setMostrarImport] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -35,7 +35,7 @@ export default function Transacoes() {
     descricao: '',
     valorTotal: '',
     tipo: 'SAIDA' as 'ENTRADA' | 'SAIDA',
-    tipoConta: 'CREDITO' as Conta['tipo'],
+    tipoConta: 'CREDITO' as const,
     data: new Date().toISOString().split('T')[0],
     categoriaNome: '',
     categoriaCor: '',
@@ -59,7 +59,7 @@ export default function Transacoes() {
       setLoading(true);
       const [transacoesData, contasData] = await Promise.all([
         transacaoService.listarPorUsuarioPaginado(paginaAtual, tamanhoPagina),
-        contaService.listarPorUsuario(usuario.id)      // ← CORRIGIDO!
+        cartaoService.listarTodos()
       ]);
       setTransacoes(transacoesData.content || []);
       setTotalPaginas(Math.max(transacoesData.totalPages || 1, 1));
@@ -81,7 +81,7 @@ export default function Transacoes() {
         descricao: transacao.descricao,
         valorTotal: transacao.valorTotal?.toString() || '',
         tipo: transacao.tipo,
-        tipoConta: transacao.conta?.tipo || 'CREDITO',
+        tipoConta: 'CREDITO',
         data: transacao.data,
         categoriaNome: transacao.categoria?.nome || '',
         categoriaCor: transacao.categoria?.cor || '',
@@ -172,7 +172,7 @@ export default function Transacoes() {
         valorTotal: parsed.valor,
         tipo: parsed.tipo,
         data: parsed.data,
-        conta: { id: parsed.contaId },
+        cartaoId: parsed.contaId,
         categoria: { id: categoriaId },
         parcelado: parsed.parcelado,
         totalParcelas: parsed.parcelado ? parsed.totalParcelas : undefined,
@@ -256,13 +256,7 @@ export default function Transacoes() {
   };
 
   const valorTotalNumerico = toNullableNumber(formData.valorTotal);
-  const contasPorTipo = contas.filter((conta) => conta.tipo === formData.tipoConta);
-  const tipoContaLabels: Record<Conta['tipo'], string> = {
-    CREDITO: 'Cartão de Crédito',
-    DEBITO: 'Débito',
-    DINHEIRO: 'Dinheiro',
-    POUPANCA: 'Poupança',
-  };
+  const contasPorTipo = contas;
 
   return (
     <Layout>
@@ -354,20 +348,6 @@ export default function Transacoes() {
                     <FieldError name="categoriaNome" error={validation.errors.categoriaNome} />
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium mb-1 text-gray-700">Tipo de Conta</label>
-                    <select
-                      name="tipoConta"
-                      value={formData.tipoConta}
-                      onChange={(e) => setFormData({ ...formData, tipoConta: e.target.value as Conta['tipo'], contaId: '' })}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="CREDITO">Cartão de Crédito</option>
-                      <option value="DEBITO">Débito</option>
-                      <option value="DINHEIRO">Dinheiro</option>
-                      <option value="POUPANCA">Poupança</option>
-                    </select>
-                  </div>
                 </div>
 
                 <div>
@@ -382,14 +362,14 @@ export default function Transacoes() {
                       <option value="">Selecione...</option>
                       {contasPorTipo.map((conta) => (
                         <option key={conta.id} value={conta.id}>
-                          {conta.nome} ({tipoContaLabels[conta.tipo]})
+                          {conta.nome} · disponível {formatCurrency(conta.limiteDisponivel)}
                         </option>
                       ))}
                     </select>
                     <FieldError name="contaId" error={validation.errors.contaId} />
                     {contasPorTipo.length === 0 && (
                       <p className="text-xs text-gray-500 mt-1">
-                        Nenhuma conta do tipo {tipoContaLabels[formData.tipoConta]} cadastrada.
+                        Nenhum cartão cadastrado.
                       </p>
                     )}
                   </div>

@@ -1,12 +1,16 @@
 package com.gestor.financeiro.controller;
 
 import com.gestor.financeiro.dto.AjusteCarteiraRequest;
-import com.gestor.financeiro.dto.CarteiraRequest;
-import com.gestor.financeiro.dto.CarteiraResponseDto;
+import com.gestor.financeiro.dto.ContaFinanceiraRequest;
+import com.gestor.financeiro.dto.ContaFinanceiraResponse;
 import com.gestor.financeiro.dto.MovimentoCarteiraResponse;
 import com.gestor.financeiro.dto.ReconciliacaoCarteiraResponse;
 import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.MovimentoCarteira;
+import com.gestor.financeiro.model.enums.NaturezaContaFinanceira;
+import com.gestor.financeiro.model.enums.SubtipoContaFinanceira;
+import com.gestor.financeiro.model.enums.TipoCarteira;
+import com.gestor.financeiro.exception.BusinessException;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.CarteiraService;
 import com.gestor.financeiro.service.LedgerReconciliationService;
@@ -46,51 +50,59 @@ public class ContaFinanceiraController {
     private final AuthenticatedUserService authenticatedUserService;
 
     @GetMapping("/minhas")
-    public ResponseEntity<Page<CarteiraResponseDto>> listar(
+    public ResponseEntity<Page<ContaFinanceiraResponse>> listar(
             @PageableDefault(size = 20, sort = "nome", direction = Sort.Direction.ASC) Pageable pageable
     ) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Pageable cappedPageable = PaginationUtils.enforceMaxSize(pageable, 100);
         Page<Carteira> contas = carteiraService.listarPorUsuario(usuarioId, cappedPageable);
-        return ResponseEntity.ok(contas.map(CarteiraResponseDto::fromEntity));
+        return ResponseEntity.ok(contas.map(ContaFinanceiraResponse::fromEntity));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<CarteiraResponseDto> buscarPorId(@PathVariable Long id) {
+    public ResponseEntity<ContaFinanceiraResponse> buscarPorId(@PathVariable Long id) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Carteira conta = carteiraService.buscarPorIdDoUsuario(id, usuarioId);
-        return ResponseEntity.ok(CarteiraResponseDto.fromEntity(conta));
+        return ResponseEntity.ok(ContaFinanceiraResponse.fromEntity(conta));
     }
 
     @PostMapping
-    public ResponseEntity<CarteiraResponseDto> criar(@Valid @RequestBody CarteiraRequest request) {
+    public ResponseEntity<ContaFinanceiraResponse> criar(@Valid @RequestBody ContaFinanceiraRequest request) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        validarGerenciavelManualmente(request);
         Carteira conta = carteiraService.criar(toEntity(request), usuarioId);
-        return ResponseEntity.ok(CarteiraResponseDto.fromEntity(conta));
+        return ResponseEntity.ok(ContaFinanceiraResponse.fromEntity(conta));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<CarteiraResponseDto> atualizar(
-            @PathVariable Long id, @Valid @RequestBody CarteiraRequest request) {
+    public ResponseEntity<ContaFinanceiraResponse> atualizar(
+            @PathVariable Long id, @Valid @RequestBody ContaFinanceiraRequest request) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        validarGerenciavelManualmente(request);
+        Carteira atual = carteiraService.buscarPorIdDoUsuario(id, usuarioId);
+        if (!SUBTIPOS_MANUAIS.contains(atual.getSubtipo())) {
+            throw new BusinessException("Conta gerenciada pelo módulo de origem é somente leitura");
+        }
         Carteira conta = carteiraService.atualizar(id, toEntity(request), usuarioId);
-        return ResponseEntity.ok(CarteiraResponseDto.fromEntity(conta));
+        return ResponseEntity.ok(ContaFinanceiraResponse.fromEntity(conta));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        validarContaGerenciavel(id, usuarioId);
         carteiraService.deletar(id, usuarioId);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/ajustes")
-    public ResponseEntity<CarteiraResponseDto> ajustarSaldo(
+    public ResponseEntity<ContaFinanceiraResponse> ajustarSaldo(
             @PathVariable Long id, @Valid @RequestBody AjusteCarteiraRequest request) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        validarContaGerenciavel(id, usuarioId);
         Carteira conta = carteiraService.ajustarSaldo(
                 id, request.getTipo(), request.getValor(), request.getDescricao(), usuarioId);
-        return ResponseEntity.ok(CarteiraResponseDto.fromEntity(conta));
+        return ResponseEntity.ok(ContaFinanceiraResponse.fromEntity(conta));
     }
 
     @GetMapping("/{id}/movimentos")
@@ -117,12 +129,41 @@ public class ContaFinanceiraController {
         return ResponseEntity.ok(ledgerReconciliationService.reconciliarCarteira(usuarioId, id));
     }
 
-    private Carteira toEntity(CarteiraRequest request) {
+    private static final java.util.Set<SubtipoContaFinanceira> SUBTIPOS_MANUAIS = java.util.EnumSet.of(
+            SubtipoContaFinanceira.DINHEIRO, SubtipoContaFinanceira.CORRENTE,
+            SubtipoContaFinanceira.POUPANCA, SubtipoContaFinanceira.PAGAMENTO);
+
+    private void validarGerenciavelManualmente(ContaFinanceiraRequest request) {
+        if (request.natureza() != NaturezaContaFinanceira.ATIVO || !SUBTIPOS_MANUAIS.contains(request.subtipo())) {
+            throw new BusinessException("Criação manual permitida apenas para contas ATIVO de caixa");
+        }
+        if (request.subtipo().naturezaPadrao() != request.natureza()) {
+            throw new BusinessException("Natureza incompatível com o subtipo");
+        }
+    }
+
+    private void validarContaGerenciavel(Long id, Long usuarioId) {
+        Carteira conta = carteiraService.buscarPorIdDoUsuario(id, usuarioId);
+        if (!SUBTIPOS_MANUAIS.contains(conta.getSubtipo())) {
+            throw new BusinessException("Conta gerenciada pelo módulo de origem é somente leitura");
+        }
+    }
+
+    private Carteira toEntity(ContaFinanceiraRequest request) {
         Carteira carteira = new Carteira();
-        carteira.setNome(request.getNome());
-        carteira.setTipo(request.getTipo());
-        carteira.setSaldo(request.getSaldo());
-        carteira.setBanco(request.getBanco());
+        carteira.setNome(request.nome());
+        carteira.setNatureza(request.natureza());
+        carteira.setSubtipo(request.subtipo());
+        carteira.setLiquidez(request.liquidez());
+        carteira.setMoeda(request.moeda());
+        carteira.setSaldo(request.saldoInicial());
+        carteira.setBanco(request.banco());
+        carteira.setTipo(switch (request.subtipo()) {
+            case DINHEIRO -> TipoCarteira.DINHEIRO;
+            case CORRENTE, PAGAMENTO -> TipoCarteira.CONTA_BANCARIA;
+            case POUPANCA -> TipoCarteira.POUPANCA;
+            default -> throw new BusinessException("Subtipo não pode ser criado manualmente");
+        });
         return carteira;
     }
 }

@@ -69,7 +69,8 @@ class ContaFinanceiraControllerTest {
     @WithMockUser(username = "alice-conta@teste.com")
     void criacaoEdicaoListagemEExclusaoTemParidadeComLegado() throws Exception {
         String payload = objectMapper.writeValueAsString(Map.of(
-                "nome", "Reserva", "tipo", "POUPANCA", "saldo", 100.00, "banco", "Nexos"));
+                "nome", "Reserva", "natureza", "ATIVO", "subtipo", "POUPANCA",
+                "liquidez", "IMEDIATA", "moeda", "BRL", "saldoInicial", 100.00, "banco", "Nexos"));
         String body = mockMvc.perform(post("/api/v1/contas-financeiras")
                         .contentType(MediaType.APPLICATION_JSON).content(payload))
                 .andExpect(status().isOk())
@@ -80,10 +81,12 @@ class ContaFinanceiraControllerTest {
         mockMvc.perform(put("/api/v1/contas-financeiras/{id}", id)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(Map.of(
-                                "nome", "Reserva editada", "tipo", "POUPANCA",
-                                "saldo", 120.00, "banco", "Nexos"))))
+                                "nome", "Reserva editada", "natureza", "ATIVO", "subtipo", "POUPANCA",
+                                "liquidez", "IMEDIATA", "moeda", "BRL",
+                                "saldoInicial", 120.00, "banco", "Nexos"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.nome").value("Reserva editada"))
+                .andExpect(jsonPath("$.tipo").doesNotExist())
                 .andExpect(jsonPath("$.saldo").value(120.00));
 
         mockMvc.perform(get("/api/v1/contas-financeiras/minhas?size=1"))
@@ -94,6 +97,17 @@ class ContaFinanceiraControllerTest {
         Carteira vazia = novaConta(alice, "Excluir", BigDecimal.ZERO);
         mockMvc.perform(delete("/api/v1/contas-financeiras/{id}", vazia.getId()))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @WithMockUser(username = "alice-conta@teste.com")
+    void rejeitaSubtiposGerenciadosPorOutrosModulos() throws Exception {
+        String payload = objectMapper.writeValueAsString(Map.of(
+                "nome", "Cartão manual", "natureza", "PASSIVO", "subtipo", "CARTAO",
+                "liquidez", "IMEDIATA", "moeda", "BRL", "saldoInicial", 0));
+        mockMvc.perform(post("/api/v1/contas-financeiras")
+                        .contentType(MediaType.APPLICATION_JSON).content(payload))
+                .andExpect(status().isUnprocessableEntity());
     }
 
     @Test

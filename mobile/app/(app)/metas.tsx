@@ -3,7 +3,7 @@ import { View, Text, FlatList, TouchableOpacity, Modal, ScrollView, ActivityIndi
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { metaService } from '../../src/services/metaService';
-import { carteiraService } from '../../src/services/carteiraService';
+import contaFinanceiraService from '../../src/services/contaFinanceiraService';
 import { formatCurrency, formatPercent, formatDate, parseDateBR, isValidDateBR, parseCurrencyBR, maskCurrencyInput, maskDateInput } from '../../src/utils/format';
 import { Meta, MetaRequest, StatusMeta } from '../../src/types';
 import { useTheme } from '../../src/theme';
@@ -57,10 +57,10 @@ export default function Metas() {
   });
 
   const { data: carteirasData } = useQuery({
-    queryKey: ['carteiras'],
-    queryFn: () => carteiraService.listar(),
+    queryKey: ['contas-financeiras-caixa'],
+    queryFn: () => contaFinanceiraService.listarParaCaixa(),
   });
-  const carteiras = carteirasData?.content ?? [];
+  const carteiras = carteirasData ?? [];
 
   const resetFormularioMeta = () => {
     setEditandoMeta(null);

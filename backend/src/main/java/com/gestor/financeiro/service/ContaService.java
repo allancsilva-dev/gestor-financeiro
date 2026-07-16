@@ -29,6 +29,15 @@ public class ContaService {
     public Page<Conta> listarPorUsuario(Long usuarioId, Pageable pageable) {
         return contaRepository.findByUsuarioIdAndAtivoTrue(usuarioId, pageable);
     }
+
+    public Page<Conta> listarCartoesPorUsuario(Long usuarioId, Pageable pageable) {
+        return contaRepository.findByUsuarioIdAndTipoAndAtivoTrue(usuarioId, TipoConta.CREDITO, pageable);
+    }
+
+    public Conta buscarCartaoDoUsuario(Long id, Long usuarioId) {
+        return contaRepository.findByIdAndUsuarioIdAndTipo(id, usuarioId, TipoConta.CREDITO)
+                .orElseThrow(() -> new ResourceNotFoundException("Cartão não encontrado"));
+    }
     
     // Cria nova conta
     @Transactional
@@ -72,6 +81,29 @@ public class ContaService {
         conta.setBanco(contaAtualizada.getBanco());
 
         return contaRepository.save(conta);
+    }
+
+    @Transactional
+    public Conta atualizarCartao(Long id, Conta cartaoAtualizado, Long usuarioId) {
+        Conta cartao = buscarCartaoDoUsuario(id, usuarioId);
+        cartao.setNome(cartaoAtualizado.getNome());
+        cartao.setLimiteTotal(cartaoAtualizado.getLimiteTotal());
+        cartao.setDiaFechamento(cartaoAtualizado.getDiaFechamento());
+        cartao.setDiaVencimento(cartaoAtualizado.getDiaVencimento());
+        cartao.setCor(cartaoAtualizado.getCor());
+        cartao.setBanco(cartaoAtualizado.getBanco());
+        if (cartao.getContaFinanceira() != null) {
+            cartao.getContaFinanceira().setNome(cartaoAtualizado.getNome());
+            cartao.getContaFinanceira().setBanco(cartaoAtualizado.getBanco());
+        }
+        return contaRepository.save(cartao);
+    }
+
+    @Transactional
+    public void deletarCartao(Long id, Long usuarioId) {
+        Conta cartao = buscarCartaoDoUsuario(id, usuarioId);
+        cartao.setAtivo(false);
+        contaRepository.save(cartao);
     }
     
     // Adiciona gasto na conta validando ownership

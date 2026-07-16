@@ -460,6 +460,7 @@ public class FaturaService {
         return new FaturaResponse(
                 null,
                 conta.getId(),
+                conta.getId(),
                 conta.getNome(),
                 mes,
                 ano,
@@ -512,6 +513,7 @@ public class FaturaService {
 
         return new FaturaResponse(
                 fatura.getId(),
+                conta.getId(),
                 conta.getId(),
                 conta.getNome(),
                 fatura.getMes(),

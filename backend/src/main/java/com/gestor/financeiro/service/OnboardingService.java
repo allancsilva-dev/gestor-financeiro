@@ -91,7 +91,7 @@ public class OnboardingService {
 
         Conta conta = new Conta();
         conta.setNome(request.nome());
-        conta.setTipo(request.tipo());
+        conta.setTipo(request.tipo() == null ? com.gestor.financeiro.model.enums.TipoConta.CREDITO : request.tipo());
         conta.setLimiteTotal(request.limiteTotal());
         conta.setDiaFechamento(request.diaFechamento());
         conta.setDiaVencimento(request.diaVencimento());

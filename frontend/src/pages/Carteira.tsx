@@ -48,7 +48,7 @@ export default function ContasFinanceiras() {
   const abrirForm = (conta?: ContaFinanceira) => {
     if (conta) {
       setEditando(conta);
-      setForm({ nome: conta.nome, tipo: conta.tipo === 'CARTAO' ? 'CONTA_BANCARIA' : conta.tipo, saldo: String(conta.saldo), banco: conta.banco ?? '' });
+      setForm({ nome: conta.nome, tipo: conta.subtipo === 'CORRENTE' || conta.subtipo === 'PAGAMENTO' ? 'CONTA_BANCARIA' : conta.subtipo as typeof form.tipo, saldo: String(conta.saldo), banco: conta.banco ?? '' });
     } else {
       setEditando(null); setForm({ nome: '', tipo: 'DINHEIRO', saldo: '', banco: '' });
     }
@@ -59,7 +59,15 @@ export default function ContasFinanceiras() {
     event.preventDefault();
     const parsed = contaValidation.validate(form);
     if (!parsed) return;
-    const input = { nome: parsed.nome, tipo: parsed.tipo, saldo: parsed.saldo, banco: parsed.tipo === 'CONTA_BANCARIA' ? parsed.banco : undefined };
+    const input = {
+      nome: parsed.nome,
+      natureza: 'ATIVO' as const,
+      subtipo: (parsed.tipo === 'CONTA_BANCARIA' ? 'CORRENTE' : parsed.tipo) as 'DINHEIRO' | 'CORRENTE' | 'POUPANCA',
+      liquidez: 'IMEDIATA' as const,
+      moeda: 'BRL',
+      saldoInicial: parsed.saldo,
+      banco: parsed.tipo === 'CONTA_BANCARIA' ? parsed.banco : undefined,
+    };
     try {
       if (editando) await contaFinanceiraService.atualizar(editando.id, input);
       else await contaFinanceiraService.criar(input);

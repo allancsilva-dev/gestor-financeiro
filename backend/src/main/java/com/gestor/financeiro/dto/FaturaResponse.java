@@ -7,6 +7,7 @@ import java.util.List;
 public record FaturaResponse(
     Long id,
     Long contaId,
+    Long cartaoId,
     String contaNome,
     Integer mes,
     Integer ano,

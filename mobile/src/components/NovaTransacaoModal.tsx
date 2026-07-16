@@ -3,8 +3,8 @@ import { View, Text, Modal, TouchableOpacity, ActivityIndicator, ScrollView } fr
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { transacaoService } from '../services/transacaoService';
 import { categoriaService } from '../services/categoriaService';
-import { carteiraService } from '../services/carteiraService';
-import { contaService } from '../services/contaService';
+import contaFinanceiraService from '../services/contaFinanceiraService';
+import cartaoService from '../services/cartaoService';
 import { useTheme } from '../theme';
 import { parseDateBR, isValidDateBR, parseCurrencyBR, maskCurrencyInput, maskDateInput } from '../utils/format';
 import { TransacaoRequest, TipoTransacao } from '../types';
@@ -38,7 +38,7 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
   const [formaPagamento, setFormaPagamento] = useState<'CARTEIRA' | 'CARTAO'>('CARTEIRA');
   const [categoriaId, setCategoriaId] = useState<number | null>(null);
   const [carteiraId, setCarteiraId] = useState<number | null>(null);
-  const [contaId, setContaId] = useState<number | null>(null);
+  const [cartaoId, setCartaoId] = useState<number | null>(null);
   const [parcelado, setParcelado] = useState(false);
   const [totalParcelas, setTotalParcelas] = useState('');
   const [observacoes, setObservacoes] = useState('');
@@ -53,16 +53,16 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
   });
 
   const { data: carteirasPage } = useQuery({
-    queryKey: ['carteiras'],
-    queryFn: () => carteiraService.listar(),
+    queryKey: ['contas-financeiras-caixa'],
+    queryFn: () => contaFinanceiraService.listarParaCaixa(),
   });
-  const carteiras = carteirasPage?.content ?? [];
+  const carteiras = carteirasPage ?? [];
 
   const { data: contasPage } = useQuery({
-    queryKey: ['contas'],
-    queryFn: () => contaService.listar(),
+    queryKey: ['cartoes'],
+    queryFn: () => cartaoService.listar(),
   });
-  const cartoes = (contasPage?.content ?? []).filter(c => c.tipo === 'CREDITO');
+  const cartoes = contasPage?.content ?? [];
 
   // Sem carteira a transação não movimenta saldo — pré-seleciona a primeira
   useEffect(() => {
@@ -70,8 +70,8 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
   }, [carteiras, carteiraId]);
 
   useEffect(() => {
-    if (contaId == null && cartoes.length > 0) setContaId(cartoes[0].id);
-  }, [cartoes, contaId]);
+    if (cartaoId == null && cartoes.length > 0) setCartaoId(cartoes[0].id);
+  }, [cartoes, cartaoId]);
 
   useEffect(() => {
     if (tipo === 'ENTRADA') {
@@ -82,7 +82,7 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
   }, [tipo]);
 
   const resetForm = () => {
-    setDescricao(''); setValor(''); setData(''); setTipo(initialTipo); setFormaPagamento('CARTEIRA'); setCategoriaId(null); setContaId(null); setParcelado(false); setTotalParcelas(''); setObservacoes('');
+    setDescricao(''); setValor(''); setData(''); setTipo(initialTipo); setFormaPagamento('CARTEIRA'); setCategoriaId(null); setCartaoId(null); setParcelado(false); setTotalParcelas(''); setObservacoes('');
     setDescricaoError(null); setValorError(null); setDataError(null); setCategoriaError(null); setPagamentoError(null); setErroForm(null);
   };
 
@@ -94,7 +94,7 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
     if (!valor || isNaN(valorNum) || valorNum <= 0) { setValorError('Valor deve ser positivo.'); hasError = true; }
     if (!isValidDateBR(data)) { setDataError('Data inválida. Use o formato DD/MM/AAAA.'); hasError = true; }
     if (!categoriaId) { setCategoriaError('Selecione uma categoria.'); hasError = true; }
-    if (tipo === 'SAIDA' && formaPagamento === 'CARTAO' && !contaId) { setPagamentoError('Selecione um cartão.'); hasError = true; }
+    if (tipo === 'SAIDA' && formaPagamento === 'CARTAO' && !cartaoId) { setPagamentoError('Selecione um cartão.'); hasError = true; }
     if (tipo === 'SAIDA' && formaPagamento === 'CARTEIRA' && !carteiraId) { setPagamentoError('Selecione uma conta.'); hasError = true; }
     const parcelasNum = parseInt(totalParcelas, 10);
     if (formaPagamento === 'CARTAO' && parcelado && (isNaN(parcelasNum) || parcelasNum < 2 || parcelasNum > 48)) {
@@ -114,7 +114,7 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
         observacoes: observacoes.trim() || undefined,
       };
       if (tipo === 'SAIDA' && formaPagamento === 'CARTAO') {
-        request.contaId = contaId ?? undefined;
+        request.cartaoId = cartaoId ?? undefined;
         request.parcelado = parcelado;
         request.totalParcelas = parcelado ? parcelasNum : undefined;
       } else {
@@ -205,7 +205,7 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
               <Text style={{ color: colors.textSecondary, fontSize: 10, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Cartão</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
                 {cartoes.map(c => (
-                  <Chip key={c.id} label={c.nome} selected={contaId === c.id} onPress={() => setContaId(c.id)} />
+                  <Chip key={c.id} label={c.nome} selected={cartaoId === c.id} onPress={() => setCartaoId(c.id)} />
                 ))}
               </View>
               {cartoes.length === 0 && <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 8 }}>Cadastre um cartão em Faturas.</Text>}

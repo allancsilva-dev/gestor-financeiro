@@ -1,12 +1,13 @@
 import React from 'react';
-import { RefreshControl, ScrollView, View, Text, TouchableOpacity } from 'react-native';
+import { ActivityIndicator, Modal, RefreshControl, ScrollView, View, Text, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import api from '../../src/services/api';
 import insightsService from '../../src/services/insightsService';
-import { DashboardResumo, Transacao, PagedResponse, ProjecaoResponse, InsightsResponse, FalhaRecorrencia } from '../../src/types';
+import metricasService from '../../src/services/metricasService';
+import { DashboardResumo, Transacao, PagedResponse, ProjecaoResponse, InsightsResponse, FalhaRecorrencia, MetricaId } from '../../src/types';
 import { useTheme } from '../../src/theme';
 import { useAuth } from '../../src/context/AuthContext';
 import SkeletonBox from '../../src/components/ui/SkeletonBox';
@@ -25,6 +26,13 @@ export default function Dashboard() {
   const resumoQuery = useQuery<DashboardResumo>({
     queryKey: ['dashboard-resumo'],
     queryFn: () => api.get<DashboardResumo>('/v1/dashboard/resumo').then(r => r.data),
+  });
+  const [metricaSelecionada, setMetricaSelecionada] = React.useState<MetricaId | null>(null);
+  const metricasQuery = useQuery({ queryKey: ['metricas'], queryFn: () => metricasService.obter() });
+  const origensQuery = useQuery({
+    queryKey: ['metricas-origens', metricaSelecionada],
+    queryFn: () => metricasService.listarOrigens(metricaSelecionada!),
+    enabled: metricaSelecionada != null,
   });
 
   const transacoesQuery = useQuery<PagedResponse<Transacao>>({
@@ -52,14 +60,15 @@ export default function Dashboard() {
 
   const primeiroNome = usuario?.nome?.split(' ')[0] ?? '';
   const mesAtual = capitalize(new Date().toLocaleDateString('pt-BR', { month: 'long' }));
-  const saldo = formatCurrency(Number(resumoQuery.data?.saldoCarteiras ?? 0));
+  const saldo = formatCurrency(Number(metricasQuery.data?.disponivelParaGastar ?? 0));
   const [saldoInt, saldoCents] = saldo.split(',');
-  const refreshing = resumoQuery.isRefetching || transacoesQuery.isRefetching
+  const refreshing = resumoQuery.isRefetching || metricasQuery.isRefetching || transacoesQuery.isRefetching
     || projecaoQuery.isRefetching || insightsQuery.isRefetching || falhasQuery.isRefetching;
 
   const handleRefresh = async () => {
     await Promise.all([
       resumoQuery.refetch(),
+      metricasQuery.refetch(),
       transacoesQuery.refetch(),
       projecaoQuery.refetch(),
       insightsQuery.refetch(),
@@ -153,13 +162,13 @@ export default function Dashboard() {
             borderRadius: 88, backgroundColor: 'rgba(255,255,255,0.05)',
           }}
         />
-        {resumoQuery.isLoading ? (
+        {metricasQuery.isLoading ? (
           <View style={{ gap: 12 }} accessibilityLabel="Carregando saldo total">
             <SkeletonBox width={88} height={16} borderRadius={8} tone="inverse" />
             <SkeletonBox width="72%" height={43} borderRadius={10} tone="inverse" />
             <SkeletonBox width="88%" height={28} borderRadius={14} tone="inverse" />
           </View>
-        ) : resumoQuery.isError ? (
+        ) : metricasQuery.isError ? (
           <View style={{ minHeight: 114, justifyContent: 'center', alignItems: 'flex-start' }}>
             <Text style={{ color: '#ffffff', fontSize: 15, fontWeight: '700' }}>Saldo indisponível</Text>
             <Text style={{ color: '#ffffff', fontSize: 13, marginTop: 4 }}>Não foi possível atualizar seus valores.</Text>
@@ -167,16 +176,16 @@ export default function Dashboard() {
               accessibilityRole="button"
               accessibilityLabel="Tentar carregar saldo novamente"
               activeOpacity={0.78}
-              onPress={() => resumoQuery.refetch()}
+              onPress={() => metricasQuery.refetch()}
               style={{ marginTop: 12, minHeight: 44, paddingHorizontal: 14, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.18)', justifyContent: 'center' }}
             >
               <Text style={{ color: '#ffffff', fontWeight: '700' }}>Tentar novamente</Text>
             </TouchableOpacity>
           </View>
-        ) : resumoQuery.data ? (
+        ) : metricasQuery.data ? (
           <>
             <Text style={{ color: '#ffffff', fontSize: 14, fontWeight: '600' }}>
-              Saldo total
+              Disponível para gastar
             </Text>
             <Text
               numberOfLines={1}
@@ -192,14 +201,14 @@ export default function Dashboard() {
               )}
             </Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginTop: 12, gap: 8 }}>
-              <View accessibilityLabel={`Entradas no mês: ${formatCurrency(Number(resumoQuery.data.totalEntradas ?? 0))}`} style={{ backgroundColor: 'rgba(255,255,255,0.94)', borderRadius: 999, paddingHorizontal: 11, paddingVertical: 6 }}>
+              <View accessibilityLabel={`Resultado mensal: ${formatCurrency(Number(metricasQuery.data.resultadoMensal ?? 0))}`} style={{ backgroundColor: 'rgba(255,255,255,0.94)', borderRadius: 999, paddingHorizontal: 11, paddingVertical: 6 }}>
                 <Text style={{ color: colors.successOnLight, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
-                  ↑ {formatCurrency(Number(resumoQuery.data.totalEntradas ?? 0))}
+                  Mês {formatCurrency(Number(metricasQuery.data.resultadoMensal ?? 0))}
                 </Text>
               </View>
-              <View accessibilityLabel={`Saídas no mês: ${formatCurrency(Number(resumoQuery.data.totalSaidas ?? 0))}`} style={{ backgroundColor: 'rgba(255,255,255,0.94)', borderRadius: 999, paddingHorizontal: 11, paddingVertical: 6 }}>
+              <View accessibilityLabel={`Dívidas: ${formatCurrency(Number(metricasQuery.data.dividas ?? 0))}`} style={{ backgroundColor: 'rgba(255,255,255,0.94)', borderRadius: 999, paddingHorizontal: 11, paddingVertical: 6 }}>
                 <Text style={{ color: colors.dangerOnLight, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
-                  ↓ {formatCurrency(Number(resumoQuery.data.totalSaidas ?? 0))}
+                  Dívidas {formatCurrency(Number(metricasQuery.data.dividas ?? 0))}
                 </Text>
               </View>
               <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '600' }}>
@@ -211,6 +220,53 @@ export default function Dashboard() {
       </LinearGradient>
       </View>
       </Entrance>
+
+      {metricasQuery.data && (
+        <View style={{ marginBottom: 16 }}>
+          <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700', marginBottom: 10 }}>Visão financeira</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {([
+              ['DISPONIVEL_AGORA', 'Disponível agora', metricasQuery.data.disponivelAgora],
+              ['RESERVADO', 'Reservado', metricasQuery.data.reservado],
+              ['COMPROMETIDO', 'Comprometido', metricasQuery.data.comprometido],
+              ['INVESTIDO', 'Investido', metricasQuery.data.investido],
+              ['DIVIDAS', 'Dívidas', metricasQuery.data.dividas],
+              ['RESULTADO_MENSAL', 'Resultado mensal', metricasQuery.data.resultadoMensal],
+              ['PATRIMONIO_LIQUIDO', 'Patrimônio líquido', metricasQuery.data.patrimonioLiquido],
+              ['VARIACAO_PATRIMONIAL', 'Variação patrimonial', metricasQuery.data.variacaoPatrimonial.total],
+            ] as Array<[MetricaId, string, number]>).map(([id, label, valor]) => (
+              <TouchableOpacity
+                key={id}
+                onPress={() => setMetricaSelecionada(id)}
+                accessibilityRole="button"
+                accessibilityLabel={`${label}: ${formatCurrency(Number(valor))}. Ver composição`}
+                style={{ width: '48%', minHeight: 72, backgroundColor: colors.card, borderRadius: 12, padding: 12, justifyContent: 'space-between' }}
+              >
+                <Text style={{ color: colors.textSecondary, fontSize: 11 }}>{label}</Text>
+                <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: Number(valor) < 0 ? colors.danger : colors.textPrimary, fontSize: 15, fontWeight: '800', fontVariant: ['tabular-nums'] }}>{formatCurrency(Number(valor))}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
+
+      <Modal visible={metricaSelecionada != null} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setMetricaSelecionada(null)}>
+        <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: 18 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+            <Text style={{ color: colors.textPrimary, fontSize: 17, fontWeight: '700' }}>Composição da métrica</Text>
+            <TouchableOpacity onPress={() => setMetricaSelecionada(null)} accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: colors.brandFg, fontWeight: '700' }}>Fechar</Text></TouchableOpacity>
+          </View>
+          {origensQuery.isLoading ? <ActivityIndicator color={colors.brand} style={{ marginTop: 48 }} /> : origensQuery.isError ? (
+            <TouchableOpacity onPress={() => origensQuery.refetch()} style={{ alignItems: 'center', padding: 48 }}><Text style={{ color: colors.brandFg, fontWeight: '700' }}>Tentar novamente</Text></TouchableOpacity>
+          ) : (origensQuery.data?.length ?? 0) === 0 ? (
+            <Text style={{ color: colors.textSecondary, textAlign: 'center', padding: 48 }}>Nenhuma origem compõe esta métrica.</Text>
+          ) : (
+            <ScrollView contentContainerStyle={{ padding: 16 }}>
+              {origensQuery.data?.map(origem => <ListRow key={`${origem.tipo}-${origem.id}`} title={origem.descricao} subtitle={origem.tipo} value={formatCurrency(Number(origem.valor))} />)}
+            </ScrollView>
+          )}
+        </View>
+      </Modal>
 
       {/* Faixa KPI: Receitas · Despesas · Disponível */}
       {resumoQuery.data && (

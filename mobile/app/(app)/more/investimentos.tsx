@@ -3,7 +3,8 @@ import { View, Text, FlatList, TouchableOpacity, Modal, ScrollView, ActivityIndi
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import investimentoService from '../../../src/services/investimentoService';
-import { Ativo, AtivoRequest, TipoAtivo, TipoMovimentacaoAtivo } from '../../../src/types';
+import contaFinanceiraService from '../../../src/services/contaFinanceiraService';
+import { Ativo, AtivoRequest, LiquidezContaFinanceira, TipoAtivo, TipoMovimentacaoAtivo } from '../../../src/types';
 import { useTheme } from '../../../src/theme';
 import BackButton from '../../../src/components/ui/BackButton';
 import { formatCurrency, formatDate, isValidDateBR, maskCurrencyInput, maskDateInput, parseCurrencyBR, parseDateBR } from '../../../src/utils/format';
@@ -36,6 +37,8 @@ function AtivoModal({ ativo, visible, onClose }: { ativo: Ativo | null; visible:
   const [nome, setNome] = useState('');
   const [tipo, setTipo] = useState<TipoAtivo>('ACAO');
   const [valorAtual, setValorAtual] = useState('');
+  const [liquidez, setLiquidez] = useState<LiquidezContaFinanceira>('IMEDIATA');
+  const [custodiaId, setCustodiaId] = useState<number | undefined>();
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
 
@@ -45,6 +48,8 @@ function AtivoModal({ ativo, visible, onClose }: { ativo: Ativo | null; visible:
     setNome(ativo?.nome ?? '');
     setTipo(ativo?.tipo ?? 'ACAO');
     setValorAtual(maskCurrencyInput(Number(ativo?.valorAtual ?? 0).toFixed(2)));
+    setLiquidez(ativo?.liquidez ?? 'IMEDIATA');
+    setCustodiaId(ativo?.custodiaId ?? undefined);
     setErro(null);
   }, [ativo, visible]);
 
@@ -56,7 +61,7 @@ function AtivoModal({ ativo, visible, onClose }: { ativo: Ativo | null; visible:
     }
     setSalvando(true);
     setErro(null);
-    const req: AtivoRequest = { ticker: ticker.trim().toUpperCase(), nome: nome.trim(), tipo, valorAtual: valor };
+    const req: AtivoRequest = { ticker: ticker.trim().toUpperCase(), nome: nome.trim(), tipo, valorAtual: valor, liquidez, custodiaId };
     try {
       if (ativo) await investimentoService.atualizar(ativo.id, req);
       else await investimentoService.criar(req);
@@ -89,6 +94,10 @@ function AtivoModal({ ativo, visible, onClose }: { ativo: Ativo | null; visible:
             ))}
           </View>
           <Field label="Preço atual" value={valorAtual} onChangeText={(v) => setValorAtual(maskCurrencyInput(v))} keyboardType="number-pad" placeholder="0,00" />
+          <Text style={{ color: colors.textSecondary, fontSize: 10, marginBottom: 6 }}>Liquidez</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+            {(['IMEDIATA','D1','D2','CARENCIA','BLOQUEADA'] as LiquidezContaFinanceira[]).map(l => <Chip key={l} label={l} selected={liquidez === l} onPress={() => setLiquidez(l)} />)}
+          </View>
           {erro && <Text style={{ color: colors.danger, fontSize: 12 }}>{erro}</Text>}
         </ScrollView>
       </View>
@@ -103,8 +112,11 @@ function MovimentoModal({ ativo, visible, onClose }: { ativo: Ativo | null; visi
   const [data, setData] = useState(hojeBR());
   const [quantidade, setQuantidade] = useState('');
   const [precoUnitario, setPrecoUnitario] = useState('');
+  const [externa, setExterna] = useState(false);
+  const [carteiraId, setCarteiraId] = useState<number | undefined>();
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const { data: contasCaixa = [] } = useQuery({ queryKey: ['contas-financeiras-caixa'], queryFn: () => contaFinanceiraService.listarParaCaixa() });
 
   useEffect(() => {
     if (!visible) return;
@@ -112,6 +124,8 @@ function MovimentoModal({ ativo, visible, onClose }: { ativo: Ativo | null; visi
     setData(hojeBR());
     setQuantidade('');
     setPrecoUnitario('');
+    setExterna(false);
+    setCarteiraId(undefined);
     setErro(null);
   }, [visible]);
 
@@ -123,6 +137,10 @@ function MovimentoModal({ ativo, visible, onClose }: { ativo: Ativo | null; visi
       setErro('Informe data, quantidade e preço válidos.');
       return;
     }
+    if (!externa && tipo !== 'BONIFICACAO' && !carteiraId) {
+      setErro('Escolha a conta de caixa ou marque como operação externa.');
+      return;
+    }
     setSalvando(true);
     setErro(null);
     try {
@@ -131,6 +149,8 @@ function MovimentoModal({ ativo, visible, onClose }: { ativo: Ativo | null; visi
         data: parseDateBR(data),
         quantidade: qtd,
         precoUnitario: preco,
+        carteiraId: externa ? undefined : carteiraId,
+        externa,
       });
       queryClient.invalidateQueries({ queryKey: ['investimentos'] });
       queryClient.invalidateQueries({ queryKey: ['investimento-movimentacoes', ativo.id] });
@@ -162,6 +182,14 @@ function MovimentoModal({ ativo, visible, onClose }: { ativo: Ativo | null; visi
           <Field label="Data" value={data} onChangeText={(v) => setData(maskDateInput(v))} keyboardType="number-pad" placeholder="DD/MM/AAAA" />
           <Field label="Quantidade" value={quantidade} onChangeText={(v) => setQuantidade(v.replace(/[^0-9,.]/g, ''))} keyboardType="decimal-pad" placeholder="0" />
           <Field label="Preço unitário" value={precoUnitario} onChangeText={(v) => setPrecoUnitario(maskCurrencyInput(v))} keyboardType="number-pad" placeholder="0,00" />
+          <Text style={{ color: colors.textSecondary, fontSize: 10, marginBottom: 6 }}>Origem da operação</Text>
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
+            <Chip label="Conta real" selected={!externa} onPress={() => setExterna(false)} />
+            <Chip label="Snapshot externo" selected={externa} onPress={() => { setExterna(true); setCarteiraId(undefined); }} />
+          </View>
+          {!externa && tipo !== 'BONIFICACAO' && <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+            {contasCaixa.map(c => <Chip key={c.id} label={c.nome} selected={carteiraId === c.id} onPress={() => setCarteiraId(c.id)} />)}
+          </View>}
           {erro && <Text style={{ color: colors.danger, fontSize: 12 }}>{erro}</Text>}
         </ScrollView>
       </View>
@@ -256,9 +284,10 @@ function DetalheAtivoModal({ ativo, onClose, onEdit }: { ativo: Ativo | null; on
               {data.map(m => (
                 <View key={m.id} style={{ backgroundColor: colors.card, borderRadius: 12, borderWidth: 1, borderColor: colors.border, padding: 12 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 10 }}>
-                    <Text style={{ color: colors.textPrimary, fontSize: 13, fontWeight: '700' }}>{TIPO_MOV_LABEL[m.tipo]}</Text>
+                    <Text style={{ color: colors.textPrimary, fontSize: 13, fontWeight: '700' }}>{TIPO_MOV_LABEL[m.tipo]} · {m.conciliacao}</Text>
                     <Text style={{ color: colors.textPrimary, fontSize: 13, fontWeight: '700' }}>{formatCurrency(Number(m.valorTotal ?? 0))}</Text>
                   </View>
+                  {m.operacaoId != null && <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 4 }}>Operação #{m.operacaoId}</Text>}
                   <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 3 }}>
                     {formatDate(m.data + 'T00:00:00')} · {Number(m.quantidade ?? 0)} x {formatCurrency(Number(m.precoUnitario ?? 0))}
                   </Text>

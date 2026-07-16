@@ -5,6 +5,7 @@ export interface Transacao {
   id?: number;
   usuario?: { id: number };
   conta?: { id: number };
+  cartaoId?: number;
   categoria?: { id: number };
   descricao: string;
   valorTotal: number;

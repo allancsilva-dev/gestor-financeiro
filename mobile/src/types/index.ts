@@ -5,6 +5,10 @@ export type TipoConta = 'CREDITO' | 'DEBITO' | 'DINHEIRO' | 'POUPANCA';
 export type StatusPagamento = 'PAGO' | 'PENDENTE' | 'ATRASADO' | 'CANCELADO';
 export type BadgeStatus = 'ativo' | 'pendente' | 'inativo' | 'cancelado';
 export type AsyncStatus = 'idle' | 'loading' | 'success' | 'error';
+export type NaturezaContaFinanceira = 'ATIVO' | 'PASSIVO';
+export type SubtipoContaFinanceira = 'DINHEIRO' | 'CORRENTE' | 'POUPANCA' | 'PAGAMENTO' | 'COFRE' | 'CUSTODIA' | 'CARTAO';
+export type LiquidezContaFinanceira = 'IMEDIATA' | 'D1' | 'D2' | 'CARENCIA' | 'BLOQUEADA';
+export type EstadoConciliacaoConta = 'CONCILIADA' | 'PENDENTE';
 
 // ── Genéricos ───────────────────────────────────────────────────────
 export interface PagedResponse<T> {
@@ -56,6 +60,26 @@ export interface DashboardResumo {
   totalContasFixas: number;
 }
 
+export type MetricaId =
+  | 'DISPONIVEL_AGORA' | 'RESERVADO' | 'COMPROMETIDO' | 'DISPONIVEL_PARA_GASTAR'
+  | 'INVESTIDO' | 'DIVIDAS' | 'RESULTADO_MENSAL' | 'PATRIMONIO_LIQUIDO' | 'VARIACAO_PATRIMONIAL';
+
+export interface MetricasFinanceiras {
+  dataReferencia: string;
+  horizonteComprometido: string;
+  disponivelAgora: number;
+  reservado: number;
+  comprometido: number;
+  disponivelParaGastar: number;
+  investido: number;
+  dividas: number;
+  resultadoMensal: number;
+  patrimonioLiquido: number;
+  variacaoPatrimonial: { total: number; caixa: number; passivo: number; aportesInvestimento: number; rendimentosInvestimento: number; precoMercado: number | null };
+}
+
+export interface OrigemMetrica { tipo: string; id: number; descricao: string; valor: number; }
+
 export interface GastoPorCategoria {
   categoria: string;
   valor: number;
@@ -106,7 +130,7 @@ export interface TransacaoRequest {
   data: string; // formato YYYY-MM-DD obrigatório
   tipo: TipoTransacao;
   categoriaId: number; // obrigatório pelo backend
-  contaId?: number;
+  cartaoId?: number;
   carteiraId?: number; // sem carteira a transação não movimenta saldo
   parcelado?: boolean;
   totalParcelas?: number;
@@ -141,6 +165,31 @@ export interface Carteira {
   banco?: string;
 }
 
+export interface ContaFinanceira {
+  id: number;
+  nome: string;
+  natureza: NaturezaContaFinanceira;
+  subtipo: SubtipoContaFinanceira;
+  liquidez: LiquidezContaFinanceira;
+  moeda: string;
+  banco?: string;
+  saldo: number;
+  origemDados: 'MANUAL' | 'CSV' | 'OFX' | 'INTEGRACAO' | 'AJUSTE';
+  estadoConciliacao: EstadoConciliacaoConta;
+}
+
+export interface ContaFinanceiraRequest {
+  nome: string;
+  natureza: 'ATIVO';
+  subtipo: 'DINHEIRO' | 'CORRENTE' | 'POUPANCA' | 'PAGAMENTO';
+  liquidez: LiquidezContaFinanceira;
+  moeda: string;
+  banco?: string;
+  saldoInicial: number;
+}
+
+export interface AjusteContaFinanceiraRequest { tipo: 'ENTRADA' | 'SAIDA'; valor: number; descricao?: string; }
+
 export type TipoMovimentoCarteira =
   | 'ENTRADA'
   | 'SAIDA'
@@ -151,7 +200,7 @@ export type TipoMovimentoCarteira =
   | 'RESGATE_META'
   | 'ESTORNO';
 
-// Item do extrato (ledger) da carteira — GET /v1/carteiras/{id}/movimentos
+// Item do extrato canônico — GET /v1/contas-financeiras/{id}/movimentos
 export interface MovimentoCarteira {
   id: number;
   carteiraId: number;
@@ -202,6 +251,29 @@ export interface ContaRequest {
   limiteTotal?: number;
   diaFechamento?: number;
   diaVencimento?: number;
+  cor?: string;
+  banco?: string;
+}
+
+export interface Cartao {
+  id: number;
+  contaFinanceiraId: number;
+  nome: string;
+  limiteTotal: number;
+  saldoDevedor: number;
+  limiteDisponivel: number;
+  diaFechamento: number;
+  diaVencimento: number;
+  ativo: boolean;
+  cor?: string;
+  banco?: string;
+}
+
+export interface CartaoRequest {
+  nome: string;
+  limiteTotal: number;
+  diaFechamento: number;
+  diaVencimento: number;
   cor?: string;
   banco?: string;
 }
@@ -321,6 +393,7 @@ export interface FaturaLancamento {
 export interface FaturaResponse {
   id: number;
   contaId: number;
+  cartaoId: number;
   contaNome: string;
   mes: number;
   ano: number;
@@ -474,10 +547,14 @@ export interface Ativo {
   tipo: TipoAtivo;
   quantidade: number;
   custoTotal: number;
-  valorAtual: number;
+  valorAtual: number | null;
   precoMedio: number;
   lucroPrejuizo: number;
   rentabilidade: number;
+  valorMercado: number | null;
+  cotacaoEm: string | null;
+  liquidez: LiquidezContaFinanceira;
+  custodiaId: number | null;
 }
 
 export interface AtivoRequest {
@@ -485,6 +562,8 @@ export interface AtivoRequest {
   nome: string;
   tipo: TipoAtivo;
   valorAtual: number;
+  liquidez: LiquidezContaFinanceira;
+  custodiaId?: number;
 }
 
 export interface MovimentacaoAtivo {
@@ -494,6 +573,8 @@ export interface MovimentacaoAtivo {
   quantidade: number;
   precoUnitario: number;
   valorTotal: number;
+  conciliacao: 'CONCILIADA' | 'EXTERNO';
+  operacaoId: number | null;
 }
 
 export interface MovimentacaoAtivoRequest {
@@ -501,4 +582,6 @@ export interface MovimentacaoAtivoRequest {
   data: string;
   quantidade: number;
   precoUnitario: number;
+  carteiraId?: number;
+  externa: boolean;
 }

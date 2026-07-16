@@ -17,6 +17,7 @@ export interface FaturaLancamento {
 export interface FaturaResponse {
   id: number;
   contaId: number;
+  cartaoId: number;
   contaNome: string;
   mes: number;
   ano: number;
@@ -30,13 +31,13 @@ export interface FaturaResponse {
 }
 
 const faturaService = {
-  buscarAtual: async (contaId: number): Promise<FaturaResponse> => {
-    const response = await api.get<FaturaResponse>(`/faturas/conta/${contaId}/atual`);
+  buscarAtual: async (cartaoId: number): Promise<FaturaResponse> => {
+    const response = await api.get<FaturaResponse>(`/faturas/cartao/${cartaoId}/atual`);
     return response.data;
   },
 
-  buscarPorMes: async (contaId: number, mes: number, ano: number): Promise<FaturaResponse> => {
-    const response = await api.get<FaturaResponse>(`/faturas/conta/${contaId}`, { params: { mes, ano } });
+  buscarPorMes: async (cartaoId: number, mes: number, ano: number): Promise<FaturaResponse> => {
+    const response = await api.get<FaturaResponse>(`/faturas/cartao/${cartaoId}`, { params: { mes, ano } });
     return response.data;
   },
 

@@ -135,9 +135,8 @@ export default function Onboarding() {
           saldo: carteiraParsed.saldo ?? 0,
           banco: carteiraParsed.banco || undefined,
         },
-        conta: {
+        cartao: {
           nome: contaParsed.nome,
-          tipo: contaParsed.tipo,
           limiteTotal: contaParsed.tipo === 'CREDITO' ? contaParsed.limiteTotal : undefined,
         },
         categorias: categoriasSelecionadas.map((nome) => {

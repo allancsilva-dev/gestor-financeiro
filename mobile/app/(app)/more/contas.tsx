@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, FlatList, Modal, ScrollView, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { contaService } from '../../../src/services/contaService';
-import { TIPO_CONTA_LABEL, formatCurrency, parseCurrencyBR, maskCurrencyInput } from '../../../src/utils/format';
+import cartaoService from '../../../src/services/cartaoService';
+import { formatCurrency, parseCurrencyBR, maskCurrencyInput } from '../../../src/utils/format';
 import { isValidDayOfMonth } from '../../../src/utils/validate';
-import { Conta, ContaRequest, TipoConta } from '../../../src/types';
+import { CartaoRequest } from '../../../src/types';
 import { useTheme } from '../../../src/theme';
 import BackButton from '../../../src/components/ui/BackButton';
 import SkeletonBox from '../../../src/components/ui/SkeletonBox';
@@ -16,27 +16,25 @@ export default function ContasScreen() {
   const queryClient = useQueryClient();
   const [modalVisible, setModalVisible] = useState(false);
   const [nome, setNome] = useState('');
-  const [tipo, setTipo] = useState<TipoConta>('DEBITO');
   const [limite, setLimite] = useState('');
   const [banco, setBanco] = useState('');
   const [diaFechamento, setDiaFechamento] = useState('');
   const [diaVencimento, setDiaVencimento] = useState('');
   const [nomeError, setNomeError] = useState<string | null>(null);
-  const [tipoError, setTipoError] = useState<string | null>(null);
   const [limiteError, setLimiteError] = useState<string | null>(null);
   const [diaError, setDiaError] = useState<string | null>(null);
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['contas'],
-    queryFn: () => contaService.listar(),
+    queryKey: ['cartoes'],
+    queryFn: () => cartaoService.listar(),
   });
 
   const criarMutation = useMutation({
-    mutationFn: (req: ContaRequest) => contaService.criar(req),
+    mutationFn: (req: CartaoRequest) => cartaoService.criar(req),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contas'] });
+      queryClient.invalidateQueries({ queryKey: ['cartoes'] });
       setModalVisible(false);
-      setNome(''); setLimite(''); setBanco(''); setDiaFechamento(''); setDiaVencimento(''); setTipo('DEBITO'); setNomeError(null); setTipoError(null); setLimiteError(null); setDiaError(null);
+      setNome(''); setLimite(''); setBanco(''); setDiaFechamento(''); setDiaVencimento(''); setNomeError(null); setLimiteError(null); setDiaError(null);
     },
     onError: (err: any) => {
       setNomeError(err?.userMessage ?? 'Erro ao criar cartão.');
@@ -48,7 +46,7 @@ export default function ContasScreen() {
       <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 12 }}>
         <BackButton />
         <Text style={{ color: colors.textPrimary, fontSize: 23, fontWeight: '800', letterSpacing: -0.4 }}>Cartões</Text>
-        <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>Crédito, débito e pagamento</Text>
+        <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>Limites, dívida e fechamento</Text>
       </View>
 
       {isLoading ? (
@@ -69,16 +67,12 @@ export default function ContasScreen() {
           renderItem={({ item: conta }) => (
             <View style={{ backgroundColor: colors.card, borderRadius: 12, borderWidth: 1, borderColor: colors.border, padding: 14, marginBottom: 8, marginHorizontal: 16 }}>
               <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600' }}>{conta.nome}</Text>
-              <View style={{ marginTop: 6 }}>
-                <View style={{ paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, backgroundColor: colors.card }}>
-                  <Text style={{ color: colors.textSecondary }}>{TIPO_CONTA_LABEL[conta.tipo]}</Text>
-                </View>
-              </View>
-              {conta.tipo === 'CREDITO' && (
-                <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 8 }}>
-                  {conta.banco ? `${conta.banco} · ` : ''}Limite: {formatCurrency(Number(conta.limiteTotal ?? 0))}
-                </Text>
-              )}
+              <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 8 }}>
+                {conta.banco ? `${conta.banco} · ` : ''}Disponível: {formatCurrency(Number(conta.limiteDisponivel ?? 0))}
+              </Text>
+              <Text style={{ color: Number(conta.saldoDevedor ?? 0) < 0 ? colors.success : colors.danger, fontSize: 12, marginTop: 4 }}>
+                {Number(conta.saldoDevedor ?? 0) < 0 ? 'Crédito' : 'Dívida'}: {formatCurrency(Math.abs(Number(conta.saldoDevedor ?? 0)))}
+              </Text>
             </View>
           )}
           ListEmptyComponent={() => (
@@ -99,33 +93,29 @@ export default function ContasScreen() {
       <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet">
         <View style={{ flex: 1, backgroundColor: colors.bg }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-            <TouchableOpacity onPress={() => { setModalVisible(false); setNome(''); setLimite(''); setBanco(''); setDiaFechamento(''); setDiaVencimento(''); setTipo('DEBITO'); setNomeError(null); setTipoError(null); setLimiteError(null); setDiaError(null); }}>
+            <TouchableOpacity onPress={() => { setModalVisible(false); setNome(''); setLimite(''); setBanco(''); setDiaFechamento(''); setDiaVencimento(''); setNomeError(null); setLimiteError(null); setDiaError(null); }}>
               <Text style={{ color: colors.brand, fontSize: 15 }}>Cancelar</Text>
             </TouchableOpacity>
             <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600' }}>Novo Cartão</Text>
             <TouchableOpacity disabled={criarMutation.status === 'pending'} onPress={() => {
-              setNomeError(null); setTipoError(null); setLimiteError(null); setDiaError(null);
+              setNomeError(null); setLimiteError(null); setDiaError(null);
               let hasErr = false;
               if (!nome.trim()) { setNomeError('Nome obrigatório.'); hasErr = true; }
-              if (!tipo) { setTipoError('Tipo obrigatório.'); hasErr = true; }
-              if (tipo === 'CREDITO') {
-                const v = parseCurrencyBR(limite);
-                if (isNaN(v) || v <= 0) { setLimiteError('Limite total obrigatório e positivo.'); hasErr = true; }
-                if (!isValidDayOfMonth(diaFechamento) || !isValidDayOfMonth(diaVencimento)) {
-                  setDiaError('Fechamento e vencimento devem ser dias entre 1 e 31.');
-                  hasErr = true;
-                }
+              const v = parseCurrencyBR(limite);
+              if (isNaN(v) || v <= 0) { setLimiteError('Limite total obrigatório e positivo.'); hasErr = true; }
+              if (!isValidDayOfMonth(diaFechamento) || !isValidDayOfMonth(diaVencimento)) {
+                setDiaError('Fechamento e vencimento devem ser dias entre 1 e 31.');
+                hasErr = true;
               }
               if (hasErr) return;
               const fech = Number(diaFechamento);
               const venc = Number(diaVencimento);
               criarMutation.mutate({
                 nome: nome.trim(),
-                tipo,
-                limiteTotal: tipo === 'CREDITO' ? parseCurrencyBR(limite) : undefined,
-                banco: tipo === 'CREDITO' && banco.trim() ? banco.trim() : undefined,
-                diaFechamento: tipo === 'CREDITO' ? fech : undefined,
-                diaVencimento: tipo === 'CREDITO' ? venc : undefined,
+                limiteTotal: parseCurrencyBR(limite),
+                banco: banco.trim() || undefined,
+                diaFechamento: fech,
+                diaVencimento: venc,
               });
             }}>
               <Text style={{ color: criarMutation.status === 'pending' ? colors.textMuted : colors.brand, fontSize: 15, fontWeight: '600' }}>Salvar</Text>
@@ -136,18 +126,7 @@ export default function ContasScreen() {
             <TextInput accessibilityLabel="Nome da conta" value={nome} onChangeText={setNome} placeholderTextColor={colors.textMuted} style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, color: colors.textPrimary, fontSize: 15, marginBottom: 8 }} />
             {nomeError && <Text style={{ color: colors.danger, marginBottom: 8 }}>{nomeError}</Text>}
 
-            <Text style={{ color: colors.textSecondary, fontSize: 9, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Tipo</Text>
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
-              {(['CREDITO','DEBITO','DINHEIRO','POUPANCA'] as TipoConta[]).map(t => (
-                <TouchableOpacity key={t} onPress={() => setTipo(t)} style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: tipo === t ? colors.brand + '26' : colors.card, borderWidth: 1, borderColor: tipo === t ? colors.brand : colors.border }}>
-                  <Text style={{ color: tipo === t ? colors.brand : colors.textSecondary }}>{TIPO_CONTA_LABEL[t]}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {tipoError && <Text style={{ color: colors.danger, marginBottom: 8 }}>{tipoError}</Text>}
-
-            {tipo === 'CREDITO' && (
-              <>
+            <>
                 <Text style={{ color: colors.textSecondary, fontSize: 9, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Limite total</Text>
                 <TextInput accessibilityLabel="Limite total" value={limite} onChangeText={(t) => setLimite(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" placeholderTextColor={colors.textMuted} style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, color: colors.textPrimary, fontSize: 15, marginBottom: 8 }} />
                 {limiteError && <Text style={{ color: colors.danger, marginBottom: 8 }}>{limiteError}</Text>}
@@ -167,7 +146,6 @@ export default function ContasScreen() {
                 </View>
                 {diaError && <Text style={{ color: colors.danger, marginBottom: 8 }}>{diaError}</Text>}
               </>
-            )}
           </ScrollView>
         </View>
       </Modal>

@@ -111,6 +111,10 @@ public class CarteiraService {
         carteira.setNome(carteiraAtualizada.getNome());
         carteira.setTipo(carteiraAtualizada.getTipo());
         carteira.setBanco(carteiraAtualizada.getBanco());
+        if (carteiraAtualizada.getNatureza() != null) carteira.setNatureza(carteiraAtualizada.getNatureza());
+        if (carteiraAtualizada.getSubtipo() != null) carteira.setSubtipo(carteiraAtualizada.getSubtipo());
+        if (carteiraAtualizada.getLiquidez() != null) carteira.setLiquidez(carteiraAtualizada.getLiquidez());
+        if (carteiraAtualizada.getMoeda() != null) carteira.setMoeda(carteiraAtualizada.getMoeda());
 
         Carteira salva = carteiraRepository.save(carteira);
         if (novoSaldo != null) {

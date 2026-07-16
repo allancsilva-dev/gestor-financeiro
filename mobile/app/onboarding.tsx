@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../src/theme';
 import { onboardingService, OnboardingFinalizarRequest } from '../src/services/onboardingService';
-import { ApiErrorWithMessage, TipoCarteira, TipoConta } from '../src/types';
+import { ApiErrorWithMessage, TipoCarteira } from '../src/types';
 import { useAuth } from '../src/context/AuthContext';
 import { CATEGORY_COLORS, isValidDateBR, maskCurrencyInput, parseCurrencyBR, parseDateBR } from '../src/utils/format';
 import { isValidDayOfMonth } from '../src/utils/validate';
@@ -43,7 +43,7 @@ export default function OnboardingScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const [carteira, setCarteira] = useState({ nome: 'Conta Principal', tipo: 'CONTA_BANCARIA' as TipoCarteira, saldo: '' });
-  const [conta, setConta] = useState({ nome: 'Cartão Principal', tipo: 'CREDITO' as TipoConta, limiteTotal: '' });
+  const [conta, setConta] = useState({ nome: 'Cartão Principal', limiteTotal: '', diaFechamento: '5', diaVencimento: '12' });
   const [categoriasSelecionadas, setCategoriasSelecionadas] = useState<string[]>(CATEGORIAS_SUGERIDAS.map((c) => c.nome));
   const [renda, setRenda] = useState({ nome: 'Salário', valor: '', diaVencimento: '1' });
   const [pularRenda, setPularRenda] = useState(false);
@@ -59,7 +59,8 @@ export default function OnboardingScreen() {
     if (passo === 1) {
       if (conta.nome.trim().length < 2) return 'Informe o nome do cartão ou conta.';
       const limite = parseCurrencyBR(conta.limiteTotal || '0');
-      if (conta.tipo === 'CREDITO' && (!Number.isFinite(limite) || limite <= 0)) return 'Limite do cartão deve ser maior que zero.';
+      if (!Number.isFinite(limite) || limite <= 0) return 'Limite do cartão deve ser maior que zero.';
+      if (!isValidDayOfMonth(conta.diaFechamento) || !isValidDayOfMonth(conta.diaVencimento)) return 'Fechamento e vencimento devem estar entre 1 e 31.';
     }
     if (passo === 2 && categoriasSelecionadas.length === 0) {
       return 'Selecione ao menos uma categoria.';
@@ -103,10 +104,11 @@ export default function OnboardingScreen() {
         tipo: carteira.tipo,
         saldo: parseCurrencyBR(carteira.saldo || '0'),
       },
-      conta: {
+      cartao: {
         nome: conta.nome.trim(),
-        tipo: conta.tipo,
-        limiteTotal: conta.tipo === 'CREDITO' ? parseCurrencyBR(conta.limiteTotal || '0') : undefined,
+        limiteTotal: parseCurrencyBR(conta.limiteTotal || '0'),
+        diaFechamento: Number(conta.diaFechamento),
+        diaVencimento: Number(conta.diaVencimento),
       },
       categorias,
       renda: pularRenda ? undefined : {
@@ -202,26 +204,9 @@ export default function OnboardingScreen() {
             onChangeText={(t) => setConta((c) => ({ ...c, nome: t }))}
             placeholder="Ex: Cartão Nubank"
           />
-          <Text style={[styles.label, { color: colors.textSecondary }]}>TIPO</Text>
-          <View style={styles.chipRow}>
-            {(['CREDITO', 'DEBITO', 'DINHEIRO'] as TipoConta[]).map((t) => (
-              <Chip
-                key={t}
-                label={t === 'CREDITO' ? 'Crédito' : t === 'DEBITO' ? 'Débito' : 'Dinheiro'}
-                selected={conta.tipo === t}
-                onPress={() => setConta((c) => ({ ...c, tipo: t }))}
-              />
-            ))}
-          </View>
-          {conta.tipo === 'CREDITO' && (
-            <Field
-              label="Limite (R$)"
-              value={conta.limiteTotal}
-              onChangeText={(t) => setConta((c) => ({ ...c, limiteTotal: maskCurrencyInput(t) }))}
-              keyboardType="number-pad"
-              placeholder="0,00"
-            />
-          )}
+          <Field label="Limite (R$)" value={conta.limiteTotal} onChangeText={(t) => setConta((c) => ({ ...c, limiteTotal: maskCurrencyInput(t) }))} keyboardType="number-pad" placeholder="0,00" />
+          <Field label="Dia de fechamento" value={conta.diaFechamento} onChangeText={(t) => setConta((c) => ({ ...c, diaFechamento: t.replace(/\D/g, '').slice(0, 2) }))} keyboardType="number-pad" placeholder="5" />
+          <Field label="Dia de vencimento" value={conta.diaVencimento} onChangeText={(t) => setConta((c) => ({ ...c, diaVencimento: t.replace(/\D/g, '').slice(0, 2) }))} keyboardType="number-pad" placeholder="12" />
         </View>
       )}
 

@@ -1,5 +1,5 @@
 import api from './api';
-import { TipoCarteira, TipoConta, Usuario } from '../types';
+import { TipoCarteira, Usuario } from '../types';
 
 export interface OnboardingStatus {
   onboardingCompleto: boolean;
@@ -12,12 +12,11 @@ export interface OnboardingFinalizarRequest {
     saldo: number;
     banco?: string;
   };
-  conta: {
+  cartao: {
     nome: string;
-    tipo: TipoConta;
-    limiteTotal?: number;
-    diaFechamento?: number;
-    diaVencimento?: number;
+    limiteTotal: number;
+    diaFechamento: number;
+    diaVencimento: number;
     cor?: string;
     banco?: string;
   };

@@ -6,7 +6,7 @@ import api from './api';
 import contaFinanceiraService, { contaPodeMovimentarCaixa, type ContaFinanceira } from './contaFinanceiraService';
 
 const conta = (partial: Partial<ContaFinanceira> = {}): ContaFinanceira => ({
-  id: 1, nome: 'Conta', tipo: 'CONTA_BANCARIA', saldo: 100,
+  id: 1, nome: 'Conta', saldo: 100,
   natureza: 'ATIVO', subtipo: 'CORRENTE', liquidez: 'IMEDIATA',
   origemDados: 'MANUAL', estadoConciliacao: 'CONCILIADA', moeda: 'BRL', ...partial,
 });
@@ -33,7 +33,7 @@ describe('contaFinanceiraService', () => {
 
   it.each([
     [conta(), true],
-    [conta({ natureza: 'PASSIVO', subtipo: 'CARTAO', tipo: 'CARTAO' }), false],
+    [conta({ natureza: 'PASSIVO', subtipo: 'CARTAO' }), false],
     [conta({ subtipo: 'COFRE' }), false],
     [conta({ subtipo: 'CUSTODIA' }), false],
     [conta({ liquidez: 'D1' }), false],

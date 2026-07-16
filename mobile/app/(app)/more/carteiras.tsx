@@ -2,15 +2,20 @@ import React, { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, FlatList, Modal, ScrollView, TextInput, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { carteiraService } from '../../../src/services/carteiraService';
-import { TIPO_CARTEIRA_LABEL, TIPO_MOVIMENTO_LABEL, formatCurrency, formatDateTime, parseCurrencyBR, maskCurrencyInput } from '../../../src/utils/format';
-import { Carteira, CarteiraRequest, TipoCarteira } from '../../../src/types';
+import contaFinanceiraService, { contaGerenciada } from '../../../src/services/contaFinanceiraService';
+import { TIPO_MOVIMENTO_LABEL, formatCurrency, formatDateTime, parseCurrencyBR, maskCurrencyInput } from '../../../src/utils/format';
+import { ContaFinanceira, ContaFinanceiraRequest, SubtipoContaFinanceira } from '../../../src/types';
 import { useTheme } from '../../../src/theme';
 import BackButton from '../../../src/components/ui/BackButton';
 import SkeletonBox from '../../../src/components/ui/SkeletonBox';
 
 // Extrato do ledger — fonte de confiança do saldo da conta
-function ExtratoModal({ carteira, onClose }: { carteira: Carteira | null; onClose: () => void }) {
+const SUBTIPO_LABEL: Record<SubtipoContaFinanceira, string> = {
+  DINHEIRO: 'Dinheiro', CORRENTE: 'Conta corrente', POUPANCA: 'Poupança',
+  PAGAMENTO: 'Conta de pagamento', COFRE: 'Cofre', CUSTODIA: 'Custódia', CARTAO: 'Cartão',
+};
+
+function ExtratoModal({ carteira, onClose }: { carteira: ContaFinanceira | null; onClose: () => void }) {
   const colors = useTheme();
   const {
     data,
@@ -22,7 +27,7 @@ function ExtratoModal({ carteira, onClose }: { carteira: Carteira | null; onClos
     isFetchingNextPage,
   } = useInfiniteQuery({
     queryKey: ['carteira-movimentos', carteira?.id],
-    queryFn: ({ pageParam }) => carteiraService.listarMovimentos(carteira!.id, pageParam),
+    queryFn: ({ pageParam }) => contaFinanceiraService.listarMovimentos(carteira!.id, pageParam),
     initialPageParam: 0,
     getNextPageParam: last => (last.number + 1 < last.totalPages ? last.number + 1 : undefined),
     enabled: carteira != null,
@@ -30,7 +35,7 @@ function ExtratoModal({ carteira, onClose }: { carteira: Carteira | null; onClos
 
   const reconciliacaoQuery = useQuery({
     queryKey: ['carteira-reconciliacao', carteira?.id],
-    queryFn: () => carteiraService.reconciliar(carteira!.id),
+    queryFn: () => contaFinanceiraService.reconciliar(carteira!.id),
     enabled: carteira != null,
   });
 
@@ -143,23 +148,27 @@ export default function CarteirasScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [modalVisible, setModalVisible] = useState(false);
-  const [extratoDe, setExtratoDe] = useState<Carteira | null>(null);
+  const [extratoDe, setExtratoDe] = useState<ContaFinanceira | null>(null);
   const [nome, setNome] = useState('');
-  const [tipo, setTipo] = useState<TipoCarteira | null>('DINHEIRO');
+  const [tipo, setTipo] = useState<ContaFinanceiraRequest['subtipo'] | null>('DINHEIRO');
   const [saldo, setSaldo] = useState('');
   const [nomeError, setNomeError] = useState<string | null>(null);
   const [tipoError, setTipoError] = useState<string | null>(null);
   const [saldoError, setSaldoError] = useState<string | null>(null);
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['carteiras'],
-    queryFn: () => carteiraService.listar(),
+    queryKey: ['contas-financeiras'],
+    queryFn: () => contaFinanceiraService.listar(),
   });
+  const contasOrdenadas = useMemo(
+    () => [...(data?.content ?? [])].sort((a, b) => a.natureza.localeCompare(b.natureza) || a.nome.localeCompare(b.nome)),
+    [data?.content],
+  );
 
   const criarMutation = useMutation({
-    mutationFn: (req: CarteiraRequest) => carteiraService.criar(req),
+    mutationFn: (req: ContaFinanceiraRequest) => contaFinanceiraService.criar(req),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['carteiras'] });
+      queryClient.invalidateQueries({ queryKey: ['contas-financeiras'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-resumo'] });
       setModalVisible(false);
       setNome(''); setSaldo(''); setTipo('DINHEIRO');
@@ -177,7 +186,10 @@ export default function CarteirasScreen() {
     const v = parseCurrencyBR(saldo || '0');
     if (isNaN(v) || v < 0) { setSaldoError('Saldo deve ser >= 0.'); hasError = true; }
     if (hasError) return;
-    const req: CarteiraRequest = { nome: nome.trim(), tipo: tipo as TipoCarteira, saldo: Number(v) };
+    const req: ContaFinanceiraRequest = {
+      nome: nome.trim(), natureza: 'ATIVO', subtipo: tipo!, liquidez: 'IMEDIATA',
+      moeda: 'BRL', saldoInicial: Number(v),
+    };
     try {
       await criarMutation.mutateAsync(req);
     } catch (err: any) {
@@ -206,9 +218,15 @@ export default function CarteirasScreen() {
         </View>
       ) : (
         <FlatList
-          data={data?.content ?? []}
+          data={contasOrdenadas}
           keyExtractor={item => item.id.toString()}
-          renderItem={({ item: c }) => (
+          renderItem={({ item: c, index }) => (
+            <>
+            {(index === 0 || contasOrdenadas[index - 1]?.natureza !== c.natureza) && (
+              <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '700', marginHorizontal: 16, marginTop: index === 0 ? 4 : 12, marginBottom: 8 }}>
+                {c.natureza === 'ATIVO' ? 'Ativos' : 'Passivos'}
+              </Text>
+            )}
             <TouchableOpacity
               onPress={() => setExtratoDe(c)}
               activeOpacity={0.7}
@@ -219,13 +237,17 @@ export default function CarteirasScreen() {
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <View style={{ flex: 1 }}>
                   <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600' }}>{c.nome}</Text>
-                  <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{TIPO_CARTEIRA_LABEL[c.tipo]}</Text>
+                  <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
+                    {SUBTIPO_LABEL[c.subtipo]} · {c.liquidez} · {c.estadoConciliacao}
+                  </Text>
                 </View>
                 <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Extrato ›</Text>
               </View>
               <Text style={{ color: colors.textPrimary, fontSize: 18, fontWeight: '700', marginTop: 8 }}>{formatCurrency(Number(c.saldo ?? 0))}</Text>
               {c.banco && <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 6 }}>{c.banco}</Text>}
+              {contaGerenciada(c) && <Text style={{ color: colors.brandFg, fontSize: 11, marginTop: 6 }}>Somente leitura · gerenciada no módulo de origem</Text>}
             </TouchableOpacity>
+            </>
           )}
           ListEmptyComponent={() => (
             <View style={{ alignItems: 'center', padding: 48 }}>
@@ -262,9 +284,9 @@ export default function CarteirasScreen() {
 
             <Text style={{ color: colors.textSecondary, fontSize: 9, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Tipo</Text>
             <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
-              {(['DINHEIRO','CONTA_BANCARIA','POUPANCA'] as TipoCarteira[]).map(t => (
+              {(['DINHEIRO','CORRENTE','POUPANCA','PAGAMENTO'] as ContaFinanceiraRequest['subtipo'][]).map(t => (
                 <TouchableOpacity key={t} onPress={() => setTipo(t)} style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: tipo === t ? colors.brand + '26' : colors.card, borderWidth: 1, borderColor: tipo === t ? colors.brand : colors.border }}>
-                  <Text style={{ color: tipo === t ? colors.brand : colors.textSecondary }}>{TIPO_CARTEIRA_LABEL[t]}</Text>
+                  <Text style={{ color: tipo === t ? colors.brand : colors.textSecondary }}>{SUBTIPO_LABEL[t]}</Text>
                 </TouchableOpacity>
               ))}
             </View>

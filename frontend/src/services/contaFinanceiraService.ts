@@ -8,12 +8,10 @@ export type SubtipoContaFinanceira =
 export type LiquidezContaFinanceira = 'IMEDIATA' | 'D1' | 'D2' | 'CARENCIA' | 'BLOQUEADA';
 export type OrigemDadosConta = 'MANUAL' | 'CSV' | 'OFX' | 'INTEGRACAO' | 'AJUSTE';
 export type EstadoConciliacaoConta = 'CONCILIADA' | 'PENDENTE';
-export type TipoContaFinanceira = 'DINHEIRO' | 'CONTA_BANCARIA' | 'POUPANCA' | 'CARTAO';
 
 export interface ContaFinanceira {
   id: number;
   nome: string;
-  tipo: TipoContaFinanceira;
   saldo: number;
   banco?: string;
   natureza: NaturezaContaFinanceira;
@@ -26,8 +24,11 @@ export interface ContaFinanceira {
 
 export interface ContaFinanceiraInput {
   nome: string;
-  tipo: Exclude<TipoContaFinanceira, 'CARTAO'>;
-  saldo: number;
+  natureza: 'ATIVO';
+  subtipo: 'DINHEIRO' | 'CORRENTE' | 'POUPANCA' | 'PAGAMENTO';
+  liquidez: LiquidezContaFinanceira;
+  moeda: string;
+  saldoInicial: number;
   banco?: string;
 }
 

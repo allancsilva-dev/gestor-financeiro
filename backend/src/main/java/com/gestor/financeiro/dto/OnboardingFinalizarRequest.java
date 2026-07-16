@@ -1,5 +1,6 @@
 package com.gestor.financeiro.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.gestor.financeiro.model.enums.TipoCarteira;
 import com.gestor.financeiro.model.enums.TipoConta;
 import jakarta.validation.Valid;
@@ -21,8 +22,9 @@ public record OnboardingFinalizarRequest(
     @Valid
     CarteiraInicial carteira,
 
-    @NotNull(message = "Conta obrigatória")
+    @NotNull(message = "Cartão obrigatório")
     @Valid
+    @JsonAlias("cartao")
     ContaInicial conta,
 
     @NotEmpty(message = "Selecione ao menos uma categoria")
@@ -56,7 +58,6 @@ public record OnboardingFinalizarRequest(
         @Size(max = 100, message = "Nome deve ter no máximo 100 caracteres")
         String nome,
 
-        @NotNull(message = "Campo obrigatório")
         TipoConta tipo,
 
         @PositiveOrZero(message = "Limite total deve ser zero ou positivo")

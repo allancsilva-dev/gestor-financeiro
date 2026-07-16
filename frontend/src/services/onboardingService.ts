@@ -12,9 +12,8 @@ export interface OnboardingFinalizarPayload {
     saldo: number;
     banco?: string;
   };
-  conta: {
+  cartao: {
     nome: string;
-    tipo: string;
     limiteTotal?: number;
     diaFechamento?: number;
     diaVencimento?: number;

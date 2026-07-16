@@ -5,9 +5,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '../../../src/theme';
 import BackButton from '../../../src/components/ui/BackButton';
 import faturaService from '../../../src/services/faturaService';
-import { contaService } from '../../../src/services/contaService';
-import { carteiraService } from '../../../src/services/carteiraService';
-import { FaturaResponse, FaturaLancamento, Conta, ContaRequest, Carteira } from '../../../src/types';
+import cartaoService from '../../../src/services/cartaoService';
+import contaFinanceiraService from '../../../src/services/contaFinanceiraService';
+import { FaturaResponse, FaturaLancamento, Cartao, CartaoRequest, ContaFinanceira } from '../../../src/types';
 import { formatCurrency, formatDate, parseCurrencyBR, maskCurrencyInput } from '../../../src/utils/format';
 
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -35,17 +35,17 @@ export default function FaturasScreen() {
   const [formError, setFormError] = useState<string | null>(null);
 
   const { data: contasData } = useQuery({
-    queryKey: ['contas-fatura'],
-    queryFn: () => contaService.listar(),
+    queryKey: ['cartoes'],
+    queryFn: () => cartaoService.listar(),
   });
-  const contasCredito = (contasData?.content ?? []).filter((c: Conta) => c.tipo === 'CREDITO');
+  const contasCredito = contasData?.content ?? [];
   const contaSelecionada = contasCredito[Math.min(contaIdx, Math.max(contasCredito.length - 1, 0))];
 
   const { data: carteirasData } = useQuery({
-    queryKey: ['carteiras'],
-    queryFn: () => carteiraService.listar(),
+    queryKey: ['contas-financeiras-caixa'],
+    queryFn: () => contaFinanceiraService.listarParaCaixa(),
   });
-  const carteiras = carteirasData?.content ?? [];
+  const carteiras = carteirasData ?? [];
 
   useEffect(() => {
     if (carteiraPagamentoId == null && carteiras.length > 0) {
@@ -74,10 +74,9 @@ export default function FaturasScreen() {
   };
 
   const criarMutation = useMutation({
-    mutationFn: (req: ContaRequest) => contaService.criar(req),
+    mutationFn: (req: CartaoRequest) => cartaoService.criar(req),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['contas-fatura'] });
-      queryClient.invalidateQueries({ queryKey: ['contas'] });
+      queryClient.invalidateQueries({ queryKey: ['cartoes'] });
       setModalVisible(false);
       resetForm();
     },
@@ -97,7 +96,6 @@ export default function FaturasScreen() {
     if (isNaN(venc) || venc < 1 || venc > 31) { setFormError('Dia de vencimento deve estar entre 1 e 31.'); return; }
     criarMutation.mutate({
       nome: nome.trim(),
-      tipo: 'CREDITO',
       limiteTotal: v,
       diaFechamento: fech,
       diaVencimento: venc,
@@ -130,7 +128,7 @@ export default function FaturasScreen() {
       queryClient.invalidateQueries({ queryKey: ['carteiras'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-resumo'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-projecao'] });
-      queryClient.invalidateQueries({ queryKey: ['contas-fatura'] });
+      queryClient.invalidateQueries({ queryKey: ['cartoes'] });
       refetch();
     } catch (err: any) {
       setPayError(err?.userMessage ?? 'Erro ao pagar fatura.');
@@ -144,7 +142,7 @@ export default function FaturasScreen() {
   const mesProximo = () => { if (mes === 12) { setMes(1); setAno(ano + 1); } else setMes(mes + 1); };
 
   const limiteTotal = Number(contaSelecionada?.limiteTotal ?? 0);
-  const gasto = Number(contaSelecionada?.valorGasto ?? 0);
+  const gasto = Number(contaSelecionada?.saldoDevedor ?? 0);
   const creditoCartao = gasto < 0 ? Math.abs(gasto) : 0;
   const usoLimite = limiteTotal > 0 ? Math.min(Math.max(gasto, 0) / limiteTotal, 1) : 0;
   const saldoRestante = Math.max(Number(fatura?.valorTotal ?? 0) - Number(fatura?.valorPago ?? 0), 0);
@@ -182,7 +180,7 @@ export default function FaturasScreen() {
 
           {contasCredito.length > 0 && (
             <View style={{ flexDirection: 'row', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
-              {contasCredito.map((c: Conta, i: number) => (
+              {contasCredito.map((c: Cartao, i: number) => (
                 <TouchableOpacity key={c.id} onPress={() => setContaIdx(i)} style={[styles.chip, { backgroundColor: i === contaIdx ? colors.brand : colors.card, borderColor: i === contaIdx ? colors.brand : colors.border }]}>
                   <Text style={{ color: i === contaIdx ? colors.brandText : colors.textSecondary, fontSize: 13, fontWeight: '500' }}>{c.nome}</Text>
                 </TouchableOpacity>
@@ -260,7 +258,7 @@ export default function FaturasScreen() {
                     </View>
                   )}
                   <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
-                    {carteiras.map((c: Carteira) => (
+                    {carteiras.map((c: ContaFinanceira) => (
                       <TouchableOpacity key={c.id} onPress={() => setCarteiraPagamentoId(c.id)} style={[styles.chip, { backgroundColor: carteiraPagamentoId === c.id ? colors.brand : colors.card, borderColor: carteiraPagamentoId === c.id ? colors.brand : colors.border }]}>
                         <Text style={{ color: carteiraPagamentoId === c.id ? colors.brandText : colors.textSecondary, fontSize: 13, fontWeight: '500' }}>{c.nome}</Text>
                       </TouchableOpacity>
