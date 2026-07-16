@@ -22,9 +22,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * scripts/baseline-metricas-fase2.sql sobre um cenário semeado e comprova que:
  *  A1  disponível agora == SUM(carteiras.saldo);
  *  A2  reservado == SUM(metas.valor_reservado) das metas não arquivadas;
- *  A3  dívidas == SUM(contas.valor_gasto) dos cartões ativos;
+ *  A3  dívidas == SUM(carteiras.saldo) dos passivos de cartão;
  *  C1  saldo materializado == soma do ledger (diferença zero);
- *  C6  valor_gasto == soma dos lançamentos de faturas não pagas.
+ *  C6  saldo passivo == soma dos lançamentos de faturas não pagas.
  * Este snapshot é a referência "antes" de toda migration da Fase 2.
  */
 @SpringBootTest
@@ -87,10 +87,11 @@ class BaselineMetricasFase2IT {
                 "insert into metas(usuario_id, nome, valor_total, valor_reservado, ativa, status, version) values (?, 'Antiga', 100.00, 0.00, false, 'ARQUIVADA', 0)",
                 usuarioId);
 
-        // Cartao: valor_gasto casado com lancamentos de fatura nao paga (invariante C6)
+        // Cartao: passivo do ledger casado com lancamentos de fatura nao paga (C6)
+        Long passivoId = inserirCarteiraPassivaComLedger(usuarioId, new BigDecimal("250.00"));
         Long contaId = jdbcTemplate.queryForObject(
-                "insert into contas(usuario_id, nome, tipo, valor_gasto, ativo, version) values (?, 'Cartao', 'CREDITO', 250.00, true, 0) returning id",
-                Long.class, usuarioId);
+                "insert into contas(usuario_id, nome, limite_total, dia_fechamento, dia_vencimento, ativo, conta_financeira_id, version) values (?, 'Cartao', 1000, 5, 12, true, ?, 0) returning id",
+                Long.class, usuarioId, passivoId);
         Long faturaId = jdbcTemplate.queryForObject(
                 "insert into faturas_cartao(usuario_id, conta_id, mes, ano, status) values (?, ?, 7, 2026, 'ABERTA') returning id",
                 Long.class, usuarioId, contaId);
@@ -103,7 +104,8 @@ class BaselineMetricasFase2IT {
 
         // A1 — disponivel agora
         BigDecimal disponivel = jdbcTemplate.queryForObject(
-                "select sum(saldo) from carteiras where usuario_id = ?", BigDecimal.class, usuarioId);
+                "select sum(saldo) from carteiras where usuario_id = ? and natureza='ATIVO' and liquidez='IMEDIATA'",
+                BigDecimal.class, usuarioId);
         assertBigDecimalEquals(new BigDecimal("1500.00"), disponivel);
 
         // A2 — reservado (metas nao arquivadas)
@@ -114,7 +116,7 @@ class BaselineMetricasFase2IT {
 
         // A3 — dividas de cartao
         BigDecimal dividas = jdbcTemplate.queryForObject(
-                "select sum(coalesce(valor_gasto,0)) from contas where usuario_id = ? and tipo = 'CREDITO' and ativo = true",
+                "select sum(saldo) from carteiras where usuario_id = ? and natureza = 'PASSIVO'",
                 BigDecimal.class, usuarioId);
         assertBigDecimalEquals(new BigDecimal("250.00"), dividas);
 
@@ -130,15 +132,15 @@ class BaselineMetricasFase2IT {
             assertBigDecimalEquals(BigDecimal.ZERO, (BigDecimal) recon.get("diferenca"));
         }
 
-        // C6 — valor_gasto == lancamentos de faturas nao pagas
+        // C6 — saldo passivo == lancamentos de faturas nao pagas
         Map<String, Object> passivo = jdbcTemplate.queryForMap("""
-                select coalesce(ct.valor_gasto,0) - coalesce((
+                select coalesce(cf.saldo,0) - coalesce((
                          select sum(fl.valor)
                          from faturas_cartao fc
                          join fatura_lancamentos fl on fl.fatura_id = fc.id
                          where fc.conta_id = ct.id and fc.status <> 'PAGA'
                        ), 0) as diferenca
-                from contas ct
+                from contas ct join carteiras cf on cf.id=ct.conta_financeira_id
                 where ct.id = ?
                 """, contaId);
         assertBigDecimalEquals(BigDecimal.ZERO, (BigDecimal) passivo.get("diferenca"));
@@ -146,7 +148,7 @@ class BaselineMetricasFase2IT {
 
     private Long inserirCarteiraComLedger(Long usuarioId, String nome, BigDecimal saldo, String idemPrefix) {
         Long carteiraId = jdbcTemplate.queryForObject(
-                "insert into carteiras(nome, tipo, subtipo, saldo, usuario_id, version) values (?, 'CONTA_BANCARIA', 'CORRENTE', ?, ?, 0) returning id",
+                "insert into carteiras(nome, subtipo, saldo, usuario_id, version) values (?, 'CORRENTE', ?, ?, 0) returning id",
                 Long.class, nome, saldo, usuarioId);
         jdbcTemplate.update("""
                 insert into movimentos_carteira(
@@ -156,6 +158,18 @@ class BaselineMetricasFase2IT {
                 ) values (?, ?, 'ENTRADA', ?, ?, 'CARTEIRA_AJUSTE',
                     'CARTEIRA', ?, 'Saldo inicial baseline', current_timestamp, ?, ?)
                 """, usuarioId, carteiraId, saldo, saldo, carteiraId, saldo, idemPrefix + "-inicial");
+        return carteiraId;
+    }
+
+    private Long inserirCarteiraPassivaComLedger(Long usuarioId, BigDecimal saldo) {
+        Long carteiraId = jdbcTemplate.queryForObject(
+                "insert into carteiras(nome, subtipo, natureza, saldo, usuario_id, version) values ('Cartao', 'CARTAO', 'PASSIVO', ?, ?, 0) returning id",
+                Long.class, saldo, usuarioId);
+        jdbcTemplate.update("""
+                insert into movimentos_carteira(usuario_id, carteira_id, tipo, valor, valor_assinado,
+                    origem, descricao, data_movimento, saldo_resultante, idempotency_key)
+                values (?, ?, 'ENTRADA', ?, ?, 'FATURA_CARTAO', 'Compra cartao', current_timestamp, ?, 'bl-f2-cartao')
+                """, usuarioId, carteiraId, saldo, saldo, saldo);
         return carteiraId;
     }
 

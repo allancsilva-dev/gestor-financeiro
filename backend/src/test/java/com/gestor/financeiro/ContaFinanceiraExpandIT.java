@@ -73,7 +73,7 @@ class ContaFinanceiraExpandIT {
     void expandAplicaDefaultsSemTocarSaldo() {
         Long usuarioId = novoUsuario("expand-defaults@teste.com");
         Long id = jdbcTemplate.queryForObject(
-                "insert into carteiras(nome, tipo, subtipo, saldo, usuario_id, version) values ('Legada', 'CONTA_BANCARIA', 'CORRENTE', 123.45, ?, 0) returning id",
+                "insert into carteiras(nome, subtipo, saldo, usuario_id, version) values ('Legada', 'CORRENTE', 123.45, ?, 0) returning id",
                 Long.class, usuarioId);
 
         Map<String, Object> row = jdbcTemplate.queryForMap(
@@ -94,38 +94,38 @@ class ContaFinanceiraExpandIT {
 
         // CUSTODIA com saldo monetario e proibido (ck_carteiras_custodia_saldo_zero)
         assertThrows(DataAccessException.class, () -> jdbcTemplate.update(
-                "insert into carteiras(nome, tipo, subtipo, saldo, usuario_id, version) values ('Corretora', 'CONTA_BANCARIA', 'CUSTODIA', 10.00, ?, 0)",
+                "insert into carteiras(nome, subtipo, saldo, usuario_id, version) values ('Corretora', 'CUSTODIA', 10.00, ?, 0)",
                 usuarioId));
 
         // CARTAO deve ser PASSIVO (ck_carteiras_natureza_subtipo)
         assertThrows(DataAccessException.class, () -> jdbcTemplate.update(
-                "insert into carteiras(nome, tipo, subtipo, natureza, saldo, usuario_id, version) values ('Cartao', 'CONTA_BANCARIA', 'CARTAO', 'ATIVO', 0, ?, 0)",
+                "insert into carteiras(nome, subtipo, natureza, saldo, usuario_id, version) values ('Cartao', 'CARTAO', 'ATIVO', 0, ?, 0)",
                 usuarioId));
 
         // PASSIVO so existe como CARTAO nesta fase
         assertThrows(DataAccessException.class, () -> jdbcTemplate.update(
-                "insert into carteiras(nome, tipo, subtipo, natureza, saldo, usuario_id, version) values ('Divida', 'CONTA_BANCARIA', 'CORRENTE', 'PASSIVO', 0, ?, 0)",
+                "insert into carteiras(nome, subtipo, natureza, saldo, usuario_id, version) values ('Divida', 'CORRENTE', 'PASSIVO', 0, ?, 0)",
                 usuarioId));
 
         // Moeda unica BRL nesta fase (ck_carteiras_moeda)
         assertThrows(DataAccessException.class, () -> jdbcTemplate.update(
-                "insert into carteiras(nome, tipo, subtipo, moeda, saldo, usuario_id, version) values ('Dolar', 'CONTA_BANCARIA', 'CORRENTE', 'USD', 0, ?, 0)",
+                "insert into carteiras(nome, subtipo, moeda, saldo, usuario_id, version) values ('Dolar', 'CORRENTE', 'USD', 0, ?, 0)",
                 usuarioId));
 
         // Subtipo fora do dominio rejeitado (ck_carteiras_subtipo)
         assertThrows(DataAccessException.class, () -> jdbcTemplate.update(
-                "insert into carteiras(nome, tipo, subtipo, saldo, usuario_id, version) values ('Foo', 'CONTA_BANCARIA', 'FOO', 0, ?, 0)",
+                "insert into carteiras(nome, subtipo, saldo, usuario_id, version) values ('Foo', 'FOO', 0, ?, 0)",
                 usuarioId));
 
         // Combinacoes validas continuam passando: CUSTODIA saldo 0 e CARTAO passivo
         assertEquals(1, jdbcTemplate.update(
-                "insert into carteiras(nome, tipo, subtipo, saldo, usuario_id, version) values ('Corretora', 'CONTA_BANCARIA', 'CUSTODIA', 0, ?, 0)",
+                "insert into carteiras(nome, subtipo, saldo, usuario_id, version) values ('Corretora', 'CUSTODIA', 0, ?, 0)",
                 usuarioId));
         assertEquals(1, jdbcTemplate.update(
-                "insert into carteiras(nome, tipo, subtipo, natureza, saldo, usuario_id, version) values ('Cartao', 'CONTA_BANCARIA', 'CARTAO', 'PASSIVO', 0, ?, 0)",
+                "insert into carteiras(nome, subtipo, natureza, saldo, usuario_id, version) values ('Cartao', 'CARTAO', 'PASSIVO', 0, ?, 0)",
                 usuarioId));
         assertEquals(1, jdbcTemplate.update(
-                "insert into carteiras(nome, tipo, subtipo, saldo, usuario_id, version) values ('Cofre', 'POUPANCA', 'COFRE', 0, ?, 0)",
+                "insert into carteiras(nome, subtipo, saldo, usuario_id, version) values ('Cofre', 'COFRE', 0, ?, 0)",
                 usuarioId));
     }
 }

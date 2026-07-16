@@ -33,3 +33,6 @@ backend/uploads/
 *.swo
 *.swpx
 .DS_Store
+# Evidencias operacionais contem dados financeiros e nunca devem ser versionadas.
+artifacts/
+**/artifacts/

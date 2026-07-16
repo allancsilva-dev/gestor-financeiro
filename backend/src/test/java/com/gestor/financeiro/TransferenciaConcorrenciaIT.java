@@ -183,7 +183,7 @@ class TransferenciaConcorrenciaIT {
 
     private Long novaConta(Long usuarioId, String nome, String saldo) {
         return jdbcTemplate.queryForObject(
-                "insert into carteiras(nome, tipo, subtipo, saldo, usuario_id, version) values (?, 'CONTA_BANCARIA', 'CORRENTE', ?::numeric, ?, 0) returning id",
+                "insert into carteiras(nome, subtipo, saldo, usuario_id, version) values (?, 'CORRENTE', ?::numeric, ?, 0) returning id",
                 Long.class, nome, saldo, usuarioId);
     }
 }

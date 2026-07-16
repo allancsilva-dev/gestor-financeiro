@@ -83,7 +83,7 @@ class PostgresMigrationIT {
                 "insert into usuarios(nome, email, senha, failed_attempts, onboarding_completo) values ('Ledger', 'ledger-it@teste.com', 'x', 0, false) returning id",
                 Long.class);
         Long carteiraId = jdbcTemplate.queryForObject(
-                "insert into carteiras(nome, tipo, subtipo, saldo, usuario_id, version) values ('Principal', 'DINHEIRO', 'DINHEIRO', 100.00, ?, 0) returning id",
+                "insert into carteiras(nome, subtipo, saldo, usuario_id, version) values ('Principal', 'DINHEIRO', 100.00, ?, 0) returning id",
                 Long.class,
                 usuarioId);
 
@@ -119,7 +119,7 @@ class PostgresMigrationIT {
                 "insert into usuarios(nome, email, senha, failed_attempts, onboarding_completo) values ('Recon', 'recon-it@teste.com', 'x', 0, false) returning id",
                 Long.class);
         Long carteiraId = jdbcTemplate.queryForObject(
-                "insert into carteiras(nome, tipo, subtipo, saldo, usuario_id, version) values ('Principal', 'DINHEIRO', 'DINHEIRO', 150.00, ?, 0) returning id",
+                "insert into carteiras(nome, subtipo, saldo, usuario_id, version) values ('Principal', 'DINHEIRO', 150.00, ?, 0) returning id",
                 Long.class,
                 usuarioId);
 
@@ -182,9 +182,12 @@ class PostgresMigrationIT {
         Long usuarioId = jdbcTemplate.queryForObject(
                 "insert into usuarios(nome, email, senha, failed_attempts, onboarding_completo) values ('Fat', 'fat-it@teste.com', 'x', 0, false) returning id",
                 Long.class);
-        Long contaId = jdbcTemplate.queryForObject(
-                "insert into contas(usuario_id, nome, tipo, version) values (?, 'Cartao', 'CREDITO', 0) returning id",
+        Long passivoId = jdbcTemplate.queryForObject(
+                "insert into carteiras(nome, subtipo, natureza, saldo, usuario_id, version) values ('Cartao', 'CARTAO', 'PASSIVO', 0, ?, 0) returning id",
                 Long.class, usuarioId);
+        Long contaId = jdbcTemplate.queryForObject(
+                "insert into contas(usuario_id, nome, limite_total, dia_fechamento, dia_vencimento, ativo, conta_financeira_id, version) values (?, 'Cartao', 1000, 5, 12, true, ?, 0) returning id",
+                Long.class, usuarioId, passivoId);
         Long faturaId = jdbcTemplate.queryForObject(
                 "insert into faturas_cartao(usuario_id, conta_id, mes, ano, status) values (?, ?, 7, 2026, 'ABERTA') returning id",
                 Long.class, usuarioId, contaId);
