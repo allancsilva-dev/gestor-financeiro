@@ -30,6 +30,15 @@ public class Meta {
     
     @Column(precision = 10, scale = 2)
     private BigDecimal valorReservado = BigDecimal.ZERO;
+
+    /**
+     * Conta financeira COFRE da meta (ADR-0012, PR-F2-11): destino real da
+     * reserva. Invariante: valorReservado == saldo do cofre; valorReservado
+     * passa a ser derivado no contract (PR-F2-19).
+     */
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cofre_id", unique = true)
+    private Carteira cofre;
     
     @Column(precision = 10, scale = 2)
     private BigDecimal valorMensal;

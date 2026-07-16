@@ -4,12 +4,20 @@ import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.exception.BusinessException;
 import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.exception.UnauthorizedAccessException;
+import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Meta;
 import com.gestor.financeiro.model.MovimentoMeta;
+import com.gestor.financeiro.model.OperacaoFinanceira;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.OrigemMovimentoCarteira;
+import com.gestor.financeiro.model.enums.OrigemOperacaoFinanceira;
+import com.gestor.financeiro.model.enums.PoliticaOperacao;
 import com.gestor.financeiro.model.enums.StatusMeta;
+import com.gestor.financeiro.model.enums.SubtipoContaFinanceira;
+import com.gestor.financeiro.model.enums.TipoCarteira;
 import com.gestor.financeiro.model.enums.TipoMovimentoCarteira;
+import com.gestor.financeiro.model.enums.TipoOperacaoFinanceira;
+import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.MetaRepository;
 import com.gestor.financeiro.repository.MovimentoMetaRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
@@ -31,6 +39,8 @@ public class MetaService {
     private final UsuarioRepository usuarioRepository;
     private final MovimentoMetaRepository movimentoMetaRepository;
     private final LedgerService ledgerService;
+    private final CarteiraRepository carteiraRepository;
+    private final OperacaoFinanceiraService operacaoService;
     
     // Lista metas do usuário por status canônico (ausência de filtro = ATIVA, compat com clientes antigos)
     public Page<Meta> listarPorUsuario(Long usuarioId, StatusMeta status, Pageable pageable) {
@@ -65,10 +75,23 @@ public class MetaService {
             throw new BusinessException("Informe a carteira de origem da reserva");
         }
 
+        // Reserva e um cofrinho real (ADR-0012): operacao com par de lancamentos
+        // carteira -> COFRE da meta; valorReservado segue em dupla escrita
+        Carteira cofre = cofreDe(meta, usuarioId);
+        OperacaoFinanceira operacao = operacaoService.criar(new CriarOperacaoCommand(
+                usuarioId, TipoOperacaoFinanceira.RESERVA_META, PoliticaOperacao.CAIXA,
+                OrigemOperacaoFinanceira.MANUAL, LocalDateTime.now(clock), null,
+                "reserva-meta|meta=" + meta.getId() + "|valor=" + valor.toPlainString(),
+                "Reserva para meta: " + meta.getNome(), null));
+
         registrarMovimentoCarteira(meta, carteiraId, usuarioId, valor,
                 TipoMovimentoCarteira.RESERVA_META,
                 RegistrarMovimentoCommand.Direcao.SAIDA,
-                "Reserva para meta: " + meta.getNome());
+                "Reserva para meta: " + meta.getNome(), operacao, false);
+        registrarMovimentoCarteira(meta, cofre.getId(), usuarioId, valor,
+                TipoMovimentoCarteira.RESERVA_META,
+                RegistrarMovimentoCommand.Direcao.ENTRADA,
+                "Reserva recebida: " + meta.getNome(), operacao, false);
 
         BigDecimal valorAnterior = meta.getValorReservado();
         meta.setValorReservado(valorAnterior.add(valor));
@@ -97,10 +120,22 @@ public class MetaService {
             throw new BusinessException("Valor maior que o reservado na meta");
         }
 
+        // Resgate: operacao com par COFRE -> carteira (ADR-0012)
+        Carteira cofre = cofreDe(meta, usuarioId);
+        OperacaoFinanceira operacao = operacaoService.criar(new CriarOperacaoCommand(
+                usuarioId, TipoOperacaoFinanceira.RESGATE_META, PoliticaOperacao.CAIXA,
+                OrigemOperacaoFinanceira.MANUAL, LocalDateTime.now(clock), null,
+                "resgate-meta|meta=" + meta.getId() + "|valor=" + valor.toPlainString(),
+                "Resgate da meta: " + meta.getNome(), null));
+
+        registrarMovimentoCarteira(meta, cofre.getId(), usuarioId, valor,
+                TipoMovimentoCarteira.RESGATE_META,
+                RegistrarMovimentoCommand.Direcao.SAIDA,
+                "Resgate enviado: " + meta.getNome(), operacao, false);
         registrarMovimentoCarteira(meta, carteiraId, usuarioId, valor,
                 TipoMovimentoCarteira.RESGATE_META,
                 RegistrarMovimentoCommand.Direcao.ENTRADA,
-                "Resgate da meta: " + meta.getNome());
+                "Resgate da meta: " + meta.getNome(), operacao, false);
 
         BigDecimal valorAnterior = meta.getValorReservado();
         meta.setValorReservado(valorAnterior.subtract(valor));
@@ -192,7 +227,8 @@ public class MetaService {
     // Debita/credita a carteira via ledger (valida ownership e saldo lá dentro)
     private void registrarMovimentoCarteira(Meta meta, Long carteiraId, Long usuarioId,
                                             BigDecimal valor, TipoMovimentoCarteira tipo,
-                                            RegistrarMovimentoCommand.Direcao direcao, String descricao) {
+                                            RegistrarMovimentoCommand.Direcao direcao, String descricao,
+                                            OperacaoFinanceira operacao, boolean permitirSaldoNegativo) {
         ledgerService.registrarMovimento(new RegistrarMovimentoCommand(
                 usuarioId,
                 carteiraId,
@@ -205,8 +241,27 @@ public class MetaService {
                 descricao,
                 null,
                 LocalDateTime.now(clock),
-                false
-        ));
+                permitirSaldoNegativo
+        ), operacao);
+    }
+
+    /** Cofre real da meta (ADR-0012): retorna o existente ou cria sob demanda. */
+    private Carteira cofreDe(Meta meta, Long usuarioId) {
+        if (meta.getCofre() != null) {
+            return meta.getCofre();
+        }
+        Usuario usuario = usuarioRepository.findById(usuarioId)
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
+        Carteira cofre = new Carteira();
+        cofre.setNome("Cofre: " + meta.getNome());
+        cofre.setTipo(TipoCarteira.POUPANCA);
+        cofre.setSubtipo(SubtipoContaFinanceira.COFRE);
+        cofre.setSaldo(BigDecimal.ZERO);
+        cofre.setUsuario(usuario);
+        cofre = carteiraRepository.save(cofre);
+        meta.setCofre(cofre);
+        metaRepository.save(meta);
+        return cofre;
     }
 
     private void registroMovimento(Meta meta, Long usuarioId, String tipo,

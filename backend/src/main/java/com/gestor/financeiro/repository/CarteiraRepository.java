@@ -30,16 +30,19 @@ public interface CarteiraRepository extends JpaRepository<Carteira, Long> {
     Optional<Carteira> findByUsuarioIdAndNomeIgnoreCase(Long usuarioId, String nome);
 
     /**
-     * Saldo total de caixa: somente contas de natureza ATIVO. Passivo do cartao
-     * (subtipo CARTAO, PR-F2-06) nunca compoe saldo disponivel (ADR-0013).
+     * Saldo total de caixa legado: somente contas ATIVO, sem o passivo do
+     * cartao (PR-F2-06) e sem COFRE de meta (PR-F2-11) — reservado nunca esteve
+     * no saldo disponivel e continua fora (ADR-0012/0013).
      */
     @Query("SELECT COALESCE(SUM(c.saldo), 0) FROM Carteira c WHERE c.usuario.id = :usuarioId "
-            + "AND c.natureza = com.gestor.financeiro.model.enums.NaturezaContaFinanceira.ATIVO")
+            + "AND c.natureza = com.gestor.financeiro.model.enums.NaturezaContaFinanceira.ATIVO "
+            + "AND c.subtipo <> com.gestor.financeiro.model.enums.SubtipoContaFinanceira.COFRE")
     BigDecimal sumSaldoByUsuarioId(@Param("usuarioId") Long usuarioId);
 
-    /** Listagem legada de /carteiras: oculta a conta passiva do cartao (PR-F2-06). */
-    Page<Carteira> findByUsuarioIdAndSubtipoNot(Long usuarioId,
-            com.gestor.financeiro.model.enums.SubtipoContaFinanceira subtipo, Pageable pageable);
+    /** Listagem legada de /carteiras: oculta cartao (passivo) e cofres de meta. */
+    Page<Carteira> findByUsuarioIdAndSubtipoNotIn(Long usuarioId,
+            java.util.List<com.gestor.financeiro.model.enums.SubtipoContaFinanceira> subtipos,
+            Pageable pageable);
 
     @Query("""
             SELECT c.id AS carteiraId,

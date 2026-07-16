@@ -42,12 +42,17 @@ public class CarteiraService {
     }
 
     /**
-     * Listagem legada de /carteiras (PR-F2-06): oculta a conta passiva do
-     * cartao, que clientes antigos ja exibem via /contas.
+     * Listagem legada de /carteiras (PR-F2-06/11): oculta a conta passiva do
+     * cartao (clientes antigos ja a exibem via /contas) e os cofres de meta
+     * (exibidos dentro das metas).
      */
     public Page<Carteira> listarLegadoPorUsuario(Long usuarioId, Pageable pageable) {
-        return carteiraRepository.findByUsuarioIdAndSubtipoNot(
-                usuarioId, com.gestor.financeiro.model.enums.SubtipoContaFinanceira.CARTAO, pageable);
+        return carteiraRepository.findByUsuarioIdAndSubtipoNotIn(
+                usuarioId,
+                java.util.List.of(
+                        com.gestor.financeiro.model.enums.SubtipoContaFinanceira.CARTAO,
+                        com.gestor.financeiro.model.enums.SubtipoContaFinanceira.COFRE),
+                pageable);
     }
     
     // Busca carteira por ID
