@@ -39,6 +39,7 @@ public class FaturaService {
     private final MovimentoCarteiraRepository movimentoCarteiraRepository;
     private final LedgerService ledgerService;
     private final OperacaoFinanceiraService operacaoService;
+    private final FaturaPagamentoRepository faturaPagamentoRepository;
     private final java.time.Clock clock;
 
     public FaturaService(FaturaCartaoRepository faturaRepository,
@@ -50,6 +51,7 @@ public class FaturaService {
                          MovimentoCarteiraRepository movimentoCarteiraRepository,
                          LedgerService ledgerService,
                          OperacaoFinanceiraService operacaoService,
+                         FaturaPagamentoRepository faturaPagamentoRepository,
                          java.time.Clock clock) {
         this.faturaRepository = faturaRepository;
         this.faturaLancamentoRepository = faturaLancamentoRepository;
@@ -60,6 +62,7 @@ public class FaturaService {
         this.movimentoCarteiraRepository = movimentoCarteiraRepository;
         this.ledgerService = ledgerService;
         this.operacaoService = operacaoService;
+        this.faturaPagamentoRepository = faturaPagamentoRepository;
         this.clock = clock;
     }
 
@@ -176,6 +179,20 @@ public class FaturaService {
             return toResponse(fatura, usuarioId, conta);
         }
 
+        // Pagamento e uma operacao unica: -caixa e -passivo vinculados (PR-F2-08)
+        String descricaoPagamento =
+                "Pagamento fatura " + conta.getNome() + " " + fatura.getMes() + "/" + fatura.getAno();
+        OperacaoFinanceira operacao = operacaoService.criar(new CriarOperacaoCommand(
+                usuarioId,
+                com.gestor.financeiro.model.enums.TipoOperacaoFinanceira.PAGAMENTO_FATURA,
+                com.gestor.financeiro.model.enums.PoliticaOperacao.CAIXA,
+                com.gestor.financeiro.model.enums.OrigemOperacaoFinanceira.MANUAL,
+                null,
+                hasText(idempotencyKey) ? "pagamento-fatura-" + fatura.getId() + "-" + idempotencyKey : null,
+                "pagamento-fatura|fatura=" + fatura.getId() + "|valorPago=" + novoValorPago.toPlainString(),
+                descricaoPagamento,
+                null));
+
         ledgerService.registrarMovimento(new RegistrarMovimentoCommand(
                 usuarioId,
                 carteira.getId(),
@@ -185,11 +202,11 @@ public class FaturaService {
                 OrigemMovimentoCarteira.FATURA_CARTAO,
                 "FATURA_CARTAO",
                 fatura.getId(),
-                "Pagamento fatura " + conta.getNome() + " " + fatura.getMes() + "/" + fatura.getAno(),
+                descricaoPagamento,
                 chaveIdempotencia,
                 null,
                 false
-        ));
+        ), operacao);
 
         fatura.setValorPago(novoValorPago);
         if (novoValorPago.compareTo(total) >= 0) {
@@ -204,10 +221,18 @@ public class FaturaService {
         BigDecimal valorGastoFinal = novoValorGasto.signum() < 0 ? BigDecimal.ZERO : novoValorGasto;
         conta.setValorGasto(valorGastoFinal);
         contaRepository.save(conta);
-        // Espelha o delta EFETIVO (com clamp) para manter ledger == valorGasto;
-        // operacao de pagamento completa entra no PR-F2-08
-        espelharPassivo(conta, valorGastoFinal.subtract(valorGastoAtual), null,
-                "Pagamento fatura " + fatura.getMes() + "/" + fatura.getAno());
+        // Espelha o delta EFETIVO (com clamp) para manter ledger == valorGasto
+        espelharPassivo(conta, valorGastoFinal.subtract(valorGastoAtual), operacao, descricaoPagamento);
+
+        // Historico explicito: cada pagamento parcial/total vira registro proprio
+        FaturaPagamento pagamento = new FaturaPagamento();
+        pagamento.setUsuario(carteira.getUsuario());
+        pagamento.setFatura(fatura);
+        pagamento.setCarteira(carteira);
+        pagamento.setOperacao(operacao);
+        pagamento.setValor(valor);
+        pagamento.setDataPagamento(java.time.LocalDateTime.now(clock));
+        faturaPagamentoRepository.save(pagamento);
 
         return toResponse(fatura, usuarioId, conta);
     }
