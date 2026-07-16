@@ -29,17 +29,49 @@ public class InvestimentoService {
     private final UsuarioRepository usuarioRepository;
     private final LedgerService ledgerService;
     private final OperacaoFinanceiraService operacaoService;
+    private final com.gestor.financeiro.repository.CarteiraRepository carteiraRepository;
+    private final java.time.Clock clock;
 
     public InvestimentoService(AtivoRepository ativoRepository,
                                MovimentacaoAtivoRepository movimentacaoRepository,
                                UsuarioRepository usuarioRepository,
                                LedgerService ledgerService,
-                               OperacaoFinanceiraService operacaoService) {
+                               OperacaoFinanceiraService operacaoService,
+                               com.gestor.financeiro.repository.CarteiraRepository carteiraRepository,
+                               java.time.Clock clock) {
         this.ativoRepository = ativoRepository;
         this.movimentacaoRepository = movimentacaoRepository;
         this.usuarioRepository = usuarioRepository;
         this.ledgerService = ledgerService;
         this.operacaoService = operacaoService;
+        this.carteiraRepository = carteiraRepository;
+        this.clock = clock;
+    }
+
+    /** Aplica cotacao manual datada, liquidez e custodia (ADR-0011, PR-F2-14). */
+    private void aplicarClassificacao(Ativo ativo, AtivoRequest request, Long usuarioId,
+                                      BigDecimal valorAtualAnterior) {
+        if (request.getValorAtual() != null
+                && (valorAtualAnterior == null || request.getValorAtual().compareTo(valorAtualAnterior) != 0)) {
+            ativo.setCotacaoEm(java.time.LocalDateTime.now(clock));
+        }
+        if (request.getLiquidez() != null) {
+            try {
+                ativo.setLiquidez(com.gestor.financeiro.model.enums.LiquidezContaFinanceira
+                        .valueOf(request.getLiquidez()));
+            } catch (IllegalArgumentException e) {
+                throw new BusinessException("Liquidez invalida: " + request.getLiquidez());
+            }
+        }
+        if (request.getCustodiaId() != null) {
+            com.gestor.financeiro.model.Carteira custodia = carteiraRepository
+                    .findByIdAndUsuarioId(request.getCustodiaId(), usuarioId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Conta de custódia não encontrada"));
+            if (custodia.getSubtipo() != com.gestor.financeiro.model.enums.SubtipoContaFinanceira.CUSTODIA) {
+                throw new BusinessException("Conta informada não é de custódia");
+            }
+            ativo.setCustodia(custodia);
+        }
     }
 
     @Transactional
@@ -53,6 +85,7 @@ public class InvestimentoService {
         ativo.setQuantidade(BigDecimal.ZERO);
         ativo.setCustoTotal(BigDecimal.ZERO);
         ativo.setValorAtual(request.getValorAtual());
+        aplicarClassificacao(ativo, request, usuarioId, null);
         ativo = ativoRepository.save(ativo);
         return toResponse(ativo);
     }
@@ -69,7 +102,9 @@ public class InvestimentoService {
         ativo.setTicker(request.getTicker().toUpperCase());
         ativo.setNome(request.getNome());
         ativo.setTipo(TipoAtivo.valueOf(request.getTipo()));
+        BigDecimal valorAnterior = ativo.getValorAtual();
         ativo.setValorAtual(request.getValorAtual());
+        aplicarClassificacao(ativo, request, usuarioId, valorAnterior);
         return toResponse(ativoRepository.save(ativo));
     }
 
@@ -272,6 +307,15 @@ public class InvestimentoService {
             }
         }
 
+        // Valor de mercado so com cotacao datada (ADR-0011); cotacao legada sem
+        // instante nao vira numero oficial
+        BigDecimal valorMercado = null;
+        if (a.getValorAtual() != null && a.getCotacaoEm() != null
+                && a.getQuantidade().compareTo(BigDecimal.ZERO) > 0) {
+            valorMercado = a.getValorAtual().multiply(a.getQuantidade())
+                    .setScale(2, RoundingMode.HALF_UP);
+        }
+
         return AtivoResponse.builder()
             .id(a.getId())
             .ticker(a.getTicker())
@@ -283,6 +327,10 @@ public class InvestimentoService {
             .precoMedio(precoMedio)
             .lucroPrejuizo(lucroPrejuizo)
             .rentabilidade(rentabilidade)
+            .valorMercado(valorMercado)
+            .cotacaoEm(a.getCotacaoEm())
+            .liquidez(a.getLiquidez() == null ? null : a.getLiquidez().name())
+            .custodiaId(a.getCustodia() == null ? null : a.getCustodia().getId())
             .build();
     }
 }

@@ -36,6 +36,21 @@ public class Ativo {
     @Column(precision = 10, scale = 2)
     private BigDecimal valorAtual;
 
+    /** Instante da ultima cotacao manual (ADR-0011); NULL = desatualizada. */
+    @Column(name = "cotacao_em")
+    private java.time.LocalDateTime cotacaoEm;
+
+    /** Liquidez declarada da posicao (ADR-0011/0013). */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 10)
+    private com.gestor.financeiro.model.enums.LiquidezContaFinanceira liquidez =
+            com.gestor.financeiro.model.enums.LiquidezContaFinanceira.IMEDIATA;
+
+    /** Conta CUSTODIA que agrupa a posicao (container sem saldo, ADR-0011). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "custodia_id")
+    private Carteira custodia;
+
     @Column(precision = 18, scale = 2)
     private BigDecimal custoTotal;
 

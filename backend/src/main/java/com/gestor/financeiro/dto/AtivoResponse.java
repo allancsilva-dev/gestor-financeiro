@@ -17,4 +17,9 @@ public class AtivoResponse {
     private BigDecimal precoMedio;
     private BigDecimal lucroPrejuizo;
     private BigDecimal rentabilidade;
+    /** quantidade x ultima cotacao valida; null sem cotacao datada (ADR-0011). */
+    private BigDecimal valorMercado;
+    private java.time.LocalDateTime cotacaoEm;
+    private String liquidez;
+    private Long custodiaId;
 }
