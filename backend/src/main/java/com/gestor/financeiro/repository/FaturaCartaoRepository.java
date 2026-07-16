@@ -38,4 +38,14 @@ public interface FaturaCartaoRepository extends JpaRepository<FaturaCartao, Long
                                             @Param("statusPago") FaturaStatus statusPago,
                                             @Param("inicio") LocalDate inicio,
                                             @Param("fim") LocalDate fim);
+
+    @Query("SELECT f FROM FaturaCartao f WHERE f.usuario.id = :usuarioId " +
+           "AND f.status <> :statusPago AND f.dataVencimento BETWEEN :inicio AND :fim " +
+           "AND COALESCE(f.valorTotal, 0) > COALESCE(f.valorPago, 0) " +
+           "AND NOT EXISTS (SELECT 1 FROM FaturaLancamento fl WHERE fl.faturaOrigem = f) " +
+           "ORDER BY f.dataVencimento, f.id")
+    List<FaturaCartao> findComprometidasNoPeriodo(@Param("usuarioId") Long usuarioId,
+                                                   @Param("statusPago") FaturaStatus statusPago,
+                                                   @Param("inicio") LocalDate inicio,
+                                                   @Param("fim") LocalDate fim);
 }

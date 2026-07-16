@@ -69,4 +69,17 @@ public interface ParcelaRepository extends JpaRepository<Parcela, Long> {
                                     @Param("statusExcluido") StatusPagamento statusExcluido,
                                     @Param("tipoSaida") TipoTransacao tipoSaida,
                                     @Param("tipoCredito") TipoConta tipoCredito);
+
+    @EntityGraph(attributePaths = {"transacao"})
+    @Query("SELECT p FROM Parcela p WHERE p.transacao.usuario.id = :usuarioId " +
+           "AND p.status <> :statusExcluido " +
+           "AND NOT (p.transacao.tipo = :tipoSaida AND p.transacao.conta IS NOT NULL " +
+           "AND p.transacao.conta.tipo = :tipoCredito) " +
+           "AND p.dataVencimento BETWEEN :inicio AND :fim ORDER BY p.dataVencimento, p.id")
+    List<Parcela> findComprometidasNoPeriodo(@Param("usuarioId") Long usuarioId,
+                                              @Param("inicio") LocalDate inicio,
+                                              @Param("fim") LocalDate fim,
+                                              @Param("statusExcluido") StatusPagamento statusExcluido,
+                                              @Param("tipoSaida") TipoTransacao tipoSaida,
+                                              @Param("tipoCredito") TipoConta tipoCredito);
 }

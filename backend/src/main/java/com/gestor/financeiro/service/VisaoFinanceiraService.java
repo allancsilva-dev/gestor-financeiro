@@ -51,6 +51,16 @@ public class VisaoFinanceiraService {
     public record Visoes(ResumoVisao compra, ResumoVisao competencia, ResumoVisao caixa) {
     }
 
+    public record DetalheCompetencia(
+            BigDecimal entradas,
+            BigDecimal saidasNaoCartao,
+            BigDecimal consumoCartao
+    ) {
+        public BigDecimal resultado() {
+            return entradas.subtract(saidasNaoCartao).subtract(consumoCartao);
+        }
+    }
+
     public Visoes resumo(Long usuarioId, LocalDate inicio, LocalDate fim) {
         return new Visoes(
                 visaoCompra(usuarioId, inicio, fim),
@@ -70,13 +80,19 @@ public class VisaoFinanceiraService {
      * compra via FaturaLancamento (nunca pela data do pagamento da fatura).
      */
     private ResumoVisao visaoCompetencia(Long usuarioId, LocalDate inicio, LocalDate fim) {
+        DetalheCompetencia detalhe = detalheCompetencia(usuarioId, inicio, fim);
+        return new ResumoVisao(detalhe.entradas(),
+                detalhe.saidasNaoCartao().add(detalhe.consumoCartao()));
+    }
+
+    public DetalheCompetencia detalheCompetencia(Long usuarioId, LocalDate inicio, LocalDate fim) {
         BigDecimal entradas = transacaoRepository.sumVisaoCompetenciaNaoCartao(
                 usuarioId, TipoTransacao.ENTRADA, inicio, fim);
         BigDecimal saidasNaoCartao = transacaoRepository.sumVisaoCompetenciaNaoCartao(
                 usuarioId, TipoTransacao.SAIDA, inicio, fim);
         BigDecimal consumoCartao = faturaLancamentoRepository.sumConsumoPorDataCompra(
                 usuarioId, TIPOS_CONSUMO_CARTAO, inicio, fim);
-        return new ResumoVisao(entradas, saidasNaoCartao.add(consumoCartao));
+        return new DetalheCompetencia(entradas, saidasNaoCartao, consumoCartao);
     }
 
     /** CAIXA: dinheiro que efetivamente se moveu nas contas ATIVO. */

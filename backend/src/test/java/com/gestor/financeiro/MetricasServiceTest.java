@@ -4,13 +4,23 @@ import com.gestor.financeiro.dto.AtivoRequest;
 import com.gestor.financeiro.dto.MovimentacaoRequest;
 import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Conta;
+import com.gestor.financeiro.model.FaturaCartao;
+import com.gestor.financeiro.model.FaturaLancamento;
 import com.gestor.financeiro.model.Meta;
+import com.gestor.financeiro.model.Parcela;
 import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.TipoCarteira;
 import com.gestor.financeiro.model.enums.TipoConta;
+import com.gestor.financeiro.model.enums.TipoFaturaLancamento;
 import com.gestor.financeiro.model.enums.TipoTransacao;
+import com.gestor.financeiro.model.enums.ModalidadeMeta;
+import com.gestor.financeiro.model.enums.StatusMeta;
 import com.gestor.financeiro.repository.CarteiraRepository;
+import com.gestor.financeiro.repository.FaturaCartaoRepository;
+import com.gestor.financeiro.repository.FaturaLancamentoRepository;
+import com.gestor.financeiro.repository.MetaRepository;
+import com.gestor.financeiro.repository.ParcelaRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
 import com.gestor.financeiro.service.ContaService;
 import com.gestor.financeiro.service.InvestimentoService;
@@ -29,6 +39,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.Map;
+import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -58,10 +70,16 @@ class MetricasServiceTest {
     @Autowired InvestimentoService investimentoService;
     @Autowired CarteiraRepository carteiraRepository;
     @Autowired UsuarioRepository usuarioRepository;
+    @Autowired MetaRepository metaRepository;
+    @Autowired ParcelaRepository parcelaRepository;
+    @Autowired FaturaCartaoRepository faturaCartaoRepository;
+    @Autowired FaturaLancamentoRepository faturaLancamentoRepository;
     @Autowired Clock clock;
 
     private Usuario usuario;
     private Carteira corrente;
+    private Conta cartao;
+    private Transacao compraCartao;
     private LocalDate hoje;
 
     @BeforeEach
@@ -83,20 +101,20 @@ class MetricasServiceTest {
                 usuario.getId(), corrente.getId(), poupanca.getId(),
                 new BigDecimal("200.00"), "Guardar", null, null));
 
-        Conta cartao = new Conta();
+        cartao = new Conta();
         cartao.setNome("Cartao");
         cartao.setTipo(TipoConta.CREDITO);
         cartao.setDiaFechamento(28);
         cartao.setDiaVencimento(10);
         cartao = contaService.criar(cartao, usuario.getId());
-        Transacao compraCartao = new Transacao();
+        compraCartao = new Transacao();
         compraCartao.setDescricao("Notebook");
         compraCartao.setValorTotal(new BigDecimal("400.00"));
         compraCartao.setTipo(TipoTransacao.SAIDA);
         compraCartao.setData(hoje);
         compraCartao.setConta(cartao);
         compraCartao.setParcelado(false);
-        transacaoService.criar(compraCartao, usuario.getId());
+        compraCartao = transacaoService.criar(compraCartao, usuario.getId());
 
         Meta meta = new Meta();
         meta.setNome("Viagem");
@@ -188,12 +206,24 @@ class MetricasServiceTest {
 
     @Test
     void drillDownExplicaCadaNumero() {
-        var disponivel = metricasService.origens(usuario.getId(), "DISPONIVEL_AGORA");
-        BigDecimal somaDisponivel = disponivel.stream()
-                .map(MetricasService.Origem::valor)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        assertEquals(0, metricasService.calcular(usuario.getId()).disponivelAgora()
-                .compareTo(somaDisponivel));
+        MetricasService.Metricas metricas = metricasService.calcular(usuario.getId());
+        Map<String, Function<MetricasService.Metricas, BigDecimal>> valores = Map.of(
+                "DISPONIVEL_AGORA", MetricasService.Metricas::disponivelAgora,
+                "RESERVADO", MetricasService.Metricas::reservado,
+                "COMPROMETIDO", MetricasService.Metricas::comprometido,
+                "DISPONIVEL_PARA_GASTAR", MetricasService.Metricas::disponivelParaGastar,
+                "INVESTIDO", MetricasService.Metricas::investido,
+                "DIVIDAS", MetricasService.Metricas::dividas,
+                "RESULTADO_MENSAL", MetricasService.Metricas::resultadoMensal,
+                "PATRIMONIO_LIQUIDO", MetricasService.Metricas::patrimonioLiquido,
+                "VARIACAO_PATRIMONIAL", m -> m.variacaoPatrimonial().total());
+
+        valores.forEach((nome, extrair) -> {
+            BigDecimal soma = metricasService.origens(usuario.getId(), nome).stream()
+                    .map(MetricasService.Origem::valor)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            assertEquals(0, extrair.apply(metricas).compareTo(soma), nome);
+        });
 
         var dividas = metricasService.origens(usuario.getId(), "DIVIDAS");
         assertEquals(1, dividas.size());
@@ -205,5 +235,77 @@ class MetricasServiceTest {
         var investido = metricasService.origens(usuario.getId(), "INVESTIDO");
         assertEquals(1, investido.size());
         assertEquals("NEXO3", investido.get(0).descricao());
+
+        var resultado = metricasService.origens(usuario.getId(), "RESULTADO_MENSAL");
+        assertTrue(resultado.stream().allMatch(o -> o.tipo().endsWith("COMPETENCIA")));
+
+        var variacao = metricasService.origens(usuario.getId(), "VARIACAO_PATRIMONIAL");
+        assertTrue(variacao.stream().anyMatch(o -> "VARIACAO_CAIXA".equals(o.tipo())));
+        assertTrue(variacao.stream().anyMatch(o -> "VARIACAO_PASSIVO".equals(o.tipo())));
+        assertTrue(variacao.stream().anyMatch(o -> "APORTES_INVESTIMENTO".equals(o.tipo())));
+    }
+
+    @Test
+    void drillDownReplicaFiltrosDeMetaArquivadaRolloverEParcelaDeCartao() {
+        Meta arquivada = new Meta();
+        arquivada.setUsuario(usuario);
+        arquivada.setNome("Meta antiga");
+        arquivada.setValorTotal(new BigDecimal("100.00"));
+        arquivada.setValorReservado(new BigDecimal("77.00"));
+        arquivada.setModalidade(ModalidadeMeta.RESERVA_VIRTUAL);
+        arquivada.setStatus(StatusMeta.ARQUIVADA);
+        arquivada.setAtiva(false);
+        metaRepository.save(arquivada);
+
+        Parcela parcelaCartao = new Parcela();
+        parcelaCartao.setTransacao(compraCartao);
+        parcelaCartao.setNumeroParcela(1);
+        parcelaCartao.setTotalParcelas(1);
+        parcelaCartao.setValor(new BigDecimal("123.00"));
+        parcelaCartao.setDataVencimento(hoje);
+        parcelaRepository.save(parcelaCartao);
+
+        FaturaCartao origem = faturaCartaoRepository.findByUsuarioId(usuario.getId()).get(0);
+        origem.setDataVencimento(hoje);
+        origem = faturaCartaoRepository.save(origem);
+
+        LocalDate mesDestino = hoje.plusMonths(12);
+        FaturaCartao destino = new FaturaCartao();
+        destino.setUsuario(usuario);
+        destino.setConta(cartao);
+        destino.setMes(mesDestino.getMonthValue());
+        destino.setAno(mesDestino.getYear());
+        destino.setDataVencimento(mesDestino);
+        destino = faturaCartaoRepository.save(destino);
+
+        FaturaLancamento rollover = new FaturaLancamento();
+        rollover.setFatura(destino);
+        rollover.setFaturaOrigem(origem);
+        rollover.setDescricao("Saldo devedor anterior");
+        rollover.setValor(new BigDecimal("400.00"));
+        rollover.setDataCompra(hoje);
+        rollover.setTipo(TipoFaturaLancamento.SALDO_DEVEDOR_ANTERIOR);
+        faturaLancamentoRepository.save(rollover);
+
+        MetricasService.Metricas metricas = metricasService.calcular(usuario.getId());
+        assertEquals(0, new BigDecimal("250.00").compareTo(metricas.reservado()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(metricas.comprometido()));
+
+        BigDecimal reservado = somaOrigens("RESERVADO");
+        BigDecimal comprometido = somaOrigens("COMPROMETIDO");
+        assertEquals(0, metricas.reservado().compareTo(reservado));
+        assertEquals(0, metricas.comprometido().compareTo(comprometido));
+        Long origemId = origem.getId();
+        Long parcelaCartaoId = parcelaCartao.getId();
+        assertTrue(metricasService.origens(usuario.getId(), "RESERVADO").stream()
+                .noneMatch(o -> arquivada.getId().equals(o.id())));
+        assertTrue(metricasService.origens(usuario.getId(), "COMPROMETIDO").stream()
+                .noneMatch(o -> origemId.equals(o.id()) || parcelaCartaoId.equals(o.id())));
+    }
+
+    private BigDecimal somaOrigens(String metrica) {
+        return metricasService.origens(usuario.getId(), metrica).stream()
+                .map(MetricasService.Origem::valor)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 }

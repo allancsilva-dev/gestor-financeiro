@@ -170,6 +170,8 @@ public class InvestimentoService {
             .quantidade(mov.getQuantidade())
             .precoUnitario(mov.getPrecoUnitario())
             .valorTotal(mov.getValorTotal())
+            .conciliacao(mov.getConciliacao())
+            .operacaoId(mov.getOperacao() == null ? null : mov.getOperacao().getId())
             .build();
     }
 
@@ -286,6 +288,8 @@ public class InvestimentoService {
                 .quantidade(m.getQuantidade())
                 .precoUnitario(m.getPrecoUnitario())
                 .valorTotal(m.getValorTotal())
+                .conciliacao(m.getConciliacao())
+                .operacaoId(m.getOperacao() == null ? null : m.getOperacao().getId())
                 .build())
             .collect(Collectors.toList());
     }

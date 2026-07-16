@@ -25,8 +25,9 @@ public interface MetaRepository extends JpaRepository<Meta, Long> {
     java.math.BigDecimal sumReservaVirtual(
             @org.springframework.data.repository.query.Param("usuarioId") Long usuarioId);
 
-    java.util.List<Meta> findByUsuarioIdAndModalidade(Long usuarioId,
-            com.gestor.financeiro.model.enums.ModalidadeMeta modalidade);
+    java.util.List<Meta> findByUsuarioIdAndModalidadeAndStatusNot(Long usuarioId,
+            com.gestor.financeiro.model.enums.ModalidadeMeta modalidade,
+            StatusMeta status);
 
     // Soma das alocacoes virtuais de outras metas sobre a mesma conta (PR-F2-12)
     @org.springframework.data.jpa.repository.Query(

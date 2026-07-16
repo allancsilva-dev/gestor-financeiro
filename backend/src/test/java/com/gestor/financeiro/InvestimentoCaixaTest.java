@@ -3,6 +3,7 @@ package com.gestor.financeiro;
 import com.gestor.financeiro.dto.AtivoRequest;
 import com.gestor.financeiro.dto.AtivoResponse;
 import com.gestor.financeiro.dto.MovimentacaoRequest;
+import com.gestor.financeiro.dto.MovimentacaoResponse;
 import com.gestor.financeiro.exception.BusinessException;
 import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.MovimentacaoAtivo;
@@ -90,8 +91,11 @@ class InvestimentoCaixaTest {
 
     @Test
     void compraComCaixaEConversaoPatrimonialConciliada() {
-        investimentoService.adicionarMovimentacao(usuario.getId(), ativoId,
+        MovimentacaoResponse response = investimentoService.adicionarMovimentacao(usuario.getId(), ativoId,
                 compra(BigDecimal.TEN, new BigDecimal("10.00"), caixa.getId(), null));
+
+        assertEquals(ConciliacaoInvestimento.CONCILIADA, response.getConciliacao());
+        assertNotNull(response.getOperacaoId());
 
         // caixa debitado (conversao patrimonial)
         assertEquals(0, new BigDecimal("1900.00").compareTo(
@@ -106,8 +110,11 @@ class InvestimentoCaixaTest {
 
     @Test
     void snapshotExternoNaoMovimentaCaixaEFicaNaoConciliado() {
-        investimentoService.adicionarMovimentacao(usuario.getId(), ativoId,
+        MovimentacaoResponse response = investimentoService.adicionarMovimentacao(usuario.getId(), ativoId,
                 compra(BigDecimal.TEN, new BigDecimal("10.00"), null, true));
+
+        assertEquals(ConciliacaoInvestimento.EXTERNO, response.getConciliacao());
+        assertEquals(null, response.getOperacaoId());
 
         assertEquals(0, new BigDecimal("2000.00").compareTo(
                 carteiraRepository.findById(caixa.getId()).orElseThrow().getSaldo()));

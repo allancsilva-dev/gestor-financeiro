@@ -7,6 +7,20 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ---
 
+## [Fase 2 — PR-F2-16A] - 2026-07-16
+
+### Contratos prontos para clientes
+- As nove métricas oficiais expõem drill-down cuja soma reconcilia com o total; metas arquivadas,
+  faturas roladas e parcelas de cartão já representadas na fatura ficam fora da origem.
+- Resultado mensal é detalhado por componentes de competência e variação patrimonial por
+  componentes de caixa, passivo e aportes líquidos.
+- `/api/v1/contas-financeiras` passa a oferecer criação, edição, exclusão, ajuste, movimentos e
+  reconciliação; `/api/v1/carteiras` permanece compatível até PR-F2-19.
+- Movimentações de investimento retornam `conciliacao` e `operacaoId`.
+- Expo atualizado somente de `54.0.35` para o patch `54.0.36` do SDK 54.
+- Nenhum deploy foi executado. `PROB-0081` permanece reaberto e rclone off-host continua sendo
+  gate obrigatório antes de produção, PR-F2-19 e encerramento da Fase 2.
+
 ## [Mobile 1.1.1] - 2026-07-15
 
 ### Android

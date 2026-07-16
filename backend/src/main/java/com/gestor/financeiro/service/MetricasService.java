@@ -7,6 +7,7 @@ import com.gestor.financeiro.model.enums.FaturaStatus;
 import com.gestor.financeiro.model.enums.ModalidadeMeta;
 import com.gestor.financeiro.model.enums.NaturezaContaFinanceira;
 import com.gestor.financeiro.model.enums.StatusPagamento;
+import com.gestor.financeiro.model.enums.StatusMeta;
 import com.gestor.financeiro.model.enums.SubtipoContaFinanceira;
 import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.model.enums.TipoMovimentacao;
@@ -182,9 +183,12 @@ public class MetricasService {
             case "DISPONIVEL_AGORA" -> contasOrigem(usuarioId, NaturezaContaFinanceira.ATIVO, true);
             case "RESERVADO" -> reservadoOrigem(usuarioId);
             case "COMPROMETIDO" -> comprometidoOrigem(usuarioId, horizonte);
+            case "DISPONIVEL_PARA_GASTAR" -> disponivelParaGastarOrigem(usuarioId, horizonte);
             case "INVESTIDO" -> investidoOrigem(usuarioId);
             case "DIVIDAS" -> dividasOrigem(usuarioId);
+            case "RESULTADO_MENSAL" -> resultadoMensalOrigem(usuarioId, hoje);
             case "PATRIMONIO_LIQUIDO" -> patrimonioOrigem(usuarioId);
+            case "VARIACAO_PATRIMONIAL" -> variacaoPatrimonialOrigem(usuarioId, hoje);
             default -> throw new BusinessException(
                     "Métrica sem drill-down disponível: " + metrica);
         };
@@ -207,7 +211,8 @@ public class MetricasService {
                 usuarioId, SubtipoContaFinanceira.COFRE)) {
             origens.add(new Origem("COFRE", cofre.getId(), cofre.getNome(), cofre.getSaldo()));
         }
-        for (Meta meta : metaRepository.findByUsuarioIdAndModalidade(usuarioId, ModalidadeMeta.RESERVA_VIRTUAL)) {
+        for (Meta meta : metaRepository.findByUsuarioIdAndModalidadeAndStatusNot(
+                usuarioId, ModalidadeMeta.RESERVA_VIRTUAL, StatusMeta.ARQUIVADA)) {
             if (meta.getValorReservado() != null && meta.getValorReservado().signum() > 0) {
                 origens.add(new Origem("ALOCACAO_VIRTUAL", meta.getId(),
                         "Meta: " + meta.getNome(), meta.getValorReservado()));
@@ -218,9 +223,8 @@ public class MetricasService {
 
     private List<Origem> comprometidoOrigem(Long usuarioId, LocalDate horizonte) {
         List<Origem> origens = new ArrayList<>();
-        faturaCartaoRepository.findByUsuarioId(usuarioId).stream()
-                .filter(f -> f.getStatus() != FaturaStatus.PAGA)
-                .filter(f -> f.getDataVencimento() != null && !f.getDataVencimento().isAfter(horizonte))
+        faturaCartaoRepository.findComprometidasNoPeriodo(
+                usuarioId, FaturaStatus.PAGA, INICIO_OBRIGACOES, horizonte).stream()
                 .forEach(f -> {
                     BigDecimal restante = nvl(f.getValorTotal()).subtract(nvl(f.getValorPago()));
                     if (restante.signum() > 0) {
@@ -228,13 +232,46 @@ public class MetricasService {
                                 "Fatura " + f.getMes() + "/" + f.getAno(), restante));
                     }
                 });
-        parcelaRepository.findFuturasByUsuarioId(usuarioId, INICIO_OBRIGACOES, StatusPagamento.PAGO)
-                .stream()
-                .filter(p -> !p.getDataVencimento().isAfter(horizonte))
+        parcelaRepository.findComprometidasNoPeriodo(
+                usuarioId, INICIO_OBRIGACOES, horizonte, StatusPagamento.PAGO,
+                TipoTransacao.SAIDA, TipoConta.CREDITO).stream()
                 .forEach(p -> origens.add(new Origem("PARCELA", p.getId(),
                         p.getTransacao().getDescricao() + " " + p.getNumeroParcela() + "/"
                                 + p.getTotalParcelas(), p.getValor())));
         return origens;
+    }
+
+    private List<Origem> disponivelParaGastarOrigem(Long usuarioId, LocalDate horizonte) {
+        List<Origem> origens = new ArrayList<>(
+                contasOrigem(usuarioId, NaturezaContaFinanceira.ATIVO, true));
+        reservadoOrigem(usuarioId).forEach(o -> origens.add(
+                new Origem(o.tipo(), o.id(), o.descricao(), o.valor().negate())));
+        comprometidoOrigem(usuarioId, horizonte).forEach(o -> origens.add(
+                new Origem(o.tipo(), o.id(), o.descricao(), o.valor().negate())));
+        return origens;
+    }
+
+    private List<Origem> resultadoMensalOrigem(Long usuarioId, LocalDate referencia) {
+        LocalDate inicio = referencia.withDayOfMonth(1);
+        LocalDate fim = referencia.withDayOfMonth(referencia.lengthOfMonth());
+        VisaoFinanceiraService.DetalheCompetencia detalhe =
+                visaoFinanceiraService.detalheCompetencia(usuarioId, inicio, fim);
+        return List.of(
+                new Origem("ENTRADAS_COMPETENCIA", null, "Entradas por competência", detalhe.entradas()),
+                new Origem("SAIDAS_NAO_CARTAO_COMPETENCIA", null,
+                        "Saídas não cartão por competência", detalhe.saidasNaoCartao().negate()),
+                new Origem("CONSUMO_CARTAO_COMPETENCIA", null,
+                        "Consumo de cartão por competência", detalhe.consumoCartao().negate()));
+    }
+
+    private List<Origem> variacaoPatrimonialOrigem(Long usuarioId, LocalDate referencia) {
+        VariacaoPatrimonial variacao = variacaoPatrimonial(
+                usuarioId, referencia.withDayOfMonth(1), referencia);
+        return List.of(
+                new Origem("VARIACAO_CAIXA", null, "Variação do caixa", variacao.caixa()),
+                new Origem("VARIACAO_PASSIVO", null, "Variação do passivo", variacao.passivo().negate()),
+                new Origem("APORTES_INVESTIMENTO", null,
+                        "Aportes líquidos em investimentos", variacao.aportesInvestimento()));
     }
 
     private List<Origem> investidoOrigem(Long usuarioId) {
@@ -261,9 +298,10 @@ public class MetricasService {
     private List<Origem> patrimonioOrigem(Long usuarioId) {
         List<Origem> origens = new ArrayList<>(contasOrigem(usuarioId, NaturezaContaFinanceira.ATIVO, false));
         origens.addAll(investidoOrigem(usuarioId));
-        for (Origem divida : dividasOrigem(usuarioId)) {
-            origens.add(new Origem(divida.tipo(), divida.id(), divida.descricao(),
-                    divida.valor().negate()));
+        for (Carteira passivo : carteiraRepository.findByUsuarioIdAndNatureza(
+                usuarioId, NaturezaContaFinanceira.PASSIVO)) {
+            origens.add(new Origem("CONTA_FINANCEIRA", passivo.getId(), passivo.getNome(),
+                    passivo.getSaldo().negate()));
         }
         return origens;
     }
