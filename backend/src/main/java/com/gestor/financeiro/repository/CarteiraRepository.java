@@ -29,8 +29,17 @@ public interface CarteiraRepository extends JpaRepository<Carteira, Long> {
 
     Optional<Carteira> findByUsuarioIdAndNomeIgnoreCase(Long usuarioId, String nome);
 
-    @Query("SELECT COALESCE(SUM(c.saldo), 0) FROM Carteira c WHERE c.usuario.id = :usuarioId")
+    /**
+     * Saldo total de caixa: somente contas de natureza ATIVO. Passivo do cartao
+     * (subtipo CARTAO, PR-F2-06) nunca compoe saldo disponivel (ADR-0013).
+     */
+    @Query("SELECT COALESCE(SUM(c.saldo), 0) FROM Carteira c WHERE c.usuario.id = :usuarioId "
+            + "AND c.natureza = com.gestor.financeiro.model.enums.NaturezaContaFinanceira.ATIVO")
     BigDecimal sumSaldoByUsuarioId(@Param("usuarioId") Long usuarioId);
+
+    /** Listagem legada de /carteiras: oculta a conta passiva do cartao (PR-F2-06). */
+    Page<Carteira> findByUsuarioIdAndSubtipoNot(Long usuarioId,
+            com.gestor.financeiro.model.enums.SubtipoContaFinanceira subtipo, Pageable pageable);
 
     @Query("""
             SELECT c.id AS carteiraId,

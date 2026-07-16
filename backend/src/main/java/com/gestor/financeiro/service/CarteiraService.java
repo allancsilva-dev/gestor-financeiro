@@ -36,9 +36,18 @@ public class CarteiraService {
     private final LedgerService ledgerService;
     private final MovimentoCarteiraRepository movimentoCarteiraRepository;
     
-    // Lista carteiras do usuário
+    // Lista contas financeiras do usuário (todas — rota nova /contas-financeiras)
     public Page<Carteira> listarPorUsuario(Long usuarioId, Pageable pageable) {
         return carteiraRepository.findByUsuarioId(usuarioId, pageable);
+    }
+
+    /**
+     * Listagem legada de /carteiras (PR-F2-06): oculta a conta passiva do
+     * cartao, que clientes antigos ja exibem via /contas.
+     */
+    public Page<Carteira> listarLegadoPorUsuario(Long usuarioId, Pageable pageable) {
+        return carteiraRepository.findByUsuarioIdAndSubtipoNot(
+                usuarioId, com.gestor.financeiro.model.enums.SubtipoContaFinanceira.CARTAO, pageable);
     }
     
     // Busca carteira por ID

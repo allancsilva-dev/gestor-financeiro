@@ -39,7 +39,7 @@ public class CarteiraController {
     ) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Pageable cappedPageable = PaginationUtils.enforceMaxSize(pageable, 100);
-        Page<Carteira> carteiras = carteiraService.listarPorUsuario(usuarioId, cappedPageable);
+        Page<Carteira> carteiras = carteiraService.listarLegadoPorUsuario(usuarioId, cappedPageable);
         return ResponseEntity.ok(carteiras.map(CarteiraResponseDto::fromEntity));
     }
     

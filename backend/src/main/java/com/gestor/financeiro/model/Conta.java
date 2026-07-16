@@ -51,4 +51,13 @@ public class Conta {
 
     @Column(length = 60)
     private String banco;
+
+    /**
+     * Conta financeira passiva do cartao (PR-F2-06, ADR-0008): 1:1 para tipo
+     * CREDITO. Conta vira configuracao interna do cartao; o passivo devedor
+     * vive no ledger da conta financeira.
+     */
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "conta_financeira_id", unique = true)
+    private Carteira contaFinanceira;
 }

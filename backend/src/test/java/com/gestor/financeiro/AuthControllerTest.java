@@ -313,7 +313,8 @@ class AuthControllerTest {
 
         var usuario = usuarioRepository.findByEmail("alice.mobile@teste.com").orElseThrow();
         assertThat(usuario.isOnboardingCompleto()).isTrue();
-        assertThat(carteiraRepository.findByUsuarioId(usuario.getId())).hasSize(1);
+        // caixa + conta passiva do cartao criada no pareamento (PR-F2-06)
+        assertThat(carteiraRepository.findByUsuarioId(usuario.getId())).hasSize(2);
         assertThat(contaRepository.findByUsuarioIdAndAtivoTrue(usuario.getId())).hasSize(1);
         // 2 categorias do payload + categoria "Renda" criada automaticamente para a renda inicial
         assertThat(categoriaRepository.findByUsuarioIdAndAtivoTrue(usuario.getId()))

@@ -99,7 +99,8 @@ class OnboardingAtomicidadeTest {
         onboardingService.finalizar(request(null));
 
         Long id = usuario.getId();
-        assertEquals(1, carteiraRepository.findByUsuarioId(id).size());
+        // caixa + conta passiva do cartao criada no pareamento (PR-F2-06)
+        assertEquals(2, carteiraRepository.findByUsuarioId(id).size());
         assertEquals(1, contaFixaRepository.findByUsuarioIdAndAtivoTrue(id).size());
         assertTrue(usuarioRepository.findById(id).orElseThrow().isOnboardingCompleto());
         assertTrue(projecaoService.projetar(id, 2).meses().stream()
@@ -140,7 +141,8 @@ class OnboardingAtomicidadeTest {
         Long id = usuario.getId();
         assertEquals(threads, sucessos.get());
         assertEquals(0, falhas.get());
-        assertEquals(1, carteiraRepository.findByUsuarioId(id).size());
+        // caixa + conta passiva do cartao (PR-F2-06); concorrencia nao duplica
+        assertEquals(2, carteiraRepository.findByUsuarioId(id).size());
         assertEquals(1, contaRepository.findByUsuarioIdAndAtivoTrue(id).size());
         assertEquals(1, contaFixaRepository.findByUsuarioIdAndAtivoTrue(id).size());
         assertEquals(1, metaRepository.findByUsuarioIdAndAtivaTrue(id).size());

@@ -14,12 +14,13 @@ public enum SubtipoContaFinanceira {
     CUSTODIA,
     CARTAO;
 
-    /** Mapeamento deterministico do modelo legado (mesma regra do backfill V32). */
+    /** Mapeamento deterministico do modelo legado (mesma regra do backfill V32/V35). */
     public static SubtipoContaFinanceira deTipoLegado(TipoCarteira tipo) {
         return switch (tipo) {
             case DINHEIRO -> DINHEIRO;
             case CONTA_BANCARIA -> CORRENTE;
             case POUPANCA -> POUPANCA;
+            case CARTAO -> CARTAO;
         };
     }
 

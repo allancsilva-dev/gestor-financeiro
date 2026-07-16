@@ -3,8 +3,12 @@ package com.gestor.financeiro.service;
 import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.exception.UnauthorizedAccessException;
+import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.Usuario;
+import com.gestor.financeiro.model.enums.TipoCarteira;
+import com.gestor.financeiro.model.enums.TipoConta;
+import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.ContaRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
 import org.springframework.data.domain.Page;
@@ -19,6 +23,7 @@ import java.util.List;
 public class ContaService {
     private final ContaRepository contaRepository;
     private final UsuarioRepository usuarioRepository;
+    private final CarteiraRepository carteiraRepository;
     
     // Lista contas ativas do usuário
     public Page<Conta> listarPorUsuario(Long usuarioId, Pageable pageable) {
@@ -38,7 +43,18 @@ public class ContaService {
         if (conta.getValorGasto() == null) conta.setValorGasto(BigDecimal.ZERO);
         if (conta.getSaldoAtual() == null) conta.setSaldoAtual(BigDecimal.ZERO);
         if (conta.getLimiteTotal() == null) conta.setLimiteTotal(BigDecimal.ZERO);
-        
+
+        // Cartao nasce pareado com sua conta financeira passiva (PR-F2-06)
+        if (conta.getTipo() == TipoConta.CREDITO && conta.getContaFinanceira() == null) {
+            Carteira passivo = new Carteira();
+            passivo.setNome(conta.getNome());
+            passivo.setTipo(TipoCarteira.CARTAO);
+            passivo.setSaldo(BigDecimal.ZERO);
+            passivo.setBanco(conta.getBanco());
+            passivo.setUsuario(usuario);
+            conta.setContaFinanceira(carteiraRepository.save(passivo));
+        }
+
         return contaRepository.save(conta);
     }
     
