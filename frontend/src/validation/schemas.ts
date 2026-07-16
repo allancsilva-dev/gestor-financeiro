@@ -45,7 +45,7 @@ const transacaoBaseShape = {
   valor: positiveMoneySchema,
   tipo: z.enum(['ENTRADA', 'SAIDA']),
   data: isoDateSchema,
-  contaId: positiveIdSchema,
+  cartaoId: positiveIdSchema,
   parcelado: z.boolean().default(false),
   totalParcelas: z.preprocess(emptyToUndefined, z.coerce.number().int().min(2, 'Mínimo de 2 parcelas').max(48, 'Máximo de 48 parcelas').optional()),
 };
@@ -131,8 +131,9 @@ export const faturaPagamentoSchema = (saldoRestante: number) => pagamentoSchema.
 
 export const onboardingContaSchema = z.object({
   nome: requiredTextSchema('Nome', 100),
-  tipo: z.enum(['CREDITO', 'DEBITO', 'DINHEIRO', 'POUPANCA']),
   limiteTotal: nonNegativeMoneySchema,
+  diaFechamento: dayOfMonthSchema,
+  diaVencimento: dayOfMonthSchema,
 });
 export const onboardingRendaSchema = z.object({
   nome: requiredTextSchema('Nome', 100),

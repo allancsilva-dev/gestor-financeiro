@@ -40,7 +40,7 @@ export default function Transacoes() {
     categoriaNome: '',
     categoriaCor: '',
     categoriaIcone: '',
-    contaId: '',
+    cartaoId: '',
     parcelado: false,
     totalParcelas: ''
   });
@@ -86,7 +86,7 @@ export default function Transacoes() {
         categoriaNome: transacao.categoria?.nome || '',
         categoriaCor: transacao.categoria?.cor || '',
         categoriaIcone: transacao.categoria?.icone || '',
-        contaId: transacao.conta?.id?.toString() || '',
+        cartaoId: transacao.cartao?.id?.toString() || '',
         parcelado: transacao.parcelado || false,
         totalParcelas: transacao.totalParcelas?.toString() || ''
       });
@@ -108,7 +108,7 @@ export default function Transacoes() {
       categoriaNome: '',
       categoriaCor: '',
       categoriaIcone: '',
-      contaId: '',
+      cartaoId: '',
       parcelado: false,
       totalParcelas: ''
     });
@@ -172,7 +172,7 @@ export default function Transacoes() {
         valorTotal: parsed.valor,
         tipo: parsed.tipo,
         data: parsed.data,
-        cartaoId: parsed.contaId,
+        cartaoId: parsed.cartaoId,
         categoria: { id: categoriaId },
         parcelado: parsed.parcelado,
         totalParcelas: parsed.parcelado ? parsed.totalParcelas : undefined,
@@ -353,9 +353,9 @@ export default function Transacoes() {
                 <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">Conta</label>
                     <select
-                      {...fieldA11y('contaId', validation.errors.contaId)}
-                      value={formData.contaId}
-                      onChange={(e) => { const next = { ...formData, contaId: e.target.value }; setFormData(next); validation.revalidateField('contaId', validationInput(next)); }}
+                      {...fieldA11y('cartaoId', validation.errors.cartaoId)}
+                      value={formData.cartaoId}
+                      onChange={(e) => { const next = { ...formData, cartaoId: e.target.value }; setFormData(next); validation.revalidateField('cartaoId', validationInput(next)); }}
                       className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 aria-invalid:border-red-500"
                       required
                     >
@@ -366,7 +366,7 @@ export default function Transacoes() {
                         </option>
                       ))}
                     </select>
-                    <FieldError name="contaId" error={validation.errors.contaId} />
+                    <FieldError name="cartaoId" error={validation.errors.cartaoId} />
                     {contasPorTipo.length === 0 && (
                       <p className="text-xs text-gray-500 mt-1">
                         Nenhum cartão cadastrado.
@@ -590,7 +590,7 @@ export default function Transacoes() {
                           </span>
                         </td>
                         <td className="px-6 py-4 text-gray-700">
-                          {t.conta?.nome || 'N/A'}
+                          {t.cartao?.nome || 'N/A'}
                         </td>
                         <td className="px-6 py-4">
                           <span className={`font-semibold ${t.tipo === 'ENTRADA' ? 'text-green-600' : 'text-red-600'}`}>

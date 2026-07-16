@@ -4,7 +4,7 @@ import type { PagedResponse } from '../types';
 export interface Transacao {
   id?: number;
   usuario?: { id: number };
-  conta?: { id: number };
+  cartao?: { id: number; nome: string };
   cartaoId?: number;
   categoria?: { id: number };
   descricao: string;

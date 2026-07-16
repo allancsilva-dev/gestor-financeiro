@@ -16,9 +16,8 @@ export interface FaturaLancamento {
 
 export interface FaturaResponse {
   id: number;
-  contaId: number;
   cartaoId: number;
-  contaNome: string;
+  cartaoNome: string;
   mes: number;
   ano: number;
   dataFechamento: string;

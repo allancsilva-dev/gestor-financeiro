@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '../src/theme';
 import { onboardingService, OnboardingFinalizarRequest } from '../src/services/onboardingService';
-import { ApiErrorWithMessage, TipoCarteira } from '../src/types';
+import { ApiErrorWithMessage } from '../src/types';
 import { useAuth } from '../src/context/AuthContext';
 import { CATEGORY_COLORS, isValidDateBR, maskCurrencyInput, parseCurrencyBR, parseDateBR } from '../src/utils/format';
 import { isValidDayOfMonth } from '../src/utils/validate';
@@ -19,6 +19,7 @@ import Field from '../src/components/ui/Field';
 import Chip from '../src/components/ui/Chip';
 
 const PASSOS = ['Conta', 'Cartão', 'Categorias', 'Renda', 'Meta', 'Confirmar'];
+type TipoContaInicial = 'DINHEIRO' | 'CONTA_BANCARIA' | 'POUPANCA';
 
 // Cores da paleta canônica de categorias (CATEGORY_COLORS) — mesma do seletor em Mais > Categorias
 const CATEGORIAS_SUGERIDAS = [
@@ -42,7 +43,7 @@ export default function OnboardingScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [carteira, setCarteira] = useState({ nome: 'Conta Principal', tipo: 'CONTA_BANCARIA' as TipoCarteira, saldo: '' });
+  const [carteira, setCarteira] = useState({ nome: 'Conta Principal', tipo: 'CONTA_BANCARIA' as TipoContaInicial, saldo: '' });
   const [conta, setConta] = useState({ nome: 'Cartão Principal', limiteTotal: '', diaFechamento: '5', diaVencimento: '12' });
   const [categoriasSelecionadas, setCategoriasSelecionadas] = useState<string[]>(CATEGORIAS_SUGERIDAS.map((c) => c.nome));
   const [renda, setRenda] = useState({ nome: 'Salário', valor: '', diaVencimento: '1' });
@@ -101,7 +102,7 @@ export default function OnboardingScreen() {
     return {
       carteira: {
         nome: carteira.nome.trim(),
-        tipo: carteira.tipo,
+        subtipo: carteira.tipo === 'CONTA_BANCARIA' ? 'CORRENTE' : carteira.tipo,
         saldo: parseCurrencyBR(carteira.saldo || '0'),
       },
       cartao: {
@@ -177,7 +178,7 @@ export default function OnboardingScreen() {
           />
           <Text style={[styles.label, { color: colors.textSecondary }]}>TIPO</Text>
           <View style={styles.chipRow}>
-            {(['CONTA_BANCARIA', 'DINHEIRO', 'POUPANCA'] as TipoCarteira[]).map((t) => (
+            {(['CONTA_BANCARIA', 'DINHEIRO', 'POUPANCA'] as TipoContaInicial[]).map((t) => (
               <Chip
                 key={t}
                 label={t === 'CONTA_BANCARIA' ? 'Bancária' : t === 'DINHEIRO' ? 'Dinheiro' : 'Poupança'}

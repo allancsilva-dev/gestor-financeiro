@@ -38,7 +38,9 @@ export default function Onboarding() {
   const [loading, setLoading] = useState(false);
 
   const [carteira, setCarteira] = useState({ nome: 'Carteira Principal', tipo: 'CONTA_BANCARIA', saldo: '', banco: '' });
-  const [conta, setConta] = useState({ nome: 'Cartão Principal', tipo: 'CREDITO', limiteTotal: '' });
+  const [cartao, setCartao] = useState({
+    nome: 'Cartão Principal', limiteTotal: '', diaFechamento: '5', diaVencimento: '12',
+  });
   const [categoriasSelecionadas, setCategoriasSelecionadas] = useState<string[]>(
     CATEGORIAS_SUGERIDAS.map((c) => c.nome)
   );
@@ -49,7 +51,7 @@ export default function Onboarding() {
 
   const [resumo, setResumo] = useState<{
     carteiraCriada?: string;
-    contaCriada?: string;
+    cartaoCriado?: string;
     categoriasCriadas?: string[];
     rendaCriada?: string;
     metaCriada?: string;
@@ -72,9 +74,9 @@ export default function Onboarding() {
   };
 
   const handleValidarConta = () => {
-    const parsed = contaValidation.validate(conta);
+    const parsed = contaValidation.validate(cartao);
     if (!parsed) return;
-    setResumo((r) => ({ ...r, contaCriada: `${conta.nome} (${conta.tipo})` }));
+    setResumo((r) => ({ ...r, cartaoCriado: cartao.nome }));
     setPasso(2);
   };
 
@@ -110,8 +112,8 @@ export default function Onboarding() {
 
   const handleFinalizar = async () => {
     const carteiraParsed = carteiraValidation.validate(carteira);
-    const contaParsed = contaValidation.validate(conta);
-    if (!carteiraParsed || !contaParsed || categoriasSelecionadas.length === 0) {
+    const cartaoParsed = contaValidation.validate(cartao);
+    if (!carteiraParsed || !cartaoParsed || categoriasSelecionadas.length === 0) {
       toast.error('Revise os passos anteriores antes de finalizar');
       return;
     }
@@ -131,13 +133,15 @@ export default function Onboarding() {
       await onboardingService.finalizar({
         carteira: {
           nome: carteiraParsed.nome,
-          tipo: carteiraParsed.tipo,
+          subtipo: carteiraParsed.tipo === 'CONTA_BANCARIA' ? 'CORRENTE' : carteiraParsed.tipo,
           saldo: carteiraParsed.saldo ?? 0,
           banco: carteiraParsed.banco || undefined,
         },
         cartao: {
-          nome: contaParsed.nome,
-          limiteTotal: contaParsed.tipo === 'CREDITO' ? contaParsed.limiteTotal : undefined,
+          nome: cartaoParsed.nome,
+          limiteTotal: cartaoParsed.limiteTotal,
+          diaFechamento: cartaoParsed.diaFechamento,
+          diaVencimento: cartaoParsed.diaVencimento,
         },
         categorias: categoriasSelecionadas.map((nome) => {
           const sugerida = CATEGORIAS_SUGERIDAS.find((c) => c.nome === nome);
@@ -288,43 +292,45 @@ export default function Onboarding() {
                 <input
                   {...fieldA11y('nome', contaValidation.errors.nome)}
                   type="text"
-                  value={conta.nome}
-                  onChange={(e) => { const next = { ...conta, nome: e.target.value }; setConta(next); contaValidation.revalidateField('nome', next); }}
+                  value={cartao.nome}
+                  onChange={(e) => { const next = { ...cartao, nome: e.target.value }; setCartao(next); contaValidation.revalidateField('nome', next); }}
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-orange-500 transition-colors"
                   placeholder="Ex: Cartão Nubank"
                 />
                 <FieldError name="nome" error={contaValidation.errors.nome} />
               </div>
               <div>
-                <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">Tipo</label>
-                <select
-                  {...fieldA11y('tipo', contaValidation.errors.tipo)}
-                  value={conta.tipo}
-                  onChange={(e) => { const next = { ...conta, tipo: e.target.value }; setConta(next); contaValidation.revalidateField('tipo', next); }}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-orange-500 transition-colors"
-                >
-                  <option value="CREDITO">Cartão de Crédito</option>
-                  <option value="DEBITO">Cartão de Débito</option>
-                  <option value="DINHEIRO">Dinheiro</option>
-                  <option value="POUPANCA">Poupança</option>
-                </select>
-              </div>
-              {conta.tipo === 'CREDITO' && (
-                <div>
                   <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">Limite (R$)</label>
                   <input
                     {...fieldA11y('limiteTotal', contaValidation.errors.limiteTotal)}
                     type="number"
                     step="0.01"
                     min="0"
-                    value={conta.limiteTotal}
-                    onChange={(e) => { const next = { ...conta, limiteTotal: e.target.value }; setConta(next); contaValidation.revalidateField('limiteTotal', next); }}
+                    value={cartao.limiteTotal}
+                    onChange={(e) => { const next = { ...cartao, limiteTotal: e.target.value }; setCartao(next); contaValidation.revalidateField('limiteTotal', next); }}
                     className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-orange-500 transition-colors aria-invalid:border-red-500"
                     placeholder="0,00"
                   />
                   <FieldError name="limiteTotal" error={contaValidation.errors.limiteTotal} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">Fechamento</label>
+                  <input {...fieldA11y('diaFechamento', contaValidation.errors.diaFechamento)} type="number" min="1" max="31"
+                    value={cartao.diaFechamento}
+                    onChange={(e) => { const next = { ...cartao, diaFechamento: e.target.value }; setCartao(next); contaValidation.revalidateField('diaFechamento', next); }}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white" />
+                  <FieldError name="diaFechamento" error={contaValidation.errors.diaFechamento} />
                 </div>
-              )}
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">Vencimento</label>
+                  <input {...fieldA11y('diaVencimento', contaValidation.errors.diaVencimento)} type="number" min="1" max="31"
+                    value={cartao.diaVencimento}
+                    onChange={(e) => { const next = { ...cartao, diaVencimento: e.target.value }; setCartao(next); contaValidation.revalidateField('diaVencimento', next); }}
+                    className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white" />
+                  <FieldError name="diaVencimento" error={contaValidation.errors.diaVencimento} />
+                </div>
+              </div>
             </div>
           )}
 
@@ -501,12 +507,12 @@ export default function Onboarding() {
                     </div>
                   </div>
                 )}
-                {resumo.contaCriada && (
+                {resumo.cartaoCriado && (
                   <div className="flex items-center gap-3 p-3 bg-slate-900/50 rounded-lg border border-slate-700">
                     <CreditCard className="w-5 h-5 text-blue-500" />
                     <div>
                       <p className="text-xs text-slate-500 uppercase">Conta/Cartão</p>
-                      <p className="text-sm text-white">{resumo.contaCriada}</p>
+                      <p className="text-sm text-white">{resumo.cartaoCriado}</p>
                     </div>
                   </div>
                 )}

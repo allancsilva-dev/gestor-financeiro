@@ -8,7 +8,7 @@ export interface OnboardingStatus {
 export interface OnboardingFinalizarPayload {
   carteira: {
     nome: string;
-    tipo: string;
+    subtipo: 'DINHEIRO' | 'CORRENTE' | 'POUPANCA' | 'PAGAMENTO';
     saldo: number;
     banco?: string;
   };

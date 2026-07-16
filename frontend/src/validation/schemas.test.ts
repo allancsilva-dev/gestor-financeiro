@@ -13,15 +13,15 @@ describe('schemas financeiros', () => {
   it('normaliza números e aceita uma transação válida', () => {
     const result = transacaoSchema.parse({
       descricao: 'Mercado', valor: '10.50', tipo: 'SAIDA', data: '2026-07-13',
-      categoriaId: '2', contaId: '3', parcelado: false, totalParcelas: '',
+      categoriaId: '2', cartaoId: '3', parcelado: false, totalParcelas: '',
     });
     expect(result.valor).toBe(10.5);
     expect(result.categoriaId).toBe(2);
   });
 
   it('rejeita valores inválidos e parcelamento incompleto', () => {
-    expect(transacaoSchema.safeParse({ descricao: 'x', valor: 'NaN', tipo: 'SAIDA', data: '2026-02-30', categoriaId: '', contaId: '', parcelado: true }).success).toBe(false);
-    expect(transacaoSchema.safeParse({ descricao: 'x', valor: -1, tipo: 'SAIDA', data: '2026-07-13', categoriaId: 1, contaId: 1, parcelado: true, totalParcelas: 49 }).success).toBe(false);
+    expect(transacaoSchema.safeParse({ descricao: 'x', valor: 'NaN', tipo: 'SAIDA', data: '2026-02-30', categoriaId: '', cartaoId: '', parcelado: true }).success).toBe(false);
+    expect(transacaoSchema.safeParse({ descricao: 'x', valor: -1, tipo: 'SAIDA', data: '2026-07-13', categoriaId: 1, cartaoId: 1, parcelado: true, totalParcelas: 49 }).success).toBe(false);
   });
 
   it('valida calendário real', () => {

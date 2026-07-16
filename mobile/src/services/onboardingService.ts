@@ -1,5 +1,5 @@
 import api from './api';
-import { TipoCarteira, Usuario } from '../types';
+import { SubtipoContaFinanceira, Usuario } from '../types';
 
 export interface OnboardingStatus {
   onboardingCompleto: boolean;
@@ -8,7 +8,7 @@ export interface OnboardingStatus {
 export interface OnboardingFinalizarRequest {
   carteira: {
     nome: string;
-    tipo: TipoCarteira;
+    subtipo: Extract<SubtipoContaFinanceira, 'DINHEIRO' | 'CORRENTE' | 'POUPANCA' | 'PAGAMENTO'>;
     saldo: number;
     banco?: string;
   };

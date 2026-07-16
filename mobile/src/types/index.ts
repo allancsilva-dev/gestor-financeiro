@@ -1,7 +1,5 @@
 // ── Enums e tipos básicos ─────────────────────────────────────────────
 export type TipoTransacao = 'ENTRADA' | 'SAIDA';
-export type TipoCarteira = 'DINHEIRO' | 'CONTA_BANCARIA' | 'POUPANCA';
-export type TipoConta = 'CREDITO' | 'DEBITO' | 'DINHEIRO' | 'POUPANCA';
 export type StatusPagamento = 'PAGO' | 'PENDENTE' | 'ATRASADO' | 'CANCELADO';
 export type BadgeStatus = 'ativo' | 'pendente' | 'inativo' | 'cancelado';
 export type AsyncStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -102,10 +100,9 @@ export interface CategoriaResumo {
   icone?: string;
 }
 
-export interface ContaResumo {
+export interface CartaoResumo {
   id: number;
   nome: string;
-  tipo: TipoConta;
 }
 
 export interface Transacao {
@@ -121,7 +118,7 @@ export interface Transacao {
   observacoes?: string;
   recorrente: boolean;
   categoria?: CategoriaResumo;
-  conta?: ContaResumo;
+  cartao?: CartaoResumo;
 }
 
 export interface TransacaoRequest {
@@ -156,15 +153,7 @@ export interface CategoriaRequest {
   valorEsperado?: number;
 }
 
-// ── Carteiras ───────────────────────────────────────────────────────
-export interface Carteira {
-  id: number;
-  nome: string;
-  tipo: TipoCarteira;
-  saldo: number;
-  banco?: string;
-}
-
+// ── Contas financeiras ──────────────────────────────────────────────
 export interface ContaFinanceira {
   id: number;
   nome: string;
@@ -216,13 +205,6 @@ export interface MovimentoCarteira {
   saldoResultante: number;
 }
 
-export interface CarteiraRequest {
-  nome: string;
-  tipo: TipoCarteira;
-  saldo: number;
-  banco?: string;
-}
-
 export interface ReconciliacaoCarteira {
   carteiraId: number;
   usuarioId: number;
@@ -232,29 +214,7 @@ export interface ReconciliacaoCarteira {
   status: 'OK' | 'DIVERGENTE';
 }
 
-// ── Contas ─────────────────────────────────────────────────────────
-export interface Conta {
-  id: number;
-  nome: string;
-  tipo: TipoConta;
-  limiteTotal?: number;
-  valorGasto?: number;
-  diaFechamento?: number;
-  diaVencimento?: number;
-  cor?: string;
-  banco?: string;
-}
-
-export interface ContaRequest {
-  nome: string;
-  tipo: TipoConta;
-  limiteTotal?: number;
-  diaFechamento?: number;
-  diaVencimento?: number;
-  cor?: string;
-  banco?: string;
-}
-
+// ── Cartões ─────────────────────────────────────────────────────────
 export interface Cartao {
   id: number;
   contaFinanceiraId: number;
@@ -392,9 +352,8 @@ export interface FaturaLancamento {
 
 export interface FaturaResponse {
   id: number;
-  contaId: number;
   cartaoId: number;
-  contaNome: string;
+  cartaoNome: string;
   mes: number;
   ano: number;
   dataFechamento: string;

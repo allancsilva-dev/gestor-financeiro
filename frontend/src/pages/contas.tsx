@@ -268,10 +268,10 @@ export default function Contas() {
               </div>
             ) : (
               contas.map((conta) => {
-                const valorGasto = conta.valorGasto || 0;
+                const saldoDevedor = conta.saldoDevedor || 0;
                 const limiteTotal = conta.limiteTotal || 0;
-                const creditoDisponivel = valorGasto < 0 ? Math.abs(valorGasto) : 0;
-                const percentualUso = limiteTotal > 0 ? Math.min((Math.max(valorGasto, 0) / limiteTotal) * 100, 100) : 0;
+                const creditoDisponivel = saldoDevedor < 0 ? Math.abs(saldoDevedor) : 0;
+                const percentualUso = limiteTotal > 0 ? Math.min((Math.max(saldoDevedor, 0) / limiteTotal) * 100, 100) : 0;
 
                 return (
                 <div
@@ -310,20 +310,20 @@ export default function Contas() {
 
                     <div>
                       <p className="text-sm text-gray-600">{creditoDisponivel > 0 ? 'Crédito disponível' : 'Valor Gasto'}</p>
-                      <p className={`text-lg font-bold ${creditoDisponivel > 0 ? 'text-green-600' : valorGasto > limiteTotal ? 'text-red-600' : 'text-green-600'}`}>
-                        {formatCurrency(creditoDisponivel > 0 ? creditoDisponivel : valorGasto)}
+                      <p className={`text-lg font-bold ${creditoDisponivel > 0 ? 'text-green-600' : saldoDevedor > limiteTotal ? 'text-red-600' : 'text-green-600'}`}>
+                        {formatCurrency(creditoDisponivel > 0 ? creditoDisponivel : saldoDevedor)}
                       </p>
                     </div>
 
                     <div>
                       <p className="text-sm text-gray-600 mb-1">Disponível</p>
                       <p className="text-sm font-semibold text-blue-600 mb-2">
-                        {formatCurrency(limiteTotal - valorGasto)}
+                        {formatCurrency(conta.limiteDisponivel)}
                       </p>
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
                           className={`h-2 rounded-full transition-all ${
-                            valorGasto > limiteTotal
+                            saldoDevedor > limiteTotal
                               ? 'bg-red-600' 
                               : 'bg-blue-600'
                           }`}

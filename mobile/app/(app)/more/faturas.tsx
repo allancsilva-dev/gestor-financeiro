@@ -19,7 +19,7 @@ export default function FaturasScreen() {
   const now = new Date();
   const [mes, setMes] = useState(now.getMonth() + 1);
   const [ano, setAno] = useState(now.getFullYear());
-  const [contaIdx, setContaIdx] = useState(0);
+  const [cartaoIdx, setCartaoIdx] = useState(0);
   const [paying, setPaying] = useState(false);
   const payingRef = useRef(false);
   const [payError, setPayError] = useState<string | null>(null);
@@ -38,8 +38,8 @@ export default function FaturasScreen() {
     queryKey: ['cartoes'],
     queryFn: () => cartaoService.listar(),
   });
-  const contasCredito = contasData?.content ?? [];
-  const contaSelecionada = contasCredito[Math.min(contaIdx, Math.max(contasCredito.length - 1, 0))];
+  const cartoes = contasData?.content ?? [];
+  const cartaoSelecionado = cartoes[Math.min(cartaoIdx, Math.max(cartoes.length - 1, 0))];
 
   const { data: carteirasData } = useQuery({
     queryKey: ['contas-financeiras-caixa'],
@@ -54,14 +54,14 @@ export default function FaturasScreen() {
   }, [carteiras, carteiraPagamentoId]);
 
   const { data: fatura, isLoading, refetch } = useQuery<FaturaResponse | null>({
-    queryKey: ['fatura', contaSelecionada?.id, mes, ano],
+    queryKey: ['fatura', cartaoSelecionado?.id, mes, ano],
     queryFn: () => {
-      if (!contaSelecionada?.id) return null;
+      if (!cartaoSelecionado?.id) return null;
       if (mes === now.getMonth() + 1 && ano === now.getFullYear())
-        return faturaService.buscarAtual(contaSelecionada.id!);
-      return faturaService.buscarPorMes(contaSelecionada.id!, mes, ano).catch(() => null);
+        return faturaService.buscarAtual(cartaoSelecionado.id!);
+      return faturaService.buscarPorMes(cartaoSelecionado.id!, mes, ano).catch(() => null);
     },
-    enabled: !!contaSelecionada?.id,
+    enabled: !!cartaoSelecionado?.id,
   });
 
   useEffect(() => {
@@ -141,8 +141,8 @@ export default function FaturasScreen() {
   const mesAnterior = () => { if (mes === 1) { setMes(12); setAno(ano - 1); } else setMes(mes - 1); };
   const mesProximo = () => { if (mes === 12) { setMes(1); setAno(ano + 1); } else setMes(mes + 1); };
 
-  const limiteTotal = Number(contaSelecionada?.limiteTotal ?? 0);
-  const gasto = Number(contaSelecionada?.saldoDevedor ?? 0);
+  const limiteTotal = Number(cartaoSelecionado?.limiteTotal ?? 0);
+  const gasto = Number(cartaoSelecionado?.saldoDevedor ?? 0);
   const creditoCartao = gasto < 0 ? Math.abs(gasto) : 0;
   const usoLimite = limiteTotal > 0 ? Math.min(Math.max(gasto, 0) / limiteTotal, 1) : 0;
   const saldoRestante = Math.max(Number(fatura?.valorTotal ?? 0) - Number(fatura?.valorPago ?? 0), 0);
@@ -161,8 +161,8 @@ export default function FaturasScreen() {
           <BackButton />
           <Text style={{ color: colors.textPrimary, fontSize: 23, fontWeight: '800', letterSpacing: -0.4 }}>Faturas</Text>
           <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>
-            {contasCredito.length > 0
-              ? `${contasCredito.length} ${contasCredito.length === 1 ? 'cartão' : 'cartões'} de crédito`
+            {cartoes.length > 0
+              ? `${cartoes.length} ${cartoes.length === 1 ? 'cartão' : 'cartões'} de crédito`
               : 'Cartões de crédito e lançamentos'}
           </Text>
         </View>
@@ -178,11 +178,11 @@ export default function FaturasScreen() {
             </TouchableOpacity>
           </View>
 
-          {contasCredito.length > 0 && (
+          {cartoes.length > 0 && (
             <View style={{ flexDirection: 'row', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
-              {contasCredito.map((c: Cartao, i: number) => (
-                <TouchableOpacity key={c.id} onPress={() => setContaIdx(i)} style={[styles.chip, { backgroundColor: i === contaIdx ? colors.brand : colors.card, borderColor: i === contaIdx ? colors.brand : colors.border }]}>
-                  <Text style={{ color: i === contaIdx ? colors.brandText : colors.textSecondary, fontSize: 13, fontWeight: '500' }}>{c.nome}</Text>
+              {cartoes.map((c: Cartao, i: number) => (
+                <TouchableOpacity key={c.id} onPress={() => setCartaoIdx(i)} style={[styles.chip, { backgroundColor: i === cartaoIdx ? colors.brand : colors.card, borderColor: i === cartaoIdx ? colors.brand : colors.border }]}>
+                  <Text style={{ color: i === cartaoIdx ? colors.brandText : colors.textSecondary, fontSize: 13, fontWeight: '500' }}>{c.nome}</Text>
                 </TouchableOpacity>
               ))}
               <TouchableOpacity onPress={() => setModalVisible(true)} style={[styles.chip, { backgroundColor: colors.brandBg, borderColor: 'transparent' }]} accessibilityLabel="Cadastrar novo cartão">
@@ -191,7 +191,7 @@ export default function FaturasScreen() {
             </View>
           )}
 
-          {contasCredito.length === 0 ? (
+          {cartoes.length === 0 ? (
             <View style={{ alignItems: 'center', paddingVertical: 56, paddingHorizontal: 24 }}>
               <Text style={{ fontSize: 40 }}>💳</Text>
               <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600', marginTop: 12, textAlign: 'center' }}>Nenhum cartão cadastrado</Text>
@@ -209,14 +209,14 @@ export default function FaturasScreen() {
               <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <View style={{ flex: 1, paddingRight: 12 }}>
-                    <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700' }}>{contaSelecionada?.nome}</Text>
-                    {!!contaSelecionada?.banco && (
-                      <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 1 }}>{contaSelecionada.banco}</Text>
+                    <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700' }}>{cartaoSelecionado?.nome}</Text>
+                    {!!cartaoSelecionado?.banco && (
+                      <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 1 }}>{cartaoSelecionado.banco}</Text>
                     )}
                     <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 4 }}>
-                      Fecha: {fatura?.dataFechamento ? formatDate(fatura.dataFechamento) : contaSelecionada?.diaFechamento ? `dia ${contaSelecionada.diaFechamento}` : '—'}
+                      Fecha: {fatura?.dataFechamento ? formatDate(fatura.dataFechamento) : cartaoSelecionado?.diaFechamento ? `dia ${cartaoSelecionado.diaFechamento}` : '—'}
                       {' • '}
-                      Vence: {fatura?.dataVencimento ? formatDate(fatura.dataVencimento) : contaSelecionada?.diaVencimento ? `dia ${contaSelecionada.diaVencimento}` : '—'}
+                      Vence: {fatura?.dataVencimento ? formatDate(fatura.dataVencimento) : cartaoSelecionado?.diaVencimento ? `dia ${cartaoSelecionado.diaVencimento}` : '—'}
                     </Text>
                   </View>
                   <View style={{ alignItems: 'flex-end' }}>

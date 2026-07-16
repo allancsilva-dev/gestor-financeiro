@@ -75,14 +75,14 @@ export default function Faturas() {
     }
   };
 
-  const carregarFatura = async (contaId: number, m: number, a: number) => {
+  const carregarFatura = async (cartaoId: number, m: number, a: number) => {
     setLoading(true);
     try {
       let data: FaturaResponse;
       if (m === now.getMonth() + 1 && a === now.getFullYear()) {
-        data = await faturaService.buscarAtual(contaId);
+        data = await faturaService.buscarAtual(cartaoId);
       } else {
-        data = await faturaService.buscarPorMes(contaId, m, a);
+        data = await faturaService.buscarPorMes(cartaoId, m, a);
       }
       setFatura(data);
     } catch {

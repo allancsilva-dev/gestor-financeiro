@@ -52,7 +52,7 @@ export default function EditarTransacaoModal({ visible, transacao, onClose }: Ed
   const [observacoes, setObservacoes] = useState('');
   const [categoriaId, setCategoriaId] = useState<number | null>(null);
 
-  const compraCartao = transacao?.tipo === 'SAIDA' && transacao?.conta?.tipo === 'CREDITO';
+  const compraCartao = transacao?.tipo === 'SAIDA' && Boolean(transacao?.cartao);
 
   useEffect(() => {
     if (visible && transacao) {
@@ -259,7 +259,7 @@ export default function EditarTransacaoModal({ visible, transacao, onClose }: Ed
   };
 
   const formaPagamento = compraCartao
-    ? `Cartão ${transacao?.conta?.nome ?? ''}${transacao?.parcelado && transacao?.totalParcelas ? ` · ${transacao.totalParcelas}x` : ' · à vista'}`
+    ? `Cartão ${transacao?.cartao?.nome ?? ''}${transacao?.parcelado && transacao?.totalParcelas ? ` · ${transacao.totalParcelas}x` : ' · à vista'}`
     : transacao?.tipo === 'ENTRADA' ? 'Entrada' : 'Saída';
 
   return (

@@ -1,5 +1,5 @@
 // Utilitários de formatação — sempre usar aqui (não usar Intl direto nos componentes)
-import { TipoCarteira, TipoConta, TipoMovimentoCarteira, StatusPagamento } from '../types';
+import { TipoMovimentoCarteira, StatusPagamento } from '../types';
 
 export const formatCurrency = (value: number): string =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -71,19 +71,6 @@ export const maskDateInput = (text: string): string => {
   if (digits.length <= 2) return digits;
   if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
   return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
-};
-
-export const TIPO_CARTEIRA_LABEL: Record<TipoCarteira, string> = {
-  DINHEIRO: 'Dinheiro',
-  CONTA_BANCARIA: 'Conta Bancária',
-  POUPANCA: 'Poupança',
-};
-
-export const TIPO_CONTA_LABEL: Record<TipoConta, string> = {
-  CREDITO: 'Crédito',
-  DEBITO: 'Débito',
-  DINHEIRO: 'Dinheiro',
-  POUPANCA: 'Poupança',
 };
 
 export const TIPO_MOVIMENTO_LABEL: Record<TipoMovimentoCarteira, string> = {
