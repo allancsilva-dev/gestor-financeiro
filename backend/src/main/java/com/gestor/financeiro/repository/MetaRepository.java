@@ -16,6 +16,18 @@ public interface MetaRepository extends JpaRepository<Meta, Long> {
     // Query gerada: SELECT * FROM metas WHERE usuario_id = ? AND ativa = true
     List<Meta> findByUsuarioIdAndAtivaTrue(Long usuarioId);
 
+    // Reservado virtual total do usuario (ADR-0013, PR-F2-15)
+    @org.springframework.data.jpa.repository.Query(
+            "SELECT COALESCE(SUM(m.valorReservado), 0) FROM Meta m " +
+            "WHERE m.usuario.id = :usuarioId " +
+            "AND m.modalidade = com.gestor.financeiro.model.enums.ModalidadeMeta.RESERVA_VIRTUAL " +
+            "AND m.status <> com.gestor.financeiro.model.enums.StatusMeta.ARQUIVADA")
+    java.math.BigDecimal sumReservaVirtual(
+            @org.springframework.data.repository.query.Param("usuarioId") Long usuarioId);
+
+    java.util.List<Meta> findByUsuarioIdAndModalidade(Long usuarioId,
+            com.gestor.financeiro.model.enums.ModalidadeMeta modalidade);
+
     // Soma das alocacoes virtuais de outras metas sobre a mesma conta (PR-F2-12)
     @org.springframework.data.jpa.repository.Query(
             "SELECT COALESCE(SUM(m.valorReservado), 0) FROM Meta m " +

@@ -44,6 +44,41 @@ public interface CarteiraRepository extends JpaRepository<Carteira, Long> {
             java.util.List<com.gestor.financeiro.model.enums.SubtipoContaFinanceira> subtipos,
             Pageable pageable);
 
+    // --- Metricas oficiais (ADR-0013, PR-F2-15) ---
+
+    /** Disponivel agora: ATIVO com liquidez IMEDIATA (COFRE entra se IMEDIATA). */
+    @Query("SELECT COALESCE(SUM(c.saldo), 0) FROM Carteira c WHERE c.usuario.id = :usuarioId "
+            + "AND c.natureza = com.gestor.financeiro.model.enums.NaturezaContaFinanceira.ATIVO "
+            + "AND c.liquidez = com.gestor.financeiro.model.enums.LiquidezContaFinanceira.IMEDIATA")
+    BigDecimal sumDisponivelAgora(@Param("usuarioId") Long usuarioId);
+
+    /** Total ATIVO (qualquer liquidez, inclui COFRE) para patrimonio. */
+    @Query("SELECT COALESCE(SUM(c.saldo), 0) FROM Carteira c WHERE c.usuario.id = :usuarioId "
+            + "AND c.natureza = com.gestor.financeiro.model.enums.NaturezaContaFinanceira.ATIVO")
+    BigDecimal sumAtivoTotal(@Param("usuarioId") Long usuarioId);
+
+    @Query("SELECT COALESCE(SUM(c.saldo), 0) FROM Carteira c WHERE c.usuario.id = :usuarioId "
+            + "AND c.subtipo = :subtipo")
+    BigDecimal sumSaldoPorSubtipo(@Param("usuarioId") Long usuarioId,
+            @Param("subtipo") com.gestor.financeiro.model.enums.SubtipoContaFinanceira subtipo);
+
+    /** Passivo assinado (credito negativo reduz divida) para patrimonio. */
+    @Query("SELECT COALESCE(SUM(c.saldo), 0) FROM Carteira c WHERE c.usuario.id = :usuarioId "
+            + "AND c.natureza = com.gestor.financeiro.model.enums.NaturezaContaFinanceira.PASSIVO")
+    BigDecimal sumPassivoAssinado(@Param("usuarioId") Long usuarioId);
+
+    /** Dividas = soma de max(passivo, 0); credito de cartao nao vira divida. */
+    @Query("SELECT COALESCE(SUM(CASE WHEN c.saldo > 0 THEN c.saldo ELSE 0 END), 0) "
+            + "FROM Carteira c WHERE c.usuario.id = :usuarioId "
+            + "AND c.natureza = com.gestor.financeiro.model.enums.NaturezaContaFinanceira.PASSIVO")
+    BigDecimal sumDividas(@Param("usuarioId") Long usuarioId);
+
+    java.util.List<Carteira> findByUsuarioIdAndSubtipo(Long usuarioId,
+            com.gestor.financeiro.model.enums.SubtipoContaFinanceira subtipo);
+
+    java.util.List<Carteira> findByUsuarioIdAndNatureza(Long usuarioId,
+            com.gestor.financeiro.model.enums.NaturezaContaFinanceira natureza);
+
     @Query("""
             SELECT c.id AS carteiraId,
                    c.usuario.id AS usuarioId,

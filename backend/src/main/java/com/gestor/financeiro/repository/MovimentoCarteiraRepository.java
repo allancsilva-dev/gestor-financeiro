@@ -22,6 +22,20 @@ public interface MovimentoCarteiraRepository extends JpaRepository<MovimentoCart
 
     java.util.List<MovimentoCarteira> findByOperacaoIdOrderByValorAssinadoAsc(Long operacaoId);
 
+    // Variacao patrimonial (ADR-0013): delta do ledger por natureza no periodo,
+    // excluindo BACKFILL (saldo de abertura nao e variacao economica)
+    @org.springframework.data.jpa.repository.Query(
+            "SELECT COALESCE(SUM(m.valorAssinado), 0) FROM MovimentoCarteira m " +
+            "WHERE m.usuario.id = :usuarioId " +
+            "AND m.carteira.natureza = :natureza " +
+            "AND m.origem <> com.gestor.financeiro.model.enums.OrigemMovimentoCarteira.BACKFILL " +
+            "AND m.dataMovimento BETWEEN :inicio AND :fim")
+    java.math.BigDecimal sumVariacaoPorNatureza(
+            @org.springframework.data.repository.query.Param("usuarioId") Long usuarioId,
+            @org.springframework.data.repository.query.Param("natureza") com.gestor.financeiro.model.enums.NaturezaContaFinanceira natureza,
+            @org.springframework.data.repository.query.Param("inicio") java.time.LocalDateTime inicio,
+            @org.springframework.data.repository.query.Param("fim") java.time.LocalDateTime fim);
+
     // Visao CAIXA (ADR-0010): fluxo real de contas ATIVO no periodo, restrito as
     // origens de consumo/renda (transferencia, meta, investimento e backfill fora)
     @org.springframework.data.jpa.repository.Query(
