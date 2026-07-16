@@ -1,284 +1,107 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 import Layout from '../components/Layout';
-import toast from 'react-hot-toast';
-import { useAuth } from '../context/AuthContext';
-// --- 1. IMPORTAMOS O TIPO DO SERVICE ---
-import dashboardService, { EvolucaoMensal, ProjecaoMensal } from '../services/dashboardService';
-import { useApi } from '../hooks/useApi';
-
 import GraficoGastosPorCategoria from '../components/GraficoGastosPorCategoria';
 import GraficoEvolucaoMensal from '../components/GraficoEvolucaoMensal';
+import dashboardService, { EvolucaoMensal, GastosPorCategoria, ProjecaoMensal, ProjecaoResponse } from '../services/dashboardService';
+import metricasService, { Metricas, MetricaId, OrigemMetrica } from '../services/metricasService';
 import { formatCurrency } from '../utils/currency';
-import { insightsService, InsightsResponse } from '../services/insightsService';
+
+type MetricDefinition = { id: MetricaId; label: string; value: (m: Metricas) => number; help: string };
+
+const groups: { title: string; metrics: MetricDefinition[] }[] = [
+  { title: 'Disponibilidade', metrics: [
+    { id: 'DISPONIVEL_AGORA', label: 'Disponível agora', value: m => m.disponivelAgora, help: 'Caixa conciliado com liquidez imediata' },
+    { id: 'RESERVADO', label: 'Reservado', value: m => m.reservado, help: 'Cofres e valores destinados a metas' },
+    { id: 'DISPONIVEL_PARA_GASTAR', label: 'Disponível para gastar', value: m => m.disponivelParaGastar, help: 'O que resta após reservas e obrigações' },
+  ]},
+  { title: 'Obrigações', metrics: [
+    { id: 'COMPROMETIDO', label: 'Comprometido', value: m => m.comprometido, help: 'Faturas e parcelas até o horizonte' },
+    { id: 'DIVIDAS', label: 'Dívidas', value: m => m.dividas, help: 'Saldo total de contas passivas' },
+  ]},
+  { title: 'Patrimônio', metrics: [
+    { id: 'INVESTIDO', label: 'Investido', value: m => m.investido, help: 'Valor de mercado das posições cotadas' },
+    { id: 'PATRIMONIO_LIQUIDO', label: 'Patrimônio líquido', value: m => m.patrimonioLiquido, help: 'Ativos e investimentos menos passivos' },
+    { id: 'VARIACAO_PATRIMONIAL', label: 'Variação patrimonial', value: m => m.variacaoPatrimonial.total, help: 'Mudança patrimonial no mês' },
+  ]},
+  { title: 'Resultado', metrics: [
+    { id: 'RESULTADO_MENSAL', label: 'Resultado mensal', value: m => m.resultadoMensal, help: 'Receitas menos despesas por competência' },
+  ]},
+];
+
+const originLabel = (value: string) => value.replaceAll('_', ' ').toLocaleLowerCase('pt-BR').replace(/^./, c => c.toUpperCase());
 
 export default function Dashboard() {
-  const { usuario } = useAuth();
-  const [insights, setInsights] = useState<InsightsResponse | null>(null);
+  const [metricas, setMetricas] = useState<Metricas | null>(null);
+  const [gastos, setGastos] = useState<GastosPorCategoria[]>([]);
+  const [evolucao, setEvolucao] = useState<EvolucaoMensal[]>([]);
+  const [projecao, setProjecao] = useState<ProjecaoResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [expanded, setExpanded] = useState<MetricaId | null>(null);
+  const [origens, setOrigens] = useState<Partial<Record<MetricaId, OrigemMetrica[]>>>({});
+  const [origensLoading, setOrigensLoading] = useState(false);
+  const [origensError, setOrigensError] = useState<MetricaId | null>(null);
 
-  const { data, loading, error, refetch } = useApi(
-    async (signal) => {
-      if (!usuario?.id) {
-        return null;
-      }
-
-      const [resumoData, gastosData, evolucaoData, projecaoData] = await Promise.all([
-        dashboardService.resumo(signal),
-        dashboardService.gastosPorCategoria(signal),
-        dashboardService.evolucaoMensal(signal),
-        dashboardService.projecao(signal),
+  const carregar = async () => {
+    setLoading(true); setError(false);
+    try {
+      const [m, g, e, p] = await Promise.all([
+        metricasService.obter(),
+        dashboardService.gastosPorCategoria().catch(() => []),
+        dashboardService.evolucaoMensal().catch(() => []),
+        dashboardService.projecao().catch(() => null),
       ]);
-
-      return {
-        resumo: resumoData,
-        gastosPorCategoria: gastosData,
-        evolucaoMensal: evolucaoData,
-        projecao: projecaoData,
-      };
-    },
-    {
-      immediate: !!usuario?.id,
-      deps: [usuario?.id],
-    }
-  );
-
-  const resumo = data?.resumo;
-  const gastosPorCategoria = (data?.gastosPorCategoria || []) as any[];
-  const evolucaoMensal = (data?.evolucaoMensal || []) as EvolucaoMensal[];
-  const projecao = data?.projecao;
-
-  useEffect(() => {
-    if (error) {
-      toast.error('Erro ao carregar dashboard');
-    }
-  }, [error]);
-
-  useEffect(() => {
-    if (usuario?.id) {
-      insightsService.gerar().then(setInsights).catch(() => {});
-    }
-  }, [usuario?.id]);
-
-  const formatarMoedaComSinal = (valor: number) => {
-    const valorNumerico = typeof valor === 'number' ? valor : 0;
-    if (valorNumerico < 0) {
-      return `-${formatCurrency(Math.abs(valorNumerico))}`;
-    }
-    return formatCurrency(valorNumerico);
+      setMetricas(m); setGastos(g); setEvolucao(e); setProjecao(p);
+    } catch { setError(true); }
+    finally { setLoading(false); }
   };
 
-  if (loading) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center">
-            <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
-            <p className="mt-4 text-gray-400">Carregando dashboard...</p>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
+  useEffect(() => { carregar(); }, []);
 
-  if (!resumo) {
-    return (
-      <Layout>
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center p-8 bg-slate-800 rounded-lg">
-            <h3 className="text-xl text-white font-bold mb-2">Ops!</h3>
-            <p className="text-red-400">Não foi possível carregar os dados do dashboard.</p>
-            <button
-              type="button"
-              onClick={() => refetch()}
-              className="mt-4 px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white"
-            >
-              Tentar novamente
-            </button>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
+  const loadOrigins = async (id: MetricaId) => {
+    setOrigensLoading(true); setOrigensError(null);
+    try {
+      const data = await metricasService.listarOrigens(id);
+      setOrigens(current => ({ ...current, [id]: data }));
+    } catch { setOrigensError(id); }
+    finally { setOrigensLoading(false); }
+  };
 
-  return (
-    <Layout>
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8">
-        <div className="max-w-7xl mx-auto space-y-6">
+  const toggleOrigins = async (id: MetricaId) => {
+    if (expanded === id) { setExpanded(null); return; }
+    setExpanded(id); setOrigensError(null);
+    if (origens[id]) return;
+    await loadOrigins(id);
+  };
 
-          {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold text-white mb-2">Dashboard Financeiro</h1>
-            <p className="text-gray-400">Visão geral das suas finanças</p>
-          </div>
+  const metricCard = (definition: MetricDefinition, primary = false) => {
+    if (!metricas) return null;
+    const value = definition.value(metricas);
+    const isNegative = value < 0 || ['COMPROMETIDO', 'DIVIDAS'].includes(definition.id);
+    const open = expanded === definition.id;
+    return <div key={definition.id} className={`${primary ? 'bg-violet-700 text-white' : 'bg-white text-slate-950'} overflow-hidden rounded-xl shadow-sm`}>
+      <button onClick={() => toggleOrigins(definition.id)} aria-expanded={open} aria-controls={`origens-${definition.id}`} className={`min-h-32 w-full p-5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset ${primary ? 'hover:bg-violet-800 focus-visible:ring-white' : 'hover:bg-violet-50 focus-visible:ring-violet-600'}`}>
+        <span className={`text-sm font-semibold ${primary ? 'text-violet-100' : 'text-slate-600'}`}>{definition.label}</span>
+        <span className={`mt-2 block text-2xl font-bold tabular-nums ${primary ? 'text-white' : isNegative ? 'text-red-700' : 'text-green-700'}`}>{formatCurrency(value)}</span>
+        <span className={`mt-2 flex items-center justify-between gap-3 text-xs ${primary ? 'text-violet-100' : 'text-slate-600'}`}><span>{definition.help}</span>{open ? <ChevronUp className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}</span>
+      </button>
+      {open && <div id={`origens-${definition.id}`} className={`${primary ? 'bg-violet-800' : 'bg-slate-50'} border-t border-black/5 px-5 py-4`}>
+        {origensLoading && !origens[definition.id] ? <p className="text-sm">Carregando origens…</p> : origensError === definition.id ? <button onClick={() => loadOrigins(definition.id)} className="text-sm font-semibold underline">Falha ao carregar. Tentar novamente</button> : (origens[definition.id]?.length ?? 0) === 0 ? <p className="text-sm">Nenhuma origem compõe este valor.</p> : <ul className="space-y-2">{origens[definition.id]?.map((o, index) => <li key={`${o.tipo}-${o.id}-${index}`} className="flex justify-between gap-4 text-sm"><span><span className="font-medium">{o.descricao}</span><span className={`ml-2 text-xs ${primary ? 'text-violet-200' : 'text-slate-500'}`}>{originLabel(o.tipo)}</span></span><strong className="tabular-nums">{formatCurrency(o.valor)}</strong></li>)}</ul>}
+      </div>}
+    </div>;
+  };
 
-          {/* KPI Cards (3 colunas em 'md') */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-             {/* Saldo Total */}
-             <div className={`rounded-2xl p-6 shadow-2xl transform hover:scale-105 transition-transform ${
-              (resumo.saldoCarteiras || 0) >= 0
-                ? 'bg-gradient-to-br from-orange-500 to-orange-600'
-                : 'bg-gradient-to-br from-red-500 to-red-600'
-              }`}>
-              <div className="flex justify-between items-start mb-4">
-                <span className="text-white/80 text-sm font-medium">Saldo Total</span>
-                <span className="text-2xl">💰</span>
-              </div>
-              <div className="text-4xl font-bold text-white mb-2">
-                {formatCurrency(resumo.saldoCarteiras)}
-              </div>
-              <div className={`text-sm flex items-center gap-1 text-white/90`}>
-                {(resumo.saldo || 0) >= 0 ? '↑' : '↓'}
-                <span>Fluxo do mês: {formatarMoedaComSinal(resumo.saldo)}</span>
-              </div>
-            </div>
+  if (loading) return <Layout><div aria-label="Carregando dashboard" className="mx-auto max-w-7xl space-y-5"><div className="h-10 w-72 animate-pulse rounded bg-violet-200"/><div className="h-40 animate-pulse rounded-xl bg-violet-200"/><div className="grid gap-4 md:grid-cols-3">{[1,2,3].map(i => <div key={i} className="h-32 animate-pulse rounded-xl bg-white"/>)}</div></div></Layout>;
+  if (error || !metricas) return <Layout><div className="mx-auto max-w-lg rounded-xl bg-white p-8 text-center"><h1 className="text-xl font-bold">Não foi possível montar sua visão financeira</h1><p className="mt-2 text-slate-600">As métricas oficiais não estão disponíveis agora.</p><button onClick={carregar} className="mt-5 min-h-11 rounded-lg bg-violet-600 px-4 font-semibold text-white">Tentar novamente</button></div></Layout>;
 
-            {/* Total Entradas */}
-            <div className="bg-slate-800 rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-shadow border border-slate-700">
-              <div className="flex justify-between items-start mb-4">
-                <span className="text-gray-400 text-sm font-medium">Total Entradas</span>
-                <span className="text-2xl">📈</span>
-              </div>
-              <div className="text-4xl font-bold text-blue-400 mb-2">
-                {formatCurrency(resumo.totalEntradas)}
-              </div>
-              <div className="text-sm text-green-400 flex items-center gap-1">
-                <span>Receitas do mês</span>
-              </div>
-            </div>
+  const principal = groups[0].metrics[2];
+  return <Layout><div className="mx-auto max-w-7xl space-y-8">
+    <header className="flex flex-wrap items-end justify-between gap-3"><div><h1 className="text-3xl font-bold tracking-tight">Visão financeira</h1><p className="mt-1 text-slate-600">Posição em {new Date(`${metricas.dataReferencia}T12:00:00`).toLocaleDateString('pt-BR')} · compromissos até {new Date(`${metricas.horizonteComprometido}T12:00:00`).toLocaleDateString('pt-BR')}</p></div><button onClick={carregar} className="flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-violet-700 hover:bg-violet-100 focus-visible:ring-2 focus-visible:ring-violet-600"><RefreshCw className="h-4 w-4"/> Atualizar</button></header>
+    <section aria-labelledby="principal-title"><h2 id="principal-title" className="sr-only">Leitura principal</h2>{metricCard(principal, true)}</section>
+    {groups.map(group => { const items = group.metrics.filter(m => m.id !== principal.id); return items.length > 0 && <section key={group.title} aria-labelledby={`group-${group.title}`}><h2 id={`group-${group.title}`} className="mb-3 text-lg font-bold">{group.title}</h2><div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{items.map(m => metricCard(m))}</div></section>; })}
 
-            {/* Total Despesas */}
-            <div className="bg-slate-800 rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-shadow border border-slate-700">
-              <div className="flex justify-between items-start mb-4">
-                <span className="text-gray-400 text-sm font-medium">Total Despesas</span>
-                <span className="text-2xl">📉</span>
-              </div>
-              <div className="text-4xl font-bold text-red-400 mb-2">
-                {formatCurrency(resumo.totalSaidas)}
-              </div>
-              <div className="text-sm text-red-400 flex items-center gap-1">
-                <span>Gastos do mês</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Cards Secundários (3 colunas em 'md') */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Cartões */}
-            <div className="bg-slate-800 rounded-2xl p-5 shadow-xl border border-slate-700">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center text-2xl">
-                  💳
-                </div>
-                <div>
-                  <div className="text-gray-400 text-sm">Cartões</div>
-                  <div className="text-2xl font-bold text-white">{resumo.totalContas}</div>
-                </div>
-              </div>
-            </div>
-            {/* Metas */}
-            <div className="bg-slate-800 rounded-2xl p-5 shadow-xl border border-slate-700">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center text-2xl">
-                  🎯
-                </div>
-                <div>
-                  <div className="text-gray-400 text-sm">Metas Ativas</div>
-                  <div className="text-2xl font-bold text-white">{resumo.totalMetas}</div>
-                </div>
-              </div>
-            </div>
-            {/* Contas Fixas */}
-            <div className="bg-slate-800 rounded-2xl p-5 shadow-xl border border-slate-700">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-orange-500/20 flex items-center justify-center text-2xl">
-                  📋
-                </div>
-                <div>
-                  <div className="text-gray-400 text-sm">Contas Fixas</div>
-                  <div className="text-2xl font-bold text-white">{resumo.totalContasFixas}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Seção de Gráficos (V8) */}
-          <div className="flex flex-col md:flex-row gap-6 mt-6">
-            
-            <div className="md:w-1/3">
-              <GraficoGastosPorCategoria chartData={gastosPorCategoria} />
-            </div>
-
-            <div className="md:w-2/3">
-              <GraficoEvolucaoMensal chartData={evolucaoMensal} />
-            </div>
-          </div>
-
-          {/* Seção de Projeção de Caixa */}
-          {projecao && projecao.meses && projecao.meses.length > 0 && (
-            <div className="mt-6">
-              <h2 className="text-xl font-bold text-white mb-4">Projeção de Caixa</h2>
-              <div className="overflow-x-auto">
-                <table className="w-full bg-slate-800 border border-slate-700 rounded-2xl overflow-hidden">
-                  <thead>
-                    <tr className="border-b border-slate-700">
-                      <th className="text-left p-3 text-xs text-slate-400 uppercase">Mês</th>
-                      <th className="text-right p-3 text-xs text-slate-400 uppercase">Contas Fixas</th>
-                      <th className="text-right p-3 text-xs text-slate-400 uppercase">Parcelas</th>
-                      <th className="text-right p-3 text-xs text-slate-400 uppercase">Total Saídas</th>
-                      <th className="text-right p-3 text-xs text-slate-400 uppercase">Saldo Final</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {projecao.meses.map((m: ProjecaoMensal, i: number) => (
-                      <tr key={i} className={`border-b border-slate-700/50 ${i === 0 ? 'bg-slate-700/30' : ''}`}>
-                        <td className="p-3 text-sm text-white font-medium">{m.periodo}</td>
-                        <td className="p-3 text-sm text-right text-red-400">{formatCurrency(m.totalContasFixas)}</td>
-                        <td className="p-3 text-sm text-right text-red-400">{formatCurrency(m.totalParcelas)}</td>
-                        <td className="p-3 text-sm text-right text-red-400 font-semibold">{formatCurrency(m.totalSaidas)}</td>
-                        <td className={`p-3 text-sm text-right font-bold ${m.saldoFinal >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                          {formatCurrency(m.saldoFinal)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {insights && (
-            <div className="mt-6 bg-gradient-to-r from-slate-700 to-slate-800 border border-slate-600 rounded-2xl p-6">
-              <h2 className="text-xl font-bold text-white mb-4">Insights Financeiros</h2>
-              <p className="text-slate-300 mb-4">{insights.resumo}</p>
-              {insights.categoriasAlerta.length > 0 && (
-                <div className="mb-4">
-                  <h3 className="text-sm font-semibold text-amber-400 mb-2">Categorias com gasto elevado</h3>
-                  <div className="space-y-1">
-                    {insights.categoriasAlerta.map((a, i) => (
-                      <div key={i} className="flex justify-between text-sm">
-                        <span className="text-slate-300">{a.categoriaNome}</span>
-                        <span className={a.acimaMedia ? 'text-red-400' : 'text-yellow-400'}>
-                          {formatCurrency(a.gastoAtual)} ({a.variacaoPercentual >= 0 ? '+' : ''}{a.variacaoPercentual?.toFixed(0)}%)
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              <div>
-                <h3 className="text-sm font-semibold text-green-400 mb-2">Recomendações</h3>
-                <ul className="space-y-1">
-                  {insights.recomendacoes.map((r, i) => (
-                    <li key={i} className="text-sm text-slate-300 flex gap-2">
-                      <span className="text-green-400">~</span> {r}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          )}
-
-        </div>
-      </div>
-    </Layout>
-  );
+    <section aria-labelledby="graficos-title"><h2 id="graficos-title" className="mb-3 text-xl font-bold">Tendências do mês</h2><div className="flex flex-col gap-5 xl:flex-row"><div className="xl:w-1/3"><GraficoGastosPorCategoria chartData={gastos} /></div><div className="xl:w-2/3"><GraficoEvolucaoMensal chartData={evolucao} /></div></div></section>
+    {projecao?.meses?.length ? <section aria-labelledby="projecao-title"><h2 id="projecao-title" className="mb-3 text-xl font-bold">Projeção de caixa</h2><div className="overflow-x-auto rounded-xl bg-white shadow-sm"><table className="w-full min-w-[700px] text-sm"><thead><tr className="border-b border-slate-200 text-left text-slate-600"><th className="p-4">Mês</th><th className="p-4 text-right">Contas fixas</th><th className="p-4 text-right">Parcelas</th><th className="p-4 text-right">Total de saídas</th><th className="p-4 text-right">Saldo final</th></tr></thead><tbody>{projecao.meses.map((m: ProjecaoMensal) => <tr key={`${m.ano}-${m.mes}`} className="border-b border-slate-100 last:border-0"><td className="p-4 font-semibold">{m.periodo}</td><td className="p-4 text-right text-red-700">{formatCurrency(m.totalContasFixas)}</td><td className="p-4 text-right text-red-700">{formatCurrency(m.totalParcelas)}</td><td className="p-4 text-right font-semibold text-red-700">{formatCurrency(m.totalSaidas)}</td><td className={`p-4 text-right font-bold ${m.saldoFinal >= 0 ? 'text-green-700' : 'text-red-700'}`}>{formatCurrency(m.saldoFinal)}</td></tr>)}</tbody></table></div></section> : null}
+  </div></Layout>;
 }

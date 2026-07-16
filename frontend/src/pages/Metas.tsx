@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { metaService, Meta, StatusMeta } from '../services/metaService';
-import carteiraService, { Carteira } from '../services/carteiraService';
+import contaFinanceiraService, { ContaFinanceira } from '../services/contaFinanceiraService';
 import { useAuth } from '../context/AuthContext';
 import { useApi } from '../hooks/useApi';
 import toast from 'react-hot-toast';
@@ -39,7 +39,7 @@ export default function Metas() {
   });
 
   const [valorAdicionar, setValorAdicionar] = useState('');
-  const [carteiras, setCarteiras] = useState<Carteira[]>([]);
+  const [carteiras, setCarteiras] = useState<ContaFinanceira[]>([]);
   const [carteiraOrigem, setCarteiraOrigem] = useState('');
   const valorTotalNumerico = toNullableNumber(formData.valorTotal);
   const valorMensalNumerico = toNullableNumber(formData.valorMensal);
@@ -85,7 +85,7 @@ export default function Metas() {
 
   useEffect(() => {
     if (!usuario?.id) return;
-    carteiraService.listarCarteiras(usuario.id, 0, 100)
+    contaFinanceiraService.listarParaCaixa()
       .then(setCarteiras)
       .catch(() => toast.error('Erro ao carregar contas'));
   }, [usuario?.id]);

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
 import contaFixaService, { ContaFixa } from '../services/contaFixaService';
 import { categoriaService, Categoria } from '../services/categoriaService';
-import carteiraService, { Carteira } from '../services/carteiraService';
+import contaFinanceiraService, { ContaFinanceira } from '../services/contaFinanceiraService';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 import { Plus, Edit2, Trash2, Check, X, Calendar, DollarSign, Tag, SkipForward } from 'lucide-react';
@@ -24,7 +24,7 @@ export default function ContasFixas() {
   const [acaoFinanceiraId, setAcaoFinanceiraId] = useState<string | null>(null);
   const [pagandoConta, setPagandoConta] = useState<number | null>(null);
   const [valorPagamento, setValorPagamento] = useState('');
-  const [carteiras, setCarteiras] = useState<Carteira[]>([]);
+  const [carteiras, setCarteiras] = useState<ContaFinanceira[]>([]);
   const [carteiraPagamento, setCarteiraPagamento] = useState('');
 
   const [formData, setFormData] = useState({
@@ -51,7 +51,7 @@ export default function ContasFixas() {
       const [contasData, categoriasData, carteirasData] = await Promise.all([
         contaFixaService.listarAtivas(usuario.id),
         categoriaService.listarMinhas(0, 100),
-        carteiraService.listarCarteiras(usuario.id, 0, 100)
+        contaFinanceiraService.listarParaCaixa()
       ]);
       setContasFixas(contasData);
       setCategorias(categoriasData);

@@ -10,10 +10,10 @@ export default function GraficoGastosPorCategoria({ chartData }: Props) {
 
   if (!chartData || chartData.length === 0) {
     return (
-      <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700">
-        <h3 className="text-lg font-bold text-white mb-4">📊 Gastos por Categoria</h3>
-        <div className="flex items-center justify-center h-64 text-gray-500">
-          Sem dados para exibir
+      <div className="rounded-xl bg-white p-6 shadow-sm">
+        <h3 className="mb-4 text-lg font-bold text-slate-950">Gastos por categoria</h3>
+        <div className="flex h-64 items-center justify-center text-slate-600">
+          Sem gastos no período
         </div>
       </div>
     );
@@ -29,10 +29,10 @@ export default function GraficoGastosPorCategoria({ chartData }: Props) {
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-slate-900 border border-slate-700 rounded-lg p-3 shadow-xl">
+        <div className="rounded-lg bg-slate-950 p-3 text-white shadow-lg">
           <p className="text-white font-semibold">{payload[0].name}</p>
-          <p className="text-orange-400">{formatarMoeda(payload[0].value)}</p>
-          <p className="text-gray-400 text-sm">{payload[0].payload.percentual}%</p>
+          <p className="text-violet-200">{formatarMoeda(payload[0].value)}</p>
+          <p className="text-slate-300 text-sm">{payload[0].payload.percentual}%</p>
         </div>
       );
     }
@@ -40,8 +40,8 @@ export default function GraficoGastosPorCategoria({ chartData }: Props) {
   };
 
   return (
-    <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700">
-      <h3 className="text-lg font-bold text-white mb-4">📊 Gastos por Categoria</h3>
+    <div className="rounded-xl bg-white p-6 shadow-sm">
+      <h3 className="mb-4 text-lg font-bold text-slate-950">Gastos por categoria</h3>
       
       <ResponsiveContainer width="100%" height={300}>
         <PieChart>
@@ -64,7 +64,7 @@ export default function GraficoGastosPorCategoria({ chartData }: Props) {
           <Tooltip content={<CustomTooltip />} />
           <Legend 
             formatter={(value: string, entry: any) => (
-              <span className="text-gray-300 text-sm">
+              <span className="text-sm text-slate-700">
                 {value}: {formatarMoeda(entry.payload.valor)}
               </span>
             )}

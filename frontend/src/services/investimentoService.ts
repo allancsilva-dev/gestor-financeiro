@@ -11,6 +11,10 @@ export interface Ativo {
   precoMedio: number;
   lucroPrejuizo: number;
   rentabilidade: number;
+  valorMercado: number | null;
+  cotacaoEm: string | null;
+  liquidez: 'IMEDIATA' | 'D1' | 'D2' | 'CARENCIA' | 'BLOQUEADA';
+  custodiaId: number | null;
 }
 
 export interface Movimentacao {
@@ -20,6 +24,17 @@ export interface Movimentacao {
   quantidade: number;
   precoUnitario: number;
   valorTotal: number;
+  conciliacao: 'CONCILIADA' | 'EXTERNO';
+  operacaoId: number | null;
+}
+
+export interface MovimentacaoInput {
+  tipo: string;
+  data: string;
+  quantidade: number;
+  precoUnitario: number;
+  carteiraId?: number;
+  externa: boolean;
 }
 
 export const investimentoService = {
@@ -47,7 +62,7 @@ export const investimentoService = {
     return response.data;
   },
 
-  adicionarMovimentacao: async (ativoId: number, data: Partial<Movimentacao>): Promise<Movimentacao> => {
+  adicionarMovimentacao: async (ativoId: number, data: MovimentacaoInput): Promise<Movimentacao> => {
     const response = await api.post(`/investimentos/${ativoId}/movimentacoes`, data);
     return response.data;
   },

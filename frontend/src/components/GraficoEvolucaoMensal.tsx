@@ -17,10 +17,10 @@ export default function GraficoEvolucaoMensal({ chartData }: Props) {
 
   if (!chartData || chartData.length === 0) {
     return (
-      <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700">
-        <h3 className="text-lg font-bold text-white mb-4">📈 Evolução Mensal</h3>
-        <div className="flex items-center justify-center h-64 text-gray-500">
-          Sem dados para exibir
+      <div className="rounded-xl bg-white p-6 shadow-sm">
+        <h3 className="mb-4 text-lg font-bold text-slate-950">Evolução mensal</h3>
+        <div className="flex h-64 items-center justify-center text-slate-600">
+          Sem histórico no período
         </div>
       </div>
     );
@@ -36,7 +36,7 @@ export default function GraficoEvolucaoMensal({ chartData }: Props) {
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       return (
-        <div className="bg-slate-900 border border-slate-700 rounded-lg p-3 shadow-xl">
+        <div className="rounded-lg bg-slate-950 p-3 text-white shadow-lg">
           <p className="text-white font-semibold mb-2">{payload[0].payload.mes}</p>
           {payload.map((entry: any, index: number) => (
             <p key={index} style={{ color: entry.color }} className="text-sm">
@@ -50,27 +50,27 @@ export default function GraficoEvolucaoMensal({ chartData }: Props) {
   };
 
   return (
-    <div className="bg-slate-800 rounded-2xl p-6 border border-slate-700">
-      <h3 className="text-lg font-bold text-white mb-4">📈 Evolução dos Últimos 6 Meses</h3>
+    <div className="rounded-xl bg-white p-6 shadow-sm">
+      <h3 className="mb-4 text-lg font-bold text-slate-950">Evolução dos últimos 6 meses</h3>
       
       <ResponsiveContainer width="100%" height={300}>
         {/* --- CORREÇÃO (V8) --- */}
         <LineChart data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
           <XAxis 
             dataKey="mes" 
-            stroke="#94a3b8"
+            stroke="#64748b"
             style={{ fontSize: '12px' }}
           />
           <YAxis 
-            stroke="#94a3b8"
+            stroke="#64748b"
             style={{ fontSize: '12px' }}
             tickFormatter={(value) => `R$ ${value}`}
           />
           <Tooltip content={<CustomTooltip />} />
           <Legend 
             wrapperStyle={{ paddingTop: '20px' }}
-            formatter={(value) => <span className="text-gray-300">{value}</span>}
+            formatter={(value) => <span className="text-slate-700">{value}</span>}
           />
           <Line 
             type="monotone" 
@@ -93,10 +93,10 @@ export default function GraficoEvolucaoMensal({ chartData }: Props) {
           <Line 
             type="monotone" 
             dataKey="saldo" 
-            stroke="#f97316" 
+            stroke="#7c5cfc"
             strokeWidth={2}
             name="Saldo"
-            dot={{ fill: '#f97316', r: 4 }}
+            dot={{ fill: '#7c5cfc', r: 4 }}
             activeDot={{ r: 6 }}
           />
         </LineChart>

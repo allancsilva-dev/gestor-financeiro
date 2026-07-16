@@ -24,10 +24,10 @@ const NotFound = lazy(() => import('./pages/NotFound'));
 
 function RouteFallback() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-900">
+    <div className="min-h-screen flex items-center justify-center bg-[#f0f2f8]">
       <div className="text-center">
-        <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-orange-500"></div>
-        <p className="mt-3 text-slate-300">Carregando tela...</p>
+        <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-violet-600"></div>
+        <p className="mt-3 text-slate-700">Carregando tela...</p>
       </div>
     </div>
   );
@@ -75,7 +75,8 @@ function AppRoutes() {
       <Route path="/contas" element={<OnboardingGuard><Contas /></OnboardingGuard>} />
       <Route path="/transacoes" element={<OnboardingGuard><Transacoes /></OnboardingGuard>} />
       <Route path="/metas" element={<OnboardingGuard><Metas /></OnboardingGuard>} />
-      <Route path="/carteira" element={<OnboardingGuard><CarteiraPage /></OnboardingGuard>} />
+      <Route path="/contas-financeiras" element={<OnboardingGuard><CarteiraPage /></OnboardingGuard>} />
+      <Route path="/carteira" element={<OnboardingGuard><Navigate to="/contas-financeiras" replace /></OnboardingGuard>} />
       <Route path="/contas-fixas" element={<OnboardingGuard><ContasFixas /></OnboardingGuard>} />
       <Route path="/orcamentos" element={<OnboardingGuard><Orcamentos /></OnboardingGuard>} />
       <Route path="/faturas" element={<OnboardingGuard><Faturas /></OnboardingGuard>} />
