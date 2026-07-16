@@ -39,6 +39,17 @@ public class Meta {
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cofre_id", unique = true)
     private Carteira cofre;
+
+    /** Exatamente uma modalidade por meta (ADR-0012, PR-F2-12). */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private com.gestor.financeiro.model.enums.ModalidadeMeta modalidade =
+            com.gestor.financeiro.model.enums.ModalidadeMeta.COFRE_REAL;
+
+    /** Conta de caixa da alocacao virtual (sem lancamento no ledger). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "carteira_alocada_id")
+    private Carteira carteiraAlocada;
     
     @Column(precision = 10, scale = 2)
     private BigDecimal valorMensal;

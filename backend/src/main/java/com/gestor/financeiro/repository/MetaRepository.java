@@ -11,10 +11,23 @@ import java.util.Optional;
 
 @Repository
 public interface MetaRepository extends JpaRepository<Meta, Long> {
-    
+
     // Busca metas ATIVAS de um usuário
     // Query gerada: SELECT * FROM metas WHERE usuario_id = ? AND ativa = true
     List<Meta> findByUsuarioIdAndAtivaTrue(Long usuarioId);
+
+    // Soma das alocacoes virtuais de outras metas sobre a mesma conta (PR-F2-12)
+    @org.springframework.data.jpa.repository.Query(
+            "SELECT COALESCE(SUM(m.valorReservado), 0) FROM Meta m " +
+            "WHERE m.usuario.id = :usuarioId " +
+            "AND m.carteiraAlocada.id = :carteiraId " +
+            "AND m.id <> :metaId " +
+            "AND m.modalidade = com.gestor.financeiro.model.enums.ModalidadeMeta.RESERVA_VIRTUAL " +
+            "AND m.status <> com.gestor.financeiro.model.enums.StatusMeta.ARQUIVADA")
+    java.math.BigDecimal somarAlocacaoVirtualNaCarteira(
+            @org.springframework.data.repository.query.Param("usuarioId") Long usuarioId,
+            @org.springframework.data.repository.query.Param("carteiraId") Long carteiraId,
+            @org.springframework.data.repository.query.Param("metaId") Long metaId);
 
     // Todas as metas, inclusive inativas (exportação LGPD)
     List<Meta> findByUsuarioId(Long usuarioId);

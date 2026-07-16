@@ -123,6 +123,9 @@ public class MetaController {
         meta.setCor(request.getCor());
         meta.setIcone(request.getIcone());
         meta.setDescricao(request.getDescricao());
+        if (request.getModalidade() != null) {
+            meta.setModalidade(request.getModalidade());
+        }
         return meta;
     }
 }

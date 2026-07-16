@@ -29,6 +29,17 @@ public class MetaRequest {
 
     private String descricao;
 
+    /** COFRE_REAL (default) ou RESERVA_VIRTUAL (ADR-0012). Imutavel com reserva. */
+    private com.gestor.financeiro.model.enums.ModalidadeMeta modalidade;
+
+    public com.gestor.financeiro.model.enums.ModalidadeMeta getModalidade() {
+        return modalidade;
+    }
+
+    public void setModalidade(com.gestor.financeiro.model.enums.ModalidadeMeta modalidade) {
+        this.modalidade = modalidade;
+    }
+
     public String getNome() {
         return nome;
     }

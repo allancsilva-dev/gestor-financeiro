@@ -19,7 +19,10 @@ public record MetaResponseDto(
     Boolean ativa,
     String cor,
     String icone,
-    String descricao
+    String descricao,
+    com.gestor.financeiro.model.enums.ModalidadeMeta modalidade,
+    Long cofreId,
+    Long carteiraAlocadaId
 ) {
     public static MetaResponseDto fromEntity(Meta meta) {
         return new MetaResponseDto(
@@ -35,7 +38,10 @@ public record MetaResponseDto(
             meta.getAtiva(),
             meta.getCor(),
             meta.getIcone(),
-            meta.getDescricao()
+            meta.getDescricao(),
+            meta.getModalidade(),
+            meta.getCofre() == null ? null : meta.getCofre().getId(),
+            meta.getCarteiraAlocada() == null ? null : meta.getCarteiraAlocada().getId()
         );
     }
 }

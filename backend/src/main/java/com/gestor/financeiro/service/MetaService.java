@@ -75,6 +75,10 @@ public class MetaService {
             throw new BusinessException("Informe a carteira de origem da reserva");
         }
 
+        if (meta.getModalidade() == com.gestor.financeiro.model.enums.ModalidadeMeta.RESERVA_VIRTUAL) {
+            return alocarVirtual(meta, valor, carteiraId, usuarioId);
+        }
+
         // Reserva e um cofrinho real (ADR-0012): operacao com par de lancamentos
         // carteira -> COFRE da meta; valorReservado segue em dupla escrita
         Carteira cofre = cofreDe(meta, usuarioId);
@@ -120,6 +124,10 @@ public class MetaService {
             throw new BusinessException("Valor maior que o reservado na meta");
         }
 
+        if (meta.getModalidade() == com.gestor.financeiro.model.enums.ModalidadeMeta.RESERVA_VIRTUAL) {
+            return desalocarVirtual(meta, valor, usuarioId);
+        }
+
         // Resgate: operacao com par COFRE -> carteira (ADR-0012)
         Carteira cofre = cofreDe(meta, usuarioId);
         OperacaoFinanceira operacao = operacaoService.criar(new CriarOperacaoCommand(
@@ -155,6 +163,16 @@ public class MetaService {
     public Meta atualizar(Long id, Meta metaAtualizada, Long usuarioId) {
         Meta meta = buscarPorIdDoUsuario(id, usuarioId);
         exigirNaoArquivada(meta);
+
+        // Troca de modalidade so com reserva zerada (ADR-0012)
+        if (metaAtualizada.getModalidade() != null
+                && metaAtualizada.getModalidade() != meta.getModalidade()) {
+            if (meta.getValorReservado() != null && meta.getValorReservado().signum() > 0) {
+                throw new BusinessException(
+                        "Resgate a reserva antes de trocar a modalidade da meta");
+            }
+            meta.setModalidade(metaAtualizada.getModalidade());
+        }
 
         meta.setNome(metaAtualizada.getNome());
         meta.setValorTotal(metaAtualizada.getValorTotal());
@@ -243,6 +261,58 @@ public class MetaService {
                 LocalDateTime.now(clock),
                 permitirSaldoNegativo
         ), operacao);
+    }
+
+    /**
+     * Alocacao virtual (ADR-0012, PR-F2-12): sem lancamento no ledger — o
+     * dinheiro continua na conta de caixa e a alocacao reduz apenas
+     * "Disponivel para gastar". Alocacao total nunca excede o saldo da conta.
+     */
+    private Meta alocarVirtual(Meta meta, BigDecimal valor, Long carteiraId, Long usuarioId) {
+        if (carteiraId == null && meta.getCarteiraAlocada() == null) {
+            throw new BusinessException("Informe a conta de caixa da alocação virtual");
+        }
+        Carteira carteira = meta.getCarteiraAlocada() != null
+                ? meta.getCarteiraAlocada()
+                : carteiraRepository.findByIdAndUsuarioId(carteiraId, usuarioId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Carteira não encontrada"));
+        if (carteira.getSubtipo() == SubtipoContaFinanceira.COFRE
+                || carteira.getSubtipo() == SubtipoContaFinanceira.CARTAO
+                || carteira.getSubtipo() == SubtipoContaFinanceira.CUSTODIA) {
+            throw new BusinessException("Alocação virtual exige conta de caixa");
+        }
+
+        BigDecimal valorAnterior = meta.getValorReservado();
+        BigDecimal novaAlocacao = valorAnterior.add(valor);
+        BigDecimal alocadoNaCarteira = metaRepository.somarAlocacaoVirtualNaCarteira(
+                usuarioId, carteira.getId(), meta.getId());
+        if (alocadoNaCarteira.add(novaAlocacao).compareTo(carteira.getSaldo()) > 0) {
+            throw new BusinessException("Alocação excede o saldo disponível da conta");
+        }
+
+        meta.setCarteiraAlocada(carteira);
+        meta.setValorReservado(novaAlocacao);
+        meta.recalcularEstado(LocalDate.now(clock));
+        Meta salva = metaRepository.save(meta);
+        registroMovimento(salva, usuarioId, "ADICAO", valor, valorAnterior,
+                "Alocação virtual na meta: " + salva.getNome());
+        return salva;
+    }
+
+    private Meta desalocarVirtual(Meta meta, BigDecimal valor, Long usuarioId) {
+        if (valor.compareTo(meta.getValorReservado()) > 0) {
+            throw new BusinessException("Valor maior que o reservado na meta");
+        }
+        BigDecimal valorAnterior = meta.getValorReservado();
+        meta.setValorReservado(valorAnterior.subtract(valor));
+        if (meta.getValorReservado().signum() == 0) {
+            meta.setCarteiraAlocada(null);
+        }
+        meta.recalcularEstado(LocalDate.now(clock));
+        Meta salva = metaRepository.save(meta);
+        registroMovimento(salva, usuarioId, "REMOCAO", valor, valorAnterior,
+                "Desalocação virtual da meta: " + salva.getNome());
+        return salva;
     }
 
     /** Cofre real da meta (ADR-0012): retorna o existente ou cria sob demanda. */
