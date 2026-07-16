@@ -21,22 +21,26 @@ public class DashboardService {
     private final MetaRepository metaRepository;
     private final ContaFixaRepository contaFixaRepository;
     private final CarteiraRepository carteiraRepository;
-    
+    private final VisaoFinanceiraService visaoFinanceiraService;
+
     public DashboardDtos.Resumo obterResumo(Long usuarioId) {
         LocalDate inicioMes = LocalDate.now(clock).withDayOfMonth(1);
         LocalDate fimMes = LocalDate.now(clock).withDayOfMonth(LocalDate.now(clock).lengthOfMonth());
-        
+
         BigDecimal totalEntradas = transacaoRepository.sumValorTotalByUsuarioIdAndTipoAndDataBetween(
                 usuarioId, TipoTransacao.ENTRADA, inicioMes, fimMes);
         BigDecimal totalSaidas = transacaoRepository.sumValorEfetivoByUsuarioIdAndTipoAndDataBetween(
                 usuarioId, TipoTransacao.SAIDA, inicioMes, fimMes);
         BigDecimal saldo = totalEntradas.subtract(totalSaidas);
         BigDecimal saldoCarteiras = carteiraRepository.sumSaldoByUsuarioId(usuarioId);
-        
+
+        // Campos legados preservados; visoes rotuladas por politica sao aditivas
+        // (ADR-0010) e substituem os legados no contract (PR-F2-19)
         return new DashboardDtos.Resumo(totalEntradas, totalSaidas, saldo,
                 categoriaRepository.countByUsuarioIdAndAtivoTrue(usuarioId), contaRepository.countByUsuarioId(usuarioId),
                 metaRepository.countByUsuarioIdAndAtivaTrue(usuarioId), contaFixaRepository.countByUsuarioIdAndAtivoTrue(usuarioId),
-                saldoCarteiras);
+                saldoCarteiras,
+                visaoFinanceiraService.resumo(usuarioId, inicioMes, fimMes));
     }
     
     public List<DashboardDtos.Categoria> obterGastosPorCategoria(Long usuarioId) {

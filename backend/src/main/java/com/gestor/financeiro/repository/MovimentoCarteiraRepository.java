@@ -22,6 +22,22 @@ public interface MovimentoCarteiraRepository extends JpaRepository<MovimentoCart
 
     java.util.List<MovimentoCarteira> findByOperacaoIdOrderByValorAssinadoAsc(Long operacaoId);
 
+    // Visao CAIXA (ADR-0010): fluxo real de contas ATIVO no periodo, restrito as
+    // origens de consumo/renda (transferencia, meta, investimento e backfill fora)
+    @org.springframework.data.jpa.repository.Query(
+            "SELECT COALESCE(SUM(CASE WHEN m.valorAssinado > 0 THEN m.valorAssinado ELSE 0 END), 0), " +
+            "       COALESCE(SUM(CASE WHEN m.valorAssinado < 0 THEN -m.valorAssinado ELSE 0 END), 0) " +
+            "FROM MovimentoCarteira m " +
+            "WHERE m.usuario.id = :usuarioId " +
+            "AND m.carteira.natureza = com.gestor.financeiro.model.enums.NaturezaContaFinanceira.ATIVO " +
+            "AND m.dataMovimento BETWEEN :inicio AND :fim " +
+            "AND m.origem IN :origens")
+    java.util.List<Object[]> sumVisaoCaixa(
+            @org.springframework.data.repository.query.Param("usuarioId") Long usuarioId,
+            @org.springframework.data.repository.query.Param("origens") java.util.List<com.gestor.financeiro.model.enums.OrigemMovimentoCarteira> origens,
+            @org.springframework.data.repository.query.Param("inicio") java.time.LocalDateTime inicio,
+            @org.springframework.data.repository.query.Param("fim") java.time.LocalDateTime fim);
+
     List<MovimentoCarteira> findByUsuarioIdAndCarteiraIdOrderByDataMovimentoDescIdDesc(Long usuarioId, Long carteiraId);
 
     boolean existsByCarteiraIdAndOrigemAndReferenciaTipo(

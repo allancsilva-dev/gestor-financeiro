@@ -18,6 +18,18 @@ public interface FaturaLancamentoRepository extends JpaRepository<FaturaLancamen
     @EntityGraph(attributePaths = {"transacao", "transacao.categoria"})
     List<FaturaLancamento> findByFaturaIdOrderByDataCompraAscIdAsc(Long faturaId);
 
+    // Parte cartao da visao COMPETENCIA (ADR-0010): consumo pela data da compra
+    // (COMPRA/AJUSTE/ESTORNO); rollover entre faturas fica fora
+    @Query("SELECT COALESCE(SUM(fl.valor), 0) FROM FaturaLancamento fl " +
+           "WHERE fl.fatura.usuario.id = :usuarioId " +
+           "AND fl.tipo IN :tipos " +
+           "AND fl.dataCompra BETWEEN :inicio AND :fim")
+    BigDecimal sumConsumoPorDataCompra(
+            @Param("usuarioId") Long usuarioId,
+            @Param("tipos") List<TipoFaturaLancamento> tipos,
+            @Param("inicio") java.time.LocalDate inicio,
+            @Param("fim") java.time.LocalDate fim);
+
     List<FaturaLancamento> findByTransacaoId(Long transacaoId);
 
     @EntityGraph(attributePaths = {"fatura"})

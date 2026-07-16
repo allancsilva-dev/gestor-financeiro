@@ -105,6 +105,33 @@ public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
             @Param("inicio") LocalDate inicio,
             @Param("fim") LocalDate fim);
 
+    // Visao COMPRA (ADR-0010): valor total na data da compra, so conciliadas
+    @Query("SELECT COALESCE(SUM(t.valorTotal), 0) FROM Transacao t " +
+           "WHERE t.usuario.id = :usuarioId AND t.ativa = true AND t.tipo = :tipo " +
+           "AND t.estadoConciliacao = com.gestor.financeiro.model.enums.EstadoConciliacaoTransacao.CONCILIADA " +
+           "AND t.data BETWEEN :inicio AND :fim")
+    BigDecimal sumVisaoCompra(
+            @Param("usuarioId") Long usuarioId,
+            @Param("tipo") TipoTransacao tipo,
+            @Param("inicio") LocalDate inicio,
+            @Param("fim") LocalDate fim);
+
+    // Parte nao-cartao da visao COMPETENCIA (cartao entra via FaturaLancamento).
+    // LEFT JOIN explicito: caminho t.conta.tipo geraria INNER JOIN e excluiria
+    // transacoes sem conta.
+    @Query("SELECT COALESCE(SUM(t.valorTotal), 0) FROM Transacao t LEFT JOIN t.conta c " +
+           "WHERE t.usuario.id = :usuarioId AND t.ativa = true AND t.tipo = :tipo " +
+           "AND t.estadoConciliacao = com.gestor.financeiro.model.enums.EstadoConciliacaoTransacao.CONCILIADA " +
+           "AND t.data BETWEEN :inicio AND :fim " +
+           "AND (c IS NULL " +
+           "     OR t.tipo <> com.gestor.financeiro.model.enums.TipoTransacao.SAIDA " +
+           "     OR c.tipo <> com.gestor.financeiro.model.enums.TipoConta.CREDITO)")
+    BigDecimal sumVisaoCompetenciaNaoCartao(
+            @Param("usuarioId") Long usuarioId,
+            @Param("tipo") TipoTransacao tipo,
+            @Param("inicio") LocalDate inicio,
+            @Param("fim") LocalDate fim);
+
     @Query("SELECT COALESCE(SUM(CASE WHEN t.parcelado = true AND t.valorParcela IS NOT NULL THEN t.valorParcela ELSE t.valorTotal END), 0) " +
            "FROM Transacao t WHERE t.usuario.id = :usuarioId AND t.ativa = true AND t.tipo = :tipo " +
            "AND t.data BETWEEN :inicio AND :fim")
