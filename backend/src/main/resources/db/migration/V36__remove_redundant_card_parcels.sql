@@ -1,5 +1,8 @@
--- RELEASE B: mover para db/migration somente depois do dry-run card-schedule na VPS.
--- Falha antes de apagar quando a equivalencia financeira nao estiver comprovada.
+-- V36 — PR-F2-09 (ADR-0010): FaturaLancamento vira cronograma UNICO do cartao.
+-- Promovida de db/contract/V27 (Fase 2). Guard fail-closed (ADR-0015): aborta
+-- antes de apagar se a equivalencia Parcela <-> FaturaLancamento nao estiver
+-- comprovada (contagem, soma por transacao e casamento por parcela).
+-- RESSALVA: dry-run na VPS pendente (E0-2); em divergencia, sanear antes.
 DO $$
 BEGIN
     IF EXISTS (
