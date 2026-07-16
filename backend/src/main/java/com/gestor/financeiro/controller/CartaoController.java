@@ -3,9 +3,8 @@ package com.gestor.financeiro.controller;
 import com.gestor.financeiro.dto.CartaoRequest;
 import com.gestor.financeiro.dto.CartaoResponse;
 import com.gestor.financeiro.model.Conta;
-import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.security.AuthenticatedUserService;
-import com.gestor.financeiro.service.ContaService;
+import com.gestor.financeiro.service.CartaoService;
 import com.gestor.financeiro.util.PaginationUtils;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -22,7 +21,7 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "Cartões", description = "Contrato público canônico de cartões")
 @RequiredArgsConstructor
 public class CartaoController {
-    private final ContaService contaService;
+    private final CartaoService cartaoService;
     private final AuthenticatedUserService authenticatedUserService;
 
     @GetMapping({"", "/meus"})
@@ -30,43 +29,42 @@ public class CartaoController {
             @PageableDefault(size = 20, sort = "nome", direction = Sort.Direction.ASC) Pageable pageable) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Pageable capped = PaginationUtils.enforceMaxSize(pageable, 100);
-        return ResponseEntity.ok(contaService.listarCartoesPorUsuario(usuarioId, capped).map(CartaoResponse::fromEntity));
+        return ResponseEntity.ok(cartaoService.listarCartoesPorUsuario(usuarioId, capped).map(CartaoResponse::fromEntity));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<CartaoResponse> buscar(@PathVariable Long id) {
         return ResponseEntity.ok(CartaoResponse.fromEntity(
-                contaService.buscarCartaoDoUsuario(id, authenticatedUserService.getAuthenticatedUserId())));
+                cartaoService.buscarCartaoDoUsuario(id, authenticatedUserService.getAuthenticatedUserId())));
     }
 
     @PostMapping
     public ResponseEntity<CartaoResponse> criar(@Valid @RequestBody CartaoRequest request) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
-        return ResponseEntity.ok(CartaoResponse.fromEntity(contaService.criar(toEntity(request), usuarioId)));
+        return ResponseEntity.ok(CartaoResponse.fromEntity(cartaoService.criar(toEntity(request), usuarioId)));
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<CartaoResponse> atualizar(
             @PathVariable Long id, @Valid @RequestBody CartaoRequest request) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
-        return ResponseEntity.ok(CartaoResponse.fromEntity(contaService.atualizarCartao(id, toEntity(request), usuarioId)));
+        return ResponseEntity.ok(CartaoResponse.fromEntity(cartaoService.atualizarCartao(id, toEntity(request), usuarioId)));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletar(@PathVariable Long id) {
-        contaService.deletarCartao(id, authenticatedUserService.getAuthenticatedUserId());
+        cartaoService.deletarCartao(id, authenticatedUserService.getAuthenticatedUserId());
         return ResponseEntity.noContent().build();
     }
 
     private Conta toEntity(CartaoRequest request) {
-        Conta conta = new Conta();
-        conta.setNome(request.nome());
-        conta.setTipo(TipoConta.CREDITO);
-        conta.setLimiteTotal(request.limiteTotal());
-        conta.setDiaFechamento(request.diaFechamento());
-        conta.setDiaVencimento(request.diaVencimento());
-        conta.setCor(request.cor());
-        conta.setBanco(request.banco());
-        return conta;
+        Conta cartao = new Conta();
+        cartao.setNome(request.nome());
+        cartao.setLimiteTotal(request.limiteTotal());
+        cartao.setDiaFechamento(request.diaFechamento());
+        cartao.setDiaVencimento(request.diaVencimento());
+        cartao.setCor(request.cor());
+        cartao.setBanco(request.banco());
+        return cartao;
     }
 }

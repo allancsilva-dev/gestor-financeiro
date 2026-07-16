@@ -1,11 +1,11 @@
 package com.gestor.financeiro;
 
+import com.gestor.financeiro.model.enums.SubtipoContaFinanceira;
 import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.model.MovimentoCarteira;
 import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.model.Usuario;
-import com.gestor.financeiro.model.enums.TipoCarteira;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.CategoriaRepository;
@@ -74,7 +74,7 @@ class TransacaoServiceLedgerTest {
         carteira = new Carteira();
         carteira.setUsuario(usuario);
         carteira.setNome("Carteira Ledger");
-        carteira.setTipo(TipoCarteira.DINHEIRO);
+        carteira.setSubtipo(SubtipoContaFinanceira.DINHEIRO);
         carteira.setSaldo(new BigDecimal("500.00"));
         carteira = carteiraRepository.save(carteira);
     }

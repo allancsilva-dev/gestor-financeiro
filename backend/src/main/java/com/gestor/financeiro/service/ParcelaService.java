@@ -9,7 +9,6 @@ import com.gestor.financeiro.model.Parcela;
 import com.gestor.financeiro.model.enums.OrigemMovimentoCarteira;
 import com.gestor.financeiro.model.enums.StatusPagamento;
 import com.gestor.financeiro.model.enums.TipoMovimentoCarteira;
-import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.ParcelaRepository;
@@ -128,9 +127,9 @@ public class ParcelaService {
     }
 
     private void rejeitarCartao(Parcela parcela) {
+        // Contract V41: toda conta referenciada e cartao
         if (parcela.getTransacao().getTipo() == TipoTransacao.SAIDA
-                && parcela.getTransacao().getConta() != null
-                && parcela.getTransacao().getConta().getTipo() == TipoConta.CREDITO) {
+                && parcela.getTransacao().getConta() != null) {
             throw new CardParcelDeprecatedException(parcela.getTransacao().getId());
         }
     }

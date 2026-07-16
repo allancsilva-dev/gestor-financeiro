@@ -81,7 +81,7 @@ public class MaintenanceCommandRunner implements ApplicationRunner {
                   COUNT(DISTINCT t.id) FILTER (WHERE p.id IS NOT NULL) AS transacoes_com_parcela_legada,
                   COUNT(DISTINCT t.id) FILTER (WHERE p.id IS NOT NULL AND fl.id IS NULL) AS sem_lancamento_canonico
                 FROM transacoes t
-                JOIN contas c ON c.id = t.conta_id AND c.tipo = 'CREDITO'
+                JOIN contas c ON c.id = t.conta_id
                 LEFT JOIN parcelas p ON p.transacao_id = t.id
                 LEFT JOIN fatura_lancamentos fl ON fl.transacao_id = t.id AND fl.tipo = 'COMPRA'
                 WHERE t.usuario_id = ? AND t.tipo = 'SAIDA'
@@ -89,7 +89,7 @@ public class MaintenanceCommandRunner implements ApplicationRunner {
         Number missing = (Number) result.get("sem_lancamento_canonico");
         Long divergences = jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM transacoes t
-                JOIN contas c ON c.id = t.conta_id AND c.tipo = 'CREDITO'
+                JOIN contas c ON c.id = t.conta_id
                 WHERE t.usuario_id = ? AND t.tipo = 'SAIDA'
                   AND EXISTS (SELECT 1 FROM parcelas p WHERE p.transacao_id = t.id)
                   AND ((SELECT COUNT(*) FROM parcelas p WHERE p.transacao_id = t.id)

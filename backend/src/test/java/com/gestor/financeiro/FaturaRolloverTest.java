@@ -1,5 +1,6 @@
 package com.gestor.financeiro;
 
+import com.gestor.financeiro.model.enums.SubtipoContaFinanceira;
 import com.gestor.financeiro.dto.FaturaResponse;
 import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Categoria;
@@ -9,8 +10,6 @@ import com.gestor.financeiro.model.FaturaLancamento;
 import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.FaturaStatus;
-import com.gestor.financeiro.model.enums.TipoCarteira;
-import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.model.enums.TipoFaturaLancamento;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.CarteiraRepository;
@@ -83,6 +82,7 @@ class FaturaRolloverTest {
     private Usuario usuario;
     private Categoria categoria;
     private Conta cartao;
+    private Carteira passivo;
 
     @BeforeEach
     void setup() {
@@ -97,7 +97,8 @@ class FaturaRolloverTest {
                 TestDataFactory.usuario("Rollover", "fatura-rollover@teste.com", passwordEncoder.encode("123456")));
         categoria = categoriaRepository.save(TestDataFactory.categoria(usuario, "Compras"));
 
-        cartao = TestDataFactory.conta(usuario, "Cartão Rollover", TipoConta.CREDITO);
+        passivo = carteiraRepository.save(TestDataFactory.contaPassivaCartao(usuario, "Cartão Rollover"));
+        cartao = TestDataFactory.cartao(usuario, "Cartão Rollover", passivo);
         cartao.setDiaFechamento(10);
         cartao.setDiaVencimento(20);
         cartao = contaRepository.save(cartao);
@@ -105,7 +106,7 @@ class FaturaRolloverTest {
         Carteira carteira = new Carteira();
         carteira.setUsuario(usuario);
         carteira.setNome("Conta corrente");
-        carteira.setTipo(TipoCarteira.CONTA_BANCARIA);
+        carteira.setSubtipo(SubtipoContaFinanceira.CORRENTE);
         carteira.setSaldo(new BigDecimal("1000.00"));
         carteiraRepository.save(carteira);
     }
@@ -117,9 +118,9 @@ class FaturaRolloverTest {
         adicionarLancamento(janeiro, TipoFaturaLancamento.ESTORNO, new BigDecimal("-150.00"));
         assertEquals(0, new BigDecimal("-50.00").compareTo(recarregarFatura(janeiro).getValorTotal()));
 
-        // Invariante (decisão 16): valorGasto acumula os lançamentos criados no setup (100 - 150).
+        // Invariante (decisão 16): o passivo acumula os lançamentos criados no setup (100 - 150).
         assertEquals(0, new BigDecimal("-50.00").compareTo(
-                contaRepository.findById(cartao.getId()).orElseThrow().getValorGasto()));
+                carteiraRepository.findById(passivo.getId()).orElseThrow().getSaldo()));
 
         FaturaResponse fevereiro = faturaService.buscarPorMes(usuario.getId(), cartao.getId(), 2, 2020);
 
@@ -138,9 +139,9 @@ class FaturaRolloverTest {
         assertEquals(janeiro.getId(), credito.getFaturaOrigem().getId());
         assertNull(credito.getTransacao());
 
-        // Invariante de valorGasto: o crédito rolado entra como qualquer lançamento (decisão 16).
+        // Invariante do passivo: o crédito rolado entra como qualquer lançamento (decisão 16).
         assertEquals(0, new BigDecimal("-100.00").compareTo(
-                contaRepository.findById(cartao.getId()).orElseThrow().getValorGasto()));
+                carteiraRepository.findById(passivo.getId()).orElseThrow().getSaldo()));
     }
 
     @Test
@@ -205,10 +206,10 @@ class FaturaRolloverTest {
         assertEquals(0, new BigDecimal("120.00").compareTo(janeiroDepois.getValorPago()));
         assertNull(janeiroDepois.getDataPagamento());
 
-        // Invariante de valorGasto: saldo devedor rolado (positivo) soma ao limite utilizado.
+        // Invariante do passivo: saldo devedor rolado (positivo) soma ao limite utilizado.
         // 200 (compra original) + 80 (saldo devedor rolado) = 280.
         assertEquals(0, new BigDecimal("280.00").compareTo(
-                contaRepository.findById(cartao.getId()).orElseThrow().getValorGasto()));
+                carteiraRepository.findById(passivo.getId()).orElseThrow().getSaldo()));
 
         // Idempotência: ler a mesma fatura de novo não duplica o rollover.
         faturaService.buscarPorMes(usuario.getId(), cartao.getId(), 2, 2020);
@@ -255,9 +256,9 @@ class FaturaRolloverTest {
                 .count();
         assertEquals(1, quantidadeCreditos);
 
-        // valorGasto não deve dobrar por ter lido a fatura destino duas vezes.
+        // o passivo não deve dobrar por ter lido a fatura destino duas vezes.
         assertEquals(0, new BigDecimal("-100.00").compareTo(
-                contaRepository.findById(cartao.getId()).orElseThrow().getValorGasto()));
+                carteiraRepository.findById(passivo.getId()).orElseThrow().getSaldo()));
     }
 
     @Test
@@ -314,7 +315,7 @@ class FaturaRolloverTest {
     }
 
     // Simula um lançamento já existente na fatura (equivalente ao que FaturaService.criarLancamento
-    // faria em produção), mantendo o total da fatura e o valorGasto da conta consistentes, sem
+    // faria em produção), mantendo o total da fatura e o passivo consistentes, sem
     // depender de TransacaoService para montar o estado inicial de "fatura já fechada".
     private void adicionarLancamento(FaturaCartao fatura, TipoFaturaLancamento tipo, BigDecimal valor) {
         FaturaLancamento lancamento = new FaturaLancamento();
@@ -329,9 +330,9 @@ class FaturaRolloverTest {
         fatura.setValorTotal(fatura.getValorTotal().add(valor));
         faturaCartaoRepository.save(fatura);
 
-        Conta conta = contaRepository.findById(cartao.getId()).orElseThrow();
-        conta.setValorGasto(conta.getValorGasto().add(valor));
-        contaRepository.save(conta);
+        Carteira p = carteiraRepository.findById(passivo.getId()).orElseThrow();
+        p.setSaldo(p.getSaldo().add(valor));
+        carteiraRepository.save(p);
     }
 
     private FaturaCartao recarregarFatura(FaturaCartao fatura) {

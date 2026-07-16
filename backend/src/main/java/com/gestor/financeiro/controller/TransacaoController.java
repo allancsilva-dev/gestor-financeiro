@@ -126,10 +126,10 @@ public class TransacaoController {
         categoria.setId(request.getCategoriaIdNormalizada());
         transacao.setCategoria(categoria);
 
-        if (request.getContaIdNormalizada() != null) {
-            Conta conta = new Conta();
-            conta.setId(request.getContaIdNormalizada());
-            transacao.setConta(conta);
+        if (request.getCartaoId() != null) {
+            Conta cartao = new Conta();
+            cartao.setId(request.getCartaoId());
+            transacao.setConta(cartao);
         }
 
         if (request.getCarteiraId() != null) {

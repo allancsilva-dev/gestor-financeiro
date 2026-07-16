@@ -5,7 +5,6 @@ import com.gestor.financeiro.dto.ProjecaoMensalDto;
 import com.gestor.financeiro.dto.ProjecaoResponse;
 import com.gestor.financeiro.model.enums.FaturaStatus;
 import com.gestor.financeiro.model.enums.StatusPagamento;
-import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.model.ContaFixa;
 import com.gestor.financeiro.repository.*;
@@ -92,7 +91,7 @@ public class ProjecaoService {
 
     private BigDecimal somarParcelasNoMes(Long usuarioId, LocalDate inicio, LocalDate fim) {
         BigDecimal total = parcelaRepository.somarValorNoPeriodo(
-                usuarioId, inicio, fim, StatusPagamento.PAGO, TipoTransacao.SAIDA, TipoConta.CREDITO);
+                usuarioId, inicio, fim, StatusPagamento.PAGO, TipoTransacao.SAIDA);
         return total != null ? total : BigDecimal.ZERO;
     }
 

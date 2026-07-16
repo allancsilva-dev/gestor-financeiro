@@ -1,8 +1,6 @@
 package com.gestor.financeiro.dto;
 
-import com.fasterxml.jackson.annotation.JsonAlias;
-import com.gestor.financeiro.model.enums.TipoCarteira;
-import com.gestor.financeiro.model.enums.TipoConta;
+import com.gestor.financeiro.model.enums.SubtipoContaFinanceira;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -17,6 +15,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
+/**
+ * Contrato canonico do onboarding (PR-F2-19): objeto cartao (sem alias conta)
+ * e carteira com subtipo canonico (TipoCarteira removido no contract V41).
+ */
 public record OnboardingFinalizarRequest(
     @NotNull(message = "Carteira obrigatória")
     @Valid
@@ -24,8 +26,7 @@ public record OnboardingFinalizarRequest(
 
     @NotNull(message = "Cartão obrigatório")
     @Valid
-    @JsonAlias("cartao")
-    ContaInicial conta,
+    CartaoInicial cartao,
 
     @NotEmpty(message = "Selecione ao menos uma categoria")
     @Valid
@@ -43,7 +44,7 @@ public record OnboardingFinalizarRequest(
         String nome,
 
         @NotNull(message = "Campo obrigatório")
-        TipoCarteira tipo,
+        SubtipoContaFinanceira subtipo,
 
         @NotNull(message = "Campo obrigatório")
         @PositiveOrZero(message = "Saldo deve ser zero ou positivo")
@@ -53,20 +54,20 @@ public record OnboardingFinalizarRequest(
         String banco
     ) {}
 
-    public record ContaInicial(
+    public record CartaoInicial(
         @NotBlank(message = "Campo obrigatório")
         @Size(max = 100, message = "Nome deve ter no máximo 100 caracteres")
         String nome,
 
-        TipoConta tipo,
-
         @PositiveOrZero(message = "Limite total deve ser zero ou positivo")
         BigDecimal limiteTotal,
 
+        @NotNull(message = "Campo obrigatório")
         @Min(value = 1, message = "Dia de fechamento deve estar entre 1 e 31")
         @Max(value = 31, message = "Dia de fechamento deve estar entre 1 e 31")
         Integer diaFechamento,
 
+        @NotNull(message = "Campo obrigatório")
         @Min(value = 1, message = "Dia de vencimento deve estar entre 1 e 31")
         @Max(value = 31, message = "Dia de vencimento deve estar entre 1 e 31")
         Integer diaVencimento,

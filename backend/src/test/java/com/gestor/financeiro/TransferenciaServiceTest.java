@@ -7,7 +7,6 @@ import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.StatusOperacaoFinanceira;
 import com.gestor.financeiro.model.enums.SubtipoContaFinanceira;
-import com.gestor.financeiro.model.enums.TipoCarteira;
 import com.gestor.financeiro.model.enums.TipoMovimentoCarteira;
 import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.MovimentoCarteiraRepository;
@@ -56,14 +55,14 @@ class TransferenciaServiceTest {
         usuario.setSenha("x");
         usuario = usuarioRepository.save(usuario);
 
-        corrente = novaConta("Corrente", TipoCarteira.CONTA_BANCARIA, new BigDecimal("1000.00"));
-        poupanca = novaConta("Poupanca", TipoCarteira.POUPANCA, new BigDecimal("200.00"));
+        corrente = novaConta("Corrente", SubtipoContaFinanceira.CORRENTE, new BigDecimal("1000.00"));
+        poupanca = novaConta("Poupanca", SubtipoContaFinanceira.POUPANCA, new BigDecimal("200.00"));
     }
 
-    private Carteira novaConta(String nome, TipoCarteira tipo, BigDecimal saldo) {
+    private Carteira novaConta(String nome, SubtipoContaFinanceira subtipo, BigDecimal saldo) {
         Carteira c = new Carteira();
         c.setNome(nome);
-        c.setTipo(tipo);
+        c.setSubtipo(subtipo);
         c.setSaldo(saldo);
         c.setUsuario(usuario);
         return carteiraRepository.save(c);
@@ -143,7 +142,7 @@ class TransferenciaServiceTest {
     void custodiaNaoAceitaTransferenciaDireta() {
         Carteira custodia = new Carteira();
         custodia.setNome("Corretora");
-        custodia.setTipo(TipoCarteira.CONTA_BANCARIA);
+        custodia.setSubtipo(SubtipoContaFinanceira.CORRENTE);
         custodia.setSubtipo(SubtipoContaFinanceira.CUSTODIA);
         custodia.setSaldo(BigDecimal.ZERO);
         custodia.setUsuario(usuario);

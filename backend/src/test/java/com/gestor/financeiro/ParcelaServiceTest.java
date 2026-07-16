@@ -3,7 +3,6 @@ package com.gestor.financeiro;
 import com.gestor.financeiro.exception.CardParcelDeprecatedException;
 import com.gestor.financeiro.model.*;
 import com.gestor.financeiro.model.enums.StatusPagamento;
-import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.ParcelaRepository;
@@ -61,7 +60,7 @@ class ParcelaServiceTest {
 
     @Test
     void rejeitaMutacaoDeParcelaLegadaDeCartao() {
-        Conta conta = new Conta(); conta.setTipo(TipoConta.CREDITO);
+        Conta conta = new Conta();
         parcela.getTransacao().setConta(conta);
         assertThrows(CardParcelDeprecatedException.class, () -> service.marcarComoPaga(3L, 7L));
     }

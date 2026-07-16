@@ -4,9 +4,8 @@ import com.gestor.financeiro.dto.OnboardingFinalizarRequest;
 import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.model.ContaFixa;
 import com.gestor.financeiro.model.Usuario;
-import com.gestor.financeiro.model.enums.TipoCarteira;
-import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.model.enums.TipoTransacao;
+import com.gestor.financeiro.model.enums.SubtipoContaFinanceira;
 import com.gestor.financeiro.repository.CategoriaRepository;
 import com.gestor.financeiro.repository.ContaFixaRepository;
 import com.gestor.financeiro.service.OnboardingService;
@@ -112,9 +111,9 @@ class OnboardingServiceTest {
     private OnboardingFinalizarRequest request() {
         return new OnboardingFinalizarRequest(
                 new OnboardingFinalizarRequest.CarteiraInicial(
-                        "Principal", TipoCarteira.CONTA_BANCARIA, new BigDecimal("1000.00"), "Nubank"),
-                new OnboardingFinalizarRequest.ContaInicial(
-                        "Cartão Roxo", TipoConta.CREDITO, new BigDecimal("2000.00"), 5, 12, "#7C3AED", "Nubank"),
+                        "Principal", SubtipoContaFinanceira.CORRENTE, new BigDecimal("1000.00"), "Nubank"),
+                new OnboardingFinalizarRequest.CartaoInicial(
+                        "Cartão Roxo", new BigDecimal("2000.00"), 5, 12, "#7C3AED", "Nubank"),
                 List.of(new OnboardingFinalizarRequest.CategoriaInicial("Alimentação", "#EF4444", "🍔", null)),
                 new OnboardingFinalizarRequest.RendaInicial("Salário", new BigDecimal("3500.00"), 5),
                 new OnboardingFinalizarRequest.MetaInicial(

@@ -2,7 +2,6 @@ package com.gestor.financeiro.service;
 
 import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.dto.*;
-import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.TransacaoRepository;
 import org.springframework.data.domain.PageRequest;
@@ -74,12 +73,12 @@ public class RelatorioService {
                 usuarioId, inicio, fim, PageRequest.of(0, 8));
         List<RelatorioContaDto> gastosPorConta = new ArrayList<>();
         for (Object[] row : contasRaw) {
-            BigDecimal valor = asBigDecimal(row[3]);
+            BigDecimal valor = asBigDecimal(row[2]);
             int pct = BigDecimal.ZERO.compareTo(totalGastos) == 0 ? 0
                     : valor.multiply(BigDecimal.valueOf(100)).divide(totalGastos, 0, RoundingMode.HALF_UP).intValue();
-            TipoConta tipo = (TipoConta) row[2];
+            // Contract V41: toda conta e cartao de credito
             gastosPorConta.add(new RelatorioContaDto(asLong(row[0]), String.valueOf(row[1]),
-                    tipo != null ? tipo.getDescricao() : null, valor, BigDecimal.valueOf(pct)));
+                    "Cartão de Crédito", valor, BigDecimal.valueOf(pct)));
         }
         return gastosPorConta;
     }

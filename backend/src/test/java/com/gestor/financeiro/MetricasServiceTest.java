@@ -1,5 +1,6 @@
 package com.gestor.financeiro;
 
+import com.gestor.financeiro.model.enums.SubtipoContaFinanceira;
 import com.gestor.financeiro.dto.AtivoRequest;
 import com.gestor.financeiro.dto.MovimentacaoRequest;
 import com.gestor.financeiro.model.Carteira;
@@ -10,8 +11,6 @@ import com.gestor.financeiro.model.Meta;
 import com.gestor.financeiro.model.Parcela;
 import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.model.Usuario;
-import com.gestor.financeiro.model.enums.TipoCarteira;
-import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.model.enums.TipoFaturaLancamento;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.model.enums.ModalidadeMeta;
@@ -22,7 +21,7 @@ import com.gestor.financeiro.repository.FaturaLancamentoRepository;
 import com.gestor.financeiro.repository.MetaRepository;
 import com.gestor.financeiro.repository.ParcelaRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
-import com.gestor.financeiro.service.ContaService;
+import com.gestor.financeiro.service.CartaoService;
 import com.gestor.financeiro.service.InvestimentoService;
 import com.gestor.financeiro.service.MetaService;
 import com.gestor.financeiro.service.MetricasService;
@@ -66,7 +65,7 @@ class MetricasServiceTest {
     @Autowired TransacaoService transacaoService;
     @Autowired TransferenciaService transferenciaService;
     @Autowired MetaService metaService;
-    @Autowired ContaService contaService;
+    @Autowired CartaoService cartaoService;
     @Autowired InvestimentoService investimentoService;
     @Autowired CarteiraRepository carteiraRepository;
     @Autowired UsuarioRepository usuarioRepository;
@@ -103,10 +102,9 @@ class MetricasServiceTest {
 
         cartao = new Conta();
         cartao.setNome("Cartao");
-        cartao.setTipo(TipoConta.CREDITO);
         cartao.setDiaFechamento(28);
         cartao.setDiaVencimento(10);
-        cartao = contaService.criar(cartao, usuario.getId());
+        cartao = cartaoService.criar(cartao, usuario.getId());
         compraCartao = new Transacao();
         compraCartao.setDescricao("Notebook");
         compraCartao.setValorTotal(new BigDecimal("400.00"));
@@ -141,7 +139,7 @@ class MetricasServiceTest {
     private Carteira novaConta(String nome, BigDecimal saldo) {
         Carteira c = new Carteira();
         c.setNome(nome);
-        c.setTipo(TipoCarteira.CONTA_BANCARIA);
+        c.setSubtipo(SubtipoContaFinanceira.CORRENTE);
         c.setSaldo(saldo);
         c.setUsuario(usuario);
         return carteiraRepository.save(c);

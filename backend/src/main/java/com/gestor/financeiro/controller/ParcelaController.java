@@ -13,7 +13,6 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpHeaders;
-import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import org.springframework.web.bind.annotation.*;
 
@@ -34,8 +33,9 @@ public class ParcelaController {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Pageable cappedPageable = PaginationUtils.enforceMaxSize(pageable, 100);
         Page<Parcela> parcelas = parcelaService.listarPorTransacao(transacaoId, usuarioId, cappedPageable);
+        // Contract V41: toda conta referenciada e cartao
         boolean cartaoLegado = parcelas.stream().findFirst().map(p -> p.getTransacao().getTipo() == TipoTransacao.SAIDA
-                && p.getTransacao().getConta() != null && p.getTransacao().getConta().getTipo() == TipoConta.CREDITO)
+                && p.getTransacao().getConta() != null)
                 .orElse(false);
         ResponseEntity.BodyBuilder response = ResponseEntity.ok();
         if (cartaoLegado) {

@@ -1,13 +1,12 @@
 package com.gestor.financeiro;
 
+import com.gestor.financeiro.model.enums.SubtipoContaFinanceira;
 import com.gestor.financeiro.exception.BusinessException;
 import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.EstadoConciliacaoTransacao;
-import com.gestor.financeiro.model.enums.TipoCarteira;
-import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.ContaRepository;
@@ -53,7 +52,7 @@ class TransacaoConciliacaoTest {
 
         carteira = new Carteira();
         carteira.setNome("Corrente");
-        carteira.setTipo(TipoCarteira.CONTA_BANCARIA);
+        carteira.setSubtipo(SubtipoContaFinanceira.CORRENTE);
         carteira.setSaldo(new BigDecimal("1000.00"));
         carteira.setUsuario(usuario);
         carteira = carteiraRepository.save(carteira);
@@ -88,10 +87,8 @@ class TransacaoConciliacaoTest {
 
     @Test
     void compraDeCartaoSemCarteiraEConciliadaViaFatura() {
-        Conta cartao = new Conta();
-        cartao.setNome("Cartao");
-        cartao.setTipo(TipoConta.CREDITO);
-        cartao.setUsuario(usuario);
+        Carteira passivoCartao = carteiraRepository.save(TestDataFactory.contaPassivaCartao(usuario, "Cartao"));
+        Conta cartao = TestDataFactory.cartao(usuario, "Cartao", passivoCartao);
         cartao.setDiaFechamento(10);
         cartao.setDiaVencimento(20);
         cartao = contaRepository.save(cartao);

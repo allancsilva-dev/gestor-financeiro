@@ -109,7 +109,6 @@ public class CarteiraService {
         BigDecimal novoSaldo = carteiraAtualizada.getSaldo();
         
         carteira.setNome(carteiraAtualizada.getNome());
-        carteira.setTipo(carteiraAtualizada.getTipo());
         carteira.setBanco(carteiraAtualizada.getBanco());
         if (carteiraAtualizada.getNatureza() != null) carteira.setNatureza(carteiraAtualizada.getNatureza());
         if (carteiraAtualizada.getSubtipo() != null) carteira.setSubtipo(carteiraAtualizada.getSubtipo());

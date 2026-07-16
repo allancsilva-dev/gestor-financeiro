@@ -1,5 +1,6 @@
 package com.gestor.financeiro;
 
+import com.gestor.financeiro.model.enums.SubtipoContaFinanceira;
 import com.gestor.financeiro.dto.AtivoRequest;
 import com.gestor.financeiro.dto.AtivoResponse;
 import com.gestor.financeiro.dto.MovimentacaoRequest;
@@ -9,7 +10,6 @@ import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.MovimentacaoAtivo;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.ConciliacaoInvestimento;
-import com.gestor.financeiro.model.enums.TipoCarteira;
 import com.gestor.financeiro.model.enums.TipoOperacaoFinanceira;
 import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.MovimentacaoAtivoRepository;
@@ -59,7 +59,7 @@ class InvestimentoCaixaTest {
 
         caixa = new Carteira();
         caixa.setNome("Corrente");
-        caixa.setTipo(TipoCarteira.CONTA_BANCARIA);
+        caixa.setSubtipo(SubtipoContaFinanceira.CORRENTE);
         caixa.setSaldo(new BigDecimal("2000.00"));
         caixa.setUsuario(usuario);
         caixa = carteiraRepository.save(caixa);

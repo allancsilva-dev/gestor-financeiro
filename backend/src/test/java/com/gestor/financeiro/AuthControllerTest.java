@@ -280,13 +280,14 @@ class AuthControllerTest {
         Map<String, Object> onboarding = Map.of(
                 "carteira", Map.of(
                         "nome", "Conta Principal",
-                        "tipo", "CONTA_BANCARIA",
+                        "subtipo", "CORRENTE",
                         "saldo", 250
                 ),
-                "conta", Map.of(
+                "cartao", Map.of(
                         "nome", "Cartao Principal",
-                        "tipo", "CREDITO",
-                        "limiteTotal", 1000
+                        "limiteTotal", 1000,
+                        "diaFechamento", 5,
+                        "diaVencimento", 12
                 ),
                 "categorias", List.of(
                         Map.of("nome", "Alimentacao", "cor", "#EF4444", "icone", "*"),

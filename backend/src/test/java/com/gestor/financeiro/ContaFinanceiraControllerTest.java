@@ -1,9 +1,9 @@
 package com.gestor.financeiro;
 
+import com.gestor.financeiro.model.enums.SubtipoContaFinanceira;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Usuario;
-import com.gestor.financeiro.model.enums.TipoCarteira;
 import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.MovimentoCarteiraRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
@@ -142,7 +142,7 @@ class ContaFinanceiraControllerTest {
     private Carteira novaConta(Usuario usuario, String nome, BigDecimal saldo) {
         Carteira c = new Carteira();
         c.setNome(nome);
-        c.setTipo(TipoCarteira.DINHEIRO);
+        c.setSubtipo(SubtipoContaFinanceira.DINHEIRO);
         c.setSaldo(saldo);
         c.setUsuario(usuario);
         return carteiraRepository.save(c);

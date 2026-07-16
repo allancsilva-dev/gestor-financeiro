@@ -9,7 +9,6 @@ import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.MovimentoCarteira;
 import com.gestor.financeiro.model.enums.NaturezaContaFinanceira;
 import com.gestor.financeiro.model.enums.SubtipoContaFinanceira;
-import com.gestor.financeiro.model.enums.TipoCarteira;
 import com.gestor.financeiro.exception.BusinessException;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.CarteiraService;
@@ -158,12 +157,10 @@ public class ContaFinanceiraController {
         carteira.setMoeda(request.moeda());
         carteira.setSaldo(request.saldoInicial());
         carteira.setBanco(request.banco());
-        carteira.setTipo(switch (request.subtipo()) {
-            case DINHEIRO -> TipoCarteira.DINHEIRO;
-            case CORRENTE, PAGAMENTO -> TipoCarteira.CONTA_BANCARIA;
-            case POUPANCA -> TipoCarteira.POUPANCA;
+        switch (request.subtipo()) {
+            case DINHEIRO, CORRENTE, PAGAMENTO, POUPANCA -> { }
             default -> throw new BusinessException("Subtipo não pode ser criado manualmente");
-        });
+        }
         return carteira;
     }
 }

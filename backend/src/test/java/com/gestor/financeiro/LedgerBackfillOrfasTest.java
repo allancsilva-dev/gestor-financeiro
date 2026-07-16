@@ -7,7 +7,6 @@ import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.OrigemMovimentoCarteira;
-import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.CategoriaRepository;
@@ -143,7 +142,8 @@ class LedgerBackfillOrfasTest {
     @Test
     void compraCartaoNaoEhOrfa() {
         Carteira carteira = carteiraRepository.save(TestDataFactory.carteira(usuario, "Principal", BigDecimal.ZERO));
-        Conta credito = contaRepository.save(TestDataFactory.conta(usuario, "Cartão", TipoConta.CREDITO));
+        Carteira passivoCartao = carteiraRepository.save(TestDataFactory.contaPassivaCartao(usuario, "Cartão"));
+        Conta credito = contaRepository.save(TestDataFactory.cartao(usuario, "Cartão", passivoCartao));
         Transacao compra = TestDataFactory.transacao(usuario, categoria, "Compra cartão", new BigDecimal("200.00"));
         compra.setTipo(TipoTransacao.SAIDA);
         compra.setCarteira(carteira);

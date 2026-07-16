@@ -1,12 +1,12 @@
 package com.gestor.financeiro;
 
+import com.gestor.financeiro.model.enums.SubtipoContaFinanceira;
 import com.gestor.financeiro.exception.BusinessException;
 import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.MovimentoCarteira;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.OrigemMovimentoCarteira;
-import com.gestor.financeiro.model.enums.TipoCarteira;
 import com.gestor.financeiro.model.enums.TipoMovimentoCarteira;
 import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.MovimentoCarteiraRepository;
@@ -185,7 +185,7 @@ class LedgerServiceTest {
         Carteira carteira = new Carteira();
         carteira.setUsuario(usuario);
         carteira.setNome(nome);
-        carteira.setTipo(TipoCarteira.DINHEIRO);
+        carteira.setSubtipo(SubtipoContaFinanceira.DINHEIRO);
         carteira.setSaldo(saldo);
         return carteira;
     }

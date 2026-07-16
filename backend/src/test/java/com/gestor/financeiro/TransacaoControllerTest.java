@@ -6,7 +6,6 @@ import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.model.Usuario;
-import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.CategoriaRepository;
@@ -88,7 +87,8 @@ class TransacaoControllerTest {
         categoriaA = categoriaRepository.save(TestDataFactory.categoria(usuarioA, "Mercado"));
         categoriaB = categoriaRepository.save(TestDataFactory.categoria(usuarioB, "Lazer"));
 
-        contaB = contaRepository.save(TestDataFactory.conta(usuarioB, "Cartão Bob", TipoConta.CREDITO));
+        contaB = contaRepository.save(TestDataFactory.cartao(usuarioB, "Cartão Bob",
+                carteiraRepository.save(TestDataFactory.contaPassivaCartao(usuarioB, "Cartão Bob"))));
         carteiraA = carteiraRepository.save(TestDataFactory.carteira(usuarioA, "Corrente Alice", new BigDecimal("1000.00")));
     }
 
@@ -276,7 +276,7 @@ class TransacaoControllerTest {
 
     @Test
     @WithMockUser(username = "alice@teste.com")
-    void criar_deveFalharQuandoContaEhDeOutroUsuario() throws Exception {
+    void criar_deveFalharQuandoCartaoEhDeOutroUsuario() throws Exception {
         mockMvc.perform(post("/api/v1/transacoes")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(Map.of(
@@ -285,9 +285,25 @@ class TransacaoControllerTest {
                         "data", "2026-03-10",
                         "tipo", "SAIDA",
                         "categoriaId", categoriaA.getId(),
-                        "contaId", contaB.getId()
+                        "cartaoId", contaB.getId()
                 ))))
             .andExpect(status().isNotFound())
             .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+    }
+
+    @Test
+    @WithMockUser(username = "alice@teste.com")
+    void criar_rejeitaContaIdLegadoCom400() throws Exception {
+        mockMvc.perform(post("/api/v1/transacoes")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "descricao", "Payload legado",
+                        "valor", 100.00,
+                        "data", "2026-03-10",
+                        "tipo", "SAIDA",
+                        "categoriaId", categoriaA.getId(),
+                        "contaId", contaB.getId()
+                ))))
+            .andExpect(status().isBadRequest());
     }
 }

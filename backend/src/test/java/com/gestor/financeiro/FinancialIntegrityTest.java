@@ -1,12 +1,11 @@
 package com.gestor.financeiro;
 
+import com.gestor.financeiro.model.enums.SubtipoContaFinanceira;
 import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.Meta;
 import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.model.Usuario;
-import com.gestor.financeiro.model.enums.TipoCarteira;
-import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.CategoriaRepository;
 import com.gestor.financeiro.repository.ContaRepository;
@@ -65,7 +64,7 @@ class FinancialIntegrityTest {
         Carteira c = new Carteira();
         c.setUsuario(usuario);
         c.setNome("Teste");
-        c.setTipo(TipoCarteira.DINHEIRO);
+        c.setSubtipo(SubtipoContaFinanceira.DINHEIRO);
         c.setSaldo(BigDecimal.valueOf(100));
         Carteira saved = carteiraRepository.saveAndFlush(c);
         assertNotNull(saved.getVersion());
@@ -77,10 +76,8 @@ class FinancialIntegrityTest {
 
     @Test
     void conta_deveTerCampoVersion() {
-        Conta c = new Conta();
-        c.setUsuario(usuario);
-        c.setNome("Teste");
-        c.setTipo(TipoConta.CREDITO);
+        Carteira passivoCartao = carteiraRepository.saveAndFlush(TestDataFactory.contaPassivaCartao(usuario, "Teste"));
+        Conta c = TestDataFactory.cartao(usuario, "Teste", passivoCartao);
         Conta saved = contaRepository.saveAndFlush(c);
         assertNotNull(saved.getVersion());
     }

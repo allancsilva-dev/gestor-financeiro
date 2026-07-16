@@ -5,12 +5,10 @@ import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.NaturezaContaFinanceira;
 import com.gestor.financeiro.model.enums.SubtipoContaFinanceira;
-import com.gestor.financeiro.model.enums.TipoCarteira;
-import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
 import com.gestor.financeiro.service.CarteiraService;
-import com.gestor.financeiro.service.ContaService;
+import com.gestor.financeiro.service.CartaoService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Transactional
 class CartaoContaPassivaTest {
 
-    @Autowired ContaService contaService;
+    @Autowired CartaoService cartaoService;
     @Autowired CarteiraService carteiraService;
     @Autowired CarteiraRepository carteiraRepository;
     @Autowired UsuarioRepository usuarioRepository;
@@ -55,43 +53,32 @@ class CartaoContaPassivaTest {
     void cartaoNasceComContaFinanceiraPassivaVinculada() {
         Conta cartao = new Conta();
         cartao.setNome("Nubank");
-        cartao.setTipo(TipoConta.CREDITO);
         cartao.setDiaFechamento(10);
         cartao.setDiaVencimento(20);
 
-        Conta criada = contaService.criar(cartao, usuario.getId());
+        Conta criada = cartaoService.criar(cartao, usuario.getId());
 
         Carteira passivo = criada.getContaFinanceira();
         assertNotNull(passivo);
-        assertEquals(TipoCarteira.CARTAO, passivo.getTipo());
         assertEquals(SubtipoContaFinanceira.CARTAO, passivo.getSubtipo());
         assertEquals(NaturezaContaFinanceira.PASSIVO, passivo.getNatureza());
         assertEquals(0, BigDecimal.ZERO.compareTo(passivo.getSaldo()));
     }
 
     @Test
-    void contaNaoCreditoNaoGanhaContaFinanceira() {
-        Conta debito = new Conta();
-        debito.setNome("Debito");
-        debito.setTipo(TipoConta.DEBITO);
-
-        Conta criada = contaService.criar(debito, usuario.getId());
-        assertEquals(null, criada.getContaFinanceira());
-    }
-
-    @Test
     void listagemLegadaOcultaCartaoESomaDeCaixaIgnoraPassivo() {
         Carteira corrente = new Carteira();
         corrente.setNome("Corrente");
-        corrente.setTipo(TipoCarteira.CONTA_BANCARIA);
+        corrente.setSubtipo(SubtipoContaFinanceira.CORRENTE);
         corrente.setSaldo(new BigDecimal("800.00"));
         corrente.setUsuario(usuario);
         carteiraRepository.save(corrente);
 
         Conta cartao = new Conta();
         cartao.setNome("Cartao");
-        cartao.setTipo(TipoConta.CREDITO);
-        Conta criada = contaService.criar(cartao, usuario.getId());
+        cartao.setDiaFechamento(10);
+        cartao.setDiaVencimento(20);
+        Conta criada = cartaoService.criar(cartao, usuario.getId());
         // passivo devedor simulado
         Carteira passivo = criada.getContaFinanceira();
         passivo.setSaldo(new BigDecimal("300.00"));

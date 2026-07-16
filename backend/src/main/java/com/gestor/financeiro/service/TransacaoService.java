@@ -12,7 +12,6 @@ import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.EstadoConciliacaoTransacao;
 import com.gestor.financeiro.model.enums.OrigemMovimentoCarteira;
 import com.gestor.financeiro.model.enums.StatusPagamento;
-import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.model.enums.TipoMovimentoCarteira;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.CarteiraRepository;
@@ -39,7 +38,6 @@ public class TransacaoService {
     private final ParcelaRepository parcelaRepository;
     private final CategoriaRepository categoriaRepository;
     private final ContaRepository contaRepository;
-    private final ContaService contaService;
     private final UsuarioRepository usuarioRepository;
     private final LedgerService ledgerService;
     private final CarteiraRepository carteiraRepository;
@@ -50,7 +48,6 @@ public class TransacaoService {
                             ParcelaRepository parcelaRepository,
                             CategoriaRepository categoriaRepository,
                             ContaRepository contaRepository,
-                            ContaService contaService,
                             UsuarioRepository usuarioRepository,
                             LedgerService ledgerService,
                             CarteiraRepository carteiraRepository,
@@ -60,7 +57,6 @@ public class TransacaoService {
         this.parcelaRepository = parcelaRepository;
         this.categoriaRepository = categoriaRepository;
         this.contaRepository = contaRepository;
-        this.contaService = contaService;
         this.usuarioRepository = usuarioRepository;
         this.ledgerService = ledgerService;
         this.carteiraRepository = carteiraRepository;
@@ -146,12 +142,6 @@ public class TransacaoService {
 
             transacao.setConta(conta);
             compraCartao = isCompraCartao(transacao);
-
-            // valorGasto da conta acumula apenas saídas; compra de cartão consome
-            // limite via lançamentos de fatura (invariante do FaturaService)
-            if (transacao.getTipo() == TipoTransacao.SAIDA && !compraCartao) {
-                contaService.adicionarGasto(conta.getId(), transacao.getValorTotal(), usuarioId);
-            }
         }
 
         if (compraCartao) {
@@ -259,17 +249,6 @@ public class TransacaoService {
 
         if (valorAlterado) {
             atualizarValorParcelas(transacao);
-
-            BigDecimal diferenca = novoValor.subtract(valorAnterior);
-            // Compra de cartão tem o limite ajustado pelo FaturaService ao ressincronizar
-            if (transacao.getConta() != null && transacao.getTipo() == TipoTransacao.SAIDA
-                    && !compraCartao) {
-                if (diferenca.signum() > 0) {
-                    contaService.adicionarGasto(transacao.getConta().getId(), diferenca, usuarioId);
-                } else {
-                    contaService.removerGasto(transacao.getConta().getId(), diferenca.abs(), usuarioId);
-                }
-            }
         }
 
         if (transacao.getTipo() == TipoTransacao.SAIDA) {
@@ -324,15 +303,6 @@ public class TransacaoService {
         if (compraCartao) {
             // Libera o limite via remoção dos lançamentos abertos e estorna a parte já paga
             faturaService.cancelarCompraCartao(transacao, usuarioId);
-        }
-
-        if (transacao.getConta() != null && transacao.getTipo() == TipoTransacao.SAIDA
-                && !compraCartao) {
-            contaService.removerGasto(
-                transacao.getConta().getId(),
-                transacao.getValorTotal(),
-                usuarioId
-            );
         }
 
         if (transacao.getCategoria() != null && transacao.getTipo() == TipoTransacao.SAIDA) {
@@ -398,10 +368,10 @@ public class TransacaoService {
         ));
     }
 
+    // Contract V41: toda conta referenciada e cartao
     private boolean isCompraCartao(Transacao transacao) {
         return transacao != null
                 && transacao.getConta() != null
-                && transacao.getConta().getTipo() == TipoConta.CREDITO
                 && transacao.getTipo() == TipoTransacao.SAIDA;
     }
 

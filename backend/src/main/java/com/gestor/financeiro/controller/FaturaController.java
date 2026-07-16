@@ -22,31 +22,31 @@ public class FaturaController {
     private final FaturaService faturaService;
     private final AuthenticatedUserService authenticatedUserService;
 
-    @GetMapping({"/conta/{contaId}/atual", "/cartao/{contaId}/atual"})
+    @GetMapping("/cartao/{cartaoId}/atual")
     @Operation(summary = "Consulta fatura do mês atual (somente leitura)")
-    public ResponseEntity<FaturaResponse> buscarAtual(@PathVariable Long contaId) {
+    public ResponseEntity<FaturaResponse> buscarAtual(@PathVariable Long cartaoId) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
-        return ResponseEntity.ok(faturaService.buscarAtual(usuarioId, contaId));
+        return ResponseEntity.ok(faturaService.buscarAtual(usuarioId, cartaoId));
     }
 
-    @GetMapping({"/conta/{contaId}", "/cartao/{contaId}"})
+    @GetMapping("/cartao/{cartaoId}")
     @Operation(summary = "Consulta fatura por mês e ano (somente leitura)")
     public ResponseEntity<FaturaResponse> buscarPorMes(
-            @PathVariable Long contaId,
+            @PathVariable Long cartaoId,
             @RequestParam Integer mes,
             @RequestParam Integer ano) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
-        return ResponseEntity.ok(faturaService.buscarPorMes(usuarioId, contaId, mes, ano));
+        return ResponseEntity.ok(faturaService.buscarPorMes(usuarioId, cartaoId, mes, ano));
     }
 
-    @PostMapping({"/conta/{contaId}", "/cartao/{contaId}"})
+    @PostMapping("/cartao/{cartaoId}")
     @Operation(summary = "Cria fatura explicitamente para um mês/ano")
     public ResponseEntity<FaturaResponse> criarFatura(
-            @PathVariable Long contaId,
+            @PathVariable Long cartaoId,
             @RequestParam Integer mes,
             @RequestParam Integer ano) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
-        return ResponseEntity.ok(faturaService.criarOuBuscarFatura(usuarioId, contaId, mes, ano));
+        return ResponseEntity.ok(faturaService.criarOuBuscarFatura(usuarioId, cartaoId, mes, ano));
     }
 
     @PutMapping("/{id}/pagar")

@@ -1,51 +1,45 @@
 package com.gestor.financeiro.model;
 
-import com.gestor.financeiro.model.enums.TipoConta;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.math.BigDecimal;
 
+/**
+ * Configuracao interna de cartao de credito (PR-F2-19, contract V41). Toda
+ * linha de contas e um cartao: a divida vive exclusivamente no ledger da conta
+ * financeira PASSIVO pareada 1:1 (ADR-0008/0009).
+ */
 @Data
 @Entity
 @Table(name = "contas")
 public class Conta {
-    
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Version
     private Long version;
-    
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usuario_id", nullable = false)
     private Usuario usuario;
-    
+
     @Column(nullable = false)
     private String nome;
-    
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private TipoConta tipo;
-    
-    @Column(precision = 10, scale = 2)
+
+    @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal limiteTotal = BigDecimal.ZERO;
-    
-    @Column(precision = 10, scale = 2)
-    private BigDecimal valorGasto = BigDecimal.ZERO;
-    
-    @Column(precision = 10, scale = 2)
-    private BigDecimal saldoAtual = BigDecimal.ZERO;
-    
-    @Column
+
+    @Column(nullable = false)
     private Integer diaFechamento;
-    
-    @Column
+
+    @Column(nullable = false)
     private Integer diaVencimento;
-    
-    @Column
+
+    @Column(nullable = false)
     private Boolean ativo = true;
-    
+
     @Column
     private String cor;
 
@@ -53,11 +47,10 @@ public class Conta {
     private String banco;
 
     /**
-     * Conta financeira passiva do cartao (PR-F2-06, ADR-0008): 1:1 para tipo
-     * CREDITO. Conta vira configuracao interna do cartao; o passivo devedor
-     * vive no ledger da conta financeira.
+     * Conta financeira passiva do cartao (PR-F2-06, ADR-0008): 1:1 obrigatorio
+     * apos a V41. Pareamento ausente e corrupcao de dados e deve falhar.
      */
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "conta_financeira_id", unique = true)
+    @OneToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "conta_financeira_id", nullable = false, unique = true)
     private Carteira contaFinanceira;
 }

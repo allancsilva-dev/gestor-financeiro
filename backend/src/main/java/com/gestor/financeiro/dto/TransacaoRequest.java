@@ -12,6 +12,11 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
+/**
+ * Contrato canonico de transacao (PR-F2-19): cartao referenciado somente por
+ * cartaoId. Os aliases legados contaId/conta foram removidos no contract V41 e
+ * payloads antigos falham com 400 (rejeicao de propriedade desconhecida).
+ */
 public class TransacaoRequest {
 
     @NotBlank(message = "Campo obrigatório")
@@ -34,10 +39,7 @@ public class TransacaoRequest {
 
     private IdRef categoria;
 
-    @JsonAlias("cartaoId")
-    private Long contaId;
-
-    private IdRef conta;
+    private Long cartaoId;
 
     private Boolean parcelado;
 
@@ -98,20 +100,12 @@ public class TransacaoRequest {
         this.categoria = categoria;
     }
 
-    public Long getContaId() {
-        return contaId;
+    public Long getCartaoId() {
+        return cartaoId;
     }
 
-    public void setContaId(Long contaId) {
-        this.contaId = contaId;
-    }
-
-    public IdRef getConta() {
-        return conta;
-    }
-
-    public void setConta(IdRef conta) {
-        this.conta = conta;
+    public void setCartaoId(Long cartaoId) {
+        this.cartaoId = cartaoId;
     }
 
     public Boolean getParcelado() {
@@ -161,18 +155,6 @@ public class TransacaoRequest {
 
         if (categoria != null) {
             return categoria.getId();
-        }
-
-        return null;
-    }
-
-    public Long getContaIdNormalizada() {
-        if (contaId != null) {
-            return contaId;
-        }
-
-        if (conta != null) {
-            return conta.getId();
         }
 
         return null;

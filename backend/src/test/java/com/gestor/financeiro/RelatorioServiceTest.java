@@ -4,12 +4,13 @@ import com.gestor.financeiro.dto.RelatorioContaDto;
 import com.gestor.financeiro.dto.RelatorioResponse;
 import com.gestor.financeiro.dto.RelatorioTransacaoDto;
 import com.gestor.financeiro.model.Categoria;
+import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.model.Usuario;
-import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.CategoriaRepository;
+import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.ContaRepository;
 import com.gestor.financeiro.repository.TransacaoRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
@@ -46,6 +47,9 @@ class RelatorioServiceTest {
     private ContaRepository contaRepository;
 
     @Autowired
+    private CarteiraRepository carteiraRepository;
+
+    @Autowired
     private UsuarioRepository usuarioRepository;
 
     @Autowired
@@ -63,8 +67,10 @@ class RelatorioServiceTest {
                 "Relator", "relatorio-service@teste.com", passwordEncoder.encode("123456")));
         catA = categoriaRepository.save(TestDataFactory.categoria(usuario, "Mercado"));
         catB = categoriaRepository.save(TestDataFactory.categoria(usuario, "Transporte"));
-        contaX = contaRepository.save(TestDataFactory.conta(usuario, "Conta X", TipoConta.DEBITO));
-        contaY = contaRepository.save(TestDataFactory.conta(usuario, "Conta Y", TipoConta.CREDITO));
+        Carteira passivoX = carteiraRepository.save(TestDataFactory.contaPassivaCartao(usuario, "Conta X"));
+        Carteira passivoY = carteiraRepository.save(TestDataFactory.contaPassivaCartao(usuario, "Conta Y"));
+        contaX = contaRepository.save(TestDataFactory.cartao(usuario, "Conta X", passivoX));
+        contaY = contaRepository.save(TestDataFactory.cartao(usuario, "Conta Y", passivoY));
 
         // catA em contaX: 100 + 200 + 50 = 350
         saida("Feira", "100.00", catA, contaX);
@@ -122,7 +128,7 @@ class RelatorioServiceTest {
         // contaX = 350+300 = 650 (maior); contaY = 400
         assertEquals(0, new BigDecimal("650.00").compareTo(primeira.valorTotal()));
         assertEquals("Conta X", primeira.nome());
-        assertEquals(TipoConta.DEBITO.getDescricao(), primeira.tipo());
+        assertEquals("Cartão de Crédito", primeira.tipo());
         assertEquals(0, new BigDecimal("400.00").compareTo(contas.get(1).valorTotal()));
     }
 

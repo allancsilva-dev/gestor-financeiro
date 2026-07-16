@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.Usuario;
-import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.ContaRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
@@ -85,20 +84,4 @@ class CartaoControllerTest {
                 .andExpect(jsonPath("$.content[0].id").value(id));
     }
 
-    @Test
-    @WithMockUser(username = "alice-cartao-canonico@teste.com")
-    void naoExpoeContaDebitoComoCartao() throws Exception {
-        Conta debito = new Conta();
-        debito.setUsuario(alice);
-        debito.setNome("Débito");
-        debito.setTipo(TipoConta.DEBITO);
-        debito.setAtivo(true);
-        debito.setLimiteTotal(BigDecimal.ZERO);
-        debito.setValorGasto(BigDecimal.ZERO);
-        debito.setSaldoAtual(BigDecimal.ZERO);
-        debito = contaRepository.save(debito);
-
-        mockMvc.perform(get("/api/v1/cartoes/{id}", debito.getId()))
-                .andExpect(status().isNotFound());
-    }
 }

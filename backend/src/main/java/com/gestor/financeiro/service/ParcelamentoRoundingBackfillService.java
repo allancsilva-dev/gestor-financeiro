@@ -33,6 +33,7 @@ public class ParcelamentoRoundingBackfillService {
     private final FaturaLancamentoRepository faturaLancamentoRepository;
     private final FaturaCartaoRepository faturaCartaoRepository;
     private final ContaRepository contaRepository;
+    private final LedgerService ledgerService;
 
     @Transactional(readOnly = true)
     public ParcelamentoRoundingBackfillResult diagnosticarUsuario(Long usuarioId) {
@@ -93,9 +94,27 @@ public class ParcelamentoRoundingBackfillService {
                 faturaCartaoRepository.save(ultimo.getFatura());
 
                 if (ultimo.getFatura().getStatus() != FaturaStatus.PAGA) {
+                    // Contract V41: o passivo vive so no ledger da conta
+                    // financeira do cartao; espelha o delta para preservar
+                    // passivo == faturas nao pagas
                     Conta conta = ultimo.getFatura().getConta();
-                    conta.setValorGasto(zeroIfNull(conta.getValorGasto()).add(diferenca));
-                    contaRepository.save(conta);
+                    ledgerService.registrarMovimento(new RegistrarMovimentoCommand(
+                            usuarioId,
+                            conta.getContaFinanceira().getId(),
+                            diferenca.signum() > 0
+                                    ? com.gestor.financeiro.model.enums.TipoMovimentoCarteira.ENTRADA
+                                    : com.gestor.financeiro.model.enums.TipoMovimentoCarteira.SAIDA,
+                            diferenca.abs(),
+                            diferenca.signum() > 0
+                                    ? RegistrarMovimentoCommand.Direcao.ENTRADA
+                                    : RegistrarMovimentoCommand.Direcao.SAIDA,
+                            com.gestor.financeiro.model.enums.OrigemMovimentoCarteira.FATURA_CARTAO,
+                            "CONTA",
+                            conta.getId(),
+                            "Backfill de arredondamento: " + transacao.getDescricao(),
+                            null,
+                            null,
+                            true));
                 }
 
                 lancamentosCorrigidos++;

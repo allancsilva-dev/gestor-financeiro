@@ -19,7 +19,7 @@ public record TransacaoResponseDto(
     BigDecimal valorParcela,
     String observacoes,
     Boolean recorrente,
-    ContaResumoDto conta,
+    CartaoResumoDto cartao,
     CategoriaResumoDto categoria,
     EstadoConciliacaoTransacao estadoConciliacao
 ) {
@@ -36,7 +36,7 @@ public record TransacaoResponseDto(
             transacao.getValorParcela(),
             transacao.getObservacoes(),
             transacao.getRecorrente(),
-            ContaResumoDto.fromEntity(transacao.getConta()),
+            CartaoResumoDto.fromEntity(transacao.getConta()),
             CategoriaResumoDto.fromEntity(transacao.getCategoria()),
             transacao.getEstadoConciliacao()
         );

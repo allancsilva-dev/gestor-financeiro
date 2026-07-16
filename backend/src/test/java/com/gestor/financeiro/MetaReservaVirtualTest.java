@@ -1,11 +1,11 @@
 package com.gestor.financeiro;
 
+import com.gestor.financeiro.model.enums.SubtipoContaFinanceira;
 import com.gestor.financeiro.exception.BusinessException;
 import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Meta;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.ModalidadeMeta;
-import com.gestor.financeiro.model.enums.TipoCarteira;
 import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.MetaRepository;
 import com.gestor.financeiro.repository.MovimentoCarteiraRepository;
@@ -54,7 +54,7 @@ class MetaReservaVirtualTest {
 
         carteira = new Carteira();
         carteira.setNome("Corrente");
-        carteira.setTipo(TipoCarteira.CONTA_BANCARIA);
+        carteira.setSubtipo(SubtipoContaFinanceira.CORRENTE);
         carteira.setSaldo(new BigDecimal("500.00"));
         carteira.setUsuario(usuario);
         carteira = carteiraRepository.save(carteira);

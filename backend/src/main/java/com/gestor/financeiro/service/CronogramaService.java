@@ -7,7 +7,6 @@ import com.gestor.financeiro.model.Parcela;
 import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.model.enums.FaturaStatus;
 import com.gestor.financeiro.model.enums.StatusPagamento;
-import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.model.enums.TipoFaturaLancamento;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.FaturaLancamentoRepository;
@@ -77,8 +76,8 @@ public class CronogramaService {
     }
 
     private boolean isCompraCartao(Transacao transacao) {
-        return transacao.getTipo() == TipoTransacao.SAIDA && transacao.getConta() != null
-                && transacao.getConta().getTipo() == TipoConta.CREDITO;
+        // Contract V41: toda conta referenciada e cartao
+        return transacao.getTipo() == TipoTransacao.SAIDA && transacao.getConta() != null;
     }
 
     private Integer numero(Integer valor) { return valor == null ? 1 : valor; }

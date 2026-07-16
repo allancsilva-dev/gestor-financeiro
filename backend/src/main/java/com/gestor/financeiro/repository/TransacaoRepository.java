@@ -117,15 +117,13 @@ public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
             @Param("fim") LocalDate fim);
 
     // Parte nao-cartao da visao COMPETENCIA (cartao entra via FaturaLancamento).
-    // LEFT JOIN explicito: caminho t.conta.tipo geraria INNER JOIN e excluiria
-    // transacoes sem conta.
-    @Query("SELECT COALESCE(SUM(t.valorTotal), 0) FROM Transacao t LEFT JOIN t.conta c " +
+    // Toda conta referenciada e cartao (contract V41): SAIDA com conta fica fora.
+    @Query("SELECT COALESCE(SUM(t.valorTotal), 0) FROM Transacao t " +
            "WHERE t.usuario.id = :usuarioId AND t.ativa = true AND t.tipo = :tipo " +
            "AND t.estadoConciliacao = com.gestor.financeiro.model.enums.EstadoConciliacaoTransacao.CONCILIADA " +
            "AND t.data BETWEEN :inicio AND :fim " +
-           "AND (c IS NULL " +
-           "     OR t.tipo <> com.gestor.financeiro.model.enums.TipoTransacao.SAIDA " +
-           "     OR c.tipo <> com.gestor.financeiro.model.enums.TipoConta.CREDITO)")
+           "AND (t.conta IS NULL " +
+           "     OR t.tipo <> com.gestor.financeiro.model.enums.TipoTransacao.SAIDA)")
     BigDecimal sumVisaoCompetenciaNaoCartao(
             @Param("usuarioId") Long usuarioId,
             @Param("tipo") TipoTransacao tipo,
@@ -181,12 +179,12 @@ public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
             @Param("fim") LocalDate fim,
             Pageable pageable);
 
-    // Relatorio: gasto por conta agregado no banco (contaId, nome, tipo, soma). Ordenado desc, limite via Pageable.
-    @Query("SELECT co.id, co.nome, co.tipo, COALESCE(SUM(t.valorTotal), 0) " +
+    // Relatorio: gasto por cartao agregado no banco (cartaoId, nome, soma). Ordenado desc, limite via Pageable.
+    @Query("SELECT co.id, co.nome, COALESCE(SUM(t.valorTotal), 0) " +
            "FROM Transacao t JOIN t.conta co " +
            "WHERE t.usuario.id = :usuarioId AND t.ativa = true AND t.tipo = 'SAIDA' " +
            "AND t.data BETWEEN :inicio AND :fim " +
-           "GROUP BY co.id, co.nome, co.tipo ORDER BY SUM(t.valorTotal) DESC")
+           "GROUP BY co.id, co.nome ORDER BY SUM(t.valorTotal) DESC")
     List<Object[]> sumSaidasAgrupadoPorConta(
             @Param("usuarioId") Long usuarioId,
             @Param("inicio") LocalDate inicio,
@@ -202,15 +200,15 @@ public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
             @Param("fim") LocalDate fim);
 
     // BACKLOG-0045: transações "órfãs" do ledger — ativas, com carteira, que NÃO são
-    // compra de cartão (SAIDA em conta CREDITO vai para fatura, não gera movimento de
+    // compra de cartão (SAIDA associada a cartao vai para fatura, não gera movimento de
     // carteira) e que não têm MovimentoCarteira de origem TRANSACAO correspondente.
     // Espelha scripts/diagnose-ledger-backfill.sql (consulta 2).
-    // LEFT JOIN explícito em conta: referenciar t.conta.tipo direto força inner join
-    // implícito e descartaria órfãs sem conta (dinheiro/carteira pura).
+    // Toda Conta e configuracao de cartao no contract V41; a presenca da
+    // associacao identifica a compra sem consultar o campo legado tipo.
     @EntityGraph(attributePaths = {"carteira"})
     @Query("SELECT t FROM Transacao t LEFT JOIN t.conta c " +
            "WHERE t.usuario.id = :usuarioId AND t.ativa = true AND t.carteira IS NOT NULL " +
-           "AND NOT (t.tipo = 'SAIDA' AND c IS NOT NULL AND c.tipo = 'CREDITO') " +
+           "AND NOT (t.tipo = 'SAIDA' AND c IS NOT NULL) " +
            "AND NOT EXISTS (SELECT 1 FROM MovimentoCarteira m " +
            "    WHERE m.origem = 'TRANSACAO' AND m.referenciaTipo = 'TRANSACAO' AND m.referenciaId = t.id) " +
            "ORDER BY t.carteira.id, t.data, t.id")

@@ -5,7 +5,6 @@ import com.gestor.financeiro.model.enums.LiquidezContaFinanceira;
 import com.gestor.financeiro.model.enums.NaturezaContaFinanceira;
 import com.gestor.financeiro.model.enums.OrigemDadosConta;
 import com.gestor.financeiro.model.enums.SubtipoContaFinanceira;
-import com.gestor.financeiro.model.enums.TipoCarteira;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -28,10 +27,6 @@ public class Carteira {
 
     @Column(nullable = false)
     private String nome;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private TipoCarteira tipo;
 
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal saldo = BigDecimal.ZERO;
@@ -69,9 +64,6 @@ public class Carteira {
     @PrePersist
     @PreUpdate
     private void sincronizarClassificacao() {
-        if (subtipo == null && tipo != null) {
-            subtipo = SubtipoContaFinanceira.deTipoLegado(tipo);
-        }
         if (subtipo != null) {
             natureza = subtipo.naturezaPadrao();
         }

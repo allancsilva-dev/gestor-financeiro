@@ -7,7 +7,6 @@ import com.gestor.financeiro.exception.BusinessException;
 import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.SubtipoContaFinanceira;
-import com.gestor.financeiro.model.enums.TipoCarteira;
 import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
 import com.gestor.financeiro.service.InvestimentoService;
@@ -96,7 +95,7 @@ class InvestimentoCustodiaCotacaoTest {
     void custodiaExigeSubtipoCustodia() {
         Carteira corrente = new Carteira();
         corrente.setNome("Corrente");
-        corrente.setTipo(TipoCarteira.CONTA_BANCARIA);
+        corrente.setSubtipo(SubtipoContaFinanceira.CORRENTE);
         corrente.setSaldo(BigDecimal.ZERO);
         corrente.setUsuario(usuario);
         final Long correnteId = carteiraRepository.save(corrente).getId();
@@ -106,7 +105,7 @@ class InvestimentoCustodiaCotacaoTest {
 
         Carteira custodia = new Carteira();
         custodia.setNome("Corretora");
-        custodia.setTipo(TipoCarteira.CONTA_BANCARIA);
+        custodia.setSubtipo(SubtipoContaFinanceira.CORRENTE);
         custodia.setSubtipo(SubtipoContaFinanceira.CUSTODIA);
         custodia.setSaldo(BigDecimal.ZERO);
         custodia.setUsuario(usuario);

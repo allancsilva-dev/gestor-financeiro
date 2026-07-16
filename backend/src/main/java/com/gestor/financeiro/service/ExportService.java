@@ -72,16 +72,16 @@ public class ExportService {
     public String exportarContasCsv(Long usuarioId) {
         List<Conta> contas = contaRepository.findByUsuarioIdAndAtivoTrue(usuarioId);
 
+        // Contract V41: toda conta e cartao; a divida vive no ledger PASSIVO
         StringBuilder csv = new StringBuilder();
-        csv.append("ID,Nome,Tipo,Limite,Valor Gasto,Saldo Atual,Dia Fechamento,Dia Vencimento,Ativo\n");
+        csv.append("ID,Nome,Limite,Divida,Dia Fechamento,Dia Vencimento,Ativo\n");
 
         for (Conta c : contas) {
             csv.append(c.getId()).append(",");
             csv.append(escapeCsv(c.getNome())).append(",");
-            csv.append(c.getTipo() != null ? c.getTipo().getDescricao() : "").append(",");
             csv.append(c.getLimiteTotal() != null ? c.getLimiteTotal() : "0").append(",");
-            csv.append(c.getValorGasto() != null ? c.getValorGasto() : "0").append(",");
-            csv.append(c.getSaldoAtual() != null ? c.getSaldoAtual() : "0").append(",");
+            csv.append(c.getContaFinanceira() != null && c.getContaFinanceira().getSaldo() != null
+                    ? c.getContaFinanceira().getSaldo() : "0").append(",");
             csv.append(c.getDiaFechamento() != null ? c.getDiaFechamento() : "").append(",");
             csv.append(c.getDiaVencimento() != null ? c.getDiaVencimento() : "").append(",");
             csv.append(Boolean.TRUE.equals(c.getAtivo()) ? "Sim" : "Não").append("\n");
@@ -119,12 +119,13 @@ public class ExportService {
         List<Carteira> carteiras = carteiraRepository.findByUsuarioId(usuarioId);
 
         StringBuilder csv = new StringBuilder();
-        csv.append("ID,Nome,Tipo,Saldo,Banco\n");
+        csv.append("ID,Nome,Natureza,Subtipo,Saldo,Banco\n");
 
         for (Carteira c : carteiras) {
             csv.append(c.getId()).append(",");
             csv.append(escapeCsv(c.getNome())).append(",");
-            csv.append(c.getTipo() != null ? c.getTipo() : "").append(",");
+            csv.append(c.getNatureza() != null ? c.getNatureza() : "").append(",");
+            csv.append(c.getSubtipo() != null ? c.getSubtipo() : "").append(",");
             csv.append(c.getSaldo() != null ? c.getSaldo() : "0").append(",");
             csv.append(c.getBanco() != null ? escapeCsv(c.getBanco()) : "").append("\n");
         }

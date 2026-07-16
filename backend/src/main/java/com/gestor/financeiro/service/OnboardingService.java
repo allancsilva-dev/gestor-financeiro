@@ -34,7 +34,7 @@ public class OnboardingService {
     private final ContaFixaRepository contaFixaRepository;
     private final MetaRepository metaRepository;
     private final CarteiraService carteiraService;
-    private final ContaService contaService;
+    private final CartaoService cartaoService;
     private final CategoriaService categoriaService;
     private final ContaFixaService contaFixaService;
     private final MetaService metaService;
@@ -52,7 +52,7 @@ public class OnboardingService {
         }
 
         criarCarteiraSeNaoExistir(usuarioId, request.carteira());
-        criarContaSeNaoExistir(usuarioId, request.conta());
+        criarCartaoSeNaoExistir(usuarioId, request.cartao());
         criarCategoriasSeNaoExistirem(usuarioId, request.categorias());
 
         if (request.renda() != null) {
@@ -74,30 +74,35 @@ public class OnboardingService {
             return;
         }
 
+        switch (request.subtipo()) {
+            case DINHEIRO, CORRENTE, POUPANCA, PAGAMENTO -> { }
+            default -> throw new com.gestor.financeiro.exception.BusinessException(
+                    "Subtipo de conta financeira inválido para onboarding");
+        }
+
         Carteira carteira = new Carteira();
         carteira.setNome(request.nome());
-        carteira.setTipo(request.tipo());
+        carteira.setSubtipo(request.subtipo());
         carteira.setSaldo(request.saldo() == null ? BigDecimal.ZERO : request.saldo());
         carteira.setBanco(request.banco());
         carteiraService.criar(carteira, usuarioId);
     }
 
-    private void criarContaSeNaoExistir(Long usuarioId, OnboardingFinalizarRequest.ContaInicial request) {
-        if (contaService.listarPorUsuario(usuarioId, org.springframework.data.domain.Pageable.unpaged())
+    private void criarCartaoSeNaoExistir(Long usuarioId, OnboardingFinalizarRequest.CartaoInicial request) {
+        if (cartaoService.listarCartoesPorUsuario(usuarioId, org.springframework.data.domain.Pageable.unpaged())
             .stream()
             .anyMatch(c -> mesmoNome(c.getNome(), request.nome()))) {
             return;
         }
 
-        Conta conta = new Conta();
-        conta.setNome(request.nome());
-        conta.setTipo(request.tipo() == null ? com.gestor.financeiro.model.enums.TipoConta.CREDITO : request.tipo());
-        conta.setLimiteTotal(request.limiteTotal());
-        conta.setDiaFechamento(request.diaFechamento());
-        conta.setDiaVencimento(request.diaVencimento());
-        conta.setCor(request.cor());
-        conta.setBanco(request.banco());
-        contaService.criar(conta, usuarioId);
+        Conta cartao = new Conta();
+        cartao.setNome(request.nome());
+        cartao.setLimiteTotal(request.limiteTotal());
+        cartao.setDiaFechamento(request.diaFechamento());
+        cartao.setDiaVencimento(request.diaVencimento());
+        cartao.setCor(request.cor());
+        cartao.setBanco(request.banco());
+        cartaoService.criar(cartao, usuarioId);
     }
 
     private List<Categoria> criarCategoriasSeNaoExistirem(

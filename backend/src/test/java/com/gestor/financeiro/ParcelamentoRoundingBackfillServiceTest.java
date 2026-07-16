@@ -1,6 +1,7 @@
 package com.gestor.financeiro;
 
 import com.gestor.financeiro.model.Categoria;
+import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.FaturaCartao;
 import com.gestor.financeiro.model.FaturaLancamento;
@@ -9,16 +10,17 @@ import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.FaturaStatus;
 import com.gestor.financeiro.model.enums.StatusPagamento;
-import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.model.enums.TipoFaturaLancamento;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.CategoriaRepository;
+import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.ContaRepository;
 import com.gestor.financeiro.repository.FaturaCartaoRepository;
 import com.gestor.financeiro.repository.FaturaLancamentoRepository;
 import com.gestor.financeiro.repository.ParcelaRepository;
 import com.gestor.financeiro.repository.TransacaoRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
+import com.gestor.financeiro.repository.MovimentoCarteiraRepository;
 import com.gestor.financeiro.service.ParcelamentoRoundingBackfillResult;
 import com.gestor.financeiro.service.ParcelamentoRoundingBackfillService;
 import org.junit.jupiter.api.AfterEach;
@@ -51,6 +53,10 @@ class ParcelamentoRoundingBackfillServiceTest {
     @Autowired
     private ContaRepository contaRepository;
     @Autowired
+    private CarteiraRepository carteiraRepository;
+    @Autowired
+    private MovimentoCarteiraRepository movimentoCarteiraRepository;
+    @Autowired
     private CategoriaRepository categoriaRepository;
     @Autowired
     private UsuarioRepository usuarioRepository;
@@ -60,6 +66,7 @@ class ParcelamentoRoundingBackfillServiceTest {
     private Usuario usuario;
     private Categoria categoria;
     private Conta credito;
+    private Carteira passivoCartao;
 
     @BeforeEach
     void setup() {
@@ -67,7 +74,8 @@ class ParcelamentoRoundingBackfillServiceTest {
         usuario = usuarioRepository.save(TestDataFactory.usuario(
                 "Backfill", "rounding-backfill@teste.com", passwordEncoder.encode("123456")));
         categoria = categoriaRepository.save(TestDataFactory.categoria(usuario, "Cartao"));
-        credito = contaRepository.save(TestDataFactory.conta(usuario, "Cartao", TipoConta.CREDITO));
+        passivoCartao = carteiraRepository.save(TestDataFactory.contaPassivaCartao(usuario, "Cartao"));
+        credito = contaRepository.save(TestDataFactory.cartao(usuario, "Cartao", passivoCartao));
     }
 
     @AfterEach
@@ -75,8 +83,10 @@ class ParcelamentoRoundingBackfillServiceTest {
         faturaLancamentoRepository.deleteAll();
         faturaCartaoRepository.deleteAll();
         parcelaRepository.deleteAll();
+        movimentoCarteiraRepository.deleteAll();
         transacaoRepository.deleteAll();
         contaRepository.deleteAll();
+        carteiraRepository.deleteAll();
         categoriaRepository.deleteAll();
         usuarioRepository.deleteAll();
     }
@@ -87,8 +97,8 @@ class ParcelamentoRoundingBackfillServiceTest {
         criarParcelasLegadas(compra, new BigDecimal("33.33"));
         FaturaCartao fatura = criarFatura(FaturaStatus.ABERTA, new BigDecimal("99.99"));
         criarLancamentosLegados(fatura, compra, new BigDecimal("33.33"));
-        credito.setValorGasto(new BigDecimal("99.99"));
-        contaRepository.save(credito);
+        passivoCartao.setSaldo(new BigDecimal("99.99"));
+        carteiraRepository.save(passivoCartao);
 
         ParcelamentoRoundingBackfillResult diagnostico = backfillService.diagnosticarUsuario(usuario.getId());
         assertEquals(true, diagnostico.dryRun());
@@ -111,7 +121,7 @@ class ParcelamentoRoundingBackfillServiceTest {
                 .findTopByTransacaoIdAndTipoOrderByParcelaNumeroDescIdDesc(
                         compra.getId(), TipoFaturaLancamento.COMPRA).orElseThrow().getValor());
         assertBig(new BigDecimal("100.00"), faturaCartaoRepository.findById(fatura.getId()).orElseThrow().getValorTotal());
-        assertBig(new BigDecimal("100.00"), contaRepository.findById(credito.getId()).orElseThrow().getValorGasto());
+        assertBig(new BigDecimal("100.00"), carteiraRepository.findById(passivoCartao.getId()).orElseThrow().getSaldo());
 
         ParcelamentoRoundingBackfillResult segunda = backfillService.corrigirUsuario(usuario.getId());
         assertEquals(0, segunda.transacoesComResiduoEmParcelas());
@@ -125,13 +135,13 @@ class ParcelamentoRoundingBackfillServiceTest {
         Transacao compra = compraParcelada("Compra paga", new BigDecimal("100.00"));
         FaturaCartao fatura = criarFatura(FaturaStatus.PAGA, new BigDecimal("99.99"));
         criarLancamentosLegados(fatura, compra, new BigDecimal("33.33"));
-        credito.setValorGasto(BigDecimal.ZERO);
-        contaRepository.save(credito);
+        passivoCartao.setSaldo(BigDecimal.ZERO);
+        carteiraRepository.save(passivoCartao);
 
         backfillService.corrigirUsuario(usuario.getId());
 
         assertBig(new BigDecimal("100.00"), faturaCartaoRepository.findById(fatura.getId()).orElseThrow().getValorTotal());
-        assertBig(BigDecimal.ZERO, contaRepository.findById(credito.getId()).orElseThrow().getValorGasto());
+        assertBig(BigDecimal.ZERO, carteiraRepository.findById(passivoCartao.getId()).orElseThrow().getSaldo());
     }
 
     @Test

@@ -6,7 +6,6 @@ import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.model.*;
 import com.gestor.financeiro.model.enums.FaturaStatus;
 import com.gestor.financeiro.model.enums.OrigemMovimentoCarteira;
-import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.model.enums.TipoFaturaLancamento;
 import com.gestor.financeiro.model.enums.TipoMovimentoCarteira;
 import com.gestor.financeiro.model.enums.TipoTransacao;
@@ -71,7 +70,7 @@ public class FaturaService {
     // este metodo (antes somente leitura) agora e transacional -- ver liquidarFaturaAnterior.
     @Transactional
     public FaturaResponse buscarAtual(Long usuarioId, Long contaId) {
-        Conta conta = validarContaCredito(usuarioId, contaId);
+        Conta conta = validarCartao(usuarioId, contaId);
         YearMonth ym = YearMonth.now(clock);
 
         liquidarFaturaAnterior(usuarioId, conta, ym);
@@ -88,7 +87,7 @@ public class FaturaService {
 
     @Transactional
     public FaturaResponse buscarPorMes(Long usuarioId, Long contaId, Integer mes, Integer ano) {
-        Conta conta = validarContaCredito(usuarioId, contaId);
+        Conta conta = validarCartao(usuarioId, contaId);
 
         liquidarFaturaAnterior(usuarioId, conta, YearMonth.of(ano, mes));
 
@@ -103,7 +102,7 @@ public class FaturaService {
 
     @Transactional
     public FaturaResponse criarOuBuscarFatura(Long usuarioId, Long contaId, Integer mes, Integer ano) {
-        Conta conta = validarContaCredito(usuarioId, contaId);
+        Conta conta = validarCartao(usuarioId, contaId);
         YearMonth competencia = YearMonth.of(ano, mes);
 
         liquidarFaturaAnterior(usuarioId, conta, competencia);
@@ -216,13 +215,8 @@ public class FaturaService {
         fatura.setValorTotal(total);
         faturaRepository.save(fatura);
 
-        BigDecimal valorGastoAtual = conta.getValorGasto() != null ? conta.getValorGasto() : BigDecimal.ZERO;
-        BigDecimal novoValorGasto = valorGastoAtual.subtract(valor);
-        BigDecimal valorGastoFinal = novoValorGasto.signum() < 0 ? BigDecimal.ZERO : novoValorGasto;
-        conta.setValorGasto(valorGastoFinal);
-        contaRepository.save(conta);
-        // Espelha o delta EFETIVO (com clamp) para manter ledger == valorGasto
-        espelharPassivo(conta, valorGastoFinal.subtract(valorGastoAtual), operacao, descricaoPagamento);
+        // Pagamento libera o passivo no ledger (valor <= saldo restante, validado acima)
+        espelharPassivo(conta, valor.negate(), operacao, descricaoPagamento);
 
         // Historico explicito: cada pagamento parcial/total vira registro proprio
         FaturaPagamento pagamento = new FaturaPagamento();
@@ -460,7 +454,6 @@ public class FaturaService {
         return new FaturaResponse(
                 null,
                 conta.getId(),
-                conta.getId(),
                 conta.getNome(),
                 mes,
                 ano,
@@ -514,7 +507,6 @@ public class FaturaService {
         return new FaturaResponse(
                 fatura.getId(),
                 conta.getId(),
-                conta.getId(),
                 conta.getNome(),
                 fatura.getMes(),
                 fatura.getAno(),
@@ -528,15 +520,9 @@ public class FaturaService {
         );
     }
 
-    private Conta validarContaCredito(Long usuarioId, Long contaId) {
-        Conta conta = contaRepository.findByIdAndUsuarioId(contaId, usuarioId)
-                .orElseThrow(() -> new ResourceNotFoundException("Conta não encontrada"));
-
-        if (conta.getTipo() != TipoConta.CREDITO) {
-            throw new BusinessException("A conta informada não é um cartão de crédito");
-        }
-
-        return conta;
+    private Conta validarCartao(Long usuarioId, Long cartaoId) {
+        return contaRepository.findByIdAndUsuarioId(cartaoId, usuarioId)
+                .orElseThrow(() -> new ResourceNotFoundException("Cartão não encontrado"));
     }
 
     private FaturaCartao criarOuBuscarFaturaEntidade(Long usuarioId, Conta conta, YearMonth competencia) {
@@ -697,7 +683,7 @@ public class FaturaService {
         atualizarTotalFatura(destino, valor);
         // Rollover move valor entre faturas; deltas se anulam contra a liberacao
         // do pagamento da fatura origem — passivo total preservado (PR-F2-08)
-        ajustarLimiteUtilizado(destino.getConta(), valor, null, descricao);
+        espelharPassivo(destino.getConta(), valor, null, descricao);
     }
 
     private void criarLancamento(FaturaCartao fatura, Transacao transacao, String descricao,
@@ -717,33 +703,24 @@ public class FaturaService {
         faturaLancamentoRepository.save(lancamento);
 
         atualizarTotalFatura(fatura, valor);
-        ajustarLimiteUtilizado(fatura.getConta(), valor, operacao, descricao);
+        espelharPassivo(fatura.getConta(), valor, operacao, descricao);
     }
 
     private void removerLancamentoDeFaturaAberta(FaturaLancamento lancamento, OperacaoFinanceira operacao) {
         atualizarTotalFatura(lancamento.getFatura(), lancamento.getValor().negate());
-        ajustarLimiteUtilizado(lancamento.getFatura().getConta(), lancamento.getValor().negate(),
+        espelharPassivo(lancamento.getFatura().getConta(), lancamento.getValor().negate(),
                 operacao, "Remoção: " + lancamento.getDescricao());
         faturaLancamentoRepository.delete(lancamento);
     }
 
-    // Invariante: valorGasto da conta == soma dos lançamentos em faturas não pagas
-    // == saldo do ledger de passivo (PR-F2-07). Toda criação/remoção de lançamento
-    // passa por aqui; pagarFatura libera pelo total da fatura.
-    private void ajustarLimiteUtilizado(Conta conta, BigDecimal delta, OperacaoFinanceira operacao,
-                                        String descricao) {
-        BigDecimal atual = conta.getValorGasto() != null ? conta.getValorGasto() : BigDecimal.ZERO;
-        conta.setValorGasto(atual.add(delta));
-        contaRepository.save(conta);
-        espelharPassivo(conta, delta, operacao, descricao);
-    }
-
     /**
-     * Dupla escrita do passivo (PR-F2-07, ADR-0008/0009): todo delta de
-     * valorGasto vira lancamento no ledger da conta financeira do cartao.
-     * Convencao: +delta = compra (+passivo); -delta = pagamento/estorno/credito.
-     * Saldo negativo = credito do cliente, permitido. Rollover entre faturas
-     * gera deltas que se anulam no total, preservando o passivo.
+     * Fonte unica do passivo (contract V41, ADR-0008/0009): todo delta de
+     * lancamento de fatura vira movimento no ledger da conta financeira do
+     * cartao. Convencao: +delta = compra (+passivo); -delta =
+     * pagamento/estorno/credito. Saldo negativo = credito do cliente,
+     * permitido. Rollover entre faturas gera deltas que se anulam no total,
+     * preservando o passivo. Invariante: saldo do passivo == soma dos
+     * lancamentos em faturas nao pagas.
      */
     private void espelharPassivo(Conta conta, BigDecimal delta, OperacaoFinanceira operacao,
                                  String descricao) {
@@ -768,20 +745,17 @@ public class FaturaService {
                 true), operacao);
     }
 
-    /** Conta financeira passiva do cartao; cria e vincula sob demanda (legado pre-V35). */
+    /**
+     * Conta financeira passiva do cartao. Apos a V41 o pareamento e garantido
+     * pelo banco (NOT NULL + FK unica); ausencia e corrupcao e deve falhar —
+     * nenhum fallback cria o pareamento sob demanda (contract V41).
+     */
     private Carteira contaPassivaDe(Conta conta) {
-        if (conta.getContaFinanceira() != null) {
-            return conta.getContaFinanceira();
+        Carteira passivo = conta.getContaFinanceira();
+        if (passivo == null) {
+            throw new IllegalStateException(
+                    "Cartão " + conta.getId() + " sem conta financeira pareada (corrupção de dados)");
         }
-        Carteira passivo = new Carteira();
-        passivo.setNome(conta.getNome());
-        passivo.setTipo(com.gestor.financeiro.model.enums.TipoCarteira.CARTAO);
-        passivo.setSaldo(BigDecimal.ZERO);
-        passivo.setBanco(conta.getBanco());
-        passivo.setUsuario(conta.getUsuario());
-        passivo = carteiraRepository.save(passivo);
-        conta.setContaFinanceira(passivo);
-        contaRepository.save(conta);
         return passivo;
     }
 
@@ -807,11 +781,11 @@ public class FaturaService {
         return valores;
     }
 
+    // Contract V41: toda conta referenciada e cartao
     private boolean isCompraCartao(Transacao transacao) {
         return transacao != null
                 && transacao.getId() != null
                 && transacao.getConta() != null
-                && transacao.getConta().getTipo() == TipoConta.CREDITO
                 && transacao.getTipo() == TipoTransacao.SAIDA
                 && transacao.getAtiva();
     }

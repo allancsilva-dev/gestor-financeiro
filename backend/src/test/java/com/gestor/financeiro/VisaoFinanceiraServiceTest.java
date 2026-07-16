@@ -1,16 +1,15 @@
 package com.gestor.financeiro;
 
+import com.gestor.financeiro.model.enums.SubtipoContaFinanceira;
 import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.model.Usuario;
-import com.gestor.financeiro.model.enums.TipoCarteira;
-import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.FaturaCartaoRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
-import com.gestor.financeiro.service.ContaService;
+import com.gestor.financeiro.service.CartaoService;
 import com.gestor.financeiro.service.FaturaService;
 import com.gestor.financeiro.service.TransacaoService;
 import com.gestor.financeiro.service.TransferenciaService;
@@ -46,7 +45,7 @@ class VisaoFinanceiraServiceTest {
     @Autowired VisaoFinanceiraService visaoService;
     @Autowired TransacaoService transacaoService;
     @Autowired TransferenciaService transferenciaService;
-    @Autowired ContaService contaService;
+    @Autowired CartaoService cartaoService;
     @Autowired FaturaService faturaService;
     @Autowired CarteiraRepository carteiraRepository;
     @Autowired FaturaCartaoRepository faturaCartaoRepository;
@@ -73,10 +72,9 @@ class VisaoFinanceiraServiceTest {
 
         Conta novo = new Conta();
         novo.setNome("Cartao");
-        novo.setTipo(TipoConta.CREDITO);
         novo.setDiaFechamento(25);
         novo.setDiaVencimento(5);
-        cartao = contaService.criar(novo, usuario.getId());
+        cartao = cartaoService.criar(novo, usuario.getId());
 
         // entrada 200 e saida 50 em caixa
         criarTransacao(TipoTransacao.ENTRADA, new BigDecimal("200.00"), corrente, null);
@@ -110,7 +108,7 @@ class VisaoFinanceiraServiceTest {
     private Carteira novaConta(String nome, BigDecimal saldo) {
         Carteira c = new Carteira();
         c.setNome(nome);
-        c.setTipo(TipoCarteira.CONTA_BANCARIA);
+        c.setSubtipo(SubtipoContaFinanceira.CORRENTE);
         c.setSaldo(saldo);
         c.setUsuario(usuario);
         return carteiraRepository.save(c);

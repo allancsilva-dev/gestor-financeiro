@@ -3,9 +3,8 @@ package com.gestor.financeiro;
 import com.gestor.financeiro.dto.FaturaResponse;
 import com.gestor.financeiro.model.*;
 import com.gestor.financeiro.model.enums.FaturaStatus;
+import com.gestor.financeiro.model.enums.SubtipoContaFinanceira;
 import com.gestor.financeiro.model.enums.OrigemMovimentoCarteira;
-import com.gestor.financeiro.model.enums.TipoCarteira;
-import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.model.enums.TipoFaturaLancamento;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.*;
@@ -72,6 +71,7 @@ class FaturaCartaoWorkflowTest {
     private Usuario usuario;
     private Categoria categoria;
     private Conta cartao;
+    private Carteira passivo;
     private Carteira carteira;
 
     @BeforeEach
@@ -89,7 +89,8 @@ class FaturaCartaoWorkflowTest {
                 TestDataFactory.usuario("Fatura", "fatura-workflow@teste.com", passwordEncoder.encode("123456")));
         categoria = categoriaRepository.save(TestDataFactory.categoria(usuario, "Mercado"));
 
-        cartao = TestDataFactory.conta(usuario, "Cartão Roxo", TipoConta.CREDITO);
+        passivo = carteiraRepository.save(TestDataFactory.contaPassivaCartao(usuario, "Cartão Roxo"));
+        cartao = TestDataFactory.cartao(usuario, "Cartão Roxo", passivo);
         cartao.setDiaFechamento(28);
         cartao.setDiaVencimento(5);
         cartao = contaRepository.save(cartao);
@@ -97,7 +98,7 @@ class FaturaCartaoWorkflowTest {
         carteira = new Carteira();
         carteira.setUsuario(usuario);
         carteira.setNome("Conta corrente");
-        carteira.setTipo(TipoCarteira.CONTA_BANCARIA);
+        carteira.setSubtipo(SubtipoContaFinanceira.CORRENTE);
         carteira.setSaldo(new BigDecimal("1000.00"));
         carteira = carteiraRepository.save(carteira);
     }
@@ -117,7 +118,7 @@ class FaturaCartaoWorkflowTest {
         assertEquals(0, new BigDecimal("1000.00").compareTo(
                 carteiraRepository.findById(carteira.getId()).orElseThrow().getSaldo()));
         assertEquals(0, new BigDecimal("120.00").compareTo(
-                contaRepository.findById(cartao.getId()).orElseThrow().getValorGasto()));
+                carteiraRepository.findById(passivo.getId()).orElseThrow().getSaldo()));
 
         FaturaCartao agosto = faturaCartaoRepository
                 .findByContaIdAndMesAndAno(cartao.getId(), 8, 2026).orElseThrow();
@@ -157,9 +158,8 @@ class FaturaCartaoWorkflowTest {
 
     @Test
     void parcelamentoForaDoCartaoContinuaEmParcelaComRestoNaUltima() {
-        Conta debito = contaRepository.save(TestDataFactory.conta(usuario, "Débito", TipoConta.DEBITO));
+        // Contract V41: fora do cartao = sem conta; caixa vem da carteira
         Transacao compra = TestDataFactory.transacao(usuario, categoria, "Curso", new BigDecimal("100.00"));
-        compra.setConta(debito);
         compra.setCarteira(carteira);
         compra.setParcelado(true);
         compra.setTotalParcelas(3);
@@ -188,7 +188,7 @@ class FaturaCartaoWorkflowTest {
         assertEquals(0, new BigDecimal("900.00").compareTo(
                 carteiraRepository.findById(carteira.getId()).orElseThrow().getSaldo()));
         assertEquals(0, BigDecimal.ZERO.compareTo(
-                contaRepository.findById(cartao.getId()).orElseThrow().getValorGasto()));
+                carteiraRepository.findById(passivo.getId()).orElseThrow().getSaldo()));
 
         List<MovimentoCarteira> movimentos = movimentoCarteiraRepository
                 .findByUsuarioIdAndCarteiraIdOrderByDataMovimentoDescIdDesc(usuario.getId(), carteira.getId());
@@ -214,7 +214,7 @@ class FaturaCartaoWorkflowTest {
         assertEquals(0, new BigDecimal("960.00").compareTo(
                 carteiraRepository.findById(carteira.getId()).orElseThrow().getSaldo()));
         assertEquals(0, new BigDecimal("60.00").compareTo(
-                contaRepository.findById(cartao.getId()).orElseThrow().getValorGasto()));
+                carteiraRepository.findById(passivo.getId()).orElseThrow().getSaldo()));
 
         FaturaResponse quitada = faturaService.pagarFatura(
                 usuario.getId(), fatura.getId(), new BigDecimal("60.00"), carteira.getId(), "parcial-2");
@@ -224,7 +224,7 @@ class FaturaCartaoWorkflowTest {
         assertEquals(0, new BigDecimal("900.00").compareTo(
                 carteiraRepository.findById(carteira.getId()).orElseThrow().getSaldo()));
         assertEquals(0, BigDecimal.ZERO.compareTo(
-                contaRepository.findById(cartao.getId()).orElseThrow().getValorGasto()));
+                carteiraRepository.findById(passivo.getId()).orElseThrow().getSaldo()));
 
         FaturaResponse retry = faturaService.pagarFatura(
                 usuario.getId(), fatura.getId(), new BigDecimal("60.00"), carteira.getId(), "parcial-2");
@@ -259,7 +259,7 @@ class FaturaCartaoWorkflowTest {
         faturaService.pagarFatura(usuario.getId(), outubro.getId(), new BigDecimal("33.34"), carteira.getId());
 
         assertEquals(0, BigDecimal.ZERO.compareTo(
-                contaRepository.findById(cartao.getId()).orElseThrow().getValorGasto()));
+                carteiraRepository.findById(passivo.getId()).orElseThrow().getSaldo()));
     }
 
     @Test
@@ -279,7 +279,7 @@ class FaturaCartaoWorkflowTest {
                 .findByContaIdAndMesAndAno(cartao.getId(), 7, 2026).orElseThrow();
         assertEquals(0, new BigDecimal("150.00").compareTo(julho.getValorTotal()));
         assertEquals(0, new BigDecimal("150.00").compareTo(
-                contaRepository.findById(cartao.getId()).orElseThrow().getValorGasto()));
+                carteiraRepository.findById(passivo.getId()).orElseThrow().getSaldo()));
     }
 
     @Test
@@ -338,7 +338,7 @@ class FaturaCartaoWorkflowTest {
         assertEquals(0, new BigDecimal("50.00").compareTo(ajuste.getValor()));
 
         assertEquals(0, new BigDecimal("50.00").compareTo(
-                contaRepository.findById(cartao.getId()).orElseThrow().getValorGasto()));
+                carteiraRepository.findById(passivo.getId()).orElseThrow().getSaldo()));
     }
 
     @Test
@@ -412,7 +412,7 @@ class FaturaCartaoWorkflowTest {
 
         // Crédito de limite: -100 compensa compras futuras na fatura de agosto
         assertEquals(0, new BigDecimal("-100.00").compareTo(
-                contaRepository.findById(cartao.getId()).orElseThrow().getValorGasto()));
+                carteiraRepository.findById(passivo.getId()).orElseThrow().getSaldo()));
     }
 
     private Transacao compraCartao(String descricao, BigDecimal valor, LocalDate data) {

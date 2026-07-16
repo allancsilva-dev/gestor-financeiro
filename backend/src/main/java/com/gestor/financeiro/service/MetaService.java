@@ -14,7 +14,6 @@ import com.gestor.financeiro.model.enums.OrigemOperacaoFinanceira;
 import com.gestor.financeiro.model.enums.PoliticaOperacao;
 import com.gestor.financeiro.model.enums.StatusMeta;
 import com.gestor.financeiro.model.enums.SubtipoContaFinanceira;
-import com.gestor.financeiro.model.enums.TipoCarteira;
 import com.gestor.financeiro.model.enums.TipoMovimentoCarteira;
 import com.gestor.financeiro.model.enums.TipoOperacaoFinanceira;
 import com.gestor.financeiro.repository.CarteiraRepository;
@@ -324,7 +323,6 @@ public class MetaService {
                 .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
         Carteira cofre = new Carteira();
         cofre.setNome("Cofre: " + meta.getNome());
-        cofre.setTipo(TipoCarteira.POUPANCA);
         cofre.setSubtipo(SubtipoContaFinanceira.COFRE);
         cofre.setSaldo(BigDecimal.ZERO);
         cofre.setUsuario(usuario);

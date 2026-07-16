@@ -6,7 +6,6 @@ import com.gestor.financeiro.model.FaturaLancamento;
 import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.StatusOperacaoFinanceira;
-import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.model.enums.TipoOperacaoFinanceira;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.CarteiraRepository;
@@ -14,7 +13,7 @@ import com.gestor.financeiro.repository.ContaRepository;
 import com.gestor.financeiro.repository.FaturaLancamentoRepository;
 import com.gestor.financeiro.repository.OperacaoFinanceiraRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
-import com.gestor.financeiro.service.ContaService;
+import com.gestor.financeiro.service.CartaoService;
 import com.gestor.financeiro.service.TransacaoService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * PR-F2-07 — Cartao no ledger: compra gera operacao COMPRA_CARTAO compartilhada
  * entre lancamentos de fatura e movimento de passivo; exclusao gera estorno com
- * original ESTORNADA; invariante saldo do passivo == valorGasto em todo fluxo.
+ * original ESTORNADA; invariante: saldo do passivo == faturas nao pagas em todo fluxo.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -42,7 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CartaoLedgerEspelhoTest {
 
     @Autowired TransacaoService transacaoService;
-    @Autowired ContaService contaService;
+    @Autowired CartaoService cartaoService;
     @Autowired ContaRepository contaRepository;
     @Autowired CarteiraRepository carteiraRepository;
     @Autowired FaturaLancamentoRepository faturaLancamentoRepository;
@@ -62,10 +61,9 @@ class CartaoLedgerEspelhoTest {
 
         Conta novo = new Conta();
         novo.setNome("Cartao");
-        novo.setTipo(TipoConta.CREDITO);
         novo.setDiaFechamento(10);
         novo.setDiaVencimento(20);
-        cartao = contaService.criar(novo, usuario.getId());
+        cartao = cartaoService.criar(novo, usuario.getId());
     }
 
     private Transacao compra(BigDecimal valor, int parcelas) {
@@ -86,10 +84,6 @@ class CartaoLedgerEspelhoTest {
                 .orElseThrow().getSaldo();
     }
 
-    private BigDecimal valorGasto() {
-        return contaRepository.findById(cartao.getId()).orElseThrow().getValorGasto();
-    }
-
     @Test
     void compraParceladaCriaOperacaoCompartilhadaEEspelhaPassivo() {
         Transacao t = compra(new BigDecimal("100.00"), 3);
@@ -104,9 +98,8 @@ class CartaoLedgerEspelhoTest {
         assertEquals(TipoOperacaoFinanceira.COMPRA_CARTAO,
                 operacaoRepository.findById(operacaoId).orElseThrow().getTipo());
 
-        // passivo espelhado: saldo do ledger == valorGasto == 100
+        // passivo espelhado no ledger == 100
         assertEquals(0, new BigDecimal("100.00").compareTo(saldoPassivo()));
-        assertEquals(0, saldoPassivo().compareTo(valorGasto()));
     }
 
     @Test
@@ -127,9 +120,8 @@ class CartaoLedgerEspelhoTest {
                         && op.getEstornoDe() != null
                         && op.getEstornoDe().getId().equals(operacaoCompraId)));
 
-        // passivo zerado e igual ao valorGasto
+        // passivo zerado no ledger
         assertEquals(0, BigDecimal.ZERO.compareTo(saldoPassivo()));
-        assertEquals(0, saldoPassivo().compareTo(valorGasto()));
     }
 
     @Test
@@ -145,7 +137,6 @@ class CartaoLedgerEspelhoTest {
         editada.setParcelado(false);
         transacaoService.atualizar(t.getId(), editada, usuario.getId());
 
-        assertEquals(0, new BigDecimal("90.00").compareTo(valorGasto()));
-        assertEquals(0, saldoPassivo().compareTo(valorGasto()));
+        assertEquals(0, new BigDecimal("90.00").compareTo(saldoPassivo()));
     }
 }

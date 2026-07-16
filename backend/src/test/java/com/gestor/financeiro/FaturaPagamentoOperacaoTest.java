@@ -1,13 +1,12 @@
 package com.gestor.financeiro;
 
+import com.gestor.financeiro.model.enums.SubtipoContaFinanceira;
 import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.FaturaPagamento;
 import com.gestor.financeiro.model.MovimentoCarteira;
 import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.model.Usuario;
-import com.gestor.financeiro.model.enums.TipoCarteira;
-import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.model.enums.TipoOperacaoFinanceira;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.CarteiraRepository;
@@ -16,7 +15,7 @@ import com.gestor.financeiro.repository.FaturaCartaoRepository;
 import com.gestor.financeiro.repository.FaturaPagamentoRepository;
 import com.gestor.financeiro.repository.MovimentoCarteiraRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
-import com.gestor.financeiro.service.ContaService;
+import com.gestor.financeiro.service.CartaoService;
 import com.gestor.financeiro.service.FaturaService;
 import com.gestor.financeiro.service.TransacaoService;
 import org.junit.jupiter.api.BeforeEach;
@@ -45,7 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class FaturaPagamentoOperacaoTest {
 
     @Autowired TransacaoService transacaoService;
-    @Autowired ContaService contaService;
+    @Autowired CartaoService cartaoService;
     @Autowired FaturaService faturaService;
     @Autowired ContaRepository contaRepository;
     @Autowired CarteiraRepository carteiraRepository;
@@ -68,17 +67,16 @@ class FaturaPagamentoOperacaoTest {
 
         caixa = new Carteira();
         caixa.setNome("Corrente");
-        caixa.setTipo(TipoCarteira.CONTA_BANCARIA);
+        caixa.setSubtipo(SubtipoContaFinanceira.CORRENTE);
         caixa.setSaldo(new BigDecimal("1000.00"));
         caixa.setUsuario(usuario);
         caixa = carteiraRepository.save(caixa);
 
         Conta novo = new Conta();
         novo.setNome("Cartao");
-        novo.setTipo(TipoConta.CREDITO);
         novo.setDiaFechamento(10);
         novo.setDiaVencimento(20);
-        cartao = contaService.criar(novo, usuario.getId());
+        cartao = cartaoService.criar(novo, usuario.getId());
 
         Transacao compra = new Transacao();
         compra.setDescricao("Compra");
@@ -119,14 +117,13 @@ class FaturaPagamentoOperacaoTest {
         assertTrue(movimentosDaOperacao.stream()
                 .allMatch(m -> m.getValorAssinado().signum() < 0));
 
-        // caixa: 1000 - 80; passivo: 200 - 80 == valorGasto
+        // caixa: 1000 - 80; passivo: 200 - 80
         assertEquals(0, new BigDecimal("920.00").compareTo(
                 carteiraRepository.findById(caixa.getId()).orElseThrow().getSaldo()));
         Conta atualizada = contaRepository.findById(cartao.getId()).orElseThrow();
         BigDecimal saldoPassivo = carteiraRepository
                 .findById(atualizada.getContaFinanceira().getId()).orElseThrow().getSaldo();
         assertEquals(0, new BigDecimal("120.00").compareTo(saldoPassivo));
-        assertEquals(0, saldoPassivo.compareTo(atualizada.getValorGasto()));
     }
 
     @Test
@@ -140,8 +137,9 @@ class FaturaPagamentoOperacaoTest {
 
         assertEquals(2, faturaPagamentoRepository
                 .findByFaturaIdOrderByDataPagamentoAsc(faturaId).size());
-        assertEquals(0, BigDecimal.ZERO.compareTo(
-                contaRepository.findById(cartao.getId()).orElseThrow().getValorGasto()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(carteiraRepository
+                .findById(contaRepository.findById(cartao.getId()).orElseThrow()
+                        .getContaFinanceira().getId()).orElseThrow().getSaldo()));
         assertEquals(0, new BigDecimal("800.00").compareTo(
                 carteiraRepository.findById(caixa.getId()).orElseThrow().getSaldo()));
     }

@@ -9,7 +9,6 @@ import com.gestor.financeiro.model.enums.NaturezaContaFinanceira;
 import com.gestor.financeiro.model.enums.StatusPagamento;
 import com.gestor.financeiro.model.enums.StatusMeta;
 import com.gestor.financeiro.model.enums.SubtipoContaFinanceira;
-import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.model.enums.TipoMovimentacao;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.AtivoRepository;
@@ -116,7 +115,7 @@ public class MetricasService {
                 usuarioId, FaturaStatus.PAGA, INICIO_OBRIGACOES, horizonte);
         BigDecimal comprometidoParcelas = parcelaRepository.somarValorNoPeriodo(
                 usuarioId, INICIO_OBRIGACOES, horizonte,
-                StatusPagamento.PAGO, TipoTransacao.SAIDA, TipoConta.CREDITO);
+                StatusPagamento.PAGO, TipoTransacao.SAIDA);
         BigDecimal comprometido = comprometidoFaturas.add(comprometidoParcelas);
 
         // Sem truncar negativos (ADR-0013)
@@ -234,7 +233,7 @@ public class MetricasService {
                 });
         parcelaRepository.findComprometidasNoPeriodo(
                 usuarioId, INICIO_OBRIGACOES, horizonte, StatusPagamento.PAGO,
-                TipoTransacao.SAIDA, TipoConta.CREDITO).stream()
+                TipoTransacao.SAIDA).stream()
                 .forEach(p -> origens.add(new Origem("PARCELA", p.getId(),
                         p.getTransacao().getDescricao() + " " + p.getNumeroParcela() + "/"
                                 + p.getTotalParcelas(), p.getValor())));
