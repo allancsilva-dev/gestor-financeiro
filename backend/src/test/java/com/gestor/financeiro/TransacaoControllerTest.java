@@ -1,12 +1,14 @@
 package com.gestor.financeiro;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.TipoConta;
 import com.gestor.financeiro.model.enums.TipoTransacao;
+import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.CategoriaRepository;
 import com.gestor.financeiro.repository.ContaRepository;
 import com.gestor.financeiro.repository.TransacaoRepository;
@@ -62,17 +64,22 @@ class TransacaoControllerTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private CarteiraRepository carteiraRepository;
+
     private Usuario usuarioA;
     private Usuario usuarioB;
     private Categoria categoriaA;
     private Categoria categoriaB;
     private Conta contaB;
+    private Carteira carteiraA;
 
     @BeforeEach
     void setup() {
         transacaoRepository.deleteAll();
         categoriaRepository.deleteAll();
         contaRepository.deleteAll();
+        carteiraRepository.deleteAll();
         usuarioRepository.deleteAll();
 
         usuarioA = usuarioRepository.save(TestDataFactory.usuario("Alice", "alice@teste.com", passwordEncoder.encode("123456")));
@@ -82,6 +89,7 @@ class TransacaoControllerTest {
         categoriaB = categoriaRepository.save(TestDataFactory.categoria(usuarioB, "Lazer"));
 
         contaB = contaRepository.save(TestDataFactory.conta(usuarioB, "Cartão Bob", TipoConta.CREDITO));
+        carteiraA = carteiraRepository.save(TestDataFactory.carteira(usuarioA, "Corrente Alice", new BigDecimal("1000.00")));
     }
 
     @Test
@@ -152,11 +160,29 @@ class TransacaoControllerTest {
                         "valor", 120.50,
                         "data", "2026-03-10",
                         "tipo", "SAIDA",
-                        "categoriaId", categoriaA.getId()
+                        "categoriaId", categoriaA.getId(),
+                        "carteiraId", carteiraA.getId()
                 ))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.id").exists())
-            .andExpect(jsonPath("$.descricao").value("Supermercado"));
+            .andExpect(jsonPath("$.descricao").value("Supermercado"))
+            .andExpect(jsonPath("$.estadoConciliacao").value("CONCILIADA"));
+    }
+
+    @Test
+    @WithMockUser(username = "alice@teste.com")
+    void criar_semContaFinanceiraRetorna422() throws Exception {
+        // PR-F2-05: operacao manual de caixa exige conta financeira
+        mockMvc.perform(post("/api/v1/transacoes")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "descricao", "Sem caixa",
+                        "valor", 10.00,
+                        "data", "2026-03-10",
+                        "tipo", "SAIDA",
+                        "categoriaId", categoriaA.getId()
+                ))))
+            .andExpect(status().isUnprocessableEntity());
     }
 
     @Test

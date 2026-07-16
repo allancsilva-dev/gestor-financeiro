@@ -48,6 +48,8 @@ public class UsuarioExclusaoService {
     public static final List<DeleteTitular> MANIFESTO_EXCLUSAO = List.of(
         new DeleteTitular("anexos",
             "DELETE FROM Anexo a WHERE a.usuario.id = :id"),
+        new DeleteTitular("fatura_pagamentos",
+            "DELETE FROM FaturaPagamento fp WHERE fp.usuario.id = :id"),
         new DeleteTitular("fatura_lancamentos",
             "DELETE FROM FaturaLancamento fl WHERE fl.fatura.id IN (SELECT f.id FROM FaturaCartao f WHERE f.usuario.id = :id)"),
         new DeleteTitular("parcelas",
@@ -72,6 +74,9 @@ public class UsuarioExclusaoService {
             "DELETE FROM Meta m WHERE m.usuario.id = :id"),
         new DeleteTitular("movimentacoes_ativo",
             "DELETE FROM MovimentacaoAtivo ma WHERE ma.usuario.id = :id"),
+        // apos todos os lancamentos que referenciam operacao_id (ADR-0009)
+        new DeleteTitular("operacoes_financeiras",
+            "DELETE FROM OperacaoFinanceira op WHERE op.usuario.id = :id"),
         new DeleteTitular("ativos",
             "DELETE FROM Ativo a WHERE a.usuario.id = :id"),
         new DeleteTitular("categorias",

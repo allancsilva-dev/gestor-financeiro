@@ -160,6 +160,7 @@ class FaturaCartaoWorkflowTest {
         Conta debito = contaRepository.save(TestDataFactory.conta(usuario, "Débito", TipoConta.DEBITO));
         Transacao compra = TestDataFactory.transacao(usuario, categoria, "Curso", new BigDecimal("100.00"));
         compra.setConta(debito);
+        compra.setCarteira(carteira);
         compra.setParcelado(true);
         compra.setTotalParcelas(3);
         transacaoService.criar(compra, usuario.getId());

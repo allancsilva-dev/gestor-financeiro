@@ -9,6 +9,7 @@ import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.Parcela;
 import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.model.Usuario;
+import com.gestor.financeiro.model.enums.EstadoConciliacaoTransacao;
 import com.gestor.financeiro.model.enums.OrigemMovimentoCarteira;
 import com.gestor.financeiro.model.enums.StatusPagamento;
 import com.gestor.financeiro.model.enums.TipoConta;
@@ -97,6 +98,21 @@ public class TransacaoService {
 
     @Transactional
     public Transacao criar(Transacao transacao, Long usuarioId, String ledgerIdempotencyKey) {
+        return criar(transacao, usuarioId, ledgerIdempotencyKey, false);
+    }
+
+    /**
+     * Caminho de importacao (PR-F2-05): transacao sem conta financeira e aceita
+     * como PENDENTE_CONCILIACAO (importacao incompleta) em vez de rejeitada.
+     */
+    @Transactional
+    public Transacao criarImportada(Transacao transacao, Long usuarioId) {
+        return criar(transacao, usuarioId, null, true);
+    }
+
+    @Transactional
+    protected Transacao criar(Transacao transacao, Long usuarioId, String ledgerIdempotencyKey,
+                              boolean importacao) {
         Usuario usuario = usuarioRepository.findById(usuarioId)
             .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
@@ -140,6 +156,7 @@ public class TransacaoService {
 
         if (compraCartao) {
             transacao.setCarteira(null);
+            transacao.setEstadoConciliacao(EstadoConciliacaoTransacao.CONCILIADA);
         } else if (transacao.getCarteira() != null && transacao.getCarteira().getId() != null) {
             // Substitui o stub detached vindo do controller por entidade gerenciada (valida ownership)
             Carteira carteira = carteiraRepository.findByIdAndUsuarioId(
@@ -147,6 +164,15 @@ public class TransacaoService {
                 .orElseThrow(() -> new ResourceNotFoundException("Carteira não encontrada"));
 
             transacao.setCarteira(carteira);
+            transacao.setEstadoConciliacao(EstadoConciliacaoTransacao.CONCILIADA);
+        } else if (importacao) {
+            // Importacao incompleta: dado entra pendente, fora de saldos/metricas
+            // conciliadas, ate ganhar conta financeira (ADR-0009/0013)
+            transacao.setEstadoConciliacao(EstadoConciliacaoTransacao.PENDENTE_CONCILIACAO);
+        } else {
+            // Operacao manual de caixa exige conta financeira (PR-F2-05; fecha P1-2)
+            throw new BusinessException(
+                    "Informe a conta financeira (carteiraId) da transação");
         }
 
         // Cartao tem cronograma canonico em FaturaLancamento. Parcela existe somente

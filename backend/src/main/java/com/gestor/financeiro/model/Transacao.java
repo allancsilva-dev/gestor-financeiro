@@ -1,6 +1,7 @@
 package com.gestor.financeiro.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.gestor.financeiro.model.enums.EstadoConciliacaoTransacao;
 import com.gestor.financeiro.model.enums.StatusPagamento;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import jakarta.persistence.*;
@@ -41,7 +42,11 @@ public class Transacao {
 
     @Column(nullable = false)
     private Boolean ativa = true;
-    
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "estado_conciliacao", nullable = false, length = 30)
+    private EstadoConciliacaoTransacao estadoConciliacao = EstadoConciliacaoTransacao.CONCILIADA;
+
     @Column(nullable = false)
     private String descricao;
     

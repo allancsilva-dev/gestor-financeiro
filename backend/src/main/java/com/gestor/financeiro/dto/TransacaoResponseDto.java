@@ -1,6 +1,7 @@
 package com.gestor.financeiro.dto;
 
 import com.gestor.financeiro.model.Transacao;
+import com.gestor.financeiro.model.enums.EstadoConciliacaoTransacao;
 import com.gestor.financeiro.model.enums.StatusPagamento;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import java.math.BigDecimal;
@@ -19,7 +20,8 @@ public record TransacaoResponseDto(
     String observacoes,
     Boolean recorrente,
     ContaResumoDto conta,
-    CategoriaResumoDto categoria
+    CategoriaResumoDto categoria,
+    EstadoConciliacaoTransacao estadoConciliacao
 ) {
     public static TransacaoResponseDto fromEntity(Transacao transacao) {
         return new TransacaoResponseDto(
@@ -35,7 +37,8 @@ public record TransacaoResponseDto(
             transacao.getObservacoes(),
             transacao.getRecorrente(),
             ContaResumoDto.fromEntity(transacao.getConta()),
-            CategoriaResumoDto.fromEntity(transacao.getCategoria())
+            CategoriaResumoDto.fromEntity(transacao.getCategoria()),
+            transacao.getEstadoConciliacao()
         );
     }
 }

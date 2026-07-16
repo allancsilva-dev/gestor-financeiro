@@ -77,7 +77,7 @@ public class ImportService {
                         result.addDuplicada();
                         continue;
                     }
-                    transacaoService.criar(tx, usuarioId);
+                    transacaoService.criarImportada(tx, usuarioId);
                     result.addImportada();
                 } catch (Exception e) {
                     result.addErro();

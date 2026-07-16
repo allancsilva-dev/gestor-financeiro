@@ -26,6 +26,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
@@ -111,11 +112,26 @@ class TransacaoServiceLedgerTest {
     }
 
     @Test
-    void criarTransacaoSemCarteiraNaoGeraMovimento() {
-        transacaoService.criar(
-                transacaoSaida(usuario, categoria, null, "Sem carteira", new BigDecimal("50.00")),
+    void criarTransacaoManualSemCarteiraERejeitada() {
+        // PR-F2-05: operacao manual de caixa exige conta financeira (fecha P1-2)
+        Transacao semCarteira = transacaoSaida(usuario, categoria, null, "Sem carteira", new BigDecimal("50.00"));
+
+        assertThrows(com.gestor.financeiro.exception.BusinessException.class,
+                () -> transacaoService.criar(semCarteira, usuario.getId()));
+
+        List<MovimentoCarteira> movimentos = movimentoCarteiraRepository
+                .findByUsuarioIdAndCarteiraIdOrderByDataMovimentoDescIdDesc(usuario.getId(), carteira.getId());
+        assertEquals(0, movimentos.size());
+    }
+
+    @Test
+    void criarTransacaoImportadaSemCarteiraNaoGeraMovimentoEFicaPendente() {
+        Transacao importada = transacaoService.criarImportada(
+                transacaoSaida(usuario, categoria, null, "Importada sem carteira", new BigDecimal("50.00")),
                 usuario.getId());
 
+        assertEquals(com.gestor.financeiro.model.enums.EstadoConciliacaoTransacao.PENDENTE_CONCILIACAO,
+                importada.getEstadoConciliacao());
         List<MovimentoCarteira> movimentos = movimentoCarteiraRepository
                 .findByUsuarioIdAndCarteiraIdOrderByDataMovimentoDescIdDesc(usuario.getId(), carteira.getId());
         assertEquals(0, movimentos.size());
