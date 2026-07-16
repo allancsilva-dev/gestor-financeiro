@@ -38,6 +38,7 @@ public class FaturaService {
     private final CarteiraRepository carteiraRepository;
     private final MovimentoCarteiraRepository movimentoCarteiraRepository;
     private final LedgerService ledgerService;
+    private final OperacaoFinanceiraService operacaoService;
     private final java.time.Clock clock;
 
     public FaturaService(FaturaCartaoRepository faturaRepository,
@@ -48,6 +49,7 @@ public class FaturaService {
                          CarteiraRepository carteiraRepository,
                          MovimentoCarteiraRepository movimentoCarteiraRepository,
                          LedgerService ledgerService,
+                         OperacaoFinanceiraService operacaoService,
                          java.time.Clock clock) {
         this.faturaRepository = faturaRepository;
         this.faturaLancamentoRepository = faturaLancamentoRepository;
@@ -57,6 +59,7 @@ public class FaturaService {
         this.carteiraRepository = carteiraRepository;
         this.movimentoCarteiraRepository = movimentoCarteiraRepository;
         this.ledgerService = ledgerService;
+        this.operacaoService = operacaoService;
         this.clock = clock;
     }
 
@@ -198,8 +201,13 @@ public class FaturaService {
 
         BigDecimal valorGastoAtual = conta.getValorGasto() != null ? conta.getValorGasto() : BigDecimal.ZERO;
         BigDecimal novoValorGasto = valorGastoAtual.subtract(valor);
-        conta.setValorGasto(novoValorGasto.signum() < 0 ? BigDecimal.ZERO : novoValorGasto);
+        BigDecimal valorGastoFinal = novoValorGasto.signum() < 0 ? BigDecimal.ZERO : novoValorGasto;
+        conta.setValorGasto(valorGastoFinal);
         contaRepository.save(conta);
+        // Espelha o delta EFETIVO (com clamp) para manter ledger == valorGasto;
+        // operacao de pagamento completa entra no PR-F2-08
+        espelharPassivo(conta, valorGastoFinal.subtract(valorGastoAtual), null,
+                "Pagamento fatura " + fatura.getMes() + "/" + fatura.getAno());
 
         return toResponse(fatura, usuarioId, conta);
     }
@@ -224,6 +232,19 @@ public class FaturaService {
                 ? transacao.getValorTotal().divide(BigDecimal.valueOf(totalParcelas), 2, RoundingMode.HALF_UP)
                 : transacao.getValorTotal();
 
+        // Compra e uma operacao financeira: lancamentos de fatura e movimento de
+        // passivo compartilham o mesmo operacao_id (ADR-0009, PR-F2-07)
+        OperacaoFinanceira operacao = operacaoService.criar(new CriarOperacaoCommand(
+                usuarioId,
+                com.gestor.financeiro.model.enums.TipoOperacaoFinanceira.COMPRA_CARTAO,
+                com.gestor.financeiro.model.enums.PoliticaOperacao.COMPETENCIA,
+                com.gestor.financeiro.model.enums.OrigemOperacaoFinanceira.MANUAL,
+                transacao.getData().atStartOfDay(),
+                null,
+                "compra-cartao|transacao=" + transacao.getId(),
+                transacao.getDescricao(),
+                null));
+
         for (int parcela = 1; parcela <= totalParcelas; parcela++) {
             // Última parcela absorve a diferença de arredondamento para fechar o valor total
             BigDecimal valorLancamento = parcela == totalParcelas
@@ -240,7 +261,7 @@ public class FaturaService {
                     transacao.getData(),
                     totalParcelas > 1 ? parcela : null,
                     totalParcelas > 1 ? totalParcelas : null,
-                    TipoFaturaLancamento.COMPRA);
+                    TipoFaturaLancamento.COMPRA, operacao);
         }
     }
 
@@ -250,12 +271,16 @@ public class FaturaService {
             return;
         }
 
+        List<FaturaLancamento> lancamentos = faturaLancamentoRepository.findByTransacaoId(transacao.getId());
+        OperacaoFinanceira operacaoEstorno = operacaoDeCorrecao(
+                usuarioId, lancamentos, "Cancelamento: " + transacao.getDescricao());
+
         BigDecimal somaFaturasPagas = BigDecimal.ZERO;
-        for (FaturaLancamento lancamento : faturaLancamentoRepository.findByTransacaoId(transacao.getId())) {
+        for (FaturaLancamento lancamento : lancamentos) {
             if (lancamento.getFatura().getStatus() == FaturaStatus.PAGA) {
                 somaFaturasPagas = somaFaturasPagas.add(lancamento.getValor());
             } else {
-                removerLancamentoDeFaturaAberta(lancamento);
+                removerLancamentoDeFaturaAberta(lancamento, operacaoEstorno);
             }
         }
         faturaLancamentoRepository.flush();
@@ -266,8 +291,36 @@ public class FaturaService {
                     usuarioId, transacao.getConta(), YearMonth.now(clock));
             criarLancamento(proxima, transacao, "Estorno: " + transacao.getDescricao(),
                     somaFaturasPagas.negate(), LocalDate.now(clock), null, null,
-                    TipoFaturaLancamento.ESTORNO);
+                    TipoFaturaLancamento.ESTORNO, operacaoEstorno);
         }
+    }
+
+    /**
+     * Correcao de compra (ADR-0009): se a compra original tem operacao, gera
+     * ESTORNO referenciando-a (original vira ESTORNADA, conteudo intacto);
+     * compra legada sem operacao gera operacao AJUSTE de sistema.
+     */
+    private OperacaoFinanceira operacaoDeCorrecao(Long usuarioId, List<FaturaLancamento> lancamentos,
+                                                  String descricao) {
+        OperacaoFinanceira original = lancamentos.stream()
+                .map(FaturaLancamento::getOperacao)
+                .filter(op -> op != null
+                        && op.getStatus() == com.gestor.financeiro.model.enums.StatusOperacaoFinanceira.CONFIRMADA)
+                .findFirst()
+                .orElse(null);
+        if (original != null) {
+            return operacaoService.estornar(usuarioId, original.getId(), descricao, null);
+        }
+        return operacaoService.criar(new CriarOperacaoCommand(
+                usuarioId,
+                com.gestor.financeiro.model.enums.TipoOperacaoFinanceira.AJUSTE,
+                com.gestor.financeiro.model.enums.PoliticaOperacao.COMPETENCIA,
+                com.gestor.financeiro.model.enums.OrigemOperacaoFinanceira.SISTEMA,
+                null,
+                null,
+                null,
+                descricao,
+                null));
     }
 
     /**
@@ -287,11 +340,16 @@ public class FaturaService {
                 ? transacao.getTotalParcelas()
                 : 1;
 
+        List<FaturaLancamento> lancamentosExistentes =
+                faturaLancamentoRepository.findByTransacaoId(transacao.getId());
+        OperacaoFinanceira operacaoEdicao = operacaoDeCorrecao(
+                usuarioId, lancamentosExistentes, "Edição: " + transacao.getDescricao());
+
         BigDecimal somaFaturasPagas = BigDecimal.ZERO;
         List<Integer> parcelasPagas = new ArrayList<>();
         boolean compraAVistaPaga = false;
 
-        for (FaturaLancamento lancamento : faturaLancamentoRepository.findByTransacaoId(transacao.getId())) {
+        for (FaturaLancamento lancamento : lancamentosExistentes) {
             if (lancamento.getFatura().getStatus() == FaturaStatus.PAGA) {
                 somaFaturasPagas = somaFaturasPagas.add(lancamento.getValor());
                 if (lancamento.getTipo() == TipoFaturaLancamento.COMPRA) {
@@ -302,7 +360,7 @@ public class FaturaService {
                     }
                 }
             } else {
-                removerLancamentoDeFaturaAberta(lancamento);
+                removerLancamentoDeFaturaAberta(lancamento, operacaoEdicao);
             }
         }
         faturaLancamentoRepository.flush();
@@ -333,7 +391,7 @@ public class FaturaService {
                         transacao.getData(),
                         totalParcelas > 1 ? numero : null,
                         totalParcelas > 1 ? totalParcelas : null,
-                        TipoFaturaLancamento.COMPRA);
+                        TipoFaturaLancamento.COMPRA, operacaoEdicao);
             }
         }
 
@@ -348,7 +406,8 @@ public class FaturaService {
             FaturaCartao proxima = faturaDisponivelParaLancamento(
                     usuarioId, transacao.getConta(), YearMonth.now(clock));
             criarLancamento(proxima, transacao, "Ajuste: " + transacao.getDescricao(),
-                    ajustePago, LocalDate.now(clock), null, null, TipoFaturaLancamento.AJUSTE);
+                    ajustePago, LocalDate.now(clock), null, null, TipoFaturaLancamento.AJUSTE,
+                    operacaoEdicao);
         }
     }
 
@@ -609,12 +668,15 @@ public class FaturaService {
         faturaLancamentoRepository.saveAndFlush(lancamento);
 
         atualizarTotalFatura(destino, valor);
-        ajustarLimiteUtilizado(destino.getConta(), valor);
+        // Rollover move valor entre faturas; deltas se anulam contra a liberacao
+        // do pagamento da fatura origem — passivo total preservado (PR-F2-08)
+        ajustarLimiteUtilizado(destino.getConta(), valor, null, descricao);
     }
 
     private void criarLancamento(FaturaCartao fatura, Transacao transacao, String descricao,
                                  BigDecimal valor, LocalDate dataCompra, Integer parcelaNumero,
-                                 Integer totalParcelas, TipoFaturaLancamento tipo) {
+                                 Integer totalParcelas, TipoFaturaLancamento tipo,
+                                 OperacaoFinanceira operacao) {
         FaturaLancamento lancamento = new FaturaLancamento();
         lancamento.setFatura(fatura);
         lancamento.setTransacao(transacao);
@@ -624,24 +686,76 @@ public class FaturaService {
         lancamento.setParcelaNumero(parcelaNumero);
         lancamento.setTotalParcelas(totalParcelas);
         lancamento.setTipo(tipo);
+        lancamento.setOperacao(operacao);
         faturaLancamentoRepository.save(lancamento);
 
         atualizarTotalFatura(fatura, valor);
-        ajustarLimiteUtilizado(fatura.getConta(), valor);
+        ajustarLimiteUtilizado(fatura.getConta(), valor, operacao, descricao);
     }
 
-    private void removerLancamentoDeFaturaAberta(FaturaLancamento lancamento) {
+    private void removerLancamentoDeFaturaAberta(FaturaLancamento lancamento, OperacaoFinanceira operacao) {
         atualizarTotalFatura(lancamento.getFatura(), lancamento.getValor().negate());
-        ajustarLimiteUtilizado(lancamento.getFatura().getConta(), lancamento.getValor().negate());
+        ajustarLimiteUtilizado(lancamento.getFatura().getConta(), lancamento.getValor().negate(),
+                operacao, "Remoção: " + lancamento.getDescricao());
         faturaLancamentoRepository.delete(lancamento);
     }
 
-    // Invariante: valorGasto da conta == soma dos lançamentos em faturas não pagas.
-    // Toda criação/remoção de lançamento passa por aqui; pagarFatura libera pelo total da fatura.
-    private void ajustarLimiteUtilizado(Conta conta, BigDecimal delta) {
+    // Invariante: valorGasto da conta == soma dos lançamentos em faturas não pagas
+    // == saldo do ledger de passivo (PR-F2-07). Toda criação/remoção de lançamento
+    // passa por aqui; pagarFatura libera pelo total da fatura.
+    private void ajustarLimiteUtilizado(Conta conta, BigDecimal delta, OperacaoFinanceira operacao,
+                                        String descricao) {
         BigDecimal atual = conta.getValorGasto() != null ? conta.getValorGasto() : BigDecimal.ZERO;
         conta.setValorGasto(atual.add(delta));
         contaRepository.save(conta);
+        espelharPassivo(conta, delta, operacao, descricao);
+    }
+
+    /**
+     * Dupla escrita do passivo (PR-F2-07, ADR-0008/0009): todo delta de
+     * valorGasto vira lancamento no ledger da conta financeira do cartao.
+     * Convencao: +delta = compra (+passivo); -delta = pagamento/estorno/credito.
+     * Saldo negativo = credito do cliente, permitido. Rollover entre faturas
+     * gera deltas que se anulam no total, preservando o passivo.
+     */
+    private void espelharPassivo(Conta conta, BigDecimal delta, OperacaoFinanceira operacao,
+                                 String descricao) {
+        if (delta == null || delta.signum() == 0) {
+            return;
+        }
+        Carteira passivo = contaPassivaDe(conta);
+        ledgerService.registrarMovimento(new RegistrarMovimentoCommand(
+                conta.getUsuario().getId(),
+                passivo.getId(),
+                delta.signum() > 0 ? TipoMovimentoCarteira.ENTRADA : TipoMovimentoCarteira.SAIDA,
+                delta.abs(),
+                delta.signum() > 0
+                        ? RegistrarMovimentoCommand.Direcao.ENTRADA
+                        : RegistrarMovimentoCommand.Direcao.SAIDA,
+                OrigemMovimentoCarteira.FATURA_CARTAO,
+                "CONTA",
+                conta.getId(),
+                descricao,
+                null,
+                null,
+                true), operacao);
+    }
+
+    /** Conta financeira passiva do cartao; cria e vincula sob demanda (legado pre-V35). */
+    private Carteira contaPassivaDe(Conta conta) {
+        if (conta.getContaFinanceira() != null) {
+            return conta.getContaFinanceira();
+        }
+        Carteira passivo = new Carteira();
+        passivo.setNome(conta.getNome());
+        passivo.setTipo(com.gestor.financeiro.model.enums.TipoCarteira.CARTAO);
+        passivo.setSaldo(BigDecimal.ZERO);
+        passivo.setBanco(conta.getBanco());
+        passivo.setUsuario(conta.getUsuario());
+        passivo = carteiraRepository.save(passivo);
+        conta.setContaFinanceira(passivo);
+        contaRepository.save(conta);
+        return passivo;
     }
 
     private void atualizarTotalFatura(FaturaCartao fatura, BigDecimal valor) {

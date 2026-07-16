@@ -35,6 +35,11 @@ public class FaturaLancamento {
     @JoinColumn(name = "fatura_origem_id")
     private FaturaCartao faturaOrigem;
 
+    /** Operacao financeira que gerou este lancamento (ADR-0009, PR-F2-07). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "operacao_id")
+    private OperacaoFinanceira operacao;
+
     @Column(nullable = false)
     private String descricao;
 
