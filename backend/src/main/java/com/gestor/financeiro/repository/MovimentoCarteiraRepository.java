@@ -20,6 +20,8 @@ public interface MovimentoCarteiraRepository extends JpaRepository<MovimentoCart
 
     Optional<MovimentoCarteira> findByUsuarioIdAndIdempotencyKey(Long usuarioId, String idempotencyKey);
 
+    java.util.List<MovimentoCarteira> findByOperacaoIdOrderByValorAssinadoAsc(Long operacaoId);
+
     List<MovimentoCarteira> findByUsuarioIdAndCarteiraIdOrderByDataMovimentoDescIdDesc(Long usuarioId, Long carteiraId);
 
     boolean existsByCarteiraIdAndOrigemAndReferenciaTipo(

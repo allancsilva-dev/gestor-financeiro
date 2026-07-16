@@ -20,7 +20,8 @@ public record MovimentoCarteiraResponse(
         BigDecimal saldoResultante,
         String idempotencyKey,
         String moeda,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        Long operacaoId
 ) {
     public static MovimentoCarteiraResponse fromEntity(MovimentoCarteira m) {
         return new MovimentoCarteiraResponse(
@@ -38,7 +39,8 @@ public record MovimentoCarteiraResponse(
                 m.getSaldoResultante(),
                 m.getIdempotencyKey(),
                 m.getMoeda(),
-                m.getCreatedAt()
+                m.getCreatedAt(),
+                m.getOperacao() == null ? null : m.getOperacao().getId()
         );
     }
 }
