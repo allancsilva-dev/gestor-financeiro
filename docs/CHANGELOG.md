@@ -7,6 +7,30 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ---
 
+## [Fase 2 — PR-F2-20] - 2026-07-16
+
+### Reconciliação global automatizada
+- Novo `GET /api/v1/reconciliacao/global`, autenticado e restrito ao titular, verifica saldo do
+  ledger, passivo de faturas terminais, cofres de metas e transações incompletas.
+- Cada relatório usa transação read-only `REPEATABLE_READ`; a varredura diária pagina usuários
+  por keyset, isola falhas e não corrige divergências automaticamente.
+- Health inicia `UNKNOWN`, fica `UP` sem divergências e `DEGRADED` com divergência/erro. O estado
+  degradado continua HTTP 200; `DOWN` e `OUT_OF_SERVICE` permanecem HTTP 503.
+- Gauges Micrometer registram última execução e quatro invariantes com tags fixas, sem IDs.
+- O maintenance job `global-reconciliation` rejeita `--apply` e caminhos dentro do repositório,
+  gera JSON restrito fora da árvore de código e checksum SHA-256.
+- Não há migration nem histórico persistido. Rollback é apenas reimplantar o artefato anterior.
+- `PROB-0081` permanece aberto. Promoção exige V41, backup off-host, restore drill, postflight do
+  PR-F2-19 e artefato global com zero divergências.
+
+## [Fase 2 — PR-F2-19] - 2026-07-16
+
+### Contract financeiro V41
+- A V41 e os contratos canônicos do PR-F2-19 estão implementados e validados localmente; não
+  houve deploy. O gate operacional `PROB-0081` continua aberto.
+- `contas` representa apenas configuração de cartão e o passivo vive exclusivamente no ledger
+  da conta financeira `PASSIVO/CARTAO`; campos legados foram removidos.
+
 ## [Fase 2 — PR-F2-18A/18B] - 2026-07-16
 
 ### Contratos finais e clientes canônicos
@@ -22,7 +46,7 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
   seletores canônicos; operações de investimento exigem caixa real ou snapshot `EXTERNO`.
 - O stash `WIP PR-F2-20 reconciliacao global antes PR-F2-16A` permanece intacto.
 - `PROB-0081` continua reaberto: o ambiente não possui rclone, remote off-host, chave pública nem
-  variáveis operacionais. V41, remoções do PR-F2-19 e PR-F2-20 não foram iniciados.
+  variáveis operacionais. Esta entrada precede a implementação local posterior de PR-F2-19/20.
 
 ## [Fase 2 — PR-F2-16A] - 2026-07-16
 

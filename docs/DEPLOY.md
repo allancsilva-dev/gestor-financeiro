@@ -466,14 +466,26 @@ Backfills não possuem endpoint HTTP. Perfil `maintenance`; dry-run padrão; rel
 ```bash
 cd backend
 SPRING_PROFILES_ACTIVE=maintenance DATABASE_URL=... DB_USERNAME=... DB_PASSWORD=... JWT_SECRET=... \
-  ./mvnw spring-boot:run -Dspring-boot.run.arguments="--job=ledger-orphans --report=../artifacts/ledger-dry-run.json"
+  ./mvnw spring-boot:run -Dspring-boot.run.arguments="--job=ledger-orphans --report=/var/lib/gestor-financeiro/reports/ledger-dry-run.json"
 
 # somente após backup criptografado, restore drill e revisão do dry-run
 SPRING_PROFILES_ACTIVE=maintenance DATABASE_URL=... DB_USERNAME=... DB_PASSWORD=... JWT_SECRET=... \
-  ./mvnw spring-boot:run -Dspring-boot.run.arguments="--job=ledger-orphans --report=../artifacts/ledger-apply.json --apply"
+  ./mvnw spring-boot:run -Dspring-boot.run.arguments="--job=ledger-orphans --report=/var/lib/gestor-financeiro/reports/ledger-apply.json --apply"
 ```
 
-Jobs: `ledger-orphans`, `rounding-residue`, `card-schedule`. Cada usuário roda em transação separada; relatórios usam somente IDs técnicos. Reexecução após `--apply` deve gerar zero mudanças. `REVISAO_MANUAL` permanece intacto.
+Jobs: `ledger-orphans`, `rounding-residue`, `card-schedule`, `global-reconciliation`. Cada usuário
+roda em transação separada e a enumeração é paginada. Relatórios financeiros são rejeitados se o
+caminho estiver dentro do repositório e são gravados com permissão restrita e checksum SHA-256.
+`global-reconciliation` é sempre read-only e rejeita `--apply`:
+
+```bash
+SPRING_PROFILES_ACTIVE=maintenance DATABASE_URL=... DB_USERNAME=... DB_PASSWORD=... JWT_SECRET=... \
+  ./mvnw spring-boot:run -Dspring-boot.run.arguments="--job=global-reconciliation --report=/var/lib/gestor-financeiro/reports/global-v41.json"
+```
+
+No clone restaurado de produção: aplicar V41, exigir `scripts/postflight-v41.sh` verde, executar o
+job global e bloquear a promoção se houver divergência ou erro. Reexecução após `--apply` dos jobs
+corretivos deve gerar zero mudanças; `REVISAO_MANUAL` permanece intacto.
 
 Antes da Release B, execute `card-schedule` e confirme zero `sem_lancamento_canonico`. Só então promova `db/contract/V27__remove_redundant_card_parcels.sql` para `db/migration`.
 

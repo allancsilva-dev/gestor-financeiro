@@ -1134,3 +1134,17 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Motivo:** Regra da auditoria `docs/15 07 2026 - MetaDoNexosFinancas.md`; foco total em integridade (PR-0..PR-4 do plano Fase 1).
 - **Criterio de aceite:** Congelamento termina somente apos PR-4 mergeado, suites globais verdes (backend, web, mobile, E2E) e evidencias registradas no PROBLEM_LEDGER
 - **Status:** ATIVO
+
+---
+
+## BACKLOG-0088 — Promover PR-F2-20 após reconciliação no clone restaurado
+
+- **Prioridade:** P0 operacional
+- **Área:** backend, banco, operação
+- **Motivo:** a reconciliação global está implementada localmente, mas não autoriza deploy antes
+  da prova em dados restaurados de produção.
+- **Critério de aceite:** backup off-host e restore drill de `PROB-0081` aprovados; V41 aplicada no
+  clone; postflight PR-F2-19 verde; maintenance `global-reconciliation` com checksum válido, zero
+  divergências e zero erros; smoke autenticado de endpoint, health e métricas após deploy.
+- **Rollback:** reimplantar somente o artefato anterior; PR-F2-20 não altera schema nem dados.
+- **Status:** ABERTO — implementação concluída; gate externo `PROB-0081` pendente.

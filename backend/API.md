@@ -154,6 +154,32 @@ Retorna usuário autenticado.
 - `GET /api/v1/dashboard/evolucao-mensal`
 - `GET /api/v1/dashboard/comparacao-mensal`
 
+## Reconciliação (`/api/v1/reconciliacao`)
+
+### GET `/api/v1/reconciliacao/global`
+
+Executa, em snapshot read-only, as quatro invariantes financeiras somente para o titular do
+token. Retorna `401` sem autenticação. A lista `detalhes` contém apenas divergências.
+
+```json
+{
+  "status": "OK",
+  "executadoEm": "2026-07-16T03:30:00Z",
+  "verificacoes": 12,
+  "divergencias": 0,
+  "resumo": [
+    {"invariante":"SALDO_LEDGER","verificacoes":3,"aprovadas":3,"divergencias":0},
+    {"invariante":"PASSIVO_FATURAS","verificacoes":1,"aprovadas":1,"divergencias":0},
+    {"invariante":"COFRE_META","verificacoes":1,"aprovadas":1,"divergencias":0},
+    {"invariante":"TRANSACAO_INCOMPLETA","verificacoes":7,"aprovadas":7,"divergencias":0}
+  ],
+  "detalhes": []
+}
+```
+
+`status` é `OK` ou `DIVERGENTE`. Os invariantes são `SALDO_LEDGER`, `PASSIVO_FATURAS`,
+`COFRE_META` e `TRANSACAO_INCOMPLETA`. Não existe endpoint HTTP multiusuário.
+
 ---
 
 ## Paginação em Listagens

@@ -2446,3 +2446,27 @@ Tipo: ENTRADA/RECEITA/CREDITO ou SAIDA/DESPESA (default SAIDA)
 **Status final:** `PASS`
 
 **Fase 4 concluida.** Proximo: deploy real e operacao.
+
+---
+
+# PR-F2-20 — Reconciliação global automatizada
+
+**Status local:** `PASS_COM_RESSALVA_OPERACIONAL`
+**Data:** 2026-07-16
+
+- [x] quatro invariantes pós-V41 com comparação exata via `BigDecimal.compareTo`
+- [x] relatório por usuário em transação read-only `REPEATABLE_READ`
+- [x] endpoint autenticado sem superfície HTTP multiusuário
+- [x] paginação keyset de usuários e falha isolada por titular
+- [x] scheduler diário configurável com proteção local de sobreposição
+- [x] gauges sem tag de alta cardinalidade e health `UNKNOWN`/`UP`/`DEGRADED`
+- [x] `DEGRADED` HTTP 200; `DOWN`/`OUT_OF_SERVICE` HTTP 503
+- [x] maintenance read-only, sem `--apply`, JSON fora do repositório, modo 0600 e SHA-256
+- [x] nenhuma migration ou tabela de histórico
+- [x] API, changelog, deploy, backlog e relatório de implementação atualizados
+- [ ] backup off-host e restore drill (`PROB-0081`)
+- [ ] V41 + postflight + reconciliação zero no clone restaurado de produção
+- [ ] smoke pós-deploy de endpoint, health, métricas e artefato
+
+Promoção permanece bloqueada por divergência, erro técnico ou `PROB-0081`. A reconciliação nunca
+corrige dados e não derruba automaticamente a API.
