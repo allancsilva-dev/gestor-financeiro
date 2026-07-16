@@ -2,6 +2,7 @@ package com.gestor.financeiro.repository;
 
 import com.gestor.financeiro.model.Meta;
 import com.gestor.financeiro.model.enums.StatusMeta;
+import com.gestor.financeiro.repository.projection.CofreMetaProjection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -54,4 +55,19 @@ public interface MetaRepository extends JpaRepository<Meta, Long> {
     Optional<Meta> findByIdAndUsuarioId(Long id, Long usuarioId);
 
     long countByUsuarioIdAndAtivaTrue(Long usuarioId);
+
+    @org.springframework.data.jpa.repository.Query(value = """
+            SELECT m.id AS "metaId", m.usuario_id AS "usuarioId",
+                   m.valor_reservado AS "valorReservado", c.id AS "cofreId",
+                   c.usuario_id AS "cofreUsuarioId", c.subtipo AS "cofreSubtipo",
+                   c.saldo AS "cofreSaldo"
+              FROM metas m
+              LEFT JOIN carteiras c ON c.id = m.cofre_id
+             WHERE m.usuario_id = :usuarioId
+               AND m.modalidade = 'COFRE_REAL'
+               AND COALESCE(m.valor_reservado, 0) > 0
+             ORDER BY m.id
+            """, nativeQuery = true)
+    List<CofreMetaProjection> reconciliarCofresByUsuarioId(
+            @org.springframework.data.repository.query.Param("usuarioId") Long usuarioId);
 }

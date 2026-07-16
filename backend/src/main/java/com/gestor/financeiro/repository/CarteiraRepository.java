@@ -2,6 +2,7 @@ package com.gestor.financeiro.repository;
 
 import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.repository.projection.LedgerSaldoProjection;
+import com.gestor.financeiro.repository.projection.PassivoFaturaProjection;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -107,4 +108,23 @@ public interface CarteiraRepository extends JpaRepository<Carteira, Long> {
             @Param("usuarioId") Long usuarioId,
             @Param("carteiraId") Long carteiraId
     );
+
+    @Query(value = """
+            SELECT co.id AS "cartaoId",
+                   cf.id AS "contaFinanceiraId",
+                   cf.saldo AS "saldoPassivo",
+                   COALESCE(SUM(CASE
+                     WHEN f.id IS NOT NULL AND f.status <> 'PAGA'
+                       AND NOT EXISTS (SELECT 1 FROM fatura_lancamentos r WHERE r.fatura_origem_id = f.id)
+                     THEN COALESCE(f.valor_total, 0) - COALESCE(f.valor_pago, 0)
+                     ELSE 0 END), 0) AS "saldoFaturas"
+              FROM contas co
+              JOIN carteiras cf ON cf.id = co.conta_financeira_id
+              LEFT JOIN faturas_cartao f ON f.conta_id = co.id AND f.usuario_id = co.usuario_id
+             WHERE co.usuario_id = :usuarioId
+             GROUP BY co.id, cf.id, cf.saldo
+             ORDER BY co.id
+            """, nativeQuery = true)
+    List<PassivoFaturaProjection> reconciliarPassivosFaturasByUsuarioId(
+            @Param("usuarioId") Long usuarioId);
 }

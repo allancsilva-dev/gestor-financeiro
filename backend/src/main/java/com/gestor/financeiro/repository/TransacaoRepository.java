@@ -2,6 +2,7 @@ package com.gestor.financeiro.repository;
 
 import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.model.enums.TipoTransacao;
+import com.gestor.financeiro.repository.projection.TransacaoIncompletaProjection;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -213,4 +214,28 @@ public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
            "    WHERE m.origem = 'TRANSACAO' AND m.referenciaTipo = 'TRANSACAO' AND m.referenciaId = t.id) " +
            "ORDER BY t.carteira.id, t.data, t.id")
     List<Transacao> findOrfasSemMovimentoByUsuarioId(@Param("usuarioId") Long usuarioId);
+
+    long countByUsuarioIdAndAtivaTrue(Long usuarioId);
+
+    @Query(value = """
+            SELECT t.id AS "transacaoId", t.conta_id AS "contaId",
+                   t.carteira_id AS "carteiraId"
+              FROM transacoes t
+             WHERE t.usuario_id = :usuarioId
+               AND t.ativa = true
+               AND t.estado_conciliacao = 'CONCILIADA'
+               AND (
+                 (NOT (t.tipo = 'SAIDA' AND t.conta_id IS NOT NULL) AND t.carteira_id IS NULL)
+                 OR
+                 (t.tipo = 'SAIDA' AND t.conta_id IS NOT NULL AND NOT EXISTS (
+                    SELECT 1 FROM fatura_lancamentos fl
+                    JOIN faturas_cartao f ON f.id = fl.fatura_id
+                    WHERE fl.transacao_id = t.id AND fl.tipo = 'COMPRA'
+                      AND f.conta_id = t.conta_id AND f.usuario_id = t.usuario_id
+                 ))
+               )
+             ORDER BY t.id
+            """, nativeQuery = true)
+    List<TransacaoIncompletaProjection> findIncompletasConciliadasByUsuarioId(
+            @Param("usuarioId") Long usuarioId);
 }
