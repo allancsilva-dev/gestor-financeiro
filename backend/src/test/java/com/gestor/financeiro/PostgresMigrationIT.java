@@ -10,9 +10,16 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.springframework.dao.DataAccessException;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
+import com.gestor.financeiro.dto.ReconciliacaoGlobalResponse;
+import com.gestor.financeiro.service.ReconciliacaoGlobalService;
 
 import java.math.BigDecimal;
 import java.util.Map;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -27,6 +34,12 @@ class PostgresMigrationIT {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private ReconciliacaoGlobalService reconciliacaoGlobalService;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     @DynamicPropertySource
     static void postgresProperties(DynamicPropertyRegistry registry) {
@@ -204,6 +217,99 @@ class PostgresMigrationIT {
         assertThrows(DataAccessException.class, () -> jdbcTemplate.update(
                 "insert into fatura_lancamentos(fatura_id, transacao_id, descricao, valor, data_compra, parcela_numero, total_parcelas, tipo) values (?, ?, 'Compra', 100.00, current_date, null, null, 'COMPRA')",
                 faturaId, transacaoId));
+    }
+
+    @Test
+    void reconciliacaoGlobalRodaSobreSchemaV41ComRolloverCofreETransacaoPendente() {
+        Long usuarioId = jdbcTemplate.queryForObject(
+                "insert into usuarios(nome,email,senha) values ('Global IT','global-v41-it@teste.com','x') returning id",
+                Long.class);
+        Long caixaId = jdbcTemplate.queryForObject(
+                "insert into carteiras(nome,subtipo,natureza,saldo,usuario_id,version) values ('Caixa','CORRENTE','ATIVO',0,?,0) returning id",
+                Long.class, usuarioId);
+        Long passivoId = jdbcTemplate.queryForObject(
+                "insert into carteiras(nome,subtipo,natureza,saldo,usuario_id,version) values ('Passivo','CARTAO','PASSIVO',70,?,0) returning id",
+                Long.class, usuarioId);
+        Long cofreId = jdbcTemplate.queryForObject(
+                "insert into carteiras(nome,subtipo,natureza,saldo,usuario_id,version) values ('Cofre','COFRE','ATIVO',30,?,0) returning id",
+                Long.class, usuarioId);
+        jdbcTemplate.update("""
+                insert into movimentos_carteira(usuario_id,carteira_id,tipo,valor,valor_assinado,
+                  origem,descricao,data_movimento,saldo_resultante)
+                values (?,?,'ENTRADA',70,70,'FATURA_CARTAO','it',current_timestamp,70),
+                       (?,?,'ENTRADA',30,30,'BACKFILL','it',current_timestamp,30)
+                """, usuarioId, passivoId, usuarioId, cofreId);
+        Long cartaoId = jdbcTemplate.queryForObject("""
+                insert into contas(usuario_id,nome,limite_total,dia_fechamento,dia_vencimento,
+                  ativo,conta_financeira_id,version)
+                values (?,'Inativo com dívida',1000,5,12,false,?,0) returning id
+                """, Long.class, usuarioId, passivoId);
+        Long origemId = jdbcTemplate.queryForObject("""
+                insert into faturas_cartao(usuario_id,conta_id,mes,ano,valor_total,valor_pago,status)
+                values (?,?,6,2026,20,0,'FECHADA') returning id
+                """, Long.class, usuarioId, cartaoId);
+        Long destinoId = jdbcTemplate.queryForObject("""
+                insert into faturas_cartao(usuario_id,conta_id,mes,ano,valor_total,valor_pago,status)
+                values (?,?,7,2026,70,0,'ABERTA') returning id
+                """, Long.class, usuarioId, cartaoId);
+        Long compraId = jdbcTemplate.queryForObject("""
+                insert into transacoes(usuario_id,conta_id,descricao,valor_total,tipo,data,status,
+                  ativa,estado_conciliacao)
+                values (?,?,'Compra',50,'SAIDA',current_date,'PENDENTE',true,'CONCILIADA') returning id
+                """, Long.class, usuarioId, cartaoId);
+        jdbcTemplate.update("""
+                insert into fatura_lancamentos(fatura_id,transacao_id,descricao,valor,data_compra,tipo)
+                values (?,?,'Compra',50,current_date,'COMPRA')
+                """, destinoId, compraId);
+        jdbcTemplate.update("""
+                insert into fatura_lancamentos(fatura_id,fatura_origem_id,descricao,valor,data_compra,tipo)
+                values (?,?,'Rollover',20,current_date,'CREDITO_ANTERIOR')
+                """, destinoId, origemId);
+        jdbcTemplate.update("""
+                insert into metas(usuario_id,nome,valor_total,valor_reservado,cofre_id,modalidade,
+                  ativa,status,version)
+                values (?,'Meta arquivada',100,30,?,'COFRE_REAL',false,'ARQUIVADA',0)
+                """, usuarioId, cofreId);
+        jdbcTemplate.update("""
+                insert into transacoes(usuario_id,carteira_id,descricao,valor_total,tipo,data,status,
+                  ativa,estado_conciliacao)
+                values (? ,?,'Com caixa',1,'ENTRADA',current_date,'PENDENTE',true,'CONCILIADA'),
+                       (?,null,'Importada',1,'ENTRADA',current_date,'PENDENTE',true,'PENDENTE_CONCILIACAO')
+                """, usuarioId, caixaId, usuarioId);
+
+        ReconciliacaoGlobalResponse report = reconciliacaoGlobalService.reconciliarUsuario(usuarioId);
+        assertEquals(ReconciliacaoGlobalResponse.Status.OK, report.status());
+        assertEquals(0, report.divergencias());
+        assertEquals(4, report.resumo().size());
+    }
+
+    @Test
+    void repeatableReadMantemSnapshotDuranteEscritaConcorrente() {
+        Long usuarioId = jdbcTemplate.queryForObject(
+                "insert into usuarios(nome,email,senha) values ('Snapshot','snapshot-it@teste.com','x') returning id",
+                Long.class);
+        TransactionTemplate snapshot = new TransactionTemplate(transactionManager);
+        snapshot.setReadOnly(true);
+        snapshot.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        snapshot.executeWithoutResult(status -> {
+            assertEquals(0L, jdbcTemplate.queryForObject(
+                    "select count(*) from carteiras where usuario_id=?", Long.class, usuarioId));
+            var executor = Executors.newSingleThreadExecutor();
+            try {
+                executor.submit(() -> jdbcTemplate.update("""
+                        insert into carteiras(nome,subtipo,natureza,saldo,usuario_id,version)
+                        values ('Concorrente','CORRENTE','ATIVO',0,?,0)
+                        """, usuarioId)).get(5, TimeUnit.SECONDS);
+            } catch (Exception ex) {
+                throw new IllegalStateException(ex);
+            } finally {
+                executor.shutdownNow();
+            }
+            assertEquals(0L, jdbcTemplate.queryForObject(
+                    "select count(*) from carteiras where usuario_id=?", Long.class, usuarioId));
+        });
+        assertEquals(1L, jdbcTemplate.queryForObject(
+                "select count(*) from carteiras where usuario_id=?", Long.class, usuarioId));
     }
 
     private static void assertBigDecimalEquals(BigDecimal expected, BigDecimal actual) {
