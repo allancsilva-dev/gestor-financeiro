@@ -74,7 +74,30 @@ public class TransacaoService {
 
     public Page<Transacao> listarPorPeriodo(Long usuarioId, LocalDate inicio, LocalDate fim,
                                             TipoTransacao tipo, String busca, Pageable pageable) {
+        return listarPorPeriodo(usuarioId, inicio, fim, tipo, busca, null, null, null, pageable);
+    }
+
+    /**
+     * Drill-down (PR-F3-04): filtros opcionais de categoria, conta financeira
+     * e cartao, combinaveis com periodo, tipo e busca. Recurso alheio segue o
+     * contrato seguro existente (404 sem vazar existencia).
+     */
+    public Page<Transacao> listarPorPeriodo(Long usuarioId, LocalDate inicio, LocalDate fim,
+                                            TipoTransacao tipo, String busca,
+                                            Long categoriaId, Long carteiraId, Long cartaoId,
+                                            Pageable pageable) {
         String q = (busca == null || busca.isBlank()) ? null : busca.trim();
+
+        if (categoriaId != null || carteiraId != null || cartaoId != null) {
+            validarOwnershipFiltros(usuarioId, categoriaId, carteiraId, cartaoId);
+            if (tipo != null) {
+                return transacaoRepository.buscarPorPeriodoTipoComFiltros(
+                        usuarioId, tipo, inicio, fim, q, categoriaId, carteiraId, cartaoId, pageable);
+            }
+            return transacaoRepository.buscarPorPeriodoComFiltros(
+                    usuarioId, inicio, fim, q, categoriaId, carteiraId, cartaoId, pageable);
+        }
+
         if (tipo != null && q != null) {
             return transacaoRepository.buscarPorPeriodoTipoEDescricao(usuarioId, tipo, inicio, fim, q, pageable);
         }
@@ -85,6 +108,21 @@ public class TransacaoService {
             return transacaoRepository.buscarPorPeriodoEDescricao(usuarioId, inicio, fim, q, pageable);
         }
         return transacaoRepository.findByUsuarioIdAndDataBetweenAndAtivaTrue(usuarioId, inicio, fim, pageable);
+    }
+
+    private void validarOwnershipFiltros(Long usuarioId, Long categoriaId, Long carteiraId, Long cartaoId) {
+        if (categoriaId != null) {
+            categoriaRepository.findByIdAndUsuarioId(categoriaId, usuarioId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Categoria não encontrada"));
+        }
+        if (carteiraId != null) {
+            carteiraRepository.findByIdAndUsuarioId(carteiraId, usuarioId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Conta financeira não encontrada"));
+        }
+        if (cartaoId != null) {
+            contaRepository.findByIdAndUsuarioId(cartaoId, usuarioId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Cartão não encontrado"));
+        }
     }
 
     @Transactional

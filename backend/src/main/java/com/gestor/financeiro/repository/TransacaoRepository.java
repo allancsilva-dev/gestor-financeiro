@@ -64,6 +64,43 @@ public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
         @Param("q") String q,
         Pageable pageable);
 
+    // Drill-down (PR-F3-04): filtros opcionais de categoria/carteira/cartao
+    // combinaveis com periodo e busca; ownership validada no service
+    @EntityGraph(attributePaths = {"categoria", "conta"})
+    @Query("SELECT t FROM Transacao t WHERE t.usuario.id = :usuarioId AND t.ativa = true " +
+           "AND t.data BETWEEN :inicio AND :fim " +
+           "AND (:q IS NULL OR LOWER(t.descricao) LIKE LOWER(CONCAT('%', :q, '%'))) " +
+           "AND (:categoriaId IS NULL OR t.categoria.id = :categoriaId) " +
+           "AND (:carteiraId IS NULL OR t.carteira.id = :carteiraId) " +
+           "AND (:cartaoId IS NULL OR t.conta.id = :cartaoId)")
+    Page<Transacao> buscarPorPeriodoComFiltros(
+        @Param("usuarioId") Long usuarioId,
+        @Param("inicio") LocalDate inicio,
+        @Param("fim") LocalDate fim,
+        @Param("q") String q,
+        @Param("categoriaId") Long categoriaId,
+        @Param("carteiraId") Long carteiraId,
+        @Param("cartaoId") Long cartaoId,
+        Pageable pageable);
+
+    @EntityGraph(attributePaths = {"categoria", "conta"})
+    @Query("SELECT t FROM Transacao t WHERE t.usuario.id = :usuarioId AND t.ativa = true " +
+           "AND t.tipo = :tipo AND t.data BETWEEN :inicio AND :fim " +
+           "AND (:q IS NULL OR LOWER(t.descricao) LIKE LOWER(CONCAT('%', :q, '%'))) " +
+           "AND (:categoriaId IS NULL OR t.categoria.id = :categoriaId) " +
+           "AND (:carteiraId IS NULL OR t.carteira.id = :carteiraId) " +
+           "AND (:cartaoId IS NULL OR t.conta.id = :cartaoId)")
+    Page<Transacao> buscarPorPeriodoTipoComFiltros(
+        @Param("usuarioId") Long usuarioId,
+        @Param("tipo") TipoTransacao tipo,
+        @Param("inicio") LocalDate inicio,
+        @Param("fim") LocalDate fim,
+        @Param("q") String q,
+        @Param("categoriaId") Long categoriaId,
+        @Param("carteiraId") Long carteiraId,
+        @Param("cartaoId") Long cartaoId,
+        Pageable pageable);
+
     @EntityGraph(attributePaths = {"categoria", "conta", "carteira"})
     Optional<Transacao> findByIdAndUsuarioId(Long id, Long usuarioId);
     

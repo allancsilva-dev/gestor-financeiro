@@ -58,11 +58,15 @@ public class TransacaoController {
         @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fim,
         @RequestParam(required = false) TipoTransacao tipo,
         @RequestParam(required = false) String q,
+        @RequestParam(required = false) Long categoriaId,
+        @RequestParam(required = false) Long carteiraId,
+        @RequestParam(required = false) Long cartaoId,
         @PageableDefault(size = 20, sort = "data", direction = Sort.Direction.DESC) Pageable pageable
     ) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Pageable cappedPageable = PaginationUtils.enforceMaxSize(pageable, 100);
-        Page<Transacao> transacoes = transacaoService.listarPorPeriodo(usuarioId, inicio, fim, tipo, q, cappedPageable);
+        Page<Transacao> transacoes = transacaoService.listarPorPeriodo(
+                usuarioId, inicio, fim, tipo, q, categoriaId, carteiraId, cartaoId, cappedPageable);
         return ResponseEntity.ok(transacoes.map(TransacaoResponseDto::fromEntity));
     }
     

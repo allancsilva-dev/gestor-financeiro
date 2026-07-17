@@ -25,6 +25,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * As 9 metricas oficiais do produto (ADR-0013, PR-F2-15), calculadas de fonte
@@ -181,7 +182,8 @@ public class MetricasService {
     }
 
     public record ObrigacaoComprometida(
-            String tipo, Long id, String descricao, BigDecimal valor, LocalDate vencimento) {
+            String tipo, Long id, String descricao, BigDecimal valor, LocalDate vencimento,
+            Long transacaoId) {
     }
 
     /**
@@ -197,7 +199,7 @@ public class MetricasService {
                     if (restante.signum() > 0) {
                         itens.add(new ObrigacaoComprometida("FATURA", f.getId(),
                                 "Fatura " + f.getMes() + "/" + f.getAno(), restante,
-                                f.getDataVencimento()));
+                                f.getDataVencimento(), null));
                     }
                 });
         parcelaRepository.findComprometidasNoPeriodo(
@@ -205,13 +207,36 @@ public class MetricasService {
                 TipoTransacao.SAIDA)
                 .forEach(p -> itens.add(new ObrigacaoComprometida("PARCELA", p.getId(),
                         p.getTransacao().getDescricao() + " " + p.getNumeroParcela() + "/"
-                                + p.getTotalParcelas(), p.getValor(), p.getDataVencimento())));
+                                + p.getTotalParcelas(), p.getValor(), p.getDataVencimento(),
+                        p.getTransacao().getId())));
         return itens;
     }
 
     // --- Drill-down (PR-F2-16): origem de cada numero ---
 
-    public record Origem(String tipo, Long id, String descricao, BigDecimal valor) {
+    /**
+     * Navegacao fornecida pelo backend (PR-F3-04): destino, ID e filtros
+     * necessarios. Origem sem destino exato fica sem navegacao (informativa);
+     * o cliente nunca inventa link aproximado.
+     */
+    public record Navegacao(String destino, Long id, Map<String, String> filtros) {
+        public static final String EXTRATO_CONTA = "EXTRATO_CONTA";
+        public static final String TRANSACAO = "TRANSACAO";
+        public static final String FATURA = "FATURA";
+        public static final String META = "META";
+        public static final String INVESTIMENTO = "INVESTIMENTO";
+        public static final String TRANSACOES = "TRANSACOES";
+
+        static Navegacao para(String destino, Long id) {
+            return new Navegacao(destino, id, null);
+        }
+    }
+
+    public record Origem(String tipo, Long id, String descricao, BigDecimal valor,
+                         Navegacao navegacao) {
+        public Origem(String tipo, Long id, String descricao, BigDecimal valor) {
+            this(tipo, id, descricao, valor, null);
+        }
     }
 
     public List<Origem> origens(Long usuarioId, String metrica) {
@@ -238,7 +263,8 @@ public class MetricasService {
             if (soImediata && c.getLiquidez() != com.gestor.financeiro.model.enums.LiquidezContaFinanceira.IMEDIATA) {
                 continue;
             }
-            origens.add(new Origem("CONTA_FINANCEIRA", c.getId(), c.getNome(), c.getSaldo()));
+            origens.add(new Origem("CONTA_FINANCEIRA", c.getId(), c.getNome(), c.getSaldo(),
+                    Navegacao.para(Navegacao.EXTRATO_CONTA, c.getId())));
         }
         return origens;
     }
@@ -247,13 +273,15 @@ public class MetricasService {
         List<Origem> origens = new ArrayList<>();
         for (Carteira cofre : carteiraRepository.findByUsuarioIdAndSubtipo(
                 usuarioId, SubtipoContaFinanceira.COFRE)) {
-            origens.add(new Origem("COFRE", cofre.getId(), cofre.getNome(), cofre.getSaldo()));
+            origens.add(new Origem("COFRE", cofre.getId(), cofre.getNome(), cofre.getSaldo(),
+                    Navegacao.para(Navegacao.EXTRATO_CONTA, cofre.getId())));
         }
         for (Meta meta : metaRepository.findByUsuarioIdAndModalidadeAndStatusNot(
                 usuarioId, ModalidadeMeta.RESERVA_VIRTUAL, StatusMeta.ARQUIVADA)) {
             if (meta.getValorReservado() != null && meta.getValorReservado().signum() > 0) {
                 origens.add(new Origem("ALOCACAO_VIRTUAL", meta.getId(),
-                        "Meta: " + meta.getNome(), meta.getValorReservado()));
+                        "Meta: " + meta.getNome(), meta.getValorReservado(),
+                        Navegacao.para(Navegacao.META, meta.getId())));
             }
         }
         return origens;
@@ -261,17 +289,28 @@ public class MetricasService {
 
     private List<Origem> comprometidoOrigem(Long usuarioId, LocalDate horizonte) {
         return obrigacoesComprometidas(usuarioId, horizonte).stream()
-                .map(o -> new Origem(o.tipo(), o.id(), o.descricao(), o.valor()))
+                .map(o -> new Origem(o.tipo(), o.id(), o.descricao(), o.valor(),
+                        navegacaoObrigacao(o)))
                 .toList();
+    }
+
+    private Navegacao navegacaoObrigacao(ObrigacaoComprometida o) {
+        if ("FATURA".equals(o.tipo())) {
+            return Navegacao.para(Navegacao.FATURA, o.id());
+        }
+        if ("PARCELA".equals(o.tipo()) && o.transacaoId() != null) {
+            return Navegacao.para(Navegacao.TRANSACAO, o.transacaoId());
+        }
+        return null;
     }
 
     private List<Origem> disponivelParaGastarOrigem(Long usuarioId, LocalDate horizonte) {
         List<Origem> origens = new ArrayList<>(
                 contasOrigem(usuarioId, NaturezaContaFinanceira.ATIVO, true));
         reservadoOrigem(usuarioId).forEach(o -> origens.add(
-                new Origem(o.tipo(), o.id(), o.descricao(), o.valor().negate())));
+                new Origem(o.tipo(), o.id(), o.descricao(), o.valor().negate(), o.navegacao())));
         comprometidoOrigem(usuarioId, horizonte).forEach(o -> origens.add(
-                new Origem(o.tipo(), o.id(), o.descricao(), o.valor().negate())));
+                new Origem(o.tipo(), o.id(), o.descricao(), o.valor().negate(), o.navegacao())));
         return origens;
     }
 
@@ -281,7 +320,14 @@ public class MetricasService {
         VisaoFinanceiraService.DetalheCompetencia detalhe =
                 visaoFinanceiraService.detalheCompetencia(usuarioId, inicio, fim);
         return List.of(
-                new Origem("ENTRADAS_COMPETENCIA", null, "Entradas por competência", detalhe.entradas()),
+                new Origem("ENTRADAS_COMPETENCIA", null, "Entradas por competência",
+                        detalhe.entradas(),
+                        new Navegacao(Navegacao.TRANSACOES, null, Map.of(
+                                "inicio", inicio.toString(),
+                                "fim", fim.toString(),
+                                "tipo", TipoTransacao.ENTRADA.name()))),
+                // Saidas nao cartao e consumo de cartao por competencia nao tem
+                // filtro exato em /v1/transacoes/periodo: ficam informativas
                 new Origem("SAIDAS_NAO_CARTAO_COMPETENCIA", null,
                         "Saídas não cartão por competência", detalhe.saidasNaoCartao().negate()),
                 new Origem("CONSUMO_CARTAO_COMPETENCIA", null,
@@ -304,7 +350,8 @@ public class MetricasService {
                 .filter(a -> a.getValorAtual() != null && a.getCotacaoEm() != null
                         && a.getQuantidade().signum() > 0)
                 .forEach(a -> origens.add(new Origem("POSICAO", a.getId(), a.getTicker(),
-                        a.getQuantidade().multiply(a.getValorAtual()))));
+                        a.getQuantidade().multiply(a.getValorAtual()),
+                        Navegacao.para(Navegacao.INVESTIMENTO, a.getId()))));
         return origens;
     }
 
@@ -313,7 +360,8 @@ public class MetricasService {
         for (Carteira c : carteiraRepository.findByUsuarioIdAndNatureza(
                 usuarioId, NaturezaContaFinanceira.PASSIVO)) {
             if (c.getSaldo().signum() > 0) {
-                origens.add(new Origem("CONTA_FINANCEIRA", c.getId(), c.getNome(), c.getSaldo()));
+                origens.add(new Origem("CONTA_FINANCEIRA", c.getId(), c.getNome(), c.getSaldo(),
+                        Navegacao.para(Navegacao.EXTRATO_CONTA, c.getId())));
             }
         }
         return origens;
@@ -325,7 +373,8 @@ public class MetricasService {
         for (Carteira passivo : carteiraRepository.findByUsuarioIdAndNatureza(
                 usuarioId, NaturezaContaFinanceira.PASSIVO)) {
             origens.add(new Origem("CONTA_FINANCEIRA", passivo.getId(), passivo.getNome(),
-                    passivo.getSaldo().negate()));
+                    passivo.getSaldo().negate(),
+                    Navegacao.para(Navegacao.EXTRATO_CONTA, passivo.getId())));
         }
         return origens;
     }
