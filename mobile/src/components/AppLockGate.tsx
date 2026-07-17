@@ -17,9 +17,9 @@ export default function AppLockGate({ children }: { children: React.ReactNode })
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const backgroundAt = useRef<number | null>(null);
-  const coldChecked = useRef(false);
+  const startupCheckPending = useRef(true);
   const autoAttempted = useRef(false);
-  const visuallyLocked = locked || (isAuthenticated && !isLoading && !coldChecked.current);
+  const visuallyLocked = locked || (isAuthenticated && !isLoading && startupCheckPending.current);
 
   const unlockWithDevice = useCallback(async () => {
     if (authenticating) return;
@@ -50,13 +50,18 @@ export default function AppLockGate({ children }: { children: React.ReactNode })
   }, [authenticating]);
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated && !coldChecked.current) {
-      coldChecked.current = true;
-      autoAttempted.current = false;
-      setLocked(true);
+    if (isLoading) return;
+
+    if (startupCheckPending.current) {
+      startupCheckPending.current = false;
+      if (isAuthenticated) {
+        autoAttempted.current = false;
+        setLocked(true);
+      }
+      return;
     }
+
     if (!isAuthenticated) {
-      coldChecked.current = false;
       setLocked(false);
     }
   }, [isAuthenticated, isLoading]);
