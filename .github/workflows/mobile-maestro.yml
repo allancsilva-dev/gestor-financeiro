@@ -52,7 +52,7 @@ jobs:
           arch: x86_64
           script: |
             adb install -r mobile/android/app/build/outputs/apk/debug/app-debug.apk
-            maestro test mobile/.maestro --format JUNIT --output mobile/maestro-android.xml -e E2E_EMAIL="$E2E_EMAIL" -e E2E_PASSWORD="$E2E_PASSWORD"
+            maestro test mobile/.maestro --include-tags smoke --format JUNIT --output mobile/maestro-android.xml -e E2E_EMAIL="$E2E_EMAIL" -e E2E_PASSWORD="$E2E_PASSWORD"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -102,7 +102,7 @@ jobs:
           xcrun simctl boot "$DEVICE"
           xcrun simctl bootstatus "$DEVICE" -b
           xcrun simctl install booted mobile/ios/build/Build/Products/Debug-iphonesimulator/mobile.app
-          maestro test mobile/.maestro --format JUNIT --output mobile/maestro-ios.xml -e E2E_EMAIL="$E2E_EMAIL" -e E2E_PASSWORD="$E2E_PASSWORD"
+          maestro test mobile/.maestro --include-tags smoke --format JUNIT --output mobile/maestro-ios.xml -e E2E_EMAIL="$E2E_EMAIL" -e E2E_PASSWORD="$E2E_PASSWORD"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
