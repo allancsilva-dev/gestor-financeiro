@@ -109,14 +109,7 @@ public class MetricasService {
                 .sumSaldoPorSubtipo(usuarioId, SubtipoContaFinanceira.COFRE)
                 .add(metaRepository.sumReservaVirtual(usuarioId));
 
-        // Comprometido: vencidas nao pagas + vencimento ate o horizonte; fatura ou
-        // parcela distante nao entra so por estar aberta (ADR-0013)
-        BigDecimal comprometidoFaturas = faturaCartaoRepository.somarSaldoRestanteNoPeriodo(
-                usuarioId, FaturaStatus.PAGA, INICIO_OBRIGACOES, horizonte);
-        BigDecimal comprometidoParcelas = parcelaRepository.somarValorNoPeriodo(
-                usuarioId, INICIO_OBRIGACOES, horizonte,
-                StatusPagamento.PAGO, TipoTransacao.SAIDA);
-        BigDecimal comprometido = comprometidoFaturas.add(comprometidoParcelas);
+        BigDecimal comprometido = comprometido(usuarioId, horizonte);
 
         // Sem truncar negativos (ADR-0013)
         BigDecimal disponivelParaGastar = disponivelAgora.subtract(reservado).subtract(comprometido);
@@ -170,6 +163,52 @@ public class MetricasService {
         return new VariacaoPatrimonial(total, caixa, passivo, aportes, dividendos, null);
     }
 
+    // --- Comprometido compartilhado (PR-F2-15 / PR-F3-01) ---
+
+    /**
+     * Valor oficial da metrica Comprometido: vencidas nao pagas + vencimento
+     * ate o horizonte; fatura ou parcela distante nao entra so por estar
+     * aberta (ADR-0013). Unica fonte do numero — compromissos (PR-F3-01)
+     * consomem este mesmo calculo.
+     */
+    public BigDecimal comprometido(Long usuarioId, LocalDate horizonte) {
+        BigDecimal faturas = faturaCartaoRepository.somarSaldoRestanteNoPeriodo(
+                usuarioId, FaturaStatus.PAGA, INICIO_OBRIGACOES, horizonte);
+        BigDecimal parcelas = parcelaRepository.somarValorNoPeriodo(
+                usuarioId, INICIO_OBRIGACOES, horizonte,
+                StatusPagamento.PAGO, TipoTransacao.SAIDA);
+        return faturas.add(parcelas);
+    }
+
+    public record ObrigacaoComprometida(
+            String tipo, Long id, String descricao, BigDecimal valor, LocalDate vencimento) {
+    }
+
+    /**
+     * Itens (FATURA/PARCELA) que compoem exatamente o Comprometido do mesmo
+     * horizonte: mesmos filtros das somas de {@link #comprometido}.
+     */
+    public List<ObrigacaoComprometida> obrigacoesComprometidas(Long usuarioId, LocalDate horizonte) {
+        List<ObrigacaoComprometida> itens = new ArrayList<>();
+        faturaCartaoRepository.findComprometidasNoPeriodo(
+                usuarioId, FaturaStatus.PAGA, INICIO_OBRIGACOES, horizonte)
+                .forEach(f -> {
+                    BigDecimal restante = nvl(f.getValorTotal()).subtract(nvl(f.getValorPago()));
+                    if (restante.signum() > 0) {
+                        itens.add(new ObrigacaoComprometida("FATURA", f.getId(),
+                                "Fatura " + f.getMes() + "/" + f.getAno(), restante,
+                                f.getDataVencimento()));
+                    }
+                });
+        parcelaRepository.findComprometidasNoPeriodo(
+                usuarioId, INICIO_OBRIGACOES, horizonte, StatusPagamento.PAGO,
+                TipoTransacao.SAIDA)
+                .forEach(p -> itens.add(new ObrigacaoComprometida("PARCELA", p.getId(),
+                        p.getTransacao().getDescricao() + " " + p.getNumeroParcela() + "/"
+                                + p.getTotalParcelas(), p.getValor(), p.getDataVencimento())));
+        return itens;
+    }
+
     // --- Drill-down (PR-F2-16): origem de cada numero ---
 
     public record Origem(String tipo, Long id, String descricao, BigDecimal valor) {
@@ -221,23 +260,9 @@ public class MetricasService {
     }
 
     private List<Origem> comprometidoOrigem(Long usuarioId, LocalDate horizonte) {
-        List<Origem> origens = new ArrayList<>();
-        faturaCartaoRepository.findComprometidasNoPeriodo(
-                usuarioId, FaturaStatus.PAGA, INICIO_OBRIGACOES, horizonte).stream()
-                .forEach(f -> {
-                    BigDecimal restante = nvl(f.getValorTotal()).subtract(nvl(f.getValorPago()));
-                    if (restante.signum() > 0) {
-                        origens.add(new Origem("FATURA", f.getId(),
-                                "Fatura " + f.getMes() + "/" + f.getAno(), restante));
-                    }
-                });
-        parcelaRepository.findComprometidasNoPeriodo(
-                usuarioId, INICIO_OBRIGACOES, horizonte, StatusPagamento.PAGO,
-                TipoTransacao.SAIDA).stream()
-                .forEach(p -> origens.add(new Origem("PARCELA", p.getId(),
-                        p.getTransacao().getDescricao() + " " + p.getNumeroParcela() + "/"
-                                + p.getTotalParcelas(), p.getValor())));
-        return origens;
+        return obrigacoesComprometidas(usuarioId, horizonte).stream()
+                .map(o -> new Origem(o.tipo(), o.id(), o.descricao(), o.valor()))
+                .toList();
     }
 
     private List<Origem> disponivelParaGastarOrigem(Long usuarioId, LocalDate horizonte) {

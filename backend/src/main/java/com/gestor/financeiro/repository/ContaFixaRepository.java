@@ -2,6 +2,7 @@ package com.gestor.financeiro.repository;
 
 import com.gestor.financeiro.model.ContaFixa;
 import com.gestor.financeiro.model.enums.StatusPagamento;
+import com.gestor.financeiro.model.enums.TipoTransacao;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -68,4 +69,16 @@ public interface ContaFixaRepository extends JpaRepository<ContaFixa, Long> {
                                         @Param("fim") LocalDate fim,
                                         @Param("pago") StatusPagamento pago,
                                         @Param("cancelado") StatusPagamento cancelado);
+
+    // Compromissos (PR-F3-01): saidas fixas ativas nao pagas vencendo ate o
+    // horizonte; vencida nao paga continua prevista (sem limite inferior).
+    @Query("SELECT c FROM ContaFixa c WHERE c.usuario.id = :usuarioId AND c.ativo = true " +
+           "AND c.tipo = :tipo AND c.status <> :pago AND c.status <> :cancelado " +
+           "AND c.dataProximoVencimento IS NOT NULL AND c.dataProximoVencimento <= :ate " +
+           "ORDER BY c.dataProximoVencimento, c.id")
+    List<ContaFixa> findPrevistasAteHorizonte(@Param("usuarioId") Long usuarioId,
+                                              @Param("tipo") TipoTransacao tipo,
+                                              @Param("pago") StatusPagamento pago,
+                                              @Param("cancelado") StatusPagamento cancelado,
+                                              @Param("ate") LocalDate ate);
 }
