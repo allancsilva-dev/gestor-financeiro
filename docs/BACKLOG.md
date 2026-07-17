@@ -1148,3 +1148,25 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   divergências e zero erros; smoke autenticado de endpoint, health e métricas após deploy.
 - **Rollback:** reimplantar somente o artefato anterior; PR-F2-20 não altera schema nem dados.
 - **Status:** ABERTO — implementação concluída; gate externo `PROB-0081` pendente.
+
+## BACKLOG-0089 — Atualizar CHANGELOG.md e CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md com PR-F3-01
+
+- **Prioridade:** P3
+- **Área:** documentação
+- **Motivo:** o PR-F3-01 (compromissos próximos, Fase 3) foi implementado e revisado, mas
+  `docs/CHANGELOG.md` e `docs/CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md` não puderam ser
+  atualizados nesta rodada porque esses dois arquivos não constam na lista de arquivos sob
+  responsabilidade do `docs-reporter` — a tentativa de edição foi bloqueada pelo sistema de
+  permissão da ferramenta. O conteúdo completo (entrada de changelog no formato existente e entrada
+  de checklist no padrão `PR-F3-01 — ...` com status/data/evidência) já foi redigido e está
+  disponível em `docs/REVIEW_REPORTS/2026-07-17_backend_implementation_pr-f3-01-compromissos-proximos.md`
+  e em `docs/SYSTEM_OVERVIEW.md` (entrada de 2026-07-17 em "Auditoria e estado atual").
+- **Dependências:** um agente ou usuário com permissão de escrita em `docs/CHANGELOG.md` e
+  `docs/CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md` aplicar as entradas.
+- **Critério de aceite:** `CHANGELOG.md` tem entrada `## [Fase 3 — PR-F3-01] - 2026-07-17` acima da
+  entrada `PR-F2-20`; o checklist tem seção `PR-F3-01` marcada como concluída com evidência de
+  `./mvnw test` (243/243) e `./mvnw verify -Pintegration-test` (243 + 27 ITs).
+- **Risco se ficar pendente:** histórico de versões e checklist de execução ficam temporariamente
+  incompletos para quem consulta apenas esses dois arquivos; a rastreabilidade completa já existe
+  em `SYSTEM_OVERVIEW.md` e no relatório de revisão.
+- **Status:** ABERTO.
