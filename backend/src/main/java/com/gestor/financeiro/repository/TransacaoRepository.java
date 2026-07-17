@@ -238,4 +238,27 @@ public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
             """, nativeQuery = true)
     List<TransacaoIncompletaProjection> findIncompletasConciliadasByUsuarioId(
             @Param("usuarioId") Long usuarioId);
+
+    // Sugestao de categoria (PR-F3-02): janela recente para comparar descricao
+    // normalizada em memoria (acentos/espacos nao sao normalizaveis em JPQL portavel)
+    @Query("SELECT t.descricao, t.categoria.id FROM Transacao t " +
+           "WHERE t.usuario.id = :usuarioId AND t.ativa = true AND t.tipo = :tipo " +
+           "AND t.categoria.ativo = true " +
+           "ORDER BY t.data DESC, t.id DESC")
+    List<Object[]> findDescricoesRecentesComCategoria(
+            @Param("usuarioId") Long usuarioId,
+            @Param("tipo") TipoTransacao tipo,
+            Pageable pageable);
+
+    // Sugestao de categoria (PR-F3-02): mais usada no periodo; empate por menor ID
+    @Query("SELECT t.categoria.id, COUNT(t) FROM Transacao t " +
+           "WHERE t.usuario.id = :usuarioId AND t.ativa = true AND t.tipo = :tipo " +
+           "AND t.categoria.ativo = true AND t.data BETWEEN :inicio AND :fim " +
+           "GROUP BY t.categoria.id ORDER BY COUNT(t) DESC, t.categoria.id ASC")
+    List<Object[]> contarCategoriasMaisUsadasNoPeriodo(
+            @Param("usuarioId") Long usuarioId,
+            @Param("tipo") TipoTransacao tipo,
+            @Param("inicio") LocalDate inicio,
+            @Param("fim") LocalDate fim,
+            Pageable pageable);
 }

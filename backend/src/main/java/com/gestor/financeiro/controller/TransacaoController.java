@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.dto.TransacaoRequest;
 import com.gestor.financeiro.dto.TransacaoResponseDto;
 import com.gestor.financeiro.dto.CronogramaItemResponse;
+import com.gestor.financeiro.dto.SugestaoCategoriaResponse;
 import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.model.Conta;
@@ -12,6 +13,7 @@ import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.TransacaoService;
 import com.gestor.financeiro.service.CronogramaService;
+import com.gestor.financeiro.service.SugestaoCategoriaService;
 import com.gestor.financeiro.util.PaginationUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -33,6 +35,7 @@ import java.util.List;
 public class TransacaoController {
     private final TransacaoService transacaoService;
     private final CronogramaService cronogramaService;
+    private final SugestaoCategoriaService sugestaoCategoriaService;
     private final AuthenticatedUserService authenticatedUserService;
     
     // GET /api/transacoes/minhas - Lista transações do usuário autenticado
@@ -63,6 +66,17 @@ public class TransacaoController {
         return ResponseEntity.ok(transacoes.map(TransacaoResponseDto::fromEntity));
     }
     
+    // GET /api/v1/transacoes/sugestao-categoria - Sugestão determinística (PR-F3-02)
+    @GetMapping("/sugestao-categoria")
+    @Operation(summary = "Sugerir categoria", description = "Sugestão determinística: última transação com descrição normalizada igual; senão, categoria mais usada nos últimos 90 dias para o mesmo tipo. Sem resultado: criterio NENHUMA e categoria nula.")
+    public ResponseEntity<SugestaoCategoriaResponse> sugerirCategoria(
+        @RequestParam String descricao,
+        @RequestParam TipoTransacao tipo
+    ) {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        return ResponseEntity.ok(sugestaoCategoriaService.sugerir(usuarioId, descricao, tipo));
+    }
+
     // GET /api/transacoes/{id} - Busca transação por ID
     @GetMapping("/{id}")
     @Operation(summary = "Buscar transação por ID", description = "Retorna uma transação específica validando ownership")
