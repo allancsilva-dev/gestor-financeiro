@@ -1149,18 +1149,20 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Rollback:** reimplantar somente o artefato anterior; PR-F2-20 não altera schema nem dados.
 - **Status:** ABERTO — implementação concluída; gate externo `PROB-0081` pendente.
 
-## BACKLOG-0089 — Atualizar CHANGELOG.md e CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md com PR-F3-01, PR-F3-02 e PR-F3-03
+## BACKLOG-0089 — Atualizar CHANGELOG.md e CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md com PR-F3-01, PR-F3-02, PR-F3-03 e PR-F3-04
 
 - **Prioridade:** P3
 - **Área:** documentação
 - **Motivo:** o PR-F3-01 (compromissos próximos, Fase 3), o PR-F3-02 (sugestão determinística de
-  categoria, Fase 3, commit `483ef36` em `main`) e o PR-F3-03 (contrato de onboarding mínimo, Fase 3,
-  commit `ccd0f10` em `main`) foram implementados e revisados, mas `docs/CHANGELOG.md` e
-  `docs/CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md` não puderam ser atualizados em nenhuma das três
-  rodadas porque esses dois arquivos não constam na lista de arquivos sob responsabilidade do
-  `docs-reporter` — a tentativa de edição foi bloqueada pelo sistema de permissão da ferramenta (e,
-  nas rodadas do PR-F3-02 e do PR-F3-03, a restrição foi confirmada explicitamente pelo
-  solicitante). O conteúdo completo de cada entrada já foi redigido e está disponível em:
+  categoria, Fase 3, commit `483ef36` em `main`), o PR-F3-03 (contrato de onboarding mínimo, Fase 3,
+  commit `ccd0f10` em `main`) e o PR-F3-04 (fundação de drill-down, Fase 3, commit `7cc4aeb` em
+  `main` — fecha o Bloco A backend da Fase 3, PR-F3-01 a PR-F3-04) foram implementados e revisados,
+  mas `docs/CHANGELOG.md` e `docs/CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md` não puderam ser
+  atualizados em nenhuma das quatro rodadas porque esses dois arquivos não constam na lista de
+  arquivos sob responsabilidade do `docs-reporter` — a tentativa de edição foi bloqueada pelo
+  sistema de permissão da ferramenta (e, nas rodadas do PR-F3-02, PR-F3-03 e PR-F3-04, a restrição
+  foi confirmada explicitamente pelo solicitante). O conteúdo completo de cada entrada já foi
+  redigido e está disponível em:
   - PR-F3-01: `docs/REVIEW_REPORTS/2026-07-17_backend_implementation_pr-f3-01-compromissos-proximos.md`
     e `docs/SYSTEM_OVERVIEW.md` (entrada de 2026-07-17 em "Auditoria e estado atual").
   - PR-F3-02: `docs/REVIEW_REPORTS/2026-07-17_backend_implementation_pr-f3-02-sugestao-categoria.md`
@@ -1169,20 +1171,27 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   - PR-F3-03: `docs/REVIEW_REPORTS/2026-07-17_backend_implementation_pr-f3-03-onboarding-minimo.md`
     (seção "O que ficou pendente", com blocos de texto prontos para `CHANGELOG.md` e para o
     checklist) e `docs/SYSTEM_OVERVIEW.md` (entrada de 2026-07-17, logo após a do PR-F3-02).
+  - PR-F3-04: `docs/REVIEW_REPORTS/2026-07-17_backend_implementation_pr-f3-04-drill-down.md`
+    (seção "O que ficou pendente", com blocos de texto prontos para `CHANGELOG.md` e para o
+    checklist) e `docs/SYSTEM_OVERVIEW.md` (entrada de 2026-07-17, logo após a do PR-F3-03).
 - **Dependências:** um agente ou usuário com permissão de escrita em `docs/CHANGELOG.md` e
-  `docs/CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md` aplicar as três entradas (podem ser aplicadas
+  `docs/CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md` aplicar as quatro entradas (podem ser aplicadas
   em commits separados ou no mesmo commit).
 - **Critério de aceite:**
   - `CHANGELOG.md` tem entrada `## [Fase 3 — PR-F3-01] - 2026-07-17` acima da entrada `PR-F2-20`,
-    entrada `## [Fase 3 — PR-F3-02] - 2026-07-17` acima da entrada `PR-F3-01`, e entrada
-    `## [Fase 3 — PR-F3-03] - 2026-07-17` acima da entrada `PR-F3-02` (ordem cronológica inversa,
+    entrada `## [Fase 3 — PR-F3-02] - 2026-07-17` acima da entrada `PR-F3-01`, entrada
+    `## [Fase 3 — PR-F3-03] - 2026-07-17` acima da entrada `PR-F3-02`, e entrada
+    `## [Fase 3 — PR-F3-04] - 2026-07-17` acima da entrada `PR-F3-03` (ordem cronológica inversa,
     seguindo o padrão já usado no arquivo).
   - O checklist tem seção `PR-F3-01` marcada como concluída com evidência de `./mvnw test`
     (243/243) e `./mvnw verify -Pintegration-test` (243 + 27 ITs), seção `PR-F3-02` marcada como
     concluída com evidência de `./mvnw verify -Pintegration-test` (247 unitários + 27 ITs, commit
-    `483ef36`), e seção `PR-F3-03` marcada como concluída com evidência de
-    `./mvnw verify -Pintegration-test` (249 unitários + 27 ITs, commit `ccd0f10`).
+    `483ef36`), seção `PR-F3-03` marcada como concluída com evidência de
+    `./mvnw verify -Pintegration-test` (249 unitários + 27 ITs, commit `ccd0f10`), e seção
+    `PR-F3-04` marcada como concluída com evidência de `./mvnw verify -Pintegration-test`
+    (255 unitários + 27 ITs, commit `7cc4aeb`), incluindo a observação de que fecha o Bloco A
+    backend da Fase 3.
 - **Risco se ficar pendente:** histórico de versões e checklist de execução ficam temporariamente
-  incompletos para quem consulta apenas esses dois arquivos; a rastreabilidade completa dos três
+  incompletos para quem consulta apenas esses dois arquivos; a rastreabilidade completa dos quatro
   PRs já existe em `SYSTEM_OVERVIEW.md` e nos respectivos relatórios de revisão.
 - **Status:** ABERTO.
