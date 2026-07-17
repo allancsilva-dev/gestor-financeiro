@@ -1,56 +1,74 @@
 import * as SecureStore from 'expo-secure-store';
+import Constants from 'expo-constants';
 
 const ACCESS_TOKEN_KEY = 'accessToken';
 const REFRESH_TOKEN_KEY = 'refreshToken';
 const CSRF_TOKEN_KEY = 'csrfToken';
 const USUARIO_KEY = 'usuario';
+const isLocalE2E = Constants.expoConfig?.extra?.appEnv === 'local-e2e';
+const volatileStore: Record<string, string | undefined> = {};
+
+const setItem = async (key: string, value: string) => {
+  if (isLocalE2E) { volatileStore[key] = value; return; }
+  await SecureStore.setItemAsync(key, value);
+};
+
+const getItem = async (key: string): Promise<string | null> => {
+  if (isLocalE2E) return volatileStore[key] ?? null;
+  return SecureStore.getItemAsync(key);
+};
+
+const deleteItem = async (key: string) => {
+  if (isLocalE2E) { delete volatileStore[key]; return; }
+  await SecureStore.deleteItemAsync(key);
+};
 
 export const setCsrfToken = async (token: string) => {
-  await SecureStore.setItemAsync(CSRF_TOKEN_KEY, token);
+  await setItem(CSRF_TOKEN_KEY, token);
 };
 
 export const getCsrfToken = async (): Promise<string | null> => {
-  return SecureStore.getItemAsync(CSRF_TOKEN_KEY);
+  return getItem(CSRF_TOKEN_KEY);
 };
 
 export const clearCsrfToken = async () => {
-  await SecureStore.deleteItemAsync(CSRF_TOKEN_KEY);
+  await deleteItem(CSRF_TOKEN_KEY);
 };
 
 export const setAccessToken = async (token: string) => {
-  await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, token);
+  await setItem(ACCESS_TOKEN_KEY, token);
 };
 
 export const getAccessToken = async (): Promise<string | null> => {
-  return SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
+  return getItem(ACCESS_TOKEN_KEY);
 };
 
 export const clearAccessToken = async () => {
-  await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
+  await deleteItem(ACCESS_TOKEN_KEY);
 };
 
 export const setRefreshToken = async (token: string) => {
-  await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, token);
+  await setItem(REFRESH_TOKEN_KEY, token);
 };
 
 export const getRefreshToken = async (): Promise<string | null> => {
-  return SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+  return getItem(REFRESH_TOKEN_KEY);
 };
 
 export const clearRefreshToken = async () => {
-  await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
+  await deleteItem(REFRESH_TOKEN_KEY);
 };
 
 export const setUsuarioCache = async (usuario: object) => {
-  await SecureStore.setItemAsync(USUARIO_KEY, JSON.stringify(usuario));
+  await setItem(USUARIO_KEY, JSON.stringify(usuario));
 };
 
 export const getUsuarioCache = async (): Promise<object | null> => {
-  const raw = await SecureStore.getItemAsync(USUARIO_KEY);
+  const raw = await getItem(USUARIO_KEY);
   if (!raw) return null;
   try { return JSON.parse(raw); } catch { return null; }
 };
 
 export const clearUsuarioCache = async () => {
-  await SecureStore.deleteItemAsync(USUARIO_KEY);
+  await deleteItem(USUARIO_KEY);
 };

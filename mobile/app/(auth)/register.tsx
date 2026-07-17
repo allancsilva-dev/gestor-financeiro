@@ -7,6 +7,7 @@ import { ApiErrorWithMessage } from '../../src/types';
 import { useRouter } from 'expo-router';
 import Field from '../../src/components/ui/Field';
 import { isValidEmail, isValidPassword } from '../../src/utils/validate';
+import Constants from 'expo-constants';
 
 export default function Register() {
   const colors = useTheme();
@@ -19,6 +20,10 @@ export default function Register() {
   const [aceitaTermos, setAceitaTermos] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isLocalE2E = Constants.expoConfig?.extra?.appEnv === 'local-e2e';
+  const passwordTextContentType = isLocalE2E
+    ? 'password'
+    : 'newPassword';
 
   const onSubmit = async () => {
     setError(null);
@@ -51,13 +56,13 @@ export default function Register() {
         <Text style={[styles.title, { color: colors.textPrimary }]}>Criar conta</Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Comece a organizar suas finanças em minutos</Text>
 
-        <Field label="Nome" value={nome} onChangeText={setNome} placeholder="Seu nome" autoCapitalize="words" textContentType="name" />
+        <Field testID="register-name" label="Nome" value={nome} onChangeText={setNome} placeholder="Seu nome" autoCapitalize="words" textContentType="name" />
 
-        <Field label="E-mail" value={email} onChangeText={setEmail} placeholder="seu@email.com" autoCapitalize="none" keyboardType="email-address" textContentType="emailAddress" />
+        <Field testID="register-email" label="E-mail" value={email} onChangeText={setEmail} placeholder="seu@email.com" autoCapitalize="none" keyboardType="email-address" textContentType="emailAddress" />
 
-        <Field label="Senha" value={password} onChangeText={setPassword} placeholder="Mínimo 8 caracteres, 1 letra e 1 número" secureTextEntry textContentType="newPassword" />
+        <Field testID="register-password" label="Senha" value={password} onChangeText={setPassword} placeholder="Mínimo 8 caracteres, 1 letra e 1 número" secureTextEntry={!isLocalE2E} textContentType={passwordTextContentType} />
 
-        <Field label="Confirmar senha" value={confirmPassword} onChangeText={setConfirmPassword} placeholder="Repita a senha" secureTextEntry textContentType="newPassword" />
+        <Field testID="register-confirm-password" label="Confirmar senha" value={confirmPassword} onChangeText={setConfirmPassword} placeholder="Repita a senha" secureTextEntry={!isLocalE2E} textContentType={passwordTextContentType} returnKeyType="done" />
 
         <View style={styles.termosRow}>
           <TouchableOpacity
@@ -82,7 +87,7 @@ export default function Register() {
 
         {error ? <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={{ color: colors.danger, marginTop: 8 }}>{error}</Text> : null}
 
-        <TouchableOpacity onPress={onSubmit} disabled={loading} accessibilityRole="button" style={[styles.button, { backgroundColor: colors.brand, opacity: loading ? 0.8 : 1 }]}>
+        <TouchableOpacity testID="register-submit" onPress={onSubmit} disabled={loading} accessibilityRole="button" style={[styles.button, { backgroundColor: colors.brand, opacity: loading ? 0.8 : 1 }]}>
           {loading ? <ActivityIndicator color={colors.brandText} /> : <Text style={{ color: colors.brandText, fontWeight: '700', letterSpacing: 1 }}>CRIAR CONTA</Text>}
         </TouchableOpacity>
 

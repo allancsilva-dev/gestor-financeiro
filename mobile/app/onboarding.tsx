@@ -188,6 +188,7 @@ export default function OnboardingScreen() {
             ))}
           </View>
           <Field
+            testID="onboarding-account-balance"
             label="Saldo inicial (R$)"
             value={carteira.saldo}
             onChangeText={(t) => setCarteira((c) => ({ ...c, saldo: maskCurrencyInput(t) }))}
@@ -205,7 +206,7 @@ export default function OnboardingScreen() {
             onChangeText={(t) => setConta((c) => ({ ...c, nome: t }))}
             placeholder="Ex: Cartão Nubank"
           />
-          <Field label="Limite (R$)" value={conta.limiteTotal} onChangeText={(t) => setConta((c) => ({ ...c, limiteTotal: maskCurrencyInput(t) }))} keyboardType="number-pad" placeholder="0,00" />
+          <Field testID="onboarding-card-limit" label="Limite (R$)" value={conta.limiteTotal} onChangeText={(t) => setConta((c) => ({ ...c, limiteTotal: maskCurrencyInput(t) }))} keyboardType="number-pad" placeholder="0,00" />
           <Field label="Dia de fechamento" value={conta.diaFechamento} onChangeText={(t) => setConta((c) => ({ ...c, diaFechamento: t.replace(/\D/g, '').slice(0, 2) }))} keyboardType="number-pad" placeholder="5" />
           <Field label="Dia de vencimento" value={conta.diaVencimento} onChangeText={(t) => setConta((c) => ({ ...c, diaVencimento: t.replace(/\D/g, '').slice(0, 2) }))} keyboardType="number-pad" placeholder="12" />
         </View>
@@ -239,6 +240,7 @@ export default function OnboardingScreen() {
         <View style={styles.form}>
           <Text style={[styles.hint, { color: colors.textSecondary }]}>Sua renda principal (opcional):</Text>
           <Field
+            testID="onboarding-goal-name"
             label="Nome"
             value={renda.nome} onChangeText={(t) => setRenda((r) => ({ ...r, nome: t }))}
             placeholder="Ex: Salário" editable={!pularRenda}
@@ -281,6 +283,7 @@ export default function OnboardingScreen() {
             style={{ opacity: pularMeta ? 0.4 : 1 }}
           />
           <Field
+            testID="onboarding-goal-total"
             label="Valor total (R$)"
             value={meta.valorTotal} onChangeText={(t) => setMeta((m) => ({ ...m, valorTotal: maskCurrencyInput(t) }))}
             keyboardType="number-pad" placeholder="0,00" editable={!pularMeta}

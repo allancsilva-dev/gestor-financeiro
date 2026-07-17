@@ -265,6 +265,7 @@ export default function FaturasScreen() {
                     ))}
                   </View>
                   <TextInput
+                    testID="invoice-payment-value"
                     accessibilityLabel="Valor do pagamento"
                     value={valorPagamento}
                     onChangeText={(t) => setValorPagamento(maskCurrencyInput(t))}
