@@ -5,7 +5,6 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
@@ -18,17 +17,17 @@ import java.util.List;
 /**
  * Contrato canonico do onboarding (PR-F2-19): objeto cartao (sem alias conta)
  * e carteira com subtipo canonico (TipoCarteira removido no contract V41).
+ * Onboarding minimo (PR-F3-03): so carteira e obrigatoria; cartao e categorias
+ * nulos, ausentes ou lista vazia sao no-op. Payload completo segue valido.
  */
 public record OnboardingFinalizarRequest(
     @NotNull(message = "Carteira obrigatória")
     @Valid
     CarteiraInicial carteira,
 
-    @NotNull(message = "Cartão obrigatório")
     @Valid
     CartaoInicial cartao,
 
-    @NotEmpty(message = "Selecione ao menos uma categoria")
     @Valid
     List<CategoriaInicial> categorias,
 

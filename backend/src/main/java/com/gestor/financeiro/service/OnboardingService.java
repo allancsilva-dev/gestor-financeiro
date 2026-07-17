@@ -52,8 +52,14 @@ public class OnboardingService {
         }
 
         criarCarteiraSeNaoExistir(usuarioId, request.carteira());
-        criarCartaoSeNaoExistir(usuarioId, request.cartao());
-        criarCategoriasSeNaoExistirem(usuarioId, request.categorias());
+
+        // Onboarding minimo (PR-F3-03): cartao/categorias nulos ou vazios sao no-op
+        if (request.cartao() != null) {
+            criarCartaoSeNaoExistir(usuarioId, request.cartao());
+        }
+        if (request.categorias() != null) {
+            criarCategoriasSeNaoExistirem(usuarioId, request.categorias());
+        }
 
         if (request.renda() != null) {
             criarRendaSeNaoExistir(usuarioId, request.renda());

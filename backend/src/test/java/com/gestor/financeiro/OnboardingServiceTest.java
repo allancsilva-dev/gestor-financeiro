@@ -35,7 +35,10 @@ class OnboardingServiceTest {
     @Autowired ContaFixaRepository contaFixaRepository;
     @Autowired CategoriaRepository categoriaRepository;
     @Autowired com.gestor.financeiro.repository.UsuarioRepository usuarioRepository;
+    @Autowired com.gestor.financeiro.repository.CarteiraRepository carteiraRepository;
+    @Autowired com.gestor.financeiro.repository.ContaRepository contaRepository;
     @Autowired PasswordEncoder passwordEncoder;
+    @Autowired jakarta.validation.Validator validator;
 
     private Usuario usuario;
 
@@ -50,6 +53,40 @@ class OnboardingServiceTest {
     @AfterEach
     void limparContexto() {
         SecurityContextHolder.clearContext();
+    }
+
+    @Test
+    void payloadMinimoSoComCarteiraFinalizaSemCartaoNemCategorias() {
+        OnboardingFinalizarRequest minimo = new OnboardingFinalizarRequest(
+                new OnboardingFinalizarRequest.CarteiraInicial(
+                        "Conta Principal", SubtipoContaFinanceira.CORRENTE, BigDecimal.ZERO, null),
+                null, null, null, null);
+        assertTrue(validator.validate(minimo).isEmpty());
+
+        onboardingService.finalizar(minimo);
+
+        Usuario atualizado = usuarioRepository.findById(usuario.getId()).orElseThrow();
+        assertTrue(atualizado.isOnboardingCompleto());
+        assertEquals(1, carteiraRepository.findByUsuarioId(usuario.getId()).size());
+        assertEquals(0, contaRepository.findByUsuarioId(usuario.getId()).size());
+        assertEquals(0, categoriaRepository.findByUsuarioIdAndAtivoTrue(usuario.getId()).size());
+        assertEquals(0, contaFixaRepository.findByUsuarioIdAndAtivoTrue(usuario.getId()).size());
+    }
+
+    @Test
+    void listaVaziaDeCategoriasEhNoOpEPayloadSemCarteiraEhRejeitado() {
+        OnboardingFinalizarRequest comListaVazia = new OnboardingFinalizarRequest(
+                new OnboardingFinalizarRequest.CarteiraInicial(
+                        "Conta Principal", SubtipoContaFinanceira.CORRENTE, BigDecimal.ZERO, null),
+                null, List.of(), null, null);
+        assertTrue(validator.validate(comListaVazia).isEmpty());
+
+        onboardingService.finalizar(comListaVazia);
+        assertEquals(0, categoriaRepository.findByUsuarioIdAndAtivoTrue(usuario.getId()).size());
+
+        OnboardingFinalizarRequest semCarteira = new OnboardingFinalizarRequest(
+                null, null, null, null, null);
+        assertEquals(1, validator.validate(semCarteira).size());
     }
 
     @Test
