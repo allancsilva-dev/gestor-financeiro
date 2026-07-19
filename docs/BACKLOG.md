@@ -1149,7 +1149,7 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Rollback:** reimplantar somente o artefato anterior; PR-F2-20 não altera schema nem dados.
 - **Status:** ABERTO — implementação concluída; gate externo `PROB-0081` pendente.
 
-## BACKLOG-0089 — Atualizar CHANGELOG.md e CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md com PR-F3-01, PR-F3-02, PR-F3-03, PR-F3-04, PR-F3-05, PR-F3-06, PR-F3-07, PR-F3-08, PR-F3-09, PR-F3-10 e PR-F3-11
+## BACKLOG-0089 — Atualizar CHANGELOG.md e CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md com PR-F3-01, PR-F3-02, PR-F3-03, PR-F3-04, PR-F3-05, PR-F3-06, PR-F3-07, PR-F3-08, PR-F3-09, PR-F3-10, PR-F3-11 e PR-F3-12
 
 - **Prioridade:** P3
 - **Área:** documentação
@@ -1207,6 +1207,12 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
     checklist) e `docs/SYSTEM_OVERVIEW.md` (entrada de 2026-07-19, logo após a do PR-F3-10). Este
     relatório também registra a correção de rastreabilidade: é o PR-F3-11, não o PR-F3-10, quem
     efetivamente fecha o Bloco B mobile da Fase 3 (PR-F3-05 a PR-F3-11).
+  - PR-F3-12 (web mínimo com drill-down do Dashboard, Fase 3, commit `9d1e8a6` em `main` —
+    primeiro PR do Bloco C, web e consolidação):
+    `docs/REVIEW_REPORTS/2026-07-19_web_implementation_pr-f3-12-web-minimo.md` (seção "O que ficou
+    pendente", com blocos de texto prontos para `CHANGELOG.md` e para o checklist) e
+    `docs/SYSTEM_OVERVIEW.md` (entrada de 2026-07-19, logo após a do PR-F3-11). A consolidação
+    dessas entradas é escopo explícito do PR-F3-13 ("Legados e documentação").
 - **Dependências:** um agente ou usuário com permissão de escrita em `docs/CHANGELOG.md` e
   `docs/CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md` aplicar as onze entradas (podem ser aplicadas
   em commits separados ou no mesmo commit). Para o PR-F3-05 especificamente, recomenda-se também
