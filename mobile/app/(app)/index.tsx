@@ -7,79 +7,90 @@ import { LinearGradient } from 'expo-linear-gradient';
 import api from '../../src/services/api';
 import insightsService from '../../src/services/insightsService';
 import metricasService from '../../src/services/metricasService';
-import { DashboardResumo, Transacao, PagedResponse, ProjecaoResponse, InsightsResponse, FalhaRecorrencia, MetricaId } from '../../src/types';
+import compromissosService from '../../src/services/compromissosService';
+import { Transacao, PagedResponse, InsightsResponse, CompromissoItem } from '../../src/types';
 import { useTheme } from '../../src/theme';
 import { useAuth } from '../../src/context/AuthContext';
 import SkeletonBox from '../../src/components/ui/SkeletonBox';
 import Card from '../../src/components/ui/Card';
 import ListRow from '../../src/components/ui/ListRow';
 import NovaTransacaoModal, { LancamentoInicial } from '../../src/components/NovaTransacaoModal';
-import ComposicaoMetricaModal from '../../src/components/ComposicaoMetricaModal';
 import Entrance from '../../src/components/ui/Entrance';
 import FloatEmoji from '../../src/components/ui/FloatEmoji';
-import { formatCurrency, getInitials } from '../../src/utils/format';
+import { formatCurrency, formatDateOnlyBR, getInitials } from '../../src/utils/format';
 
-const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-
+// Home reduzida (PR-F3-07) — ordem fixa: Disponível para gastar; Compromissos
+// próximos; lançar; cinco movimentações; uma recomendação textual; link para
+// a Visão financeira. Máximo de 4 requests: métricas, compromissos,
+// movimentações e insights.
 export default function Dashboard() {
   const colors = useTheme();
   const router = useRouter();
 
-  const resumoQuery = useQuery<DashboardResumo>({
-    queryKey: ['dashboard-resumo'],
-    queryFn: () => api.get<DashboardResumo>('/v1/dashboard/resumo').then(r => r.data),
-  });
-  const [metricaSelecionada, setMetricaSelecionada] = React.useState<MetricaId | null>(null);
+  const [lancarAberto, setLancarAberto] = React.useState(false);
   // Repetir lançamento (PR-F3-05): pré-preenche e exige confirmação no Salvar
   const [repetirLancamento, setRepetirLancamento] = React.useState<LancamentoInicial | null>(null);
+
   const metricasQuery = useQuery({ queryKey: ['metricas'], queryFn: () => metricasService.obter() });
+  const compromissosQuery = useQuery({
+    queryKey: ['compromissos'],
+    queryFn: () => compromissosService.listar(),
+  });
   const transacoesQuery = useQuery<PagedResponse<Transacao>>({
     queryKey: ['transacoes-recentes'],
     queryFn: () => api.get<PagedResponse<Transacao>>('/v1/transacoes/minhas?page=0&size=5&sort=data,desc').then(r => r.data),
   });
-
-  const projecaoQuery = useQuery<ProjecaoResponse>({
-    queryKey: ['dashboard-projecao'],
-    queryFn: () => api.get<ProjecaoResponse>('/v1/dashboard/projecao?meses=6').then(r => r.data),
-  });
-
   const insightsQuery = useQuery<InsightsResponse>({
     queryKey: ['insights'],
     queryFn: () => insightsService.buscar(),
-  });
-
-  const falhasQuery = useQuery<FalhaRecorrencia[]>({
-    queryKey: ['recorrencias-falhas'],
-    queryFn: () => api.get<FalhaRecorrencia[]>('/v1/contas-fixas/falhas-pendentes').then(r => r.data),
   });
 
   const { usuario } = useAuth();
   const insets = useSafeAreaInsets();
 
   const primeiroNome = usuario?.nome?.split(' ')[0] ?? '';
-  const mesAtual = capitalize(new Date().toLocaleDateString('pt-BR', { month: 'long' }));
   const saldo = formatCurrency(Number(metricasQuery.data?.disponivelParaGastar ?? 0));
   const [saldoInt, saldoCents] = saldo.split(',');
-  const refreshing = resumoQuery.isRefetching || metricasQuery.isRefetching || transacoesQuery.isRefetching
-    || projecaoQuery.isRefetching || insightsQuery.isRefetching || falhasQuery.isRefetching;
+  const refreshing = metricasQuery.isRefetching || compromissosQuery.isRefetching
+    || transacoesQuery.isRefetching || insightsQuery.isRefetching;
 
   const handleRefresh = async () => {
     await Promise.all([
-      resumoQuery.refetch(),
       metricasQuery.refetch(),
+      compromissosQuery.refetch(),
       transacoesQuery.refetch(),
-      projecaoQuery.refetch(),
       insightsQuery.refetch(),
-      falhasQuery.refetch(),
     ]);
   };
 
-  const atalhos: Array<{ label: string; glyph: string; bg: string; fg: string; onPress: () => void }> = [
-    { label: 'Recorrências', glyph: '📅', bg: colors.brandBg, fg: colors.brandFg, onPress: () => router.push('/more/contas-fixas' as any) },
-    { label: 'Cartão', glyph: '💳', bg: colors.dangerBg, fg: colors.danger, onPress: () => router.push('/more/faturas' as any) },
-    { label: 'Metas', glyph: '◎', bg: colors.brandBg, fg: colors.brandFg, onPress: () => router.push('/(app)/metas') },
-    { label: 'Relatórios', glyph: '📊', bg: colors.infoBg, fg: colors.info, onPress: () => router.push('/more/relatorios' as any) },
-  ];
+  const comprometidos = compromissosQuery.data?.itens.filter(i => i.grupo === 'COMPROMETIDO') ?? [];
+  const previstos = compromissosQuery.data?.itens.filter(i => i.grupo === 'PREVISTO') ?? [];
+  // Recomendação: somente texto — números de insights nunca aparecem na home
+  const recomendacao = insightsQuery.data?.recomendacoes?.[0] || insightsQuery.data?.resumo || null;
+
+  const destinoCompromisso = (item: CompromissoItem) => {
+    if (item.tipo === 'FATURA') return '/more/faturas';
+    if (item.tipo === 'CONTA_FIXA') return '/more/contas-fixas';
+    return '/(app)/transacoes';
+  };
+
+  const linhaCompromisso = (item: CompromissoItem, i: number, arr: CompromissoItem[]) => (
+    <ListRow
+      key={`${item.tipo}-${item.id}`}
+      height={52}
+      divider={i < arr.length - 1}
+      icon={item.alerta === 'FALHA_SALDO' ? '⚠️' : item.tipo === 'FATURA' ? '💳' : item.tipo === 'PARCELA' ? '🧾' : '📅'}
+      iconTone={item.alerta === 'FALHA_SALDO' ? 'danger' : item.grupo === 'COMPROMETIDO' ? 'danger' : 'neutral'}
+      title={item.descricao}
+      subtitle={item.alerta === 'FALHA_SALDO'
+        ? 'Aguardando saldo — abra para resolver'
+        : `Vence ${formatDateOnlyBR(item.vencimento)}`}
+      value={formatCurrency(Number(item.valor))}
+      valueTone={item.grupo === 'COMPROMETIDO' ? 'danger' : undefined}
+      onPress={() => router.push(destinoCompromisso(item) as any)}
+      accessibilityLabel={`${item.descricao}, ${formatCurrency(Number(item.valor))}, vence ${formatDateOnlyBR(item.vencimento)}${item.alerta === 'FALHA_SALDO' ? ', aguardando saldo' : ''}`}
+    />
+  );
 
   return (
     <ScrollView
@@ -120,7 +131,7 @@ export default function Dashboard() {
         </TouchableOpacity>
       </Entrance>
 
-      {/* Saldo principal: destaque visual canônico do dashboard */}
+      {/* 1. Disponível para gastar */}
       <Entrance kind="pop" delay={100}>
       <View
         style={{
@@ -137,7 +148,7 @@ export default function Dashboard() {
         colors={[colors.brand, colors.brandDeep]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={{ borderRadius: 22, padding: 22, minHeight: 158, overflow: 'hidden' }}
+        style={{ borderRadius: 22, padding: 22, minHeight: 132, overflow: 'hidden' }}
       >
         <View
           pointerEvents="none"
@@ -161,13 +172,12 @@ export default function Dashboard() {
           }}
         />
         {metricasQuery.isLoading ? (
-          <View style={{ gap: 12 }} accessibilityLabel="Carregando saldo total">
+          <View style={{ gap: 12 }} accessibilityLabel="Carregando saldo disponível">
             <SkeletonBox width={88} height={16} borderRadius={8} tone="inverse" />
             <SkeletonBox width="72%" height={43} borderRadius={10} tone="inverse" />
-            <SkeletonBox width="88%" height={28} borderRadius={14} tone="inverse" />
           </View>
         ) : metricasQuery.isError ? (
-          <View style={{ minHeight: 114, justifyContent: 'center', alignItems: 'flex-start' }}>
+          <View style={{ minHeight: 90, justifyContent: 'center', alignItems: 'flex-start' }}>
             <Text style={{ color: '#ffffff', fontSize: 15, fontWeight: '700' }}>Saldo indisponível</Text>
             <Text style={{ color: '#ffffff', fontSize: 13, marginTop: 4 }}>Não foi possível atualizar seus valores.</Text>
             <TouchableOpacity
@@ -198,182 +208,81 @@ export default function Dashboard() {
                 </Text>
               )}
             </Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginTop: 12, gap: 8 }}>
-              <View accessibilityLabel={`Resultado mensal: ${formatCurrency(Number(metricasQuery.data.resultadoMensal ?? 0))}`} style={{ backgroundColor: 'rgba(255,255,255,0.94)', borderRadius: 999, paddingHorizontal: 11, paddingVertical: 6 }}>
-                <Text style={{ color: colors.successOnLight, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
-                  Mês {formatCurrency(Number(metricasQuery.data.resultadoMensal ?? 0))}
-                </Text>
-              </View>
-              <View accessibilityLabel={`Dívidas: ${formatCurrency(Number(metricasQuery.data.dividas ?? 0))}`} style={{ backgroundColor: 'rgba(255,255,255,0.94)', borderRadius: 999, paddingHorizontal: 11, paddingVertical: 6 }}>
-                <Text style={{ color: colors.dangerOnLight, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
-                  Dívidas {formatCurrency(Number(metricasQuery.data.dividas ?? 0))}
-                </Text>
-              </View>
-              <Text style={{ color: '#ffffff', fontSize: 12, fontWeight: '600' }}>
-                em {mesAtual}
-              </Text>
-            </View>
           </>
         ) : null}
       </LinearGradient>
       </View>
       </Entrance>
 
-      {metricasQuery.data && (
-        <View style={{ marginBottom: 16 }}>
-          <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700', marginBottom: 10 }}>Visão financeira</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-            {([
-              ['DISPONIVEL_AGORA', 'Disponível agora', metricasQuery.data.disponivelAgora],
-              ['RESERVADO', 'Reservado', metricasQuery.data.reservado],
-              ['COMPROMETIDO', 'Comprometido', metricasQuery.data.comprometido],
-              ['INVESTIDO', 'Investido', metricasQuery.data.investido],
-              ['DIVIDAS', 'Dívidas', metricasQuery.data.dividas],
-              ['RESULTADO_MENSAL', 'Resultado mensal', metricasQuery.data.resultadoMensal],
-              ['PATRIMONIO_LIQUIDO', 'Patrimônio líquido', metricasQuery.data.patrimonioLiquido],
-              ['VARIACAO_PATRIMONIAL', 'Variação patrimonial', metricasQuery.data.variacaoPatrimonial.total],
-            ] as Array<[MetricaId, string, number]>).map(([id, label, valor]) => (
-              <TouchableOpacity
-                key={id}
-                onPress={() => setMetricaSelecionada(id)}
-                accessibilityRole="button"
-                accessibilityLabel={`${label}: ${formatCurrency(Number(valor))}. Ver composição`}
-                style={{ width: '48%', minHeight: 72, backgroundColor: colors.card, borderRadius: 12, padding: 12, justifyContent: 'space-between' }}
-              >
-                <Text style={{ color: colors.textSecondary, fontSize: 11 }}>{label}</Text>
-                <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: Number(valor) < 0 ? colors.danger : colors.textPrimary, fontSize: 15, fontWeight: '800', fontVariant: ['tabular-nums'] }}>{formatCurrency(Number(valor))}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      )}
-
-      <ComposicaoMetricaModal metrica={metricaSelecionada} onClose={() => setMetricaSelecionada(null)} />
-
-      {/* Faixa KPI: Receitas · Despesas · Disponível */}
-      {resumoQuery.data && (
-        <Entrance delay={150}>
-        <Card padded={false} radius={20} style={{ flexDirection: 'row', alignItems: 'stretch', paddingVertical: 16, paddingHorizontal: 6, marginBottom: 16 }}>
-          {([
-            { label: 'Receitas', valor: Number(resumoQuery.data.totalEntradas ?? 0), glyph: '↑', bg: colors.successBg, fg: colors.success },
-            { label: 'Despesas', valor: Number(resumoQuery.data.totalSaidas ?? 0), glyph: '↓', bg: colors.dangerBg, fg: colors.danger },
-            { label: 'Saldo do mês', valor: Number(resumoQuery.data.saldo ?? 0), glyph: '●', bg: colors.brandBg, fg: colors.brandFg },
-          ]).map((kpi, i) => (
-            <React.Fragment key={kpi.label}>
-              {i > 0 && <View style={{ width: 1, backgroundColor: colors.border, marginVertical: 2 }} />}
-              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 8 }}>
-                <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: kpi.bg, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ color: kpi.fg, fontSize: kpi.glyph === '●' ? 10 : 15, fontWeight: '700' }}>{kpi.glyph}</Text>
-                </View>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={{ color: colors.textSecondary, fontSize: 11 }}>{kpi.label}</Text>
-                  <Text numberOfLines={1} style={{ color: colors.textPrimary, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
-                    {formatCurrency(kpi.valor)}
-                  </Text>
-                </View>
-              </View>
-            </React.Fragment>
-          ))}
-        </Card>
-        </Entrance>
-      )}
-
-      {insightsQuery.data && (
-        <Entrance delay={175}>
-          <Card padded radius={20} style={{ marginBottom: 16 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700' }}>Insights</Text>
-                <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 3 }}>
-                  {insightsQuery.data.resumo || 'Leitura automática do seu mês financeiro.'}
-                </Text>
-              </View>
-              <View style={{ borderRadius: 999, backgroundColor: Number(insightsQuery.data.variacaoPercentual ?? 0) <= 0 ? colors.successBg : colors.warningBg, paddingHorizontal: 10, paddingVertical: 5 }}>
-                <Text style={{ color: Number(insightsQuery.data.variacaoPercentual ?? 0) <= 0 ? colors.success : colors.warning, fontSize: 11, fontWeight: '700' }}>
-                  {Number(insightsQuery.data.variacaoPercentual ?? 0) > 0 ? '+' : ''}{Number(insightsQuery.data.variacaoPercentual ?? 0).toFixed(1)}%
-                </Text>
-              </View>
-            </View>
-
-            <View style={{ flexDirection: 'row', gap: 8, marginTop: 14 }}>
-              <View style={{ flex: 1, borderRadius: 12, backgroundColor: colors.dangerBg, padding: 10 }}>
-                <Text style={{ color: colors.danger, fontSize: 10, fontWeight: '700' }}>Gasto mês</Text>
-                <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: colors.danger, fontSize: 13, fontWeight: '800', marginTop: 2, fontVariant: ['tabular-nums'] }}>
-                  {formatCurrency(Number(insightsQuery.data.gastoMesAtual ?? 0))}
-                </Text>
-              </View>
-              <View style={{ flex: 1, borderRadius: 12, backgroundColor: colors.infoBg, padding: 10 }}>
-                <Text style={{ color: colors.info, fontSize: 10, fontWeight: '700' }}>Média</Text>
-                <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: colors.info, fontSize: 13, fontWeight: '800', marginTop: 2, fontVariant: ['tabular-nums'] }}>
-                  {formatCurrency(Number(insightsQuery.data.gastoMedioMensal ?? 0))}
-                </Text>
-              </View>
-            </View>
-
-            {insightsQuery.data.categoriasAlerta?.length > 0 && (
-              <View style={{ marginTop: 12, gap: 8 }}>
-                {insightsQuery.data.categoriasAlerta.slice(0, 2).map((c, i) => (
-                  <View key={`${c.categoriaNome}-${i}`} style={{ paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.border }}>
-                    <Text style={{ color: colors.textPrimary, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>{c.categoriaNome}</Text>
-                    <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 2 }}>
-                      {formatCurrency(Number(c.gastoAtual ?? 0))} no mês · {Number(c.variacaoPercentual ?? 0).toFixed(1)}% vs média
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            {insightsQuery.data.recomendacoes?.[0] && (
-              <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 12 }}>
-                {insightsQuery.data.recomendacoes[0]}
-              </Text>
-            )}
-          </Card>
-        </Entrance>
-      )}
-
-      {!!falhasQuery.data?.length && (
-        <TouchableOpacity
-          onPress={() => router.push('/more/contas-fixas' as any)}
-          accessibilityRole="button"
-          accessibilityLabel={`${falhasQuery.data.length} recorrências aguardando saldo`}
-          style={{ backgroundColor: colors.warningBg, borderRadius: 14, padding: 14, marginBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 10 }}
-        >
-          <Text style={{ fontSize: 20 }}>⚠️</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: colors.warning, fontSize: 14, fontWeight: '700' }}>Recorrência aguardando saldo</Text>
-            <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>Abra para escolher outra conta ou realizar manualmente.</Text>
-          </View>
-          <Text style={{ color: colors.warning, fontSize: 18 }}>›</Text>
-        </TouchableOpacity>
-      )}
-
-      {/* Atalhos rápidos */}
-      <Entrance delay={200} style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
-        {atalhos.map(a => (
-          <TouchableOpacity
-            key={a.label}
-            onPress={a.onPress}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel={a.label.replace('\n', ' ')}
-            style={{ flex: 1 }}
+      {/* 2. Compromissos próximos: comprometidos compõem o total; previstos ficam fora */}
+      <Entrance delay={150}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700' }}>Compromissos próximos</Text>
+        {compromissosQuery.data && (
+          <Text
+            accessibilityLabel={`Total comprometido: ${formatCurrency(Number(compromissosQuery.data.totalComprometido))}`}
+            style={{ color: colors.danger, fontSize: 14, fontWeight: '800', fontVariant: ['tabular-nums'] }}
           >
-            <Card padded={false} radius={16} style={{ alignItems: 'center', gap: 9, paddingVertical: 14, paddingHorizontal: 4, minHeight: 104 }}>
-              <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: a.bg, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ color: a.fg, fontSize: 20, fontWeight: '500' }}>{a.glyph}</Text>
-              </View>
-              <Text numberOfLines={2} style={{ color: colors.textSecondary, fontSize: 11.5, fontWeight: '500', textAlign: 'center', lineHeight: 14, minHeight: 28 }}>
-                {a.label}
-              </Text>
-            </Card>
-          </TouchableOpacity>
-        ))}
+            {formatCurrency(Number(compromissosQuery.data.totalComprometido))}
+          </Text>
+        )}
+      </View>
+      <Card padded radius={20} style={{ marginBottom: 16 }}>
+        {compromissosQuery.isLoading ? (
+          <View style={{ gap: 8 }}>
+            {[1, 2].map(i => <SkeletonBox key={i} width="100%" height={48} />)}
+          </View>
+        ) : compromissosQuery.isError ? (
+          <View style={{ alignItems: 'center', paddingVertical: 12 }}>
+            <Text style={{ color: colors.textSecondary }}>Erro ao carregar compromissos</Text>
+            <TouchableOpacity onPress={() => compromissosQuery.refetch()} style={{ marginTop: 8 }} accessibilityRole="button">
+              <Text style={{ color: colors.brandFg, fontWeight: '600' }}>Tentar novamente</Text>
+            </TouchableOpacity>
+          </View>
+        ) : comprometidos.length === 0 && previstos.length === 0 ? (
+          <Text style={{ color: colors.textSecondary, textAlign: 'center', paddingVertical: 12 }}>
+            Nenhum compromisso até o fim do mês.
+          </Text>
+        ) : (
+          <>
+            {comprometidos.map((item, i, arr) => linhaCompromisso(item, i, arr))}
+            {previstos.length > 0 && (
+              <>
+                <Text style={{ color: colors.textSecondary, fontSize: 11, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: comprometidos.length > 0 ? 14 : 0, marginBottom: 4 }}>
+                  Previstos · fora do total
+                </Text>
+                {previstos.map((item, i, arr) => linhaCompromisso(item, i, arr))}
+              </>
+            )}
+          </>
+        )}
+      </Card>
       </Entrance>
 
+      {/* 3. Lançar */}
+      <Entrance delay={200}>
+      <TouchableOpacity
+        onPress={() => setLancarAberto(true)}
+        activeOpacity={0.85}
+        accessibilityRole="button"
+        accessibilityLabel="Lançar transação"
+        style={{ marginBottom: 16 }}
+      >
+        <LinearGradient
+          colors={[colors.brand, colors.brandDeep]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{ borderRadius: 16, minHeight: 52, alignItems: 'center', justifyContent: 'center' }}
+        >
+          <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: '700' }}>＋ Lançar</Text>
+        </LinearGradient>
+      </TouchableOpacity>
+      </Entrance>
+
+      {/* 4. Cinco movimentações */}
       <Entrance delay={250}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-        <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700' }}>Últimas transações</Text>
+        <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700' }}>Últimas movimentações</Text>
         <TouchableOpacity onPress={() => router.push('/(app)/transacoes')} accessibilityRole="button">
           <Text style={{ color: colors.brandFg, fontSize: 13, fontWeight: '600' }}>Ver todas</Text>
         </TouchableOpacity>
@@ -394,7 +303,7 @@ export default function Dashboard() {
         ) : transacoesQuery.data && transacoesQuery.data.content.length === 0 ? (
           <View style={{ alignItems: 'center', paddingVertical: 16 }}>
             <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600' }}>Nenhuma transação ainda</Text>
-            <Text style={{ color: colors.textSecondary, marginTop: 4, fontSize: 13 }}>Toque no + para lançar a primeira</Text>
+            <Text style={{ color: colors.textSecondary, marginTop: 4, fontSize: 13 }}>Toque em Lançar para registrar a primeira</Text>
           </View>
         ) : (
           transacoesQuery.data?.content.map((t, i, arr) => (
@@ -434,62 +343,33 @@ export default function Dashboard() {
       </Card>
       </Entrance>
 
-      {projecaoQuery.data && projecaoQuery.data.meses && projecaoQuery.data.meses.length > 0 && (
-        <View style={{ marginTop: 24 }}>
-          <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700', marginBottom: 10 }}>Projeção de caixa</Text>
-          <Card padded radius={20}>
-            {projecaoQuery.data.meses.map((m, i, arr) => (
-              <View
-                key={i}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingVertical: 10,
-                  borderBottomWidth: i < arr.length - 1 ? 1 : 0,
-                  borderBottomColor: colors.border,
-                }}
-              >
-                <Text style={{ color: i === 0 ? colors.brandFg : colors.textSecondary, fontSize: 13, fontWeight: '600', width: 44 }}>
-                  {m.periodo}
-                </Text>
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={{ color: colors.textSecondary, fontSize: 11 }}>Entradas</Text>
-                    <Text style={{ color: colors.success, fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] }}>
-                      {formatCurrency(m.totalEntradas ?? 0)}
-                    </Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}>
-                    <Text style={{ color: colors.textSecondary, fontSize: 11 }}>Saídas</Text>
-                    <Text style={{ color: colors.danger, fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] }}>
-                      {formatCurrency(m.totalSaidas)}
-                    </Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}>
-                    <Text style={{ color: colors.textSecondary, fontSize: 11 }}>Saldo final</Text>
-                    <Text
-                      style={{
-                        color: m.saldoFinal >= 0 ? colors.success : colors.danger,
-                        fontSize: 12,
-                        fontWeight: '700',
-                        fontVariant: ['tabular-nums'],
-                      }}
-                    >
-                      {formatCurrency(m.saldoFinal)}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            ))}
+      {/* 5. Uma recomendação textual (nunca números de insights) */}
+      {recomendacao && (
+        <Entrance delay={300}>
+          <Card padded radius={20} style={{ marginTop: 16 }}>
+            <Text style={{ color: colors.textPrimary, fontSize: 14, fontWeight: '700' }}>Recomendação</Text>
+            <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>{recomendacao}</Text>
           </Card>
-        </View>
+        </Entrance>
       )}
 
+      {/* 6. Link para a Visão financeira */}
+      <Entrance delay={350}>
+        <TouchableOpacity
+          onPress={() => router.push('/more/visao-financeira' as any)}
+          accessibilityRole="button"
+          accessibilityLabel="Abrir visão financeira completa"
+          style={{ marginTop: 16, minHeight: 48, borderRadius: 16, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.card }}
+        >
+          <Text style={{ color: colors.brandFg, fontSize: 14, fontWeight: '700' }}>Ver visão financeira completa ›</Text>
+        </TouchableOpacity>
+      </Entrance>
+
       <NovaTransacaoModal
-        visible={repetirLancamento != null}
+        visible={lancarAberto || repetirLancamento != null}
         initialData={repetirLancamento}
-        onClose={() => setRepetirLancamento(null)}
-        onSaved={() => setRepetirLancamento(null)}
+        onClose={() => { setLancarAberto(false); setRepetirLancamento(null); }}
+        onSaved={() => { setLancarAberto(false); setRepetirLancamento(null); }}
       />
     </ScrollView>
   );

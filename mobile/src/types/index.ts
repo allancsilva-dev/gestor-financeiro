@@ -135,6 +135,28 @@ export interface TransacaoRequest {
   recorrente?: boolean;
 }
 
+// Compromissos próximos (PR-F3-01/07): faturas/parcelas compõem o total
+// oficial Comprometido; contas fixas são PREVISTO e ficam fora do total
+export type GrupoCompromisso = 'COMPROMETIDO' | 'PREVISTO';
+export type TipoCompromisso = 'FATURA' | 'PARCELA' | 'CONTA_FIXA';
+
+export interface CompromissoItem {
+  tipo: TipoCompromisso;
+  id: number;
+  descricao: string;
+  valor: number;
+  vencimento: string;
+  grupo: GrupoCompromisso;
+  alerta: 'FALHA_SALDO' | null;
+}
+
+export interface Compromissos {
+  referencia: string;
+  horizonte: string;
+  totalComprometido: number;
+  itens: CompromissoItem[];
+}
+
 // Sugestão determinística de categoria (PR-F3-02/05)
 export type CriterioSugestaoCategoria = 'DESCRICAO_IGUAL' | 'MAIS_USADA_90_DIAS' | 'NENHUMA';
 

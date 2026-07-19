@@ -205,6 +205,8 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
         ? { formaPagamento: 'CARTAO', cartaoId: cartaoId ?? undefined }
         : { formaPagamento: 'CARTEIRA', carteiraId: carteiraId ?? undefined }
       ).catch(() => {}); // preferência é conveniência: falha não bloqueia o salvamento
+      queryClient.invalidateQueries({ queryKey: ['metricas'] });
+      queryClient.invalidateQueries({ queryKey: ['compromissos'] });
       queryClient.invalidateQueries({ queryKey: ['transacoes'] });
       queryClient.invalidateQueries({ queryKey: ['relatorio'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-evolucao'] });

@@ -32,6 +32,13 @@ export const getGreeting = (): string => {
 export const getInitials = (nome: string): string =>
   nome.trim().split(' ').slice(0, 2).map(n => n[0].toUpperCase()).join('');
 
+// Data ISO (YYYY-MM-DD) para DD/MM/AAAA sem passar por Date — evita o
+// deslocamento de fuso do new Date('YYYY-MM-DD') (UTC) em telas de vencimento
+export const formatDateOnlyBR = (iso: string): string => {
+  const [year, month, day] = iso.split('-');
+  return `${day}/${month}/${year}`;
+};
+
 // Data de hoje no formato DD/MM/AAAA (default do lançamento rápido, PR-F3-05)
 export const todayBR = (): string => {
   const d = new Date();
