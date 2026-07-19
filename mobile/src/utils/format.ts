@@ -32,6 +32,14 @@ export const getGreeting = (): string => {
 export const getInitials = (nome: string): string =>
   nome.trim().split(' ').slice(0, 2).map(n => n[0].toUpperCase()).join('');
 
+// Data de hoje no formato DD/MM/AAAA (default do lançamento rápido, PR-F3-05)
+export const todayBR = (): string => {
+  const d = new Date();
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  return `${day}/${month}/${d.getFullYear()}`;
+};
+
 // Converte data do formato DD/MM/AAAA para YYYY-MM-DD (necessário para enviar ao backend)
 export const parseDateBR = (dataBR: string): string => {
   const [day, month, year] = dataBR.split('/');

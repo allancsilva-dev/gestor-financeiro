@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Modal, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { transacaoService } from '../services/transacaoService';
@@ -6,20 +6,36 @@ import { categoriaService } from '../services/categoriaService';
 import contaFinanceiraService from '../services/contaFinanceiraService';
 import cartaoService from '../services/cartaoService';
 import { useTheme } from '../theme';
-import { parseDateBR, isValidDateBR, parseCurrencyBR, maskCurrencyInput, maskDateInput } from '../utils/format';
-import { TransacaoRequest, TipoTransacao } from '../types';
+import { parseDateBR, isValidDateBR, parseCurrencyBR, maskCurrencyInput, maskDateInput, todayBR } from '../utils/format';
+import { TransacaoRequest, TipoTransacao, SugestaoCategoria } from '../types';
+import { getLancamentoPrefs, setLancamentoPrefs } from '../store/lancamentoPrefs';
 import Chip from './ui/Chip';
 import Field from './ui/Field';
+
+// Pré-preenchimento do "Repetir lançamento" (PR-F3-05): exige confirmação
+// explícita no Salvar — nunca grava sozinho.
+export interface LancamentoInicial {
+  descricao: string;
+  valor: number;
+  tipo: TipoTransacao;
+  categoriaId?: number;
+  cartaoId?: number;
+}
 
 interface NovaTransacaoModalProps {
   visible: boolean;
   onClose: () => void;
   onSaved?: () => void;
   initialTipo?: TipoTransacao;
+  initialData?: LancamentoInicial | null;
 }
 
-// Sheet "Nova Transação" — aberto pelo + central da tab bar e pelos atalhos da home
-export default function NovaTransacaoModal({ visible, onClose, onSaved, initialTipo = 'SAIDA' }: NovaTransacaoModalProps) {
+const DEBOUNCE_SUGESTAO_MS = 600;
+
+// Sheet "Nova Transação" — aberto pelo + central da tab bar, pelos atalhos da
+// home e pelo "Repetir lançamento". Fluxo principal: valor → descrição →
+// confirmar; data default hoje; observações/parcelamento em "Mais detalhes".
+export default function NovaTransacaoModal({ visible, onClose, onSaved, initialTipo = 'SAIDA', initialData = null }: NovaTransacaoModalProps) {
   const colors = useTheme();
   const queryClient = useQueryClient();
 
@@ -42,10 +58,43 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
   const [parcelado, setParcelado] = useState(false);
   const [totalParcelas, setTotalParcelas] = useState('');
   const [observacoes, setObservacoes] = useState('');
+  const [maisDetalhes, setMaisDetalhes] = useState(false);
 
+  const [sugestao, setSugestao] = useState<SugestaoCategoria | null>(null);
+  const categoriaEscolhidaManualmente = useRef(false);
+  const prefsAplicadas = useRef(false);
+
+  // Abertura: data default hoje, pré-preenchimento do repetir e última
+  // conta/cartão usados no dispositivo (nunca sobrescreve o repetir)
   useEffect(() => {
-    if (visible) setTipo(initialTipo);
-  }, [visible, initialTipo]);
+    if (!visible) return;
+    setTipo(initialData?.tipo ?? initialTipo);
+    setData(todayBR());
+    if (initialData) {
+      setDescricao(initialData.descricao);
+      setValor(maskCurrencyInput(String(Math.round(initialData.valor * 100))));
+      if (initialData.categoriaId != null) {
+        setCategoriaId(initialData.categoriaId);
+        categoriaEscolhidaManualmente.current = true;
+      }
+      if (initialData.cartaoId != null) {
+        setFormaPagamento('CARTAO');
+        setCartaoId(initialData.cartaoId);
+        prefsAplicadas.current = true;
+        return;
+      }
+    }
+    if (!prefsAplicadas.current) {
+      getLancamentoPrefs().then(prefs => {
+        if (!prefs) return;
+        setFormaPagamento(prefs.formaPagamento);
+        if (prefs.carteiraId != null) setCarteiraId(prefs.carteiraId);
+        if (prefs.cartaoId != null) setCartaoId(prefs.cartaoId);
+        prefsAplicadas.current = true;
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
 
   const { data: categorias = [] } = useQuery({
     queryKey: ['categorias'],
@@ -81,9 +130,39 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
     }
   }, [tipo]);
 
+  // Sugestão determinística (PR-F3-02) após descrição estável; nunca
+  // sobrescreve categoria já escolhida
+  useEffect(() => {
+    if (!visible) return;
+    const estavel = descricao.trim();
+    if (estavel.length < 3 || categoriaEscolhidaManualmente.current) {
+      setSugestao(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      transacaoService.sugerirCategoria(estavel, tipo)
+        .then(s => {
+          if (categoriaEscolhidaManualmente.current) return;
+          setSugestao(s.categoria ? s : null);
+          if (s.categoria && categoriaId == null) setCategoriaId(s.categoria.id);
+        })
+        .catch(() => setSugestao(null)); // sugestão é opcional: falha não bloqueia o fluxo
+    }, DEBOUNCE_SUGESTAO_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [descricao, tipo, visible]);
+
+  const selecionarCategoria = (id: number) => {
+    categoriaEscolhidaManualmente.current = true;
+    setCategoriaId(id);
+  };
+
   const resetForm = () => {
     setDescricao(''); setValor(''); setData(''); setTipo(initialTipo); setFormaPagamento('CARTEIRA'); setCategoriaId(null); setCartaoId(null); setParcelado(false); setTotalParcelas(''); setObservacoes('');
     setDescricaoError(null); setValorError(null); setDataError(null); setCategoriaError(null); setPagamentoError(null); setErroForm(null);
+    setMaisDetalhes(false); setSugestao(null);
+    categoriaEscolhidaManualmente.current = false;
+    prefsAplicadas.current = false;
   };
 
   const handleSalvar = async () => {
@@ -121,6 +200,11 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
         request.carteiraId = carteiraId ?? undefined;
       }
       await transacaoService.criar(request);
+      // Última conta/cartão ficam somente no dispositivo (PR-F3-05)
+      setLancamentoPrefs(tipo === 'SAIDA' && formaPagamento === 'CARTAO'
+        ? { formaPagamento: 'CARTAO', cartaoId: cartaoId ?? undefined }
+        : { formaPagamento: 'CARTEIRA', carteiraId: carteiraId ?? undefined }
+      ).catch(() => {}); // preferência é conveniência: falha não bloqueia o salvamento
       queryClient.invalidateQueries({ queryKey: ['transacoes'] });
       queryClient.invalidateQueries({ queryKey: ['relatorio'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-evolucao'] });
@@ -142,6 +226,8 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
     }
   };
 
+  const tituloModal = initialData ? 'Repetir lançamento' : 'Nova Transação';
+
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -149,12 +235,17 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
           <TouchableOpacity onPress={() => { resetForm(); onClose(); }} accessibilityRole="button">
             <Text style={{ color: colors.brandFg, fontSize: 15 }}>Cancelar</Text>
           </TouchableOpacity>
-          <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700' }}>Nova Transação</Text>
+          <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700' }}>{tituloModal}</Text>
           <TouchableOpacity onPress={handleSalvar} disabled={salvando} accessibilityRole="button">
             {salvando ? <ActivityIndicator color={colors.brand} size="small" /> : <Text style={{ color: colors.brandFg, fontSize: 15, fontWeight: '700' }}>Salvar</Text>}
           </TouchableOpacity>
         </View>
         <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
+          {initialData && (
+            <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 12 }}>
+              Dados pré-preenchidos do lançamento anterior. Revise e confirme em Salvar.
+            </Text>
+          )}
           <Text style={{ color: colors.textSecondary, fontSize: 10, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Tipo</Text>
           <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
             {(['ENTRADA', 'SAIDA'] as TipoTransacao[]).map(t => (
@@ -167,13 +258,18 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
           <Field testID="transaction-date" label="Data" value={data} onChangeText={(t) => setData(maskDateInput(t))} placeholder="DD/MM/AAAA" keyboardType="number-pad" error={dataError} />
 
           <Text style={{ color: colors.textSecondary, fontSize: 10, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Categoria</Text>
+          {sugestao?.categoria && categoriaId === sugestao.categoria.id && !categoriaEscolhidaManualmente.current && (
+            <Text testID="category-suggestion" style={{ color: colors.brandFg, fontSize: 12, marginBottom: 6 }}>
+              Sugerida pelo seu histórico — toque em outra para trocar.
+            </Text>
+          )}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
             {categorias.map(cat => (
               <Chip
                 key={cat.id}
                 label={`${cat.icone ? cat.icone + ' ' : ''}${cat.nome}`}
                 selected={categoriaId === cat.id}
-                onPress={() => setCategoriaId(cat.id)}
+                onPress={() => selecionarCategoria(cat.id)}
               />
             ))}
           </View>
@@ -209,18 +305,39 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
                 ))}
               </View>
               {cartoes.length === 0 && <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 8 }}>Cadastre um cartão em Faturas.</Text>}
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
-                <Chip label="À vista" selected={!parcelado} onPress={() => { setParcelado(false); setTotalParcelas(''); }} />
-                <Chip label="Parcelado" selected={parcelado} onPress={() => setParcelado(true)} />
-              </View>
-              {parcelado && (
-                <Field label="Parcelas" value={totalParcelas} onChangeText={(t) => setTotalParcelas(t.replace(/\D/g, '').slice(0, 2))} keyboardType="number-pad" placeholder="Ex: 6" />
-              )}
             </>
           )}
           {pagamentoError && <Text style={{ color: colors.danger, fontSize: 12, marginBottom: 8 }}>{pagamentoError}</Text>}
 
-          <Field label="Observações" value={observacoes} onChangeText={setObservacoes} multiline style={{ height: 100, textAlignVertical: 'top' }} />
+          {/* Fora do fluxo principal (PR-F3-05): observações e parcelamento */}
+          <TouchableOpacity
+            testID="more-details-toggle"
+            onPress={() => setMaisDetalhes(v => !v)}
+            accessibilityRole="button"
+            style={{ paddingVertical: 10, marginBottom: 4 }}
+          >
+            <Text style={{ color: colors.brandFg, fontSize: 14, fontWeight: '600' }}>
+              {maisDetalhes ? 'Menos detalhes ▲' : 'Mais detalhes ▼'}
+            </Text>
+          </TouchableOpacity>
+
+          {maisDetalhes && (
+            <>
+              {tipo === 'SAIDA' && formaPagamento === 'CARTAO' && (
+                <>
+                  <Text style={{ color: colors.textSecondary, fontSize: 10, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Parcelamento</Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+                    <Chip label="À vista" selected={!parcelado} onPress={() => { setParcelado(false); setTotalParcelas(''); }} />
+                    <Chip label="Parcelado" selected={parcelado} onPress={() => setParcelado(true)} />
+                  </View>
+                  {parcelado && (
+                    <Field label="Parcelas" value={totalParcelas} onChangeText={(t) => setTotalParcelas(t.replace(/\D/g, '').slice(0, 2))} keyboardType="number-pad" placeholder="Ex: 6" />
+                  )}
+                </>
+              )}
+              <Field label="Observações" value={observacoes} onChangeText={setObservacoes} multiline style={{ height: 100, textAlignVertical: 'top' }} />
+            </>
+          )}
 
           {erroForm && <Text style={{ color: colors.danger, marginBottom: 8 }}>{erroForm}</Text>}
         </ScrollView>

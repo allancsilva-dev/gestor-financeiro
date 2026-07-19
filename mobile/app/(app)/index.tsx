@@ -13,6 +13,7 @@ import { useAuth } from '../../src/context/AuthContext';
 import SkeletonBox from '../../src/components/ui/SkeletonBox';
 import Card from '../../src/components/ui/Card';
 import ListRow from '../../src/components/ui/ListRow';
+import NovaTransacaoModal, { LancamentoInicial } from '../../src/components/NovaTransacaoModal';
 import Entrance from '../../src/components/ui/Entrance';
 import FloatEmoji from '../../src/components/ui/FloatEmoji';
 import { formatCurrency, getInitials } from '../../src/utils/format';
@@ -28,6 +29,8 @@ export default function Dashboard() {
     queryFn: () => api.get<DashboardResumo>('/v1/dashboard/resumo').then(r => r.data),
   });
   const [metricaSelecionada, setMetricaSelecionada] = React.useState<MetricaId | null>(null);
+  // Repetir lançamento (PR-F3-05): pré-preenche e exige confirmação no Salvar
+  const [repetirLancamento, setRepetirLancamento] = React.useState<LancamentoInicial | null>(null);
   const metricasQuery = useQuery({ queryKey: ['metricas'], queryFn: () => metricasService.obter() });
   const origensQuery = useQuery({
     queryKey: ['metricas-origens', metricaSelecionada],
@@ -424,8 +427,28 @@ export default function Dashboard() {
               iconTone={t.tipo === 'ENTRADA' ? 'success' : 'danger'}
               title={t.descricao}
               subtitle={t.categoria?.nome ?? undefined}
-              value={`${t.tipo === 'ENTRADA' ? '+' : '−'} ${formatCurrency(Number(t.valorTotal ?? 0))}`}
-              valueTone={t.tipo === 'ENTRADA' ? 'success' : 'danger'}
+              trailing={
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={{ color: t.tipo === 'ENTRADA' ? colors.success : colors.danger, fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
+                    {`${t.tipo === 'ENTRADA' ? '+' : '−'} ${formatCurrency(Number(t.valorTotal ?? 0))}`}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => setRepetirLancamento({
+                      descricao: t.descricao,
+                      valor: Number(t.valorTotal ?? 0),
+                      tipo: t.tipo,
+                      categoriaId: t.categoria?.id,
+                      cartaoId: t.cartao?.id,
+                    })}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Repetir lançamento ${t.descricao}`}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    style={{ paddingLeft: 10 }}
+                  >
+                    <Text style={{ color: colors.brandFg, fontSize: 16 }}>⟳</Text>
+                  </TouchableOpacity>
+                </View>
+              }
             />
           ))
         )}
@@ -483,6 +506,12 @@ export default function Dashboard() {
         </View>
       )}
 
+      <NovaTransacaoModal
+        visible={repetirLancamento != null}
+        initialData={repetirLancamento}
+        onClose={() => setRepetirLancamento(null)}
+        onSaved={() => setRepetirLancamento(null)}
+      />
     </ScrollView>
   );
 }

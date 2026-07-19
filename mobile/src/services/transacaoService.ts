@@ -1,5 +1,5 @@
 import api from './api';
-import { TipoTransacao, Transacao, TransacaoRequest, PagedResponse, CronogramaItem } from '../types';
+import { TipoTransacao, Transacao, TransacaoRequest, PagedResponse, CronogramaItem, SugestaoCategoria } from '../types';
 
 export interface FiltroPeriodo {
   inicio: string;
@@ -30,6 +30,12 @@ export const transacaoService = {
 
   cronograma: (id: number) =>
     api.get<CronogramaItem[]>(`/v1/transacoes/${id}/cronograma`).then(r => r.data),
+
+  // Sugestão determinística (PR-F3-02): nunca cria categoria nem altera lançamento
+  sugerirCategoria: (descricao: string, tipo: TipoTransacao) =>
+    api.get<SugestaoCategoria>('/v1/transacoes/sugestao-categoria', {
+      params: { descricao, tipo },
+    }).then(r => r.data),
 
   criar: (data: TransacaoRequest) =>
     api.post<Transacao>('/v1/transacoes', data).then(r => r.data),

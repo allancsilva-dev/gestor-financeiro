@@ -135,6 +135,14 @@ export interface TransacaoRequest {
   recorrente?: boolean;
 }
 
+// Sugestão determinística de categoria (PR-F3-02/05)
+export type CriterioSugestaoCategoria = 'DESCRICAO_IGUAL' | 'MAIS_USADA_90_DIAS' | 'NENHUMA';
+
+export interface SugestaoCategoria {
+  criterio: CriterioSugestaoCategoria;
+  categoria: CategoriaResumo | null;
+}
+
 // ── Categorias ──────────────────────────────────────────────────────
 export interface Categoria {
   id: number;
