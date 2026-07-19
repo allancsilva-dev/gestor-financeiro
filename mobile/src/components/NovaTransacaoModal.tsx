@@ -9,6 +9,9 @@ import { useTheme } from '../theme';
 import { parseDateBR, isValidDateBR, parseCurrencyBR, maskCurrencyInput, maskDateInput, todayBR } from '../utils/format';
 import { TransacaoRequest, TipoTransacao, SugestaoCategoria } from '../types';
 import { getLancamentoPrefs, setLancamentoPrefs } from '../store/lancamentoPrefs';
+import { CATEGORIAS_INICIAIS } from '../domain/categoriasIniciais';
+import { CATEGORY_COLORS } from '../utils/format';
+import { isValidDayOfMonth } from '../utils/validate';
 import Chip from './ui/Chip';
 import Field from './ui/Field';
 
@@ -61,6 +64,15 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
   const [maisDetalhes, setMaisDetalhes] = useState(false);
 
   const [sugestao, setSugestao] = useState<SugestaoCategoria | null>(null);
+
+  // Setup progressivo (PR-F3-10): criação contextual quando falta cadastro
+  const [criandoPacote, setCriandoPacote] = useState(false);
+  const [novaCategoriaNome, setNovaCategoriaNome] = useState('');
+  const [criandoCategoria, setCriandoCategoria] = useState(false);
+  const [criarCartaoAberto, setCriarCartaoAberto] = useState(false);
+  const [novoCartao, setNovoCartao] = useState({ nome: 'Cartão Principal', limite: '', fechamento: '5', vencimento: '12' });
+  const [criandoCartao, setCriandoCartao] = useState(false);
+  const [setupError, setSetupError] = useState<string | null>(null);
   const categoriaEscolhidaManualmente = useRef(false);
   const prefsAplicadas = useRef(false);
 
@@ -157,10 +169,76 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
     setCategoriaId(id);
   };
 
+  // Um toque cria o pacote inicial de categorias (PR-F3-10)
+  const criarPacoteInicial = async () => {
+    setCriandoPacote(true);
+    setSetupError(null);
+    try {
+      for (const categoria of CATEGORIAS_INICIAIS) {
+        await categoriaService.criar(categoria);
+      }
+      await queryClient.invalidateQueries({ queryKey: ['categorias'] });
+    } catch (err: any) {
+      setSetupError(err?.userMessage ?? 'Não foi possível criar as categorias. Tente novamente.');
+    } finally {
+      setCriandoPacote(false);
+    }
+  };
+
+  const criarCategoriaUnica = async () => {
+    const nome = novaCategoriaNome.trim();
+    if (nome.length < 2) {
+      setSetupError('Informe o nome da categoria.');
+      return;
+    }
+    setCriandoCategoria(true);
+    setSetupError(null);
+    try {
+      const criada = await categoriaService.criar({ nome, cor: CATEGORY_COLORS[8], icone: '📌' });
+      await queryClient.invalidateQueries({ queryKey: ['categorias'] });
+      selecionarCategoria(criada.id);
+      setNovaCategoriaNome('');
+    } catch (err: any) {
+      setSetupError(err?.userMessage ?? 'Não foi possível criar a categoria. Tente novamente.');
+    } finally {
+      setCriandoCategoria(false);
+    }
+  };
+
+  // CTA de cartão no pagamento com cartão (PR-F3-10)
+  const criarCartaoRapido = async () => {
+    if (novoCartao.nome.trim().length < 2) { setSetupError('Informe o nome do cartão.'); return; }
+    const limite = parseCurrencyBR(novoCartao.limite || '0');
+    if (!Number.isFinite(limite) || limite <= 0) { setSetupError('Limite do cartão deve ser maior que zero.'); return; }
+    if (!isValidDayOfMonth(novoCartao.fechamento) || !isValidDayOfMonth(novoCartao.vencimento)) {
+      setSetupError('Fechamento e vencimento devem estar entre 1 e 31.');
+      return;
+    }
+    setCriandoCartao(true);
+    setSetupError(null);
+    try {
+      const criado = await cartaoService.criar({
+        nome: novoCartao.nome.trim(),
+        limiteTotal: limite,
+        diaFechamento: Number(novoCartao.fechamento),
+        diaVencimento: Number(novoCartao.vencimento),
+      });
+      await queryClient.invalidateQueries({ queryKey: ['cartoes'] });
+      setCartaoId(criado.id);
+      setCriarCartaoAberto(false);
+    } catch (err: any) {
+      setSetupError(err?.userMessage ?? 'Não foi possível criar o cartão. Tente novamente.');
+    } finally {
+      setCriandoCartao(false);
+    }
+  };
+
   const resetForm = () => {
     setDescricao(''); setValor(''); setData(''); setTipo(initialTipo); setFormaPagamento('CARTEIRA'); setCategoriaId(null); setCartaoId(null); setParcelado(false); setTotalParcelas(''); setObservacoes('');
     setDescricaoError(null); setValorError(null); setDataError(null); setCategoriaError(null); setPagamentoError(null); setErroForm(null);
     setMaisDetalhes(false); setSugestao(null);
+    setCriarCartaoAberto(false); setNovaCategoriaNome(''); setSetupError(null);
+    setNovoCartao({ nome: 'Cartão Principal', limite: '', fechamento: '5', vencimento: '12' });
     categoriaEscolhidaManualmente.current = false;
     prefsAplicadas.current = false;
   };
@@ -275,6 +353,47 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
               />
             ))}
           </View>
+          {categorias.length === 0 && (
+            <View style={{ marginBottom: 12, gap: 8 }}>
+              <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
+                Você ainda não tem categorias. Crie antes de salvar:
+              </Text>
+              <TouchableOpacity
+                testID="create-category-pack"
+                onPress={criarPacoteInicial}
+                disabled={criandoPacote}
+                accessibilityRole="button"
+                accessibilityLabel="Criar pacote inicial de categorias"
+                style={{ minHeight: 44, borderRadius: 12, backgroundColor: colors.brandBg, alignItems: 'center', justifyContent: 'center', opacity: criandoPacote ? 0.6 : 1 }}
+              >
+                {criandoPacote
+                  ? <ActivityIndicator color={colors.brand} size="small" />
+                  : <Text style={{ color: colors.brandFg, fontWeight: '700' }}>Criar pacote inicial (9 categorias)</Text>}
+              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
+                <View style={{ flex: 1 }}>
+                  <Field
+                    testID="quick-category-name"
+                    label="Ou crie uma"
+                    value={novaCategoriaNome}
+                    onChangeText={setNovaCategoriaNome}
+                    placeholder="Ex: Mercado"
+                  />
+                </View>
+                <TouchableOpacity
+                  onPress={criarCategoriaUnica}
+                  disabled={criandoCategoria}
+                  accessibilityRole="button"
+                  accessibilityLabel="Criar categoria"
+                  style={{ minHeight: 44, marginTop: 22, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', opacity: criandoCategoria ? 0.6 : 1 }}
+                >
+                  {criandoCategoria
+                    ? <ActivityIndicator color={colors.brand} size="small" />
+                    : <Text style={{ color: colors.brandFg, fontWeight: '600' }}>Criar</Text>}
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
           {categoriaError && <Text style={{ color: colors.danger, fontSize: 12, marginBottom: 8 }}>{categoriaError}</Text>}
 
           {tipo === 'SAIDA' && (
@@ -306,7 +425,42 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
                   <Chip key={c.id} label={c.nome} selected={cartaoId === c.id} onPress={() => setCartaoId(c.id)} />
                 ))}
               </View>
-              {cartoes.length === 0 && <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 8 }}>Cadastre um cartão em Faturas.</Text>}
+              {cartoes.length === 0 && !criarCartaoAberto && (
+                <TouchableOpacity
+                  testID="create-card-cta"
+                  onPress={() => setCriarCartaoAberto(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Criar cartão agora"
+                  style={{ minHeight: 44, borderRadius: 12, backgroundColor: colors.brandBg, alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}
+                >
+                  <Text style={{ color: colors.brandFg, fontWeight: '700' }}>Criar cartão agora</Text>
+                </TouchableOpacity>
+              )}
+              {cartoes.length === 0 && criarCartaoAberto && (
+                <View style={{ marginBottom: 8 }}>
+                  <Field testID="quick-card-name" label="Nome do cartão" value={novoCartao.nome} onChangeText={(t) => setNovoCartao(c => ({ ...c, nome: t }))} placeholder="Ex: Cartão Principal" />
+                  <Field testID="quick-card-limit" label="Limite (R$)" value={novoCartao.limite} onChangeText={(t) => setNovoCartao(c => ({ ...c, limite: maskCurrencyInput(t) }))} keyboardType="number-pad" placeholder="0,00" />
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <View style={{ flex: 1 }}>
+                      <Field label="Fechamento" value={novoCartao.fechamento} onChangeText={(t) => setNovoCartao(c => ({ ...c, fechamento: t.replace(/\D/g, '').slice(0, 2) }))} keyboardType="number-pad" placeholder="5" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Field label="Vencimento" value={novoCartao.vencimento} onChangeText={(t) => setNovoCartao(c => ({ ...c, vencimento: t.replace(/\D/g, '').slice(0, 2) }))} keyboardType="number-pad" placeholder="12" />
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    onPress={criarCartaoRapido}
+                    disabled={criandoCartao}
+                    accessibilityRole="button"
+                    accessibilityLabel="Salvar cartão"
+                    style={{ minHeight: 44, borderRadius: 12, backgroundColor: colors.brandBg, alignItems: 'center', justifyContent: 'center', marginTop: 4, opacity: criandoCartao ? 0.6 : 1 }}
+                  >
+                    {criandoCartao
+                      ? <ActivityIndicator color={colors.brand} size="small" />
+                      : <Text style={{ color: colors.brandFg, fontWeight: '700' }}>Salvar cartão</Text>}
+                  </TouchableOpacity>
+                </View>
+              )}
             </>
           )}
           {pagamentoError && <Text style={{ color: colors.danger, fontSize: 12, marginBottom: 8 }}>{pagamentoError}</Text>}
@@ -341,6 +495,7 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
             </>
           )}
 
+          {setupError && <Text style={{ color: colors.danger, fontSize: 12, marginBottom: 8 }}>{setupError}</Text>}
           {erroForm && <Text style={{ color: colors.danger, marginBottom: 8 }}>{erroForm}</Text>}
         </ScrollView>
       </View>

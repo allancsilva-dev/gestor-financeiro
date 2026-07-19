@@ -324,7 +324,14 @@ export default function Metas() {
                   : 'Nenhuma meta arquivada'}
               </Text>
               {statusFiltro === 'ATIVA' && (
-                <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>Toque no + para criar a primeira</Text>
+                <TouchableOpacity
+                  onPress={abrirCriarMeta}
+                  accessibilityRole="button"
+                  accessibilityLabel="Criar primeira meta"
+                  style={{ marginTop: 12, minHeight: 44, paddingHorizontal: 20, borderRadius: 12, backgroundColor: colors.brandBg, alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Text style={{ color: colors.brandFg, fontWeight: '700' }}>Criar primeira meta</Text>
+                </TouchableOpacity>
               )}
             </View>
           )}

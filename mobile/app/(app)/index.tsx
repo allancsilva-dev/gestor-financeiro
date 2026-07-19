@@ -18,6 +18,7 @@ import NovaTransacaoModal, { LancamentoInicial } from '../../src/components/Nova
 import Entrance from '../../src/components/ui/Entrance';
 import FloatEmoji from '../../src/components/ui/FloatEmoji';
 import { formatCurrency, formatDateOnlyBR, getInitials } from '../../src/utils/format';
+import { dismissHomeChecklist, isHomeChecklistDismissed } from '../../src/store/homeChecklist';
 
 // Home reduzida (PR-F3-07) — ordem fixa: Disponível para gastar; Compromissos
 // próximos; lançar; cinco movimentações; uma recomendação textual; link para
@@ -65,6 +66,29 @@ export default function Dashboard() {
 
   const comprometidos = compromissosQuery.data?.itens.filter(i => i.grupo === 'COMPROMETIDO') ?? [];
   const previstos = compromissosQuery.data?.itens.filter(i => i.grupo === 'PREVISTO') ?? [];
+
+  // Checklist de setup (PR-F3-10): opcional, discreto e derivado somente das
+  // 4 queries que a home já faz — nenhum request extra. Dispensável de vez.
+  const [checklistOculto, setChecklistOculto] = React.useState(true);
+  React.useEffect(() => {
+    isHomeChecklistDismissed().then(d => setChecklistOculto(d));
+  }, []);
+  const ocultarChecklist = () => {
+    setChecklistOculto(true);
+    dismissHomeChecklist().catch(() => {});
+  };
+  const checklistItens: Array<{ label: string; onPress: () => void }> = [];
+  if (!checklistOculto && metricasQuery.data && compromissosQuery.data && transacoesQuery.data) {
+    if (transacoesQuery.data.content.length === 0) {
+      checklistItens.push({ label: 'Lance sua primeira movimentação', onPress: () => setLancarAberto(true) });
+    }
+    if (previstos.length === 0) {
+      checklistItens.push({ label: 'Cadastre suas contas fixas', onPress: () => router.push('/more/contas-fixas' as any) });
+    }
+    if (Number(metricasQuery.data.reservado) === 0) {
+      checklistItens.push({ label: 'Crie sua primeira meta', onPress: () => router.push('/metas' as any) });
+    }
+  }
   // Recomendação: somente texto — números de insights nunca aparecem na home
   const recomendacao = insightsQuery.data?.recomendacoes?.[0] || insightsQuery.data?.resumo || null;
 
@@ -349,6 +373,32 @@ export default function Dashboard() {
           <Card padded radius={20} style={{ marginTop: 16 }}>
             <Text style={{ color: colors.textPrimary, fontSize: 14, fontWeight: '700' }}>Recomendação</Text>
             <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>{recomendacao}</Text>
+          </Card>
+        </Entrance>
+      )}
+
+      {/* Checklist de setup (PR-F3-10): discreto, opcional, nunca bloqueia */}
+      {checklistItens.length > 0 && (
+        <Entrance delay={325}>
+          <Card padded radius={16} style={{ marginTop: 16 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase' }}>Complete seu setup</Text>
+              <TouchableOpacity onPress={ocultarChecklist} accessibilityRole="button" accessibilityLabel="Ocultar checklist de setup" hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Text style={{ color: colors.textMuted, fontSize: 12 }}>Ocultar</Text>
+              </TouchableOpacity>
+            </View>
+            {checklistItens.map((item, i) => (
+              <TouchableOpacity
+                key={item.label}
+                onPress={item.onPress}
+                accessibilityRole="button"
+                accessibilityLabel={item.label}
+                style={{ minHeight: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderTopWidth: i === 0 ? 0 : 1, borderTopColor: colors.border, marginTop: i === 0 ? 6 : 0 }}
+              >
+                <Text style={{ color: colors.textPrimary, fontSize: 13 }}>{item.label}</Text>
+                <Text style={{ color: colors.brandFg, fontSize: 14 }}>›</Text>
+              </TouchableOpacity>
+            ))}
           </Card>
         </Entrance>
       )}

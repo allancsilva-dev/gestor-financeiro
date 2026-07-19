@@ -227,7 +227,15 @@ export default function ContasFixasScreen() {
             <View style={{ alignItems: 'center', paddingHorizontal: 32, paddingVertical: 48 }}>
               <Text style={{ fontSize: 40, marginBottom: 12 }}>🧾</Text>
               <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600', textAlign: 'center' }}>Nenhuma recorrência ainda</Text>
-              <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4, textAlign: 'center' }}>Toque no + para cadastrar salário, aluguel ou outros valores recorrentes.</Text>
+              <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4, textAlign: 'center' }}>Cadastre salário, aluguel ou outros valores recorrentes.</Text>
+              <TouchableOpacity
+                onPress={() => { limparCriar(); setModalCriarVisible(true); }}
+                accessibilityRole="button"
+                accessibilityLabel="Cadastrar primeira recorrência"
+                style={{ marginTop: 12, minHeight: 44, paddingHorizontal: 20, borderRadius: 12, backgroundColor: colors.brandBg, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Text style={{ color: colors.brandFg, fontWeight: '700' }}>Cadastrar recorrência</Text>
+              </TouchableOpacity>
             </View>
           )}
         />
