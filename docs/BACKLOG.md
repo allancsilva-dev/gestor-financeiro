@@ -1149,7 +1149,7 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Rollback:** reimplantar somente o artefato anterior; PR-F2-20 não altera schema nem dados.
 - **Status:** ABERTO — implementação concluída; gate externo `PROB-0081` pendente.
 
-## BACKLOG-0089 — Atualizar CHANGELOG.md e CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md com PR-F3-01, PR-F3-02, PR-F3-03, PR-F3-04, PR-F3-05, PR-F3-06, PR-F3-07 e PR-F3-08
+## BACKLOG-0089 — Atualizar CHANGELOG.md e CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md com PR-F3-01, PR-F3-02, PR-F3-03, PR-F3-04, PR-F3-05, PR-F3-06, PR-F3-07, PR-F3-08 e PR-F3-09
 
 - **Prioridade:** P3
 - **Área:** documentação
@@ -1160,11 +1160,12 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   mobile, Fase 3, commit `413d191` em `main` — primeiro PR do Bloco B, consumo mobile), o PR-F3-06
   (visão financeira mobile, Fase 3, commit `0c892bc` em `main` — segundo PR do Bloco B, consumo
   mobile), o PR-F3-07 (home reduzida mobile, Fase 3, commit `628cf8e` em `main` — terceiro PR do
-  Bloco B, consumo mobile) e o PR-F3-08 (drill-down até o extrato mobile, Fase 3, commit `672d97b`
-  em `main` — quarto PR do Bloco B, consumo mobile) foram implementados e revisados, mas
-  `docs/CHANGELOG.md` e `docs/CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md` não puderam ser
-  atualizados em nenhuma das oito rodadas porque esses dois arquivos não constam na lista de
-  arquivos sob responsabilidade do `docs-reporter` — a tentativa de edição foi bloqueada pelo
+  Bloco B, consumo mobile), o PR-F3-08 (drill-down até o extrato mobile, Fase 3, commit `672d97b`
+  em `main` — quarto PR do Bloco B, consumo mobile) e o PR-F3-09 (onboarding mobile mínimo, Fase 3,
+  commit `0849847` em `main` — quinto PR do Bloco B, consumo mobile) foram implementados e
+  revisados, mas `docs/CHANGELOG.md` e `docs/CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md` não
+  puderam ser atualizados em nenhuma das nove rodadas porque esses dois arquivos não constam na
+  lista de arquivos sob responsabilidade do `docs-reporter` — a tentativa de edição foi bloqueada pelo
   sistema de permissão da ferramenta (e, nas rodadas do PR-F3-02 em diante, a restrição foi
   confirmada explicitamente pelo solicitante). O conteúdo completo de cada entrada já foi redigido
   e está disponível em:
@@ -1191,8 +1192,11 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   - PR-F3-08: `docs/REVIEW_REPORTS/2026-07-19_mobile_implementation_pr-f3-08-drill-down.md`
     (seção "O que ficou pendente", com blocos de texto prontos para `CHANGELOG.md` e para o
     checklist) e `docs/SYSTEM_OVERVIEW.md` (entrada de 2026-07-19, logo após a do PR-F3-07).
+  - PR-F3-09: `docs/REVIEW_REPORTS/2026-07-19_mobile_implementation_pr-f3-09-onboarding-minimo.md`
+    (seção "O que ficou pendente", com blocos de texto prontos para `CHANGELOG.md` e para o
+    checklist) e `docs/SYSTEM_OVERVIEW.md` (entrada de 2026-07-19, logo após a do PR-F3-08).
 - **Dependências:** um agente ou usuário com permissão de escrita em `docs/CHANGELOG.md` e
-  `docs/CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md` aplicar as oito entradas (podem ser aplicadas
+  `docs/CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md` aplicar as nove entradas (podem ser aplicadas
   em commits separados ou no mesmo commit). Para o PR-F3-05 especificamente, recomenda-se também
   executar o Maestro `financial-critical.yaml` atualizado (simulador iOS + stack local) antes de
   marcar a entrada do checklist como totalmente concluída, dado que o flow foi alterado e ainda não
@@ -1205,7 +1209,13 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   nenhuma validação end-to-end automatizada, e aumentou ainda mais com o PR-F3-08, pois este é o
   primeiro PR do Bloco B cujo comportamento novo depende diretamente de integração real com
   `expo-router` (parâmetros de rota para drill-down), não coberta por nenhum teste unitário até
-  aqui.
+  aqui. **Para o PR-F3-09, a execução do Maestro passa a ser prioridade CRÍTICA e deve ser agendada
+  antes da rodada única dos PRs anteriores (não apenas acumulada a ela)** — o onboarding foi
+  reescrito do zero (wizard de 6 passos → etapa única), o Maestro ganhou um bloco novo inteiro de
+  setup pós-onboarding (categoria, cartão e meta criados pelas telas normais), e nenhum teste
+  unitário Jest cobre `onboarding.tsx`; este é o primeiro fluxo que todo usuário novo percorre, e uma
+  falha nele bloquearia a entrada de qualquer conta nova no app (ver achado #3, severidade
+  MÉDIA/ALTA, do relatório de revisão do PR-F3-09).
 - **Critério de aceite:**
   - `CHANGELOG.md` tem entrada `## [Fase 3 — PR-F3-01] - 2026-07-17` acima da entrada `PR-F2-20`,
     entrada `## [Fase 3 — PR-F3-02] - 2026-07-17` acima da entrada `PR-F3-01`, entrada
