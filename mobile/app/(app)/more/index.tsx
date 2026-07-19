@@ -12,6 +12,7 @@ import Card from '../../../src/components/ui/Card';
 
 // Grid 2 colunas (DESIGN.md) — tile 44 violeta (navegação é marca, nunca arco-íris), label + subtítulo
 const itens = [
+  { label: 'Visão financeira', sub: 'Métricas oficiais', rota: '/more/visao-financeira', icone: '🧭' },
   { label: 'Contas',       sub: 'Saldos e dinheiro', rota: '/more/carteiras',    icone: '₿' },
   { label: 'Recorrências', sub: 'Entradas e saídas', rota: '/more/contas-fixas', icone: '📅' },
   { label: 'Orçamentos',   sub: 'Por categoria',    rota: '/more/orcamentos',   icone: '📊' },

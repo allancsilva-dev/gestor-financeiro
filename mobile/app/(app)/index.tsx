@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, Modal, RefreshControl, ScrollView, View, Text, TouchableOpacity } from 'react-native';
+import { RefreshControl, ScrollView, View, Text, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
@@ -14,6 +14,7 @@ import SkeletonBox from '../../src/components/ui/SkeletonBox';
 import Card from '../../src/components/ui/Card';
 import ListRow from '../../src/components/ui/ListRow';
 import NovaTransacaoModal, { LancamentoInicial } from '../../src/components/NovaTransacaoModal';
+import ComposicaoMetricaModal from '../../src/components/ComposicaoMetricaModal';
 import Entrance from '../../src/components/ui/Entrance';
 import FloatEmoji from '../../src/components/ui/FloatEmoji';
 import { formatCurrency, getInitials } from '../../src/utils/format';
@@ -32,12 +33,6 @@ export default function Dashboard() {
   // Repetir lançamento (PR-F3-05): pré-preenche e exige confirmação no Salvar
   const [repetirLancamento, setRepetirLancamento] = React.useState<LancamentoInicial | null>(null);
   const metricasQuery = useQuery({ queryKey: ['metricas'], queryFn: () => metricasService.obter() });
-  const origensQuery = useQuery({
-    queryKey: ['metricas-origens', metricaSelecionada],
-    queryFn: () => metricasService.listarOrigens(metricaSelecionada!),
-    enabled: metricaSelecionada != null,
-  });
-
   const transacoesQuery = useQuery<PagedResponse<Transacao>>({
     queryKey: ['transacoes-recentes'],
     queryFn: () => api.get<PagedResponse<Transacao>>('/v1/transacoes/minhas?page=0&size=5&sort=data,desc').then(r => r.data),
@@ -253,23 +248,7 @@ export default function Dashboard() {
         </View>
       )}
 
-      <Modal visible={metricaSelecionada != null} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setMetricaSelecionada(null)}>
-        <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: 18 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-            <Text style={{ color: colors.textPrimary, fontSize: 17, fontWeight: '700' }}>Composição da métrica</Text>
-            <TouchableOpacity onPress={() => setMetricaSelecionada(null)} accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: colors.brandFg, fontWeight: '700' }}>Fechar</Text></TouchableOpacity>
-          </View>
-          {origensQuery.isLoading ? <ActivityIndicator color={colors.brand} style={{ marginTop: 48 }} /> : origensQuery.isError ? (
-            <TouchableOpacity onPress={() => origensQuery.refetch()} style={{ alignItems: 'center', padding: 48 }}><Text style={{ color: colors.brandFg, fontWeight: '700' }}>Tentar novamente</Text></TouchableOpacity>
-          ) : (origensQuery.data?.length ?? 0) === 0 ? (
-            <Text style={{ color: colors.textSecondary, textAlign: 'center', padding: 48 }}>Nenhuma origem compõe esta métrica.</Text>
-          ) : (
-            <ScrollView contentContainerStyle={{ padding: 16 }}>
-              {origensQuery.data?.map(origem => <ListRow key={`${origem.tipo}-${origem.id}`} title={origem.descricao} subtitle={origem.tipo} value={formatCurrency(Number(origem.valor))} />)}
-            </ScrollView>
-          )}
-        </View>
-      </Modal>
+      <ComposicaoMetricaModal metrica={metricaSelecionada} onClose={() => setMetricaSelecionada(null)} />
 
       {/* Faixa KPI: Receitas · Despesas · Disponível */}
       {resumoQuery.data && (
