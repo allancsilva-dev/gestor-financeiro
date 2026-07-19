@@ -1149,18 +1149,19 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Rollback:** reimplantar somente o artefato anterior; PR-F2-20 não altera schema nem dados.
 - **Status:** ABERTO — implementação concluída; gate externo `PROB-0081` pendente.
 
-## BACKLOG-0089 — Atualizar CHANGELOG.md e CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md com PR-F3-01, PR-F3-02, PR-F3-03, PR-F3-04 e PR-F3-05
+## BACKLOG-0089 — Atualizar CHANGELOG.md e CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md com PR-F3-01, PR-F3-02, PR-F3-03, PR-F3-04, PR-F3-05 e PR-F3-06
 
 - **Prioridade:** P3
 - **Área:** documentação
 - **Motivo:** o PR-F3-01 (compromissos próximos, Fase 3), o PR-F3-02 (sugestão determinística de
   categoria, Fase 3, commit `483ef36` em `main`), o PR-F3-03 (contrato de onboarding mínimo, Fase 3,
   commit `ccd0f10` em `main`), o PR-F3-04 (fundação de drill-down, Fase 3, commit `7cc4aeb` em
-  `main` — fecha o Bloco A backend da Fase 3, PR-F3-01 a PR-F3-04) e o PR-F3-05 (lançamento rápido
-  mobile, Fase 3, commit `413d191` em `main` — primeiro PR do Bloco B, consumo mobile) foram
-  implementados e revisados, mas `docs/CHANGELOG.md` e
+  `main` — fecha o Bloco A backend da Fase 3, PR-F3-01 a PR-F3-04), o PR-F3-05 (lançamento rápido
+  mobile, Fase 3, commit `413d191` em `main` — primeiro PR do Bloco B, consumo mobile) e o PR-F3-06
+  (visão financeira mobile, Fase 3, commit `0c892bc` em `main` — segundo PR do Bloco B, consumo
+  mobile) foram implementados e revisados, mas `docs/CHANGELOG.md` e
   `docs/CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md` não puderam ser atualizados em nenhuma das
-  cinco rodadas porque esses dois arquivos não constam na lista de arquivos sob responsabilidade do
+  seis rodadas porque esses dois arquivos não constam na lista de arquivos sob responsabilidade do
   `docs-reporter` — a tentativa de edição foi bloqueada pelo sistema de permissão da ferramenta (e,
   nas rodadas do PR-F3-02 em diante, a restrição foi confirmada explicitamente pelo solicitante). O
   conteúdo completo de cada entrada já foi redigido e está disponível em:
@@ -1178,18 +1179,25 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   - PR-F3-05: `docs/REVIEW_REPORTS/2026-07-19_mobile_implementation_pr-f3-05-lancamento-rapido.md`
     (seção "O que ficou pendente", com blocos de texto prontos para `CHANGELOG.md` e para o
     checklist) e `docs/SYSTEM_OVERVIEW.md` (entrada de 2026-07-19, logo após a do PR-F3-04).
+  - PR-F3-06: `docs/REVIEW_REPORTS/2026-07-19_mobile_implementation_pr-f3-06-visao-financeira.md`
+    (seção "O que ficou pendente", com blocos de texto prontos para `CHANGELOG.md` e para o
+    checklist) e `docs/SYSTEM_OVERVIEW.md` (entrada de 2026-07-19, logo após a do PR-F3-05).
 - **Dependências:** um agente ou usuário com permissão de escrita em `docs/CHANGELOG.md` e
-  `docs/CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md` aplicar as cinco entradas (podem ser aplicadas
+  `docs/CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md` aplicar as seis entradas (podem ser aplicadas
   em commits separados ou no mesmo commit). Para o PR-F3-05 especificamente, recomenda-se também
   executar o Maestro `financial-critical.yaml` atualizado (simulador iOS + stack local) antes de
   marcar a entrada do checklist como totalmente concluída, dado que o flow foi alterado e ainda não
-  foi rodado (ver achado #2 do relatório de revisão do PR-F3-05).
+  foi rodado (ver achado #2 do relatório de revisão do PR-F3-05). Para o PR-F3-06, recomenda-se
+  realizar a validação visual (Maestro/simulador, tema claro/escuro) em conjunto com a do PR-F3-05,
+  numa única rodada para o Bloco B até aqui (ver achados #4 e #5 do relatório de revisão do
+  PR-F3-06).
 - **Critério de aceite:**
   - `CHANGELOG.md` tem entrada `## [Fase 3 — PR-F3-01] - 2026-07-17` acima da entrada `PR-F2-20`,
     entrada `## [Fase 3 — PR-F3-02] - 2026-07-17` acima da entrada `PR-F3-01`, entrada
     `## [Fase 3 — PR-F3-03] - 2026-07-17` acima da entrada `PR-F3-02`, entrada
-    `## [Fase 3 — PR-F3-04] - 2026-07-17` acima da entrada `PR-F3-03`, e entrada
-    `## [Fase 3 — PR-F3-05] - 2026-07-19` acima da entrada `PR-F3-04` (ordem cronológica inversa,
+    `## [Fase 3 — PR-F3-04] - 2026-07-17` acima da entrada `PR-F3-03`, entrada
+    `## [Fase 3 — PR-F3-05] - 2026-07-19` acima da entrada `PR-F3-04`, e entrada
+    `## [Fase 3 — PR-F3-06] - 2026-07-19` acima da entrada `PR-F3-05` (ordem cronológica inversa,
     seguindo o padrão já usado no arquivo).
   - O checklist tem seção `PR-F3-01` marcada como concluída com evidência de `./mvnw test`
     (243/243) e `./mvnw verify -Pintegration-test` (243 + 27 ITs), seção `PR-F3-02` marcada como
@@ -1198,11 +1206,14 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
     `./mvnw verify -Pintegration-test` (249 unitários + 27 ITs, commit `ccd0f10`), seção
     `PR-F3-04` marcada como concluída com evidência de `./mvnw verify -Pintegration-test`
     (255 unitários + 27 ITs, commit `7cc4aeb`), incluindo a observação de que fecha o Bloco A
-    backend da Fase 3, e seção `PR-F3-05` marcada como `PASS_COM_RESSALVA` com evidência de
+    backend da Fase 3, seção `PR-F3-05` marcada como `PASS_COM_RESSALVA` com evidência de
     `npx tsc --noEmit` limpo e Jest 26/26 (9 suites, commit `413d191`), incluindo explicitamente os
     itens em aberto (Maestro `financial-critical.yaml` não executado, evidência visual claro/escuro
-    e medição do tempo do fluxo pendentes).
+    e medição do tempo do fluxo pendentes), e seção `PR-F3-06` marcada como `PASS_COM_RESSALVA` com
+    evidência de `npx tsc --noEmit` limpo e Jest 26/26 (9 suites, commit `0c892bc`), incluindo
+    explicitamente os itens em aberto (Maestro/simulador não executado para a tela nova, evidência
+    visual claro/escuro pendente, acumulada com a mesma pendência do PR-F3-05).
 - **Risco se ficar pendente:** histórico de versões e checklist de execução ficam temporariamente
-  incompletos para quem consulta apenas esses dois arquivos; a rastreabilidade completa dos cinco
+  incompletos para quem consulta apenas esses dois arquivos; a rastreabilidade completa dos seis
   PRs já existe em `SYSTEM_OVERVIEW.md` e nos respectivos relatórios de revisão.
 - **Status:** ABERTO.
