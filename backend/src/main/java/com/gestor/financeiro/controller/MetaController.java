@@ -65,6 +65,11 @@ public class MetaController {
     @PostMapping
     public ResponseEntity<MetaResponseDto> criar(@Valid @RequestBody MetaRequest request) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        // Modalidade obrigatoria na criacao (PR-F3-11); imutavel depois
+        if (request.getModalidade() == null) {
+            throw new com.gestor.financeiro.exception.BusinessException(
+                    "Escolha a modalidade da meta: COFRE_REAL ou RESERVA_VIRTUAL");
+        }
         Meta meta = toEntity(request);
         Meta metaCriada = metaService.criar(meta, usuarioId);
         return ResponseEntity.ok(MetaResponseDto.fromEntity(metaCriada));

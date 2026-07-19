@@ -101,7 +101,8 @@ class MetaReservaVirtualTest {
     }
 
     @Test
-    void trocaDeModalidadeComReservaEBloqueada() {
+    void trocaDeModalidadeEBloqueadaMesmoComReservaZerada() {
+        // Com reserva
         metaService.adicionarValor(metaVirtual.getId(), new BigDecimal("100.00"),
                 carteira.getId(), usuario.getId());
 
@@ -112,5 +113,15 @@ class MetaReservaVirtualTest {
 
         assertThrows(BusinessException.class,
                 () -> metaService.atualizar(metaVirtual.getId(), alteracao, usuario.getId()));
+
+        // Reserva zerada: troca continua bloqueada (PR-F3-11, imutavel pos-criacao)
+        metaService.removerValor(metaVirtual.getId(), new BigDecimal("100.00"),
+                carteira.getId(), usuario.getId());
+        assertThrows(BusinessException.class,
+                () -> metaService.atualizar(metaVirtual.getId(), alteracao, usuario.getId()));
+
+        // Mesma modalidade no payload segue aceita (nao e troca)
+        alteracao.setModalidade(ModalidadeMeta.RESERVA_VIRTUAL);
+        metaService.atualizar(metaVirtual.getId(), alteracao, usuario.getId());
     }
 }

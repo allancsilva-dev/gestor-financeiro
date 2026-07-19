@@ -325,6 +325,8 @@ export interface FalhaRecorrencia {
 
 // ── Metas ──────────────────────────────────────────────────────────
 export type StatusMeta = 'ATIVA' | 'CONCLUIDA' | 'ARQUIVADA';
+// Exatamente uma modalidade por meta (ADR-0012); imutável após a criação (PR-F3-11)
+export type ModalidadeMeta = 'COFRE_REAL' | 'RESERVA_VIRTUAL';
 
 export interface Meta {
   id: number;
@@ -341,6 +343,9 @@ export interface Meta {
   cor?: string;
   icone?: string;
   descricao?: string;
+  modalidade: ModalidadeMeta;
+  cofreId?: number | null;
+  carteiraAlocadaId?: number | null;
 }
 
 export interface MetaRequest {
@@ -351,6 +356,7 @@ export interface MetaRequest {
   cor?: string;
   icone?: string;
   descricao?: string;
+  modalidade?: ModalidadeMeta; // obrigatória na criação; na edição, mesma modalidade ou ausente
 }
 
 export interface MetaProgresso {

@@ -163,14 +163,12 @@ public class MetaService {
         Meta meta = buscarPorIdDoUsuario(id, usuarioId);
         exigirNaoArquivada(meta);
 
-        // Troca de modalidade so com reserva zerada (ADR-0012)
+        // Modalidade e imutavel apos a criacao, inclusive com reserva zerada
+        // (PR-F3-11 endurece a ADR-0012)
         if (metaAtualizada.getModalidade() != null
                 && metaAtualizada.getModalidade() != meta.getModalidade()) {
-            if (meta.getValorReservado() != null && meta.getValorReservado().signum() > 0) {
-                throw new BusinessException(
-                        "Resgate a reserva antes de trocar a modalidade da meta");
-            }
-            meta.setModalidade(metaAtualizada.getModalidade());
+            throw new BusinessException(
+                    "Modalidade da meta não pode ser alterada após a criação");
         }
 
         meta.setNome(metaAtualizada.getNome());

@@ -4,8 +4,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { metaService } from '../../src/services/metaService';
 import contaFinanceiraService from '../../src/services/contaFinanceiraService';
-import { formatCurrency, formatPercent, formatDate, parseDateBR, isValidDateBR, parseCurrencyBR, maskCurrencyInput, maskDateInput } from '../../src/utils/format';
-import { Meta, MetaRequest, StatusMeta } from '../../src/types';
+import { useRouter } from 'expo-router';
+import { formatCurrency, formatPercent, formatDate, formatDateOnlyBR, parseDateBR, isValidDateBR, parseCurrencyBR, maskCurrencyInput, maskDateInput } from '../../src/utils/format';
+import { Meta, MetaRequest, ModalidadeMeta, StatusMeta } from '../../src/types';
 import { useTheme } from '../../src/theme';
 import SkeletonBox from '../../src/components/ui/SkeletonBox';
 import Card from '../../src/components/ui/Card';
@@ -15,10 +16,25 @@ import ProgressBar from '../../src/components/ui/ProgressBar';
 import Fab from '../../src/components/ui/Fab';
 import Field from '../../src/components/ui/Field';
 import Chip from '../../src/components/ui/Chip';
-import { acoesDaMeta } from '../../src/domain/metaPolicy';
+import { acoesDaMeta, duracaoDaMetaConcluidaEmDias } from '../../src/domain/metaPolicy';
+
+// Textos do glossário (ADR-0012) — a escolha é definitiva (PR-F3-11)
+const MODALIDADES: Array<{ id: ModalidadeMeta; titulo: string; descricao: string }> = [
+  {
+    id: 'COFRE_REAL',
+    titulo: 'Cofre real',
+    descricao: 'O dinheiro sai da sua conta e fica guardado num cofre com extrato próprio.',
+  },
+  {
+    id: 'RESERVA_VIRTUAL',
+    titulo: 'Reserva virtual',
+    descricao: 'O dinheiro continua na sua conta, marcado como reservado; reduz só o disponível para gastar.',
+  },
+];
 
 export default function Metas() {
   const colors = useTheme();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
 
@@ -40,6 +56,9 @@ export default function Metas() {
   const [erroCarteiraDestino, setErroCarteiraDestino] = useState<string | null>(null);
 
   const [nomeCriar, setNomeCriar] = useState('');
+  // Escolha obrigatória na criação; imutável depois (PR-F3-11)
+  const [modalidadeCriar, setModalidadeCriar] = useState<ModalidadeMeta | null>(null);
+  const [modalidadeError, setModalidadeError] = useState<string | null>(null);
   const [valorTotalCriar, setValorTotalCriar] = useState('');
   const [valorMensalCriar, setValorMensalCriar] = useState('');
   const [dataLimiteCriar, setDataLimiteCriar] = useState('');
@@ -64,6 +83,8 @@ export default function Metas() {
 
   const resetFormularioMeta = () => {
     setEditandoMeta(null);
+    setModalidadeCriar(null);
+    setModalidadeError(null);
     setNomeCriar('');
     setValorTotalCriar('');
     setValorMensalCriar('');
@@ -83,6 +104,7 @@ export default function Metas() {
 
   const abrirEditarMeta = (meta: Meta) => {
     setEditandoMeta(meta);
+    setModalidadeCriar(meta.modalidade ?? 'COFRE_REAL');
     setNomeCriar(meta.nome);
     setValorTotalCriar(maskCurrencyInput(Number(meta.valorTotal ?? 0).toFixed(2)));
     setValorMensalCriar(meta.valorMensal ? maskCurrencyInput(Number(meta.valorMensal).toFixed(2)) : '');
@@ -132,8 +154,9 @@ export default function Metas() {
   };
 
   const montarPayloadMeta = (): MetaRequest | null => {
-    setNomeError(null); setValorTotalError(null); setValorMensalError(null); setDataLimiteError(null); setErroCriar(null);
+    setNomeError(null); setValorTotalError(null); setValorMensalError(null); setDataLimiteError(null); setErroCriar(null); setModalidadeError(null);
     let hasErr = false;
+    if (!editandoMeta && modalidadeCriar == null) { setModalidadeError('Escolha como a meta guarda o dinheiro.'); hasErr = true; }
     if (!nomeCriar.trim() || nomeCriar.trim().length < 3) { setNomeError('Nome obrigatório (mínimo 3 caracteres).'); hasErr = true; }
     const valorTotal = parseCurrencyBR(valorTotalCriar);
     if (isNaN(valorTotal) || valorTotal <= 0) { setValorTotalError('Valor total obrigatório e positivo.'); hasErr = true; }
@@ -147,6 +170,7 @@ export default function Metas() {
       valorMensal: valorMensal ? Number(valorMensal) : undefined,
       dataLimite: dataLimiteCriar ? parseDateBR(dataLimiteCriar) : undefined,
       descricao: descricaoCriar || undefined,
+      modalidade: modalidadeCriar ?? undefined,
     };
   };
 
@@ -262,6 +286,9 @@ export default function Metas() {
             <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2, fontVariant: ['tabular-nums'] }}>
               {formatCurrency(Number(meta.valorReservado ?? 0))} de {formatCurrency(Number(meta.valorTotal ?? 0))}
             </Text>
+            <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
+              {meta.modalidade === 'RESERVA_VIRTUAL' ? 'Reserva virtual' : 'Cofre real'}
+            </Text>
           </View>
         </View>
 
@@ -271,6 +298,25 @@ export default function Metas() {
           <Text style={{ color: concluida ? colors.success : colors.brandFg, fontSize: 12, fontWeight: '700' }}>{formatPercent(progresso)}</Text>
           {meta.dataPrevista && <Text style={{ color: colors.textSecondary, fontSize: 11 }}>até {formatDate(meta.dataPrevista)}</Text>}
         </View>
+
+        {/* Concluída: quando terminou, com quanto e em quantos dias (PR-F3-11) */}
+        {concluida && meta.dataConclusao && (
+          <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 8 }}>
+            Concluída em {formatDateOnlyBR(meta.dataConclusao)} com {formatCurrency(Number(meta.valorReservado ?? 0))}
+            {duracaoDaMetaConcluidaEmDias(meta) != null ? ` · ${duracaoDaMetaConcluidaEmDias(meta)} dias` : ''}
+          </Text>
+        )}
+
+        {acoesDaMeta(meta).verExtratoCofre && (
+          <TouchableOpacity
+            onPress={() => router.push(`/more/carteiras?contaId=${meta.cofreId}` as any)}
+            accessibilityRole="button"
+            accessibilityLabel={`Ver extrato do cofre da meta ${meta.nome}`}
+            style={{ marginTop: 8, alignSelf: 'flex-start', minHeight: 32, justifyContent: 'center' }}
+          >
+            <Text style={{ color: colors.brandFg, fontSize: 12, fontWeight: '600' }}>Ver extrato do cofre ›</Text>
+          </TouchableOpacity>
+        )}
 
         {acoesDaMeta(meta).adicionar && (
           <TouchableOpacity
@@ -544,7 +590,35 @@ export default function Metas() {
             </TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
-            <Field testID="goal-name" label="Nome" value={nomeCriar} onChangeText={setNomeCriar} placeholder="Ex: Reserva de emergência" error={nomeError} autoFocus />
+            {!editandoMeta ? (
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ color: colors.textSecondary, fontSize: 10, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Como guardar o dinheiro</Text>
+                {MODALIDADES.map(m => (
+                  <TouchableOpacity
+                    key={m.id}
+                    onPress={() => setModalidadeCriar(m.id)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: modalidadeCriar === m.id }}
+                    accessibilityLabel={`${m.titulo}: ${m.descricao}`}
+                    style={{ borderWidth: 1.5, borderColor: modalidadeCriar === m.id ? colors.brand : colors.border, backgroundColor: modalidadeCriar === m.id ? colors.brandBg : colors.card, borderRadius: 12, padding: 12, marginBottom: 8 }}
+                  >
+                    <Text style={{ color: modalidadeCriar === m.id ? colors.brandFg : colors.textPrimary, fontSize: 14, fontWeight: '700' }}>{m.titulo}</Text>
+                    <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>{m.descricao}</Text>
+                  </TouchableOpacity>
+                ))}
+                <Text style={{ color: colors.textMuted, fontSize: 11 }}>A escolha é definitiva para esta meta.</Text>
+                {modalidadeError && <Text style={{ color: colors.danger, fontSize: 12, marginTop: 4 }}>{modalidadeError}</Text>}
+              </View>
+            ) : (
+              <View style={{ marginBottom: 16 }}>
+                <Text style={{ color: colors.textSecondary, fontSize: 10, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Modalidade</Text>
+                <Text style={{ color: colors.textPrimary, fontSize: 14, fontWeight: '600' }}>
+                  {editandoMeta.modalidade === 'RESERVA_VIRTUAL' ? 'Reserva virtual' : 'Cofre real'}
+                </Text>
+                <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>Definida na criação — não pode ser alterada.</Text>
+              </View>
+            )}
+            <Field testID="goal-name" label="Nome" value={nomeCriar} onChangeText={setNomeCriar} placeholder="Ex: Reserva de emergência" error={nomeError} />
             <Field testID="goal-total" label="Valor total" value={valorTotalCriar} onChangeText={(t) => setValorTotalCriar(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" error={valorTotalError} />
             <Field label="Valor mensal (opcional)" value={valorMensalCriar} onChangeText={(t) => setValorMensalCriar(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" error={valorMensalError} />
             <Field label="Data limite" value={dataLimiteCriar} onChangeText={(t) => setDataLimiteCriar(maskDateInput(t))} placeholder="DD/MM/AAAA" keyboardType="number-pad" error={dataLimiteError} />
