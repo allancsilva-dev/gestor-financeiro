@@ -25,42 +25,64 @@ tags:
 - tapOn:
     id: "register-submit"
 - extendedWaitUntil:
-    visible: "Conta"
+    visible: "Sua conta principal"
     timeout: 20000
 
-# Onboarding atomico: conta 1.000, cartao 5.000, categorias, sem renda e meta 1.000
+# Onboarding minimo (PR-F3-09): etapa unica, so conta principal com 1.000
+- assertVisible: "Sua conta principal"
 - tapOn:
     id: "onboarding-account-balance"
 - inputText: "100000"
 - hideKeyboard
-- tapOn: "Continuar"
-- assertVisible: "Cartão"
-- tapOn:
-    id: "onboarding-card-limit"
-- inputText: "500000"
-- hideKeyboard
-- tapOn: "Continuar"
-- assertVisible: "Categorias"
-- assertVisible: "Alimentação"
-- tapOn: "Continuar"
-- assertVisible: "Renda"
-- tapOn: "Pular — configuro depois"
-- tapOn: "Continuar"
-- assertVisible: "Meta"
-- tapOn:
-    id: "onboarding-goal-name"
-- inputText: "Meta Smoke"
-- tapOn:
-    id: "onboarding-goal-total"
-- inputText: "100000"
-- hideKeyboard
-- tapOn: "Continuar"
-- assertVisible: "Confirmar"
 - tapOn: "Começar"
 - extendedWaitUntil:
     visible: "Início"
     timeout: 20000
 - takeScreenshot: "01-onboarding-completo"
+
+# Setup pos-onboarding pelas telas: cartao, categoria e meta (nao criados no onboarding minimo)
+- tapOn: "Mais"
+- tapOn: "Categorias"
+- tapOn: "Nova categoria"
+- tapOn:
+    id: "category-name"
+- inputText: "Alimentação"
+- hideKeyboard
+- tapOn: "Salvar"
+- extendedWaitUntil:
+    visible: "Alimentação"
+    timeout: 15000
+- tapOn: "Voltar"
+- tapOn: "Cartões"
+- tapOn: "Novo cartão"
+- tapOn: "Nome da conta"
+- inputText: "Cartão Principal"
+- tapOn: "Limite total"
+- inputText: "500000"
+- tapOn: "Dia de fechamento"
+- inputText: "5"
+- tapOn: "Dia de vencimento"
+- inputText: "12"
+- hideKeyboard
+- tapOn: "Salvar"
+- extendedWaitUntil:
+    visible: "Cartão Principal"
+    timeout: 15000
+- tapOn: "Voltar"
+- tapOn: "Planejamento"
+- tapOn: "Criar meta"
+- tapOn:
+    id: "goal-name"
+- inputText: "Meta Smoke"
+- tapOn:
+    id: "goal-total"
+- inputText: "100000"
+- hideKeyboard
+- tapOn: "Salvar"
+- extendedWaitUntil:
+    visible: "Meta Smoke"
+    timeout: 15000
+- tapOn: "Início"
 
 # Despesa de R$ 100 na conta principal
 - tapOn: "Nova transação"

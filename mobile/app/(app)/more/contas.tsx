@@ -85,6 +85,8 @@ export default function ContasScreen() {
 
       <TouchableOpacity
         onPress={() => setModalVisible(true)}
+        accessibilityRole="button"
+        accessibilityLabel="Novo cartão"
         style={{ position: 'absolute', bottom: 24, right: 16, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' }}
       >
         <Text style={{ color: colors.brandText, fontSize: 28, lineHeight: 30 }}>+</Text>

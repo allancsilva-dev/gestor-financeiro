@@ -98,7 +98,7 @@ export default function CategoriasScreen() {
             </TouchableOpacity>
           </View>
           <ScrollView contentContainerStyle={{ padding: 16 }}>
-            <Field label="Nome" value={nome} onChangeText={setNome} placeholder="Ex: Alimentação" error={nomeError} />
+            <Field testID="category-name" label="Nome" value={nome} onChangeText={setNome} placeholder="Ex: Alimentação" error={nomeError} />
 
             <Text style={{ color: colors.textSecondary, fontSize: 10, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Cor</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 8 }}>

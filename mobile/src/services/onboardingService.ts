@@ -5,6 +5,8 @@ export interface OnboardingStatus {
   onboardingCompleto: boolean;
 }
 
+// Onboarding mínimo (PR-F3-03/09): só carteira é obrigatória; cartão e
+// categorias ausentes são no-op no backend
 export interface OnboardingFinalizarRequest {
   carteira: {
     nome: string;
@@ -12,7 +14,7 @@ export interface OnboardingFinalizarRequest {
     saldo: number;
     banco?: string;
   };
-  cartao: {
+  cartao?: {
     nome: string;
     limiteTotal: number;
     diaFechamento: number;
@@ -20,7 +22,7 @@ export interface OnboardingFinalizarRequest {
     cor?: string;
     banco?: string;
   };
-  categorias: Array<{
+  categorias?: Array<{
     nome: string;
     cor?: string;
     icone?: string;
