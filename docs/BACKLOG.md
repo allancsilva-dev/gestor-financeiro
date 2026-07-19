@@ -1149,7 +1149,7 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Rollback:** reimplantar somente o artefato anterior; PR-F2-20 não altera schema nem dados.
 - **Status:** ABERTO — implementação concluída; gate externo `PROB-0081` pendente.
 
-## BACKLOG-0089 — Atualizar CHANGELOG.md e CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md com PR-F3-01, PR-F3-02, PR-F3-03, PR-F3-04, PR-F3-05, PR-F3-06, PR-F3-07, PR-F3-08, PR-F3-09 e PR-F3-10
+## BACKLOG-0089 — Atualizar CHANGELOG.md e CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md com PR-F3-01, PR-F3-02, PR-F3-03, PR-F3-04, PR-F3-05, PR-F3-06, PR-F3-07, PR-F3-08, PR-F3-09, PR-F3-10 e PR-F3-11
 
 - **Prioridade:** P3
 - **Área:** documentação
@@ -1162,11 +1162,14 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   mobile), o PR-F3-07 (home reduzida mobile, Fase 3, commit `628cf8e` em `main` — terceiro PR do
   Bloco B, consumo mobile), o PR-F3-08 (drill-down até o extrato mobile, Fase 3, commit `672d97b`
   em `main` — quarto PR do Bloco B, consumo mobile), o PR-F3-09 (onboarding mobile mínimo, Fase 3,
-  commit `0849847` em `main` — quinto PR do Bloco B, consumo mobile) e o PR-F3-10 (setup progressivo
-  mobile, Fase 3, commit `f0b27de` em `main` — sexto PR do Bloco B, consumo mobile) foram
+  commit `0849847` em `main` — quinto PR do Bloco B, consumo mobile), o PR-F3-10 (setup progressivo
+  mobile, Fase 3, commit `f0b27de` em `main` — sexto PR do Bloco B, consumo mobile) e o PR-F3-11
+  (modalidade imutável e histórico de metas, Fase 3, commit `6712653` em `main`, com ajuste de
+  flow Maestro em `feee1cb` — sétimo PR do Bloco B; é este PR, não o PR-F3-10, quem efetivamente
+  fecha o Bloco B mobile da Fase 3, PR-F3-05 a PR-F3-11) foram
   implementados e revisados, mas `docs/CHANGELOG.md` e
-  `docs/CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md` não puderam ser atualizados em nenhuma das dez
-  rodadas porque esses dois arquivos não constam na lista de arquivos sob responsabilidade do
+  `docs/CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md` não puderam ser atualizados em nenhuma das
+  onze rodadas porque esses dois arquivos não constam na lista de arquivos sob responsabilidade do
   `docs-reporter` — a tentativa de edição foi bloqueada pelo sistema de permissão da ferramenta (e,
   nas rodadas do PR-F3-02 em diante, a restrição foi confirmada explicitamente pelo solicitante). O
   conteúdo completo de cada entrada já foi redigido e está disponível em:
@@ -1199,8 +1202,13 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   - PR-F3-10: `docs/REVIEW_REPORTS/2026-07-19_mobile_implementation_pr-f3-10-setup-progressivo.md`
     (seção "O que ficou pendente", com blocos de texto prontos para `CHANGELOG.md` e para o
     checklist) e `docs/SYSTEM_OVERVIEW.md` (entrada de 2026-07-19, logo após a do PR-F3-09).
+  - PR-F3-11: `docs/REVIEW_REPORTS/2026-07-19_fullstack_implementation_pr-f3-11-modalidade-metas.md`
+    (seção "O que ficou pendente", com blocos de texto prontos para `CHANGELOG.md` e para o
+    checklist) e `docs/SYSTEM_OVERVIEW.md` (entrada de 2026-07-19, logo após a do PR-F3-10). Este
+    relatório também registra a correção de rastreabilidade: é o PR-F3-11, não o PR-F3-10, quem
+    efetivamente fecha o Bloco B mobile da Fase 3 (PR-F3-05 a PR-F3-11).
 - **Dependências:** um agente ou usuário com permissão de escrita em `docs/CHANGELOG.md` e
-  `docs/CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md` aplicar as dez entradas (podem ser aplicadas
+  `docs/CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md` aplicar as onze entradas (podem ser aplicadas
   em commits separados ou no mesmo commit). Para o PR-F3-05 especificamente, recomenda-se também
   executar o Maestro `financial-critical.yaml` atualizado (simulador iOS + stack local) antes de
   marcar a entrada do checklist como totalmente concluída, dado que o flow foi alterado e ainda não
@@ -1225,7 +1233,13 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   criação de categoria única inline no lançamento, e os CTAs "Criar primeira meta"/"Cadastrar
   recorrência" nos vazios de `metas.tsx`/`contas-fixas.tsx`) e o checklist discreto da home
   ("Complete seu setup"), nenhum dos quais foi exercitado por simulador ou Maestro nesta rodada (ver
-  achado #3 do relatório de revisão do PR-F3-10).
+  achado #3 do relatório de revisão do PR-F3-10). **Para o PR-F3-11, a mesma execução de Maestro
+  agendada para o Bloco B deve cobrir também a criação de meta com escolha obrigatória de
+  modalidade** — o flow `financial-critical.yaml` já foi corrigido para tocar "Cofre real" antes de
+  preencher a meta smoke (commit de acompanhamento `feee1cb`, confirmado por leitura direta de
+  `git show`/`git rev-parse HEAD` pelo `docs-reporter`), mas a rodada real de simulador continua sem
+  ocorrer; esta é a rodada final que fecha a validação visual/E2E pendente de todo o Bloco B
+  (PR-F3-05 a PR-F3-11, ver achado #3 do relatório de revisão do PR-F3-11).
 - **Critério de aceite:**
   - `CHANGELOG.md` tem entrada `## [Fase 3 — PR-F3-01] - 2026-07-17` acima da entrada `PR-F2-20`,
     entrada `## [Fase 3 — PR-F3-02] - 2026-07-17` acima da entrada `PR-F3-01`, entrada
@@ -1236,7 +1250,8 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
     `## [Fase 3 — PR-F3-07] - 2026-07-19` acima da entrada `PR-F3-06`, entrada
     `## [Fase 3 — PR-F3-08] - 2026-07-19` acima da entrada `PR-F3-07`, entrada
     `## [Fase 3 — PR-F3-09] - 2026-07-19` acima da entrada `PR-F3-08`, e entrada
-    `## [Fase 3 — PR-F3-10] - 2026-07-19` acima da entrada `PR-F3-09` (ordem cronológica inversa,
+    `## [Fase 3 — PR-F3-10] - 2026-07-19` acima da entrada `PR-F3-09`, e entrada
+    `## [Fase 3 — PR-F3-11] - 2026-07-19` acima da entrada `PR-F3-10` (ordem cronológica inversa,
     seguindo o padrão já usado no arquivo).
   - O checklist tem seção `PR-F3-01` marcada como concluída com evidência de `./mvnw test`
     (243/243) e `./mvnw verify -Pintegration-test` (243 + 27 ITs), seção `PR-F3-02` marcada como
@@ -1272,8 +1287,14 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
     não executado para os três fluxos de criação contextual e para o checklist da home, evidência
     visual claro/escuro pendente, acumulada com PR-F3-05 a PR-F3-09, e a heurística do checklist —
     cartão fica de fora por não ser derivável com confiança das 4 queries da home — registrada como
-    decisão de produto, não um bug).
+    decisão de produto, não um bug), e seção `PR-F3-11` marcada como `PASS_COM_RESSALVA` com
+    evidência de `./mvnw verify -Pintegration-test` (255 unitários + 27 ITs, commit `6712653`),
+    `npx tsc --noEmit` limpo e Jest 36/36 (12 suites), incluindo explicitamente os itens em aberto
+    (Maestro/simulador não executado de fato para o flow `financial-critical.yaml`, ainda que o flow
+    já tenha sido corrigido textualmente para a escolha de modalidade pelo commit de acompanhamento
+    `feee1cb`; evidência visual claro/escuro pendente, acumulada com PR-F3-05 a PR-F3-10; e a nota de
+    que este PR, não o PR-F3-10, é quem fecha o Bloco B mobile da Fase 3, PR-F3-05 a PR-F3-11).
 - **Risco se ficar pendente:** histórico de versões e checklist de execução ficam temporariamente
-  incompletos para quem consulta apenas esses dois arquivos; a rastreabilidade completa dos dez
+  incompletos para quem consulta apenas esses dois arquivos; a rastreabilidade completa dos onze
   PRs já existe em `SYSTEM_OVERVIEW.md` e nos respectivos relatórios de revisão.
 - **Status:** ABERTO.
