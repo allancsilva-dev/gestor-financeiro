@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { transacaoService, Transacao } from '../services/transacaoService';
 import { categoriaService } from '../services/categoriaService';
 import cartaoService, { Cartao } from '../services/cartaoService';
@@ -30,6 +31,14 @@ export default function Transacoes() {
   const [paginaAtual, setPaginaAtual] = useState(0);
   const [totalPaginas, setTotalPaginas] = useState(1);
   const tamanhoPagina = 20;
+
+  // Drill-down (PR-F3-12): filtros do contrato F3-04 chegam pela URL
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filtroTransacaoId = searchParams.get('transacaoId');
+  const filtroInicio = searchParams.get('inicio');
+  const filtroFim = searchParams.get('fim');
+  const filtroAtivo = Boolean(filtroTransacaoId || (filtroInicio && filtroFim));
+  const limparFiltro = () => { setSearchParams({}, { replace: true }); setPaginaAtual(0); };
   
   const [formData, setFormData] = useState({
     descricao: '',
@@ -50,7 +59,26 @@ export default function Transacoes() {
     if (usuario?.id) { // ← ADICIONADO: só carrega se tiver usuário
       carregarDados();
     }
-  }, [usuario, paginaAtual]);
+  }, [usuario, paginaAtual, searchParams]);
+
+  const listarComFiltro = async () => {
+    if (filtroTransacaoId) {
+      const transacao = await transacaoService.buscarPorId(Number(filtroTransacaoId));
+      return { content: transacao ? [transacao] : [], totalPages: 1 };
+    }
+    if (filtroInicio && filtroFim) {
+      return transacaoService.listarPorPeriodo({
+        inicio: filtroInicio,
+        fim: filtroFim,
+        tipo: searchParams.get('tipo') ?? undefined,
+        q: searchParams.get('q') ?? undefined,
+        categoriaId: searchParams.get('categoriaId') ?? undefined,
+        carteiraId: searchParams.get('carteiraId') ?? undefined,
+        cartaoId: searchParams.get('cartaoId') ?? undefined,
+      }, paginaAtual, tamanhoPagina);
+    }
+    return transacaoService.listarPorUsuarioPaginado(paginaAtual, tamanhoPagina);
+  };
 
   const carregarDados = async () => {
     if (!usuario?.id) return; // ← ADICIONADO: proteção
@@ -58,7 +86,7 @@ export default function Transacoes() {
     try {
       setLoading(true);
       const [transacoesData, contasData] = await Promise.all([
-        transacaoService.listarPorUsuarioPaginado(paginaAtual, tamanhoPagina),
+        listarComFiltro(),
         cartaoService.listarTodos()
       ]);
       setTransacoes(transacoesData.content || []);
@@ -199,6 +227,16 @@ export default function Transacoes() {
   };
 
   const handleDeletar = async (id: number) => {
+    if (!window.confirm('Tem certeza que deseja deletar?')) return;
+
+    try {
+      await transacaoService.deletar(id);
+      toast.success('Transação deletada!');
+      carregarDados();
+    } catch (error: any) {
+      toast.error('Erro ao deletar transação');
+    }
+  };
 
   const handleImportar = async () => {
     if (!importFile) return;
@@ -244,16 +282,6 @@ export default function Transacoes() {
       toast.error('Erro ao excluir anexo');
     }
   };
-    if (!window.confirm('Tem certeza que deseja deletar?')) return;
-    
-    try {
-      await transacaoService.deletar(id);
-      toast.success('Transação deletada!');
-      carregarDados();
-    } catch (error: any) {
-      toast.error('Erro ao deletar transação');
-    }
-  };
 
   const valorTotalNumerico = toNullableNumber(formData.valorTotal);
   const contasPorTipo = contas;
@@ -287,6 +315,19 @@ export default function Transacoes() {
               </button>
             </div>
           </div>
+
+          {filtroAtivo && (
+            <div className="mb-6 flex items-center justify-between gap-4 rounded-lg border border-violet-200 bg-violet-50 px-4 py-3">
+              <p className="text-sm text-violet-900">
+                {filtroTransacaoId
+                  ? 'Exibindo a transação aberta a partir da visão financeira.'
+                  : 'Exibindo transações filtradas a partir da visão financeira.'}
+              </p>
+              <button onClick={limparFiltro} className="text-sm font-semibold text-violet-700 underline hover:text-violet-900">
+                Limpar filtro
+              </button>
+            </div>
+          )}
 
           {mostrarForm && (
             <div className="bg-white p-6 rounded-lg shadow-md mb-8">
@@ -351,7 +392,7 @@ export default function Transacoes() {
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium mb-1 text-gray-700">Conta</label>
+                    <label className="block text-sm font-medium mb-1 text-gray-700">Cartão</label>
                     <select
                       {...fieldA11y('cartaoId', validation.errors.cartaoId)}
                       value={formData.cartaoId}
@@ -548,8 +589,8 @@ export default function Transacoes() {
               </div>
             ) : transacoes.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-gray-500 text-lg">Nenhuma transação cadastrada</p>
-                <p className="text-gray-400 text-sm mt-2">Clique em "+ Nova Transação" para começar</p>
+                <p className="text-gray-500 text-lg">{filtroAtivo ? 'Nenhuma transação encontrada para este filtro' : 'Nenhuma transação cadastrada'}</p>
+                <p className="text-gray-400 text-sm mt-2">{filtroAtivo ? 'Limpe o filtro para ver todas as transações' : 'Clique em "+ Nova Transação" para começar'}</p>
               </div>
             ) : (
               <>

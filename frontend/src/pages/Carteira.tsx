@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { ChevronDown, ChevronUp, Edit2, Landmark, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import Layout from '../components/Layout';
@@ -39,6 +40,16 @@ export default function ContasFinanceiras() {
   };
 
   useEffect(() => { carregar(); }, []);
+
+  // Drill-down (PR-F3-12): ?contaId= abre o extrato da conta vinda do Dashboard
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const contaId = Number(searchParams.get('contaId'));
+    if (!contaId || contas.length === 0) return;
+    const conta = contas.find(c => c.id === contaId);
+    if (conta && detalheId !== conta.id) abrirDetalhe(conta);
+    setSearchParams(params => { params.delete('contaId'); return params; }, { replace: true });
+  }, [contas]);
 
   const grupos = useMemo(() => ({
     ATIVO: contas.filter(c => c.natureza === 'ATIVO'),

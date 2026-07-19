@@ -28,11 +28,21 @@ export interface Metricas {
   variacaoPatrimonial: VariacaoPatrimonial;
 }
 
+export type DestinoNavegacao =
+  | 'EXTRATO_CONTA' | 'TRANSACAO' | 'FATURA' | 'META' | 'INVESTIMENTO' | 'TRANSACOES';
+
+export interface NavegacaoOrigem {
+  destino: DestinoNavegacao;
+  id: number | null;
+  filtros: Record<string, string> | null;
+}
+
 export interface OrigemMetrica {
   tipo: string;
-  id: number;
+  id: number | null;
   descricao: string;
   valor: number;
+  navegacao?: NavegacaoOrigem | null;
 }
 
 const metricasService = {

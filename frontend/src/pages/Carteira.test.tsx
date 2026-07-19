@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ContasFinanceiras from './Carteira';
 import contaFinanceiraService from '../services/contaFinanceiraService';
@@ -19,12 +20,19 @@ describe('Contas financeiras', () => {
   });
 
   it('agrupa ATIVO/PASSIVO, exibe badges e restringe ações gerenciadas', async () => {
-    render(<ContasFinanceiras />);
+    render(<MemoryRouter><ContasFinanceiras /></MemoryRouter>);
     expect(await screen.findByRole('heading', { name: 'Ativos' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Passivos' })).toBeInTheDocument();
     expect(screen.getByText('Somente leitura')).toBeInTheDocument();
     expect(screen.getByText('Pendente')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Editar Cartão principal' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Editar Conta corrente' })).toBeInTheDocument();
+  });
+
+  it('abre o extrato da conta indicada por ?contaId= (PR-F3-12)', async () => {
+    vi.mocked(contaFinanceiraService.listarMovimentos).mockResolvedValue({ content: [], totalPages: 1, totalElements: 0, size: 20, number: 0 });
+    render(<MemoryRouter initialEntries={['/contas-financeiras?contaId=1']}><ContasFinanceiras /></MemoryRouter>);
+    await waitFor(() => expect(contaFinanceiraService.listarMovimentos).toHaveBeenCalledWith(1));
+    expect(await screen.findByText('Ainda não há movimentos nesta conta.')).toBeInTheDocument();
   });
 });

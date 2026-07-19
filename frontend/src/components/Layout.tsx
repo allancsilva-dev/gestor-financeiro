@@ -5,7 +5,7 @@ import { Wallet, LayoutDashboard, CreditCard, ArrowLeftRight, Target, LogOut, Fi
 interface LayoutProps { children: React.ReactNode }
 
 const menuItems = [
-  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/dashboard', label: 'Visão financeira', icon: LayoutDashboard },
   { path: '/contas-financeiras', label: 'Contas financeiras', icon: Wallet },
   { path: '/contas', label: 'Cartões', icon: CreditCard },
   { path: '/transacoes', label: 'Transações', icon: ArrowLeftRight },

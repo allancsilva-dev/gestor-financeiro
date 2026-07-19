@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
-import { ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ChevronDown, ChevronRight, ChevronUp, RefreshCw } from 'lucide-react';
 import Layout from '../components/Layout';
 import GraficoGastosPorCategoria from '../components/GraficoGastosPorCategoria';
 import GraficoEvolucaoMensal from '../components/GraficoEvolucaoMensal';
 import dashboardService, { EvolucaoMensal, GastosPorCategoria, ProjecaoMensal, ProjecaoResponse } from '../services/dashboardService';
 import metricasService, { Metricas, MetricaId, OrigemMetrica } from '../services/metricasService';
+import { rotaDaNavegacao } from '../utils/rotaDaNavegacao';
 import { formatCurrency } from '../utils/currency';
 
 type MetricDefinition = { id: MetricaId; label: string; value: (m: Metricas) => number; help: string };
@@ -42,6 +44,7 @@ export default function Dashboard() {
   const [origens, setOrigens] = useState<Partial<Record<MetricaId, OrigemMetrica[]>>>({});
   const [origensLoading, setOrigensLoading] = useState(false);
   const [origensError, setOrigensError] = useState<MetricaId | null>(null);
+  const navigate = useNavigate();
 
   const carregar = async () => {
     setLoading(true); setError(false);
@@ -87,7 +90,16 @@ export default function Dashboard() {
         <span className={`mt-2 flex items-center justify-between gap-3 text-xs ${primary ? 'text-violet-100' : 'text-slate-600'}`}><span>{definition.help}</span>{open ? <ChevronUp className="h-4 w-4 shrink-0" /> : <ChevronDown className="h-4 w-4 shrink-0" />}</span>
       </button>
       {open && <div id={`origens-${definition.id}`} className={`${primary ? 'bg-violet-800' : 'bg-slate-50'} border-t border-black/5 px-5 py-4`}>
-        {origensLoading && !origens[definition.id] ? <p className="text-sm">Carregando origens…</p> : origensError === definition.id ? <button onClick={() => loadOrigins(definition.id)} className="text-sm font-semibold underline">Falha ao carregar. Tentar novamente</button> : (origens[definition.id]?.length ?? 0) === 0 ? <p className="text-sm">Nenhuma origem compõe este valor.</p> : <ul className="space-y-2">{origens[definition.id]?.map((o, index) => <li key={`${o.tipo}-${o.id}-${index}`} className="flex justify-between gap-4 text-sm"><span><span className="font-medium">{o.descricao}</span><span className={`ml-2 text-xs ${primary ? 'text-violet-200' : 'text-slate-500'}`}>{originLabel(o.tipo)}</span></span><strong className="tabular-nums">{formatCurrency(o.valor)}</strong></li>)}</ul>}
+        {origensLoading && !origens[definition.id] ? <p className="text-sm">Carregando origens…</p> : origensError === definition.id ? <button onClick={() => loadOrigins(definition.id)} className="text-sm font-semibold underline">Falha ao carregar. Tentar novamente</button> : (origens[definition.id]?.length ?? 0) === 0 ? <p className="text-sm">Nenhuma origem compõe este valor.</p> : <ul className="space-y-2">{origens[definition.id]?.map((o, index) => {
+          // Linha só aparenta ser clicável com destino válido (PR-F3-12)
+          const rota = o.navegacao ? rotaDaNavegacao(o.navegacao) : null;
+          const conteudo = <><span><span className="font-medium">{o.descricao}</span><span className={`ml-2 text-xs ${primary ? 'text-violet-200' : 'text-slate-500'}`}>{originLabel(o.tipo)}</span></span><span className="flex items-center gap-2"><strong className="tabular-nums">{formatCurrency(o.valor)}</strong>{rota && <ChevronRight className="h-4 w-4 shrink-0" aria-hidden="true" />}</span></>;
+          return <li key={`${o.tipo}-${o.id}-${index}`} className="text-sm">
+            {rota
+              ? <button onClick={() => navigate(rota)} aria-label={`${o.descricao}, ${formatCurrency(o.valor)}. Abrir detalhe`} className={`flex min-h-11 w-full items-center justify-between gap-4 rounded-lg px-2 text-left focus-visible:outline-none focus-visible:ring-2 ${primary ? 'hover:bg-violet-700 focus-visible:ring-white' : 'hover:bg-violet-100 focus-visible:ring-violet-600'}`}>{conteudo}</button>
+              : <div className="flex items-center justify-between gap-4 px-2">{conteudo}</div>}
+          </li>;
+        })}</ul>}
       </div>}
     </div>;
   };
