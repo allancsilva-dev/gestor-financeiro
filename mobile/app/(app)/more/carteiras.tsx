@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, FlatList, Modal, ScrollView, TextInput, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLocalSearchParams } from 'expo-router';
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import contaFinanceiraService, { contaGerenciada } from '../../../src/services/contaFinanceiraService';
 import { TIPO_MOVIMENTO_LABEL, formatCurrency, formatDateTime, parseCurrencyBR, maskCurrencyInput } from '../../../src/utils/format';
@@ -149,6 +150,9 @@ export default function CarteirasScreen() {
   const queryClient = useQueryClient();
   const [modalVisible, setModalVisible] = useState(false);
   const [extratoDe, setExtratoDe] = useState<ContaFinanceira | null>(null);
+  // Drill-down (PR-F3-08): ?contaId= abre o extrato da conta direto por rota
+  const { contaId } = useLocalSearchParams<{ contaId?: string }>();
+  const contaIdAberto = useRef<string | null>(null);
   const [nome, setNome] = useState('');
   const [tipo, setTipo] = useState<ContaFinanceiraRequest['subtipo'] | null>('DINHEIRO');
   const [saldo, setSaldo] = useState('');
@@ -164,6 +168,16 @@ export default function CarteirasScreen() {
     () => [...(data?.content ?? [])].sort((a, b) => a.natureza.localeCompare(b.natureza) || a.nome.localeCompare(b.nome)),
     [data?.content],
   );
+
+  // Abre o extrato da conta chegada por rota assim que a lista carrega
+  useEffect(() => {
+    if (!contaId || contaIdAberto.current === contaId) return;
+    const conta = data?.content?.find(c => String(c.id) === String(contaId));
+    if (conta) {
+      contaIdAberto.current = contaId;
+      setExtratoDe(conta);
+    }
+  }, [contaId, data?.content]);
 
   const criarMutation = useMutation({
     mutationFn: (req: ContaFinanceiraRequest) => contaFinanceiraService.criar(req),

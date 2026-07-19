@@ -1,10 +1,11 @@
 import React from 'react';
 import { View, Text, Modal, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 import metricasService from '../services/metricasService';
 import { useTheme } from '../theme';
 import { formatCurrency } from '../utils/format';
-import { MetricaId } from '../types';
+import { MetricaId, NavegacaoOrigem } from '../types';
 import ListRow from './ui/ListRow';
 
 interface ComposicaoMetricaModalProps {
@@ -12,10 +13,41 @@ interface ComposicaoMetricaModalProps {
   onClose: () => void;
 }
 
+// Drill-down (PR-F3-08): rota do app para cada destino fornecido pelo
+// backend (PR-F3-04). Destino desconhecido → sem navegação.
+export function rotaDaNavegacao(nav: NavegacaoOrigem): string | null {
+  switch (nav.destino) {
+    case 'EXTRATO_CONTA':
+      return nav.id != null ? `/more/carteiras?contaId=${nav.id}` : null;
+    case 'TRANSACAO':
+      return nav.id != null ? `/transacoes?transacaoId=${nav.id}` : null;
+    case 'FATURA':
+      return '/more/faturas';
+    case 'META':
+      return '/metas';
+    case 'INVESTIMENTO':
+      return '/more/investimentos';
+    case 'TRANSACOES': {
+      const params = new URLSearchParams(nav.filtros ?? {}).toString();
+      return params ? `/transacoes?${params}` : '/transacoes';
+    }
+    default:
+      return null;
+  }
+}
+
 // Composição (origens) de uma métrica oficial — extraído da home (PR-F3-06)
 // para ser usado também na tela Visão financeira.
 export default function ComposicaoMetricaModal({ metrica, onClose }: ComposicaoMetricaModalProps) {
   const colors = useTheme();
+  const router = useRouter();
+
+  const navegar = (nav: NavegacaoOrigem) => {
+    const rota = rotaDaNavegacao(nav);
+    if (!rota) return;
+    onClose();
+    router.push(rota as any);
+  };
 
   const origensQuery = useQuery({
     queryKey: ['metricas-origens', metrica],
@@ -42,14 +74,29 @@ export default function ComposicaoMetricaModal({ metrica, onClose }: ComposicaoM
           <Text style={{ color: colors.textSecondary, textAlign: 'center', padding: 48 }}>Nenhuma origem compõe esta métrica.</Text>
         ) : (
           <ScrollView contentContainerStyle={{ padding: 16 }}>
-            {origensQuery.data?.map(origem => (
-              <ListRow
-                key={`${origem.tipo}-${origem.id}`}
-                title={origem.descricao}
-                subtitle={origem.tipo}
-                value={formatCurrency(Number(origem.valor))}
-              />
-            ))}
+            {origensQuery.data?.map(origem => {
+              // Linha só aparenta ser clicável com destino válido (PR-F3-08)
+              const rota = origem.navegacao ? rotaDaNavegacao(origem.navegacao) : null;
+              return (
+                <ListRow
+                  key={`${origem.tipo}-${origem.id}`}
+                  title={origem.descricao}
+                  subtitle={origem.tipo}
+                  onPress={rota ? () => navegar(origem.navegacao!) : undefined}
+                  accessibilityLabel={rota
+                    ? `${origem.descricao}, ${formatCurrency(Number(origem.valor))}. Abrir detalhe`
+                    : undefined}
+                  trailing={
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={{ color: colors.textPrimary, fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
+                        {formatCurrency(Number(origem.valor))}
+                      </Text>
+                      {rota != null && <Text style={{ color: colors.textSecondary, fontSize: 16 }}>›</Text>}
+                    </View>
+                  }
+                />
+              );
+            })}
           </ScrollView>
         )}
       </View>

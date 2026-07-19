@@ -76,7 +76,24 @@ export interface MetricasFinanceiras {
   variacaoPatrimonial: { total: number; caixa: number; passivo: number; aportesInvestimento: number; rendimentosInvestimento: number; precoMercado: number | null };
 }
 
-export interface OrigemMetrica { tipo: string; id: number; descricao: string; valor: number; }
+// Navegação fornecida pelo backend (PR-F3-04): origem sem navegação é
+// informativa — o cliente nunca inventa link aproximado
+export type DestinoNavegacao =
+  | 'EXTRATO_CONTA' | 'TRANSACAO' | 'FATURA' | 'META' | 'INVESTIMENTO' | 'TRANSACOES';
+
+export interface NavegacaoOrigem {
+  destino: DestinoNavegacao;
+  id: number | null;
+  filtros: Record<string, string> | null;
+}
+
+export interface OrigemMetrica {
+  tipo: string;
+  id: number;
+  descricao: string;
+  valor: number;
+  navegacao?: NavegacaoOrigem | null;
+}
 
 export interface GastoPorCategoria {
   categoria: string;

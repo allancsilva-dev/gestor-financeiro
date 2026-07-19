@@ -1,6 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, FlatList, RefreshControl, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLocalSearchParams } from 'expo-router';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { transacaoService } from '../../src/services/transacaoService';
 import relatorioService from '../../src/services/relatorioService';
@@ -27,15 +28,33 @@ const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 export default function Transacoes() {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
+  // Drill-down (PR-F3-08): filtros/transação chegam por rota (navegação do backend)
+  const params = useLocalSearchParams<{ inicio?: string; tipo?: string; transacaoId?: string }>();
 
   const [mesRef, setMesRef] = useState(() => {
+    if (params.inicio && /^\d{4}-\d{2}-\d{2}$/.test(params.inicio)) {
+      const [ano, mes] = params.inicio.split('-').map(Number);
+      return new Date(ano, mes - 1, 1);
+    }
     const hoje = new Date();
     return new Date(hoje.getFullYear(), hoje.getMonth(), 1);
   });
-  const [filtro, setFiltro] = useState<'TODOS' | TipoTransacao>('TODOS');
+  const [filtro, setFiltro] = useState<'TODOS' | TipoTransacao>(
+    params.tipo === 'ENTRADA' || params.tipo === 'SAIDA' ? params.tipo : 'TODOS');
   const [busca, setBusca] = useState('');
   const [buscaAtiva, setBuscaAtiva] = useState('');
   const [selecionada, setSelecionada] = useState<Transacao | null>(null);
+  const transacaoIdAberta = useRef<string | null>(null);
+
+  // Parcela → transação: abre o detalhe da transação chegada por rota
+  useEffect(() => {
+    const id = params.transacaoId;
+    if (!id || transacaoIdAberta.current === id) return;
+    transacaoIdAberta.current = id;
+    transacaoService.buscarPorId(Number(id))
+      .then(t => setSelecionada(t))
+      .catch(() => {}); // transação inacessível: permanece na lista, sem detalhe
+  }, [params.transacaoId]);
 
   // Debounce: só consulta o backend 350ms após parar de digitar
   useEffect(() => {
