@@ -71,6 +71,7 @@ tags:
 - tapOn: "Voltar"
 - tapOn: "Planejamento"
 - tapOn: "Criar meta"
+- tapOn: "Cofre real.*"
 - tapOn:
     id: "goal-name"
 - inputText: "Meta Smoke"
