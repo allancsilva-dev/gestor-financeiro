@@ -1149,7 +1149,7 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Rollback:** reimplantar somente o artefato anterior; PR-F2-20 não altera schema nem dados.
 - **Status:** ABERTO — implementação concluída; gate externo `PROB-0081` pendente.
 
-## BACKLOG-0089 — Atualizar CHANGELOG.md e CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md com PR-F3-01, PR-F3-02, PR-F3-03, PR-F3-04, PR-F3-05, PR-F3-06 e PR-F3-07
+## BACKLOG-0089 — Atualizar CHANGELOG.md e CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md com PR-F3-01, PR-F3-02, PR-F3-03, PR-F3-04, PR-F3-05, PR-F3-06, PR-F3-07 e PR-F3-08
 
 - **Prioridade:** P3
 - **Área:** documentação
@@ -1159,13 +1159,15 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   `main` — fecha o Bloco A backend da Fase 3, PR-F3-01 a PR-F3-04), o PR-F3-05 (lançamento rápido
   mobile, Fase 3, commit `413d191` em `main` — primeiro PR do Bloco B, consumo mobile), o PR-F3-06
   (visão financeira mobile, Fase 3, commit `0c892bc` em `main` — segundo PR do Bloco B, consumo
-  mobile) e o PR-F3-07 (home reduzida mobile, Fase 3, commit `628cf8e` em `main` — terceiro PR do
-  Bloco B, consumo mobile) foram implementados e revisados, mas `docs/CHANGELOG.md` e
-  `docs/CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md` não puderam ser atualizados em nenhuma das
-  sete rodadas porque esses dois arquivos não constam na lista de arquivos sob responsabilidade do
-  `docs-reporter` — a tentativa de edição foi bloqueada pelo sistema de permissão da ferramenta (e,
-  nas rodadas do PR-F3-02 em diante, a restrição foi confirmada explicitamente pelo solicitante). O
-  conteúdo completo de cada entrada já foi redigido e está disponível em:
+  mobile), o PR-F3-07 (home reduzida mobile, Fase 3, commit `628cf8e` em `main` — terceiro PR do
+  Bloco B, consumo mobile) e o PR-F3-08 (drill-down até o extrato mobile, Fase 3, commit `672d97b`
+  em `main` — quarto PR do Bloco B, consumo mobile) foram implementados e revisados, mas
+  `docs/CHANGELOG.md` e `docs/CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md` não puderam ser
+  atualizados em nenhuma das oito rodadas porque esses dois arquivos não constam na lista de
+  arquivos sob responsabilidade do `docs-reporter` — a tentativa de edição foi bloqueada pelo
+  sistema de permissão da ferramenta (e, nas rodadas do PR-F3-02 em diante, a restrição foi
+  confirmada explicitamente pelo solicitante). O conteúdo completo de cada entrada já foi redigido
+  e está disponível em:
   - PR-F3-01: `docs/REVIEW_REPORTS/2026-07-17_backend_implementation_pr-f3-01-compromissos-proximos.md`
     e `docs/SYSTEM_OVERVIEW.md` (entrada de 2026-07-17 em "Auditoria e estado atual").
   - PR-F3-02: `docs/REVIEW_REPORTS/2026-07-17_backend_implementation_pr-f3-02-sugestao-categoria.md`
@@ -1186,25 +1188,33 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   - PR-F3-07: `docs/REVIEW_REPORTS/2026-07-19_mobile_implementation_pr-f3-07-home-reduzida.md`
     (seção "O que ficou pendente", com blocos de texto prontos para `CHANGELOG.md` e para o
     checklist) e `docs/SYSTEM_OVERVIEW.md` (entrada de 2026-07-19, logo após a do PR-F3-06).
+  - PR-F3-08: `docs/REVIEW_REPORTS/2026-07-19_mobile_implementation_pr-f3-08-drill-down.md`
+    (seção "O que ficou pendente", com blocos de texto prontos para `CHANGELOG.md` e para o
+    checklist) e `docs/SYSTEM_OVERVIEW.md` (entrada de 2026-07-19, logo após a do PR-F3-07).
 - **Dependências:** um agente ou usuário com permissão de escrita em `docs/CHANGELOG.md` e
-  `docs/CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md` aplicar as sete entradas (podem ser aplicadas
+  `docs/CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md` aplicar as oito entradas (podem ser aplicadas
   em commits separados ou no mesmo commit). Para o PR-F3-05 especificamente, recomenda-se também
   executar o Maestro `financial-critical.yaml` atualizado (simulador iOS + stack local) antes de
   marcar a entrada do checklist como totalmente concluída, dado que o flow foi alterado e ainda não
-  foi rodado (ver achado #2 do relatório de revisão do PR-F3-05). Para o PR-F3-06 e o PR-F3-07,
-  recomenda-se realizar a validação visual (Maestro/simulador, tema claro/escuro) em conjunto com a
-  do PR-F3-05, numa única rodada para o Bloco B até aqui (ver achados #4 e #5 do relatório de
-  revisão do PR-F3-06, e achados #4 e #5 do relatório de revisão do PR-F3-07) — a prioridade dessa
-  rodada aumentou com o PR-F3-07, pois a home (tela mais frequentada do app) já teve estrutura
-  visual alterada em 3 PRs consecutivos sem nenhuma validação end-to-end automatizada.
+  foi rodado (ver achado #2 do relatório de revisão do PR-F3-05). Para o PR-F3-06, o PR-F3-07 e o
+  PR-F3-08, recomenda-se realizar a validação visual (Maestro/simulador, tema claro/escuro) em
+  conjunto com a do PR-F3-05, numa única rodada para o Bloco B até aqui (ver achados #4 e #5 do
+  relatório de revisão do PR-F3-06, achados #4 e #5 do relatório de revisão do PR-F3-07, e achado
+  #4 do relatório de revisão do PR-F3-08) — a prioridade dessa rodada aumentou com o PR-F3-07, pois
+  a home (tela mais frequentada do app) já teve estrutura visual alterada em 3 PRs consecutivos sem
+  nenhuma validação end-to-end automatizada, e aumentou ainda mais com o PR-F3-08, pois este é o
+  primeiro PR do Bloco B cujo comportamento novo depende diretamente de integração real com
+  `expo-router` (parâmetros de rota para drill-down), não coberta por nenhum teste unitário até
+  aqui.
 - **Critério de aceite:**
   - `CHANGELOG.md` tem entrada `## [Fase 3 — PR-F3-01] - 2026-07-17` acima da entrada `PR-F2-20`,
     entrada `## [Fase 3 — PR-F3-02] - 2026-07-17` acima da entrada `PR-F3-01`, entrada
     `## [Fase 3 — PR-F3-03] - 2026-07-17` acima da entrada `PR-F3-02`, entrada
     `## [Fase 3 — PR-F3-04] - 2026-07-17` acima da entrada `PR-F3-03`, entrada
     `## [Fase 3 — PR-F3-05] - 2026-07-19` acima da entrada `PR-F3-04`, entrada
-    `## [Fase 3 — PR-F3-06] - 2026-07-19` acima da entrada `PR-F3-05`, e entrada
-    `## [Fase 3 — PR-F3-07] - 2026-07-19` acima da entrada `PR-F3-06` (ordem cronológica inversa,
+    `## [Fase 3 — PR-F3-06] - 2026-07-19` acima da entrada `PR-F3-05`, entrada
+    `## [Fase 3 — PR-F3-07] - 2026-07-19` acima da entrada `PR-F3-06`, e entrada
+    `## [Fase 3 — PR-F3-08] - 2026-07-19` acima da entrada `PR-F3-07` (ordem cronológica inversa,
     seguindo o padrão já usado no arquivo).
   - O checklist tem seção `PR-F3-01` marcada como concluída com evidência de `./mvnw test`
     (243/243) e `./mvnw verify -Pintegration-test` (243 + 27 ITs), seção `PR-F3-02` marcada como
@@ -1219,13 +1229,19 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
     e medição do tempo do fluxo pendentes), seção `PR-F3-06` marcada como `PASS_COM_RESSALVA` com
     evidência de `npx tsc --noEmit` limpo e Jest 26/26 (9 suites, commit `0c892bc`), incluindo
     explicitamente os itens em aberto (Maestro/simulador não executado para a tela nova, evidência
-    visual claro/escuro pendente, acumulada com a mesma pendência do PR-F3-05), e seção `PR-F3-07`
+    visual claro/escuro pendente, acumulada com a mesma pendência do PR-F3-05), seção `PR-F3-07`
     marcada como `PASS_COM_RESSALVA` com evidência de `npx tsc --noEmit` limpo e Jest 29/29
     (10 suites, 1 nova, commit `628cf8e`), incluindo explicitamente os itens em aberto
     (Maestro/simulador não executado para a home reescrita, evidência visual claro/escuro pendente,
     ambos acumulados com PR-F3-05/06, e a nota de escopo de que `perfil.tsx` mantém o consumo de
-    `/v1/dashboard/resumo` até o PR-F3-13).
+    `/v1/dashboard/resumo` até o PR-F3-13), e seção `PR-F3-08` marcada como `PASS_COM_RESSALVA` com
+    evidência de `npx tsc --noEmit` limpo e Jest 31/31 (11 suites, 1 nova, commit `672d97b`),
+    incluindo explicitamente os itens em aberto (Maestro/simulador não executado para o fluxo de
+    drill-down, evidência visual claro/escuro pendente, ambos acumulados com PR-F3-05/06/07, a
+    falha silenciosa para `transacaoId` inválido/inacessível em `transacoes.tsx` sem feedback
+    visual ao usuário, e o parser de `params.inicio` sem validação de limites de mês/dia além do
+    formato).
 - **Risco se ficar pendente:** histórico de versões e checklist de execução ficam temporariamente
-  incompletos para quem consulta apenas esses dois arquivos; a rastreabilidade completa dos sete
+  incompletos para quem consulta apenas esses dois arquivos; a rastreabilidade completa dos oito
   PRs já existe em `SYSTEM_OVERVIEW.md` e nos respectivos relatórios de revisão.
 - **Status:** ABERTO.
