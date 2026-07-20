@@ -75,6 +75,25 @@ seguem ADR-0008..0015. Mantido junto com os ADRs em `docs/adr/`.
 - **Variacao patrimonial** — diferenca de patrimonio inicio/fim do periodo, com decomposicao
   (aportes, retiradas, rendimentos, preco de mercado).
 
+## Experiencia simples (Fase 3)
+
+- **Compromissos proximos** — `GET /v1/compromissos?ate=`: itens FATURA/PARCELA (status
+  COMPROMETIDO, compoem exatamente a metrica oficial Comprometido, calculo compartilhado com
+  `MetricasService`) e CONTA_FIXA (status PREVISTO, exibida separada e fora do total). Item pode
+  carregar alerta `FALHA_SALDO` da recorrencia automatica.
+- **Previsto** — conta fixa ainda nao lancada dentro do horizonte; nunca soma no Comprometido e
+  nunca deve aparentar estar incluida no total.
+- **Sugestao de categoria** — `GET /v1/transacoes/sugestao-categoria`: deterministica; prioridade
+  para ultima transacao de descricao normalizada igual, depois categoria mais usada em 90 dias
+  para o mesmo tipo, empate por menor ID; `criterio: NENHUMA` sem resultado. Nao cria categoria
+  nem altera lancamento; nao substitui regras persistentes da Fase 4.
+- **Navegacao de origem (drill-down)** — cada `Origem` de metrica pode trazer
+  `navegacao { destino, id, filtros }` fornecida pelo backend (destinos: EXTRATO_CONTA, TRANSACAO,
+  FATURA, META, INVESTIMENTO, TRANSACOES). Origem sem destino exato e informativa: o cliente
+  nunca inventa link aproximado nem exibe affordance de clique.
+- **Modalidade da meta** — escolha obrigatoria COFRE_REAL/RESERVA_VIRTUAL na criacao e imutavel
+  depois, inclusive com reserva zerada (endurecimento da ADR-0012 no PR-F3-11).
+
 ## Regras de ouro (resumo executivo)
 
 1. Backend e a unica fonte de regra financeira; clientes apresentam (ADR-0001).

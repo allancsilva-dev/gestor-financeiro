@@ -1149,7 +1149,7 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Rollback:** reimplantar somente o artefato anterior; PR-F2-20 não altera schema nem dados.
 - **Status:** ABERTO — implementação concluída; gate externo `PROB-0081` pendente.
 
-## BACKLOG-0089 — Atualizar CHANGELOG.md e CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md com PR-F3-01, PR-F3-02, PR-F3-03, PR-F3-04, PR-F3-05, PR-F3-06, PR-F3-07, PR-F3-08, PR-F3-09, PR-F3-10, PR-F3-11 e PR-F3-12
+## BACKLOG-0089 — Atualizar CHANGELOG.md e CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md com PR-F3-01 a PR-F3-13 (Fase 3 completa)
 
 - **Prioridade:** P3
 - **Área:** documentação
@@ -1213,6 +1213,15 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
     pendente", com blocos de texto prontos para `CHANGELOG.md` e para o checklist) e
     `docs/SYSTEM_OVERVIEW.md` (entrada de 2026-07-19, logo após a do PR-F3-11). A consolidação
     dessas entradas é escopo explícito do PR-F3-13 ("Legados e documentação").
+  - PR-F3-13 (legados e documentação, Fase 3 — fecha o Bloco C e a Fase 3): a rodada do PR-F3-13
+    (2026-07-19) TENTOU aplicar a consolidação e confirmou que `docs/CHANGELOG.md` e
+    `docs/CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md` estão negados por configuração de
+    permissão também para a sessão principal (erro "directory denied by permission settings"),
+    não apenas para o `docs-reporter`. O texto consolidado COMPLETO das treze entradas de
+    CHANGELOG (por bloco/PR, com commits) e a seção de checklist da Fase 3 UX estão prontos em
+    `docs/REVIEW_REPORTS/2026-07-19_fullstack_implementation_pr-f3-13-legados-documentacao.md`
+    (seção "Texto pronto para CHANGELOG/CHECKLIST") — basta colar. Glossário, BACKLOG e
+    SYSTEM_OVERVIEW (sem bloqueio) já foram atualizados nas próprias rodadas.
 - **Dependências:** um agente ou usuário com permissão de escrita em `docs/CHANGELOG.md` e
   `docs/CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md` aplicar as onze entradas (podem ser aplicadas
   em commits separados ou no mesmo commit). Para o PR-F3-05 especificamente, recomenda-se também
