@@ -25,8 +25,12 @@ public class DashboardController {
     private final UsuarioRepository usuarioRepository;
 
     // GET /api/dashboard/resumo - Resumo geral
+    // Legado (PR-F3-13): substituido por /v1/metricas (numeros oficiais) e
+    // /v1/compromissos; mantido apenas para clientes antigos, sem remocao.
+    @Deprecated
     @GetMapping("/resumo")
-    @Operation(summary = "Resumo financeiro", description = "Retorna métricas consolidadas do mês")
+    @Operation(summary = "Resumo financeiro (legado)", deprecated = true,
+        description = "DEPRECATED: use /v1/metricas para números oficiais e /v1/compromissos para obrigações. Mantido para compatibilidade; nenhum cliente atual consome.")
     public ResponseEntity<DashboardDtos.Resumo> obterResumo(Authentication authentication) {
         String email = authentication.getName();
         Usuario usuario = usuarioRepository.findByEmail(email)

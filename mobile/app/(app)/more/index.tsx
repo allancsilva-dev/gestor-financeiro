@@ -20,7 +20,7 @@ const itens = [
   { label: 'Relatórios',   sub: 'Gráficos',         rota: '/more/relatorios',   icone: '📋' },
   { label: 'Categorias',   sub: 'Organizar',        rota: '/more/categorias',   icone: '🏷' },
   { label: 'Cartões',      sub: 'Crédito e débito', rota: '/more/contas',       icone: '💳' },
-  { label: 'Investimentos', sub: 'Carteira',         rota: '/more/investimentos', icone: '◈' },
+  { label: 'Investimentos', sub: 'Posições',         rota: '/more/investimentos', icone: '◈' },
   { label: 'Entrada por IA', sub: 'Em breve',       rota: null,                 icone: '🤖', desabilitado: true },
   { label: 'Importar CSV', sub: 'Extrato',           rota: null,                 icone: '⇪', acao: 'importar' },
   { label: 'Exportar Dados', sub: 'CSV',            rota: null,                 icone: '📥', acao: 'exportar' },

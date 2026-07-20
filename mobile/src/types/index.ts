@@ -47,17 +47,6 @@ export interface LoginResponse {
 }
 
 // ── Dashboard ───────────────────────────────────────────────────────
-export interface DashboardResumo {
-  totalEntradas: number;
-  totalSaidas: number;
-  saldo: number; // saldo do mês
-  saldoCarteiras: number; // patrimônio total das carteiras
-  totalCategorias: number;
-  totalContas: number;
-  totalMetas: number;
-  totalContasFixas: number;
-}
-
 export type MetricaId =
   | 'DISPONIVEL_AGORA' | 'RESERVADO' | 'COMPROMETIDO' | 'DISPONIVEL_PARA_GASTAR'
   | 'INVESTIDO' | 'DIVIDAS' | 'RESULTADO_MENSAL' | 'PATRIMONIO_LIQUIDO' | 'VARIACAO_PATRIMONIAL';

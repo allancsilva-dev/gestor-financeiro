@@ -180,7 +180,6 @@ export default function Metas() {
     onSuccess: (metaAtualizada) => {
       setMetaSelecionada(metaAtualizada);
       queryClient.invalidateQueries({ queryKey: ['metas'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-resumo'] });
       queryClient.invalidateQueries({ queryKey: ['carteiras'] });
       fecharMovimentacao('adicionar');
     },
@@ -193,7 +192,6 @@ export default function Metas() {
     onSuccess: (metaAtualizada) => {
       setMetaSelecionada(metaAtualizada);
       queryClient.invalidateQueries({ queryKey: ['metas'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-resumo'] });
       queryClient.invalidateQueries({ queryKey: ['carteiras'] });
       fecharMovimentacao('remover');
     },
@@ -205,7 +203,6 @@ export default function Metas() {
     onSuccess: (metaAtualizada) => {
       setMetaSelecionada(metaAtualizada);
       queryClient.invalidateQueries({ queryKey: ['metas'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-resumo'] });
       setModalCriarVisible(false);
       resetFormularioMeta();
     },
@@ -217,7 +214,6 @@ export default function Metas() {
     onSuccess: (metaAtualizada) => {
       setMetaSelecionada(metaAtualizada);
       queryClient.invalidateQueries({ queryKey: ['metas'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-resumo'] });
       setModalCriarVisible(false);
       resetFormularioMeta();
     },
@@ -228,7 +224,6 @@ export default function Metas() {
     mutationFn: (id: number) => metaService.deletar(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['metas'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-resumo'] });
       setModalDetalheVisible(false);
       setMetaSelecionada(null);
     },

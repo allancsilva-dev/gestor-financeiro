@@ -183,7 +183,6 @@ export default function CarteirasScreen() {
     mutationFn: (req: ContaFinanceiraRequest) => contaFinanceiraService.criar(req),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contas-financeiras'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-resumo'] });
       setModalVisible(false);
       setNome(''); setSaldo(''); setTipo('DINHEIRO');
     },

@@ -132,14 +132,14 @@ export default function ContasFixas() {
   };
 
   const handleDeletar = async (id: number) => {
-    if (!window.confirm('Deseja realmente deletar esta conta fixa?')) return;
+    if (!window.confirm('Deseja realmente excluir esta conta fixa?')) return;
 
     try {
       await contaFixaService.deletar(id);
-      toast.success('Conta fixa deletada!');
+      toast.success('Conta fixa excluída!');
       carregarDados();
     } catch (error: any) {
-      toast.error('Erro ao deletar conta fixa');
+      toast.error('Erro ao excluir conta fixa');
     }
   };
 

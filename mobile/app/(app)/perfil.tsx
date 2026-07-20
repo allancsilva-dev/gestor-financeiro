@@ -4,11 +4,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../src/theme';
 import { useAuth } from '../../src/context/AuthContext';
-import { useQueryClient, useQuery } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { getInitials } from '../../src/utils/format';
 import api from '../../src/services/api';
-import { DashboardResumo, Usuario } from '../../src/types';
+import { Usuario } from '../../src/types';
 import Card from '../../src/components/ui/Card';
 import Field from '../../src/components/ui/Field';
 import { isValidPassword } from '../../src/utils/validate';
@@ -26,8 +26,6 @@ export default function Perfil() {
   const [novaSenha, setNovaSenha] = useState('');
   const [senhaError, setSenhaError] = useState<string | null>(null);
   const [salvandoSenha, setSalvandoSenha] = useState(false);
-
-  const { data: resumo } = useQuery({ queryKey: ['dashboard-resumo'], queryFn: () => api.get<DashboardResumo>('/v1/dashboard/resumo').then(r => r.data) });
 
   useEffect(() => {
     setNome(usuario?.nome ?? '');
@@ -48,13 +46,6 @@ export default function Perfil() {
       },
     ]);
   };
-
-  const stats: Array<{ label: string; valor: number | undefined; cor: string }> = [
-    { label: 'Metas', valor: resumo?.totalMetas, cor: colors.brandFg },
-    { label: 'Categorias', valor: resumo?.totalCategorias, cor: colors.brandFg },
-    { label: 'Cartões', valor: resumo?.totalContas, cor: colors.success },
-    { label: 'Contas Fixas', valor: resumo?.totalContasFixas, cor: colors.brandFg },
-  ];
 
   const salvarNome = async () => {
     setNomeError(null);
@@ -107,15 +98,6 @@ export default function Perfil() {
         </LinearGradient>
         <Text style={{ color: colors.textPrimary, fontSize: 19, fontWeight: '800', marginTop: 12 }}>{usuario?.nome}</Text>
         <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 2 }}>{usuario?.email}</Text>
-      </View>
-
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 }}>
-        {stats.map(({ label, valor, cor }) => (
-          <Card key={label} radius={14} style={{ flexBasis: '46%', flexGrow: 1, alignItems: 'center', paddingVertical: 14, paddingHorizontal: 6 }}>
-            <Text style={{ color: cor, fontSize: 18, fontWeight: '800', letterSpacing: -0.3, fontVariant: ['tabular-nums'] }}>{valor ?? '–'}</Text>
-            <Text style={{ color: colors.textSecondary, fontSize: 9, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 3 }}>{label}</Text>
-          </Card>
-        ))}
       </View>
 
       <Card radius={16} style={{ marginBottom: 12 }}>

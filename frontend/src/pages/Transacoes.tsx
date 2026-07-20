@@ -227,14 +227,14 @@ export default function Transacoes() {
   };
 
   const handleDeletar = async (id: number) => {
-    if (!window.confirm('Tem certeza que deseja deletar?')) return;
+    if (!window.confirm('Tem certeza que deseja excluir?')) return;
 
     try {
       await transacaoService.deletar(id);
-      toast.success('Transação deletada!');
+      toast.success('Transação excluída!');
       carregarDados();
     } catch (error: any) {
-      toast.error('Erro ao deletar transação');
+      toast.error('Erro ao excluir transação');
     }
   };
 
@@ -650,7 +650,7 @@ export default function Transacoes() {
                               onClick={() => handleDeletar(t.id!)}
                               className="text-red-600 hover:text-red-800 font-medium transition"
                             >
-                              Deletar
+                              Excluir
                             </button>
                           </div>
                         </td>

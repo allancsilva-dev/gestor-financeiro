@@ -120,14 +120,14 @@ export default function Contas() {
   };
 
   const handleDeletar = async (id: number) => {
-    if (!window.confirm('Tem certeza que deseja deletar este cartão?')) return;
-    
+    if (!window.confirm('Tem certeza que deseja excluir este cartão?')) return;
+
     try {
       await cartaoService.deletar(id);
-      toast.success('Cartão deletado!');
+      toast.success('Cartão excluído!');
       carregarContas();
     } catch (error: any) {
-      toast.error('Erro ao deletar cartao');
+      toast.error('Erro ao excluir cartão');
     }
   };
 
@@ -295,7 +295,7 @@ export default function Contas() {
                         onClick={() => handleDeletar(conta.id!)}
                         className="text-red-600 hover:text-red-800 text-sm font-medium"
                       >
-                        Deletar
+                        Excluir
                       </button>
                     </div>
                   </div>

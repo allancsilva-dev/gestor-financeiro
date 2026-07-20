@@ -89,7 +89,6 @@ export default function EditarTransacaoModal({ visible, transacao, onClose }: Ed
     queryClient.invalidateQueries({ queryKey: ['dashboard-evolucao'] });
     queryClient.invalidateQueries({ queryKey: ['dashboard-comparacao-mensal'] });
     queryClient.invalidateQueries({ queryKey: ['transacoes-recentes'] });
-    queryClient.invalidateQueries({ queryKey: ['dashboard-resumo'] });
     queryClient.invalidateQueries({ queryKey: ['dashboard-projecao'] });
     queryClient.invalidateQueries({ queryKey: ['carteiras'] });
     queryClient.invalidateQueries({ queryKey: ['contas'] });

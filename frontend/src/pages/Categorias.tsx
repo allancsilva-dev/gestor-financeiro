@@ -80,14 +80,14 @@ export default function Categorias() {
   };
 
   const handleDeletar = async (id: number) => {
-    if (!window.confirm('Tem certeza que deseja deletar?')) return;
-    
+    if (!window.confirm('Tem certeza que deseja excluir?')) return;
+
     try {
       await categoriaService.deletar(id);
-      toast.success('Categoria deletada!');
+      toast.success('Categoria excluída!');
       carregarCategorias();
     } catch (error: any) {
-      const mensagem = error.response?.data?.message || error.message || 'Erro ao deletar categoria';
+      const mensagem = error.response?.data?.message || error.message || 'Erro ao excluir categoria';
       toast.error(mensagem);
     }
   };
@@ -245,7 +245,7 @@ export default function Categorias() {
                             onClick={() => handleDeletar(cat.id!)}
                             className="text-red-600 hover:text-red-800 font-medium transition"
                           >
-                            Deletar
+                            Excluir
                           </button>
                         </td>
                       </tr>

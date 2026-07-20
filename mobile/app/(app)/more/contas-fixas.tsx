@@ -52,7 +52,6 @@ export default function ContasFixasScreen() {
       contaFixaService.marcarComoPaga(id, valor, carteiraId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contas-fixas'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-resumo'] });
       queryClient.invalidateQueries({ queryKey: ['carteiras'] });
       queryClient.invalidateQueries({ queryKey: ['transacoes-recentes'] });
       queryClient.invalidateQueries({ queryKey: ['recorrencias-falhas'] });
@@ -320,7 +319,7 @@ export default function ContasFixasScreen() {
                 const dia = Number(diaCriar);
                 if (!Number.isInteger(dia) || dia < 1 || dia > 31) { setDiaError('Dia deve ser um número entre 1 e 31.'); hasErr = true; }
                 if (!categoriaCriarId) { setCategoriaError('Selecione uma categoria.'); hasErr = true; }
-                if (automaticaCriar && !carteiraCriarId) { setErroCriar('Selecione a carteira da execução automática.'); hasErr = true; }
+                if (automaticaCriar && !carteiraCriarId) { setErroCriar('Selecione a conta da execução automática.'); hasErr = true; }
                 if (hasErr) return;
                 criarMutation.mutate({
                   descricao: descricaoCriar.trim(),

@@ -126,7 +126,6 @@ export default function FaturasScreen() {
       const key = `${fatura.id}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
       await faturaService.pagarFatura(fatura.id, valor, carteiraPagamentoId, key);
       queryClient.invalidateQueries({ queryKey: ['carteiras'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-resumo'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-projecao'] });
       queryClient.invalidateQueries({ queryKey: ['cartoes'] });
       refetch();

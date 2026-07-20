@@ -71,7 +71,7 @@ export default function Faturas() {
         setCarteiraPagamentoId(data[0].id);
       }
     } catch {
-      toast.error('Erro ao carregar carteiras');
+      toast.error('Erro ao carregar contas');
     }
   };
 
@@ -204,7 +204,7 @@ export default function Faturas() {
                           onChange={(e) => { const value = e.target.value ? Number(e.target.value) : null; setCarteiraPagamentoId(value); validation.revalidateField('carteiraId', { valor: valorPagamento, carteiraId: value }); }}
                           className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-3 text-white aria-invalid:border-red-500"
                         >
-                          <option value="">Selecione uma carteira</option>
+                          <option value="">Selecione uma conta</option>
                           {carteiras.map((c) => (
                             <option key={c.id} value={c.id}>{c.nome}</option>
                           ))}

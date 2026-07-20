@@ -36,23 +36,7 @@ export interface ProjecaoResponse {
   meses: ProjecaoMensal[];
 }
 
-export interface DashboardResumo {
-  totalEntradas: number;
-  totalSaidas: number;
-  saldo: number;
-  totalCategorias: number;
-  totalContas: number;
-  totalMetas: number;
-  totalContasFixas: number;
-  saldoCarteiras: number;
-}
-
 const dashboardService = {
-  resumo: async (signal?: AbortSignal): Promise<DashboardResumo> => {
-    const response = await api.get('/dashboard/resumo', { signal });
-    return response.data;
-  },
-
   // Buscar gastos por categoria do mês atual
   gastosPorCategoria: async (signal?: AbortSignal): Promise<GastosPorCategoria[]> => {
     const response = await api.get('/dashboard/gastos-por-categoria', { signal });

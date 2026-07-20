@@ -10,7 +10,7 @@ import { useZodForm } from '../hooks/useZodForm';
 import { carteiraSchema, onboardingCategoriasSchema, onboardingContaSchema, onboardingMetaSchema, onboardingRendaSchema } from '../validation/schemas';
 
 const PASSOS = [
-  { titulo: 'Carteira', icone: Wallet, descricao: 'Onde seu dinheiro está' },
+  { titulo: 'Conta', icone: Wallet, descricao: 'Onde seu dinheiro está' },
   { titulo: 'Conta/Cartão', icone: CreditCard, descricao: 'Meio de pagamento' },
   { titulo: 'Categorias', icone: Tag, descricao: 'Organize seus gastos' },
   { titulo: 'Renda', icone: TrendingUp, descricao: 'Sua renda mensal' },
@@ -37,7 +37,7 @@ export default function Onboarding() {
   const [passo, setPasso] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  const [carteira, setCarteira] = useState({ nome: 'Carteira Principal', tipo: 'CONTA_BANCARIA', saldo: '', banco: '' });
+  const [carteira, setCarteira] = useState({ nome: 'Conta Principal', tipo: 'CONTA_BANCARIA', saldo: '', banco: '' });
   const [cartao, setCartao] = useState({
     nome: 'Cartão Principal', limiteTotal: '', diaFechamento: '5', diaVencimento: '12',
   });
@@ -502,7 +502,7 @@ export default function Onboarding() {
                   <div className="flex items-center gap-3 p-3 bg-slate-900/50 rounded-lg border border-slate-700">
                     <Wallet className="w-5 h-5 text-teal-500" />
                     <div>
-                      <p className="text-xs text-slate-500 uppercase">Carteira</p>
+                      <p className="text-xs text-slate-500 uppercase">Conta</p>
                       <p className="text-sm text-white">{resumo.carteiraCriada}</p>
                     </div>
                   </div>
