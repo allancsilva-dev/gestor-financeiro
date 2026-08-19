@@ -1689,3 +1689,64 @@ gera erro benigno `transaction_timeout` — manter major igual entre dump e rest
 O coordenador host-side substituiu esse mecanismo, mas ainda precisa de novo drill. Por isso
 esta evidência histórica não fecha o problema;
 `PROB-0081` permanece reaberto até o drill off-host real passar com o coordenador host-side.
+
+---
+
+## PROB-0082 — Código do redesign visual "Fase 4" (dark-first ciano) só existe em stash não commitado
+
+- **ID:** PROB-0082
+- **Titulo:** Reversão total do protótipo/redesign "Fase 4" do mobile deixou o código descartado sem
+  local durável além de `git stash`
+- **Data:** 2026-08-19
+- **Origem:** decisão do dono do produto, branch `chore/remove-prototipo`
+- **Severidade:** LOW
+- **Status:** FECHADO em 2026-08-19 — risco materializado por decisão consciente do dono (ver abaixo).
+- **Area:** mobile, documentacao
+- **Sintoma:** Nenhum sintoma de execução — trata-se de uma decisão de produto executada
+  corretamente. O ponto registrado é que o único protótipo commitado no repositório
+  (`docs/Gestor Financeiro (standalone).html`, tema claro lavanda) foi removido via `git rm`, o
+  protótipo dark-first ciano em `docs/prototipo/app.html` (untracked) e o rename staged
+  `docs/prototipo/legado-claro.html` deixaram de existir, e todo o redesign "Fase 4" não commitado
+  do app mobile foi revertido ao estado do commit `ae30d62` via
+  `git stash push --include-untracked -m "fase4-prototipo-descartado-2026-08-19"`.
+- **Causa raiz:** N/A — não é um bug. Decisão explícita do dono do produto: "ficou horrível e só
+  atrapalha o sistema", descartando por inteiro o redesign visual "Fase 4" (dark-first ciano).
+- **Impacto tecnico:** (1) `docs/prototipo/` não existe mais como diretório no working tree; (2) o
+  tema dark-first ciano (`mobile/src/theme/colors.ts`, `theme/index.ts`), as telas
+  `mobile/app/(app)/carteira.tsx` e `mobile/app/(app)/analises.tsx`, os componentes `CardBadge`,
+  `CreditCardArt`, `DiaHeader`, `MerchantLogo`, `ProgressRing`, `TransacaoRow`,
+  `mobile/src/domain/marcas.ts`, `mobile/src/store/themePref.ts`, `mobile/src/utils/color.ts`,
+  testes novos (`marcas.test.ts`, `telasNovas.test.tsx`, `themePref.test.ts`,
+  `uiPrimitivos.test.tsx`) e `mobile/.maestro/fase4-visual.yaml` só existem em
+  `git stash@{0}` no momento deste registro — fora do reflog padrão de commits; (3)
+  `mobile/app/(app)/more/relatorios.tsx` (que o redesign havia apagado) foi restaurado junto com o
+  link em `more/index.tsx`; a tab bar voltou para `Início · Transações · + · Planejamento · Mais`;
+  (4) `DESIGN.md` e `PRODUCT.md` (raiz do projeto) foram limpos para não citar mais o protótipo como
+  fonte canônica — a fonte canônica passa a ser `DESIGN.md` + `mobile/src/theme/colors.ts`.
+- **Arquivos ou modulos relacionados:** `mobile/src/theme/colors.ts`, `mobile/src/theme/index.ts`,
+  `mobile/app/(app)/carteira.tsx`, `mobile/app/(app)/analises.tsx`,
+  `mobile/app/(app)/more/relatorios.tsx`, `mobile/app/(app)/more/index.tsx`,
+  `mobile/app/(app)/_layout.tsx`, `mobile/src/components/ui/CardBadge.tsx`,
+  `mobile/src/components/ui/CreditCardArt.tsx`, `mobile/src/components/ui/DiaHeader.tsx`,
+  `mobile/src/components/ui/MerchantLogo.tsx`, `mobile/src/components/ui/ProgressRing.tsx`,
+  `mobile/src/components/ui/TransacaoRow.tsx`, `mobile/src/domain/marcas.ts`,
+  `mobile/src/store/themePref.ts`, `mobile/src/utils/color.ts`, `mobile/.maestro/fase4-visual.yaml`,
+  `DESIGN.md`, `PRODUCT.md` (raiz — fora da propriedade do `docs-reporter`).
+- **Solucao proposta:** Ver BACKLOG-0090 — decisão explícita do dono sobre manter o stash com prazo
+  de revisão, exportar para um branch nomeado, ou dropar de vez.
+- **Solucao aplicada:** O dono decidiu apagar de vez. Após commitar a remoção do protótipo na `main`,
+  o stash `fase4-prototipo-descartado-2026-08-19` foi dropado (`git stash drop`). O código do redesign
+  "Fase 4" deixou de existir no repositório — não há branch, commit nem stash com ele. O risco
+  descrito aqui foi aceito explicitamente, não mitigado. Ver BACKLOG-0090.
+- **Evidencias ou comandos usados:** `git status --short` (working tree limpo de artefatos do
+  redesign, exceto `DESIGN.md`/`PRODUCT.md` modificados e a deleção do standalone); `git stash list`
+  (`stash@{0}: On main: fase4-prototipo-descartado-2026-08-19`); `git stash show --stat stash@{0}`
+  (18 arquivos, 458 insertions(+), 566 deletions(-) — inclui a remoção de 296 linhas de
+  `relatorios.tsx` dentro do stash, ou seja, o stash registra a versão em que o arquivo tinha sido
+  apagado pelo redesign); `npx tsc --noEmit` limpo pós-reversão; `npm test` no mobile 12 suítes / 36
+  testes PASS pós-reversão; `grep -in "prototipo|standalone" DESIGN.md PRODUCT.md` sem hits.
+- **Riscos residuais:** `git stash drop`/`git stash clear` acidental apaga o código do redesign de
+  forma irreversível fora do reflog local (não sincronizado com nenhum remoto). Baixa severidade
+  porque a decisão do dono foi descartar o trabalho — o risco é apenas de perda de opcionalidade
+  futura, não de regressão em produção.
+- **Proximo passo:** Ver BACKLOG-0090.

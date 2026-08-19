@@ -627,6 +627,12 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Risco se ficar pendente:** N/A — já implementado nesta sessão.
 - **Status:** FECHADO (2026-07-09)
 - **Evidencias:** `mobile/src/components/ui/Entrance.tsx` (novo), `mobile/src/components/ui/FloatEmoji.tsx` (novo), `mobile/src/components/ui/Fab.tsx`, aplicados em `mobile/app/(app)/index.tsx`, `mobile/app/(app)/metas.tsx`, `mobile/app/(app)/transacoes.tsx`. Não validado com teste automatizado (mobile sem suíte de testes configurada — ver limitação conhecida em `SYSTEM_OVERVIEW.md`).
+- **Nota (2026-08-19, BACKLOG-0091):** o caminho `docs/Gestor Financeiro (standalone).html` citado
+  acima **não existe mais** no working tree — removido em 2026-08-19 (`git rm`, branch
+  `chore/remove-prototipo`) por decisão do dono do produto de descartar por inteiro o protótipo
+  HTML e o redesign visual "Fase 4". O arquivo permanece apenas no histórico do git (até o commit
+  `ae30d62`). O componente `Fab` com gradiente violeta segue em uso — este registro descreve
+  apenas o caminho morto do arquivo de referência, não uma reversão desta entrada.
 
 ---
 
@@ -1313,3 +1319,59 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   incompletos para quem consulta apenas esses dois arquivos; a rastreabilidade completa dos onze
   PRs já existe em `SYSTEM_OVERVIEW.md` e nos respectivos relatórios de revisão.
 - **Status:** ABERTO.
+
+---
+
+## BACKLOG-0090 — Decidir destino do stash `fase4-prototipo-descartado-2026-08-19`
+
+- **Titulo:** Definir se o código do redesign visual "Fase 4" (dark-first ciano) descartado fica
+  apenas em stash, é exportado para um branch nomeado, ou é dropado de vez
+- **Prioridade:** P2
+- **Área:** mobile, documentação
+- **Motivo:** Em 2026-08-19, na branch `chore/remove-prototipo`, o dono do produto decidiu descartar
+  por inteiro o protótipo HTML e o redesign "Fase 4" do mobile ("ficou horrível e só atrapalha o
+  sistema" — ver PROB-0082 e `docs/REVIEW_REPORTS/2026-08-19_mobile_decisao_reversao-prototipo-fase4.md`).
+  A reversão foi feita via `git stash push --include-untracked -m
+  "fase4-prototipo-descartado-2026-08-19"`, então o código completo (tema dark-first ciano em
+  `mobile/src/theme/colors.ts`/`theme/index.ts`, telas `mobile/app/(app)/carteira.tsx` e
+  `mobile/app/(app)/analises.tsx`, componentes `CardBadge`, `CreditCardArt`, `DiaHeader`,
+  `MerchantLogo`, `ProgressRing`, `TransacaoRow`, `mobile/src/domain/marcas.ts`,
+  `mobile/src/store/themePref.ts`, `mobile/src/utils/color.ts`, testes novos e
+  `mobile/.maestro/fase4-visual.yaml`) existe **somente** em `git stash@{0}` no momento deste
+  registro. Um `git stash drop`/`git stash clear` acidental apaga esse trabalho fora do reflog local.
+- **Dependências:** Nenhuma técnica; depende apenas de decisão do dono do produto.
+- **Critério de aceite:** Uma das três opções executada e documentada: (a) stash mantido
+  intencionalmente com prazo de revisão registrado; (b) `git branch fase4-prototipo-descartado
+  stash@{0}` (ou equivalente) para persistir o código fora do stash sem afetar `main`; (c)
+  `git stash drop` explicitamente autorizado pelo dono após confirmação de que o código não será
+  reaproveitado.
+- **Risco se ficar pendente:** Perda irreversível (fora do reflog) de ~458 linhas de código já
+  implementado e validado (`tsc --noEmit` limpo, Jest 36/36 no momento da reversão) caso o stash
+  seja descartado por engano em uma limpeza futura (`git stash clear`, `git gc` agressivo, etc.).
+- **Status:** FECHADO em 2026-08-19 — opção (c) executada. O dono autorizou explicitamente apagar de vez ("Apagar de vez"), e o `git stash drop` do stash `fase4-prototipo-descartado-2026-08-19` foi executado após o commit da remoção na `main`. O redesign "Fase 4" não existe mais em nenhum ponto recuperável do repositório.
+
+---
+
+## BACKLOG-0091 — Anotar caminho morto `docs/Gestor Financeiro (standalone).html` em registros históricos
+
+- **Titulo:** Registros históricos que citam o protótipo removido devem sinalizar que o caminho não
+  existe mais no working tree
+- **Prioridade:** P3
+- **Área:** documentação
+- **Motivo:** Em 2026-08-19 (branch `chore/remove-prototipo`), o arquivo
+  `docs/Gestor Financeiro (standalone).html` foi removido do working tree (`git rm`), permanecendo
+  apenas no histórico do git até o commit `ae30d62`. `docs/BACKLOG.md` (BACKLOG-0048), `docs/SYSTEM_OVERVIEW.md`
+  (item 11 da lista de decisões técnicas e na seção "Auditoria e estado atual") e `docs/BUGFIX_LOG.md`
+  citam esse caminho como referência de design em registros datados de 2026-07-09. Esses registros
+  são história verdadeira no momento em que foram escritos e não devem ser apagados nem reescritos,
+  mas passam a referenciar um arquivo inexistente no HEAD atual.
+  Este registro já cumpre parte da anotação: ver notas adicionadas em `docs/BACKLOG.md` (BACKLOG-0048)
+  e `docs/SYSTEM_OVERVIEW.md` (itens 11 e "Correções 2026-07-09") nesta mesma rodada do `docs-reporter`.
+- **Dependências:** Nenhuma.
+- **Critério de aceite:** `docs/BUGFIX_LOG.md` (~L766, contexto do backup off-host, menção lateral a
+  "standalone" no sentido de topologia de nginx, não do protótipo — confirmar se aplica) revisado
+  para clareza; nenhuma citação ativa trata o caminho do protótipo como referência válida sem nota.
+- **Risco se ficar pendente:** Baixo — confusão eventual de quem consulta o histórico sem saber que o
+  redesign visual foi descartado por completo em 2026-08-19.
+- **Status:** ABERTO (parcialmente endereçado nesta rodada — ver anotações cravadas em
+  BACKLOG-0048 e SYSTEM_OVERVIEW.md).

@@ -1,6 +1,6 @@
 # Design
 
-Sistema visual do Gestor Financeiro. Fonte canônica: protótipo `docs/Gestor Financeiro (standalone).html` (tokens extraídos do render real). Implementação mobile: `mobile/src/theme/colors.ts` (migrar brand de ciano → violeta).
+Sistema visual do Gestor Financeiro. Fonte canônica: este documento. Implementação mobile: `mobile/src/theme/colors.ts`.
 
 ## Theme
 
@@ -19,7 +19,7 @@ Estratégia: **restrained** — neutros lavanda + violeta como único acento de 
 | `border` | `rgba(0,0,0,0.07)` | divisores, contorno de card |
 | `textPrimary` | `#1a1d23` | títulos, valores |
 | `textSecondary` | `#6b7280` | subtítulos, metadados |
-| `textMuted` | `#8a91a0` | placeholder/decorativo (o `#aab0bd` do protótipo falha AA — escurecido) |
+| `textMuted` | `#8a91a0` | placeholder/decorativo (escurecido para passar AA) |
 | `brand` | `#7c5cfc` | FAB, botões primários, tab ativa |
 | `brandDeep` | `#5546b8` | gradiente do card de saldo (com `brand`) |
 | `brandText` | `#6d28d9` | texto/ícone violeta sobre claro (AA) |
@@ -47,7 +47,7 @@ Estratégia: **restrained** — neutros lavanda + violeta como único acento de 
 
 ## Typography
 
-System font (SF Pro / Roboto via `system-ui`). Sem fonte customizada — o protótipo é system-native.
+System font (SF Pro / Roboto via `system-ui`). Sem fonte customizada.
 
 - Display (saldo): 34–40, weight 800, tabular-nums
 - Título de tela: 26–28, weight 700

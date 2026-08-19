@@ -12,7 +12,7 @@ Gestor Financeiro pessoal completo: carteiras, transações, cartões/faturas, c
 
 ## Brand Personality
 
-Leve, amigável, confiável. Finanças sem cara de banco: tom acolhedor ("Olá, Mariana 👋"), emoji como ícones de categoria em quadradinhos pastel, números grandes e claros. Dinheiro que entra é verde, que sai é vermelho — sempre. A referência visual canônica é o protótipo em `docs/Gestor Financeiro (standalone).html` (tema claro lavanda + violeta).
+Leve, amigável, confiável. Finanças sem cara de banco: tom acolhedor ("Olá, Mariana 👋"), emoji como ícones de categoria em quadradinhos pastel, números grandes e claros. Dinheiro que entra é verde, que sai é vermelho — sempre. O sistema visual canônico (tokens, tipografia, motion) está em `DESIGN.md`.
 
 ## Anti-references
 
