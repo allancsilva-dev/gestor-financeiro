@@ -249,11 +249,14 @@ export default function CarteiraScreen() {
                   <ResumoCartao cartao={selecionado} />
                 </View>
 
+                {/* Nome e acoes em linhas separadas: dividir a linha com o lapis e o
+                    botao de despesa sobrava ~160pt pro nome e truncava qualquer cartao
+                    de nome medio ("Nubank Ultraviol..."). */}
                 <View style={{
-                  flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-                  paddingHorizontal: spacing.lg, marginTop: spacing.xxl, gap: spacing.md,
+                  flexDirection: 'row', alignItems: 'center',
+                  paddingHorizontal: spacing.lg, marginTop: spacing.xxl, gap: spacing.sm,
                 }}>
-                  <Text numberOfLines={1} style={{ ...typography.section, color: colors.textPrimary, flex: 1 }}>
+                  <Text numberOfLines={2} style={{ ...typography.section, color: colors.textPrimary, flex: 1 }}>
                     {selecionado.nome}
                   </Text>
                   <TouchableOpacity
@@ -265,6 +268,16 @@ export default function CarteiraScreen() {
                   >
                     <Ionicons name="create-outline" size={20} color={colors.textSecondary} />
                   </TouchableOpacity>
+                </View>
+
+                <View style={{
+                  flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                  paddingHorizontal: spacing.lg, marginTop: spacing.xs, gap: spacing.md,
+                }}>
+                  <Text style={{ ...typography.body, color: colors.textSecondary, flex: 1 }}>
+                    {selecionado.ultimosDigitos ? `•••• ${selecionado.ultimosDigitos} · ` : ''}
+                    Vence dia {selecionado.diaVencimento ?? '—'}
+                  </Text>
                   <TouchableOpacity
                     onPress={() => setNovaDespesaVisible(true)}
                     accessibilityRole="button"
@@ -281,11 +294,6 @@ export default function CarteiraScreen() {
                     </Text>
                   </TouchableOpacity>
                 </View>
-
-                <Text style={{ ...typography.body, color: colors.textSecondary, paddingHorizontal: spacing.lg, marginTop: spacing.xs }}>
-                  {selecionado.ultimosDigitos ? `•••• ${selecionado.ultimosDigitos} · ` : ''}
-                  Vence dia {selecionado.diaVencimento ?? '—'}
-                </Text>
 
                 <View style={{ paddingHorizontal: spacing.lg, gap: spacing.md - 2, marginTop: spacing.lg }}>
                   {selecionado.faturas.map(f => (

@@ -19,7 +19,6 @@ const itens = [
   { label: 'Carteira',     sub: 'Cartões e faturas', rota: '/more/faturas',      icone: '💳' },
   { label: 'Relatórios',   sub: 'Gráficos',         rota: '/analises',   icone: '📋' },
   { label: 'Categorias',   sub: 'Organizar',        rota: '/more/categorias',   icone: '🏷' },
-  { label: 'Cartões',      sub: 'Crédito e débito', rota: '/more/contas',       icone: '💳' },
   { label: 'Investimentos', sub: 'Posições',         rota: '/more/investimentos', icone: '◈' },
   { label: 'Entrada por IA', sub: 'Em breve',       rota: null,                 icone: '🤖', desabilitado: true },
   { label: 'Importar CSV', sub: 'Extrato',           rota: null,                 icone: '⇪', acao: 'importar' },
