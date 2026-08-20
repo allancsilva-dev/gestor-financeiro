@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import investimentoService from '../../../src/services/investimentoService';
 import contaFinanceiraService from '../../../src/services/contaFinanceiraService';
 import { Ativo, AtivoRequest, LiquidezContaFinanceira, TipoAtivo, TipoMovimentacaoAtivo } from '../../../src/types';
-import { useTheme } from '../../../src/theme';
+import { useTheme, useTabBarSpace } from '../../../src/theme';
 import BackButton from '../../../src/components/ui/BackButton';
 import { formatCurrency, formatDate, isValidDateBR, maskCurrencyInput, maskDateInput, parseCurrencyBR, parseDateBR } from '../../../src/utils/format';
 import Card from '../../../src/components/ui/Card';
@@ -289,7 +289,7 @@ function DetalheAtivoModal({ ativo, onClose, onEdit }: { ativo: Ativo | null; on
                   </View>
                   {m.operacaoId != null && <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 4 }}>Operação #{m.operacaoId}</Text>}
                   <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 3 }}>
-                    {formatDate(m.data + 'T00:00:00')} · {Number(m.quantidade ?? 0)} x {formatCurrency(Number(m.precoUnitario ?? 0))}
+                    {formatDate(m.data)} · {Number(m.quantidade ?? 0)} x {formatCurrency(Number(m.precoUnitario ?? 0))}
                   </Text>
                 </View>
               ))}
@@ -304,6 +304,7 @@ function DetalheAtivoModal({ ativo, onClose, onEdit }: { ativo: Ativo | null; on
 
 export default function InvestimentosScreen() {
   const colors = useTheme();
+  const tabBarSpace = useTabBarSpace();
   const insets = useSafeAreaInsets();
   const [ativoModal, setAtivoModal] = useState<Ativo | null>(null);
   const [ativoModalVisible, setAtivoModalVisible] = useState(false);
@@ -348,7 +349,7 @@ export default function InvestimentosScreen() {
         <FlatList
           data={data}
           keyExtractor={item => item.id.toString()}
-          contentContainerStyle={{ padding: 16, paddingBottom: 96 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: tabBarSpace }}
           ListHeaderComponent={(
             <Card radius={18} style={{ marginBottom: 12 }}>
               <View style={{ flexDirection: 'row', gap: 8 }}>

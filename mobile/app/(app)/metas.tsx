@@ -7,7 +7,7 @@ import contaFinanceiraService from '../../src/services/contaFinanceiraService';
 import { useRouter } from 'expo-router';
 import { formatCurrency, formatPercent, formatDate, formatDateOnlyBR, parseDateBR, isValidDateBR, parseCurrencyBR, maskCurrencyInput, maskDateInput } from '../../src/utils/format';
 import { Meta, MetaRequest, ModalidadeMeta, StatusMeta } from '../../src/types';
-import { useTheme } from '../../src/theme';
+import { useTheme, useTabBarSpace } from '../../src/theme';
 import SkeletonBox from '../../src/components/ui/SkeletonBox';
 import Card from '../../src/components/ui/Card';
 import IconTile from '../../src/components/ui/IconTile';
@@ -34,6 +34,7 @@ const MODALIDADES: Array<{ id: ModalidadeMeta; titulo: string; descricao: string
 
 export default function Metas() {
   const colors = useTheme();
+  const tabBarSpace = useTabBarSpace();
   const router = useRouter();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
@@ -356,7 +357,7 @@ export default function Metas() {
           data={data?.content ?? []}
           keyExtractor={m => m.id.toString()}
           renderItem={renderItem}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 96 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: tabBarSpace }}
           ListEmptyComponent={() => (
             <View style={{ alignItems: 'center', padding: 48 }}>
               <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600' }}>

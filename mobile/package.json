@@ -9,7 +9,7 @@
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
     "lint": "eslint app src --ext .ts,.tsx --max-warnings=0",
-    "test": "jest --runInBand"
+    "test": "TZ=America/Sao_Paulo jest --runInBand"
   },
   "jest": {
     "preset": "jest-expo",
@@ -22,6 +22,7 @@
     ]
   },
   "dependencies": {
+    "@expo/vector-icons": "^15.0.3",
     "@sentry/react-native": "~7.2.0",
     "@tanstack/react-query": "^5.96.2",
     "axios": "^1.18.1",
@@ -29,6 +30,7 @@
     "expo-constants": "~18.0.13",
     "expo-document-picker": "~14.0.8",
     "expo-file-system": "~19.0.23",
+    "expo-font": "~14.0.12",
     "expo-image-picker": "~17.0.10",
     "expo-linear-gradient": "~15.0.8",
     "expo-linking": "~8.0.12",

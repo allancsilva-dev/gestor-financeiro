@@ -21,8 +21,12 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const isLocalE2E = Constants.expoConfig?.extra?.appEnv === 'local-e2e';
+  // Em local-e2e o AutoFill do iOS sequestra o campo de senha e só o último
+  // caractere digitado sobrevive no TextInput controlado — o registro do
+  // financial-critical falhava sempre com a senha truncada. 'none' tira o
+  // AutoFill do caminho; fora do e2e o comportamento normal é preservado.
   const passwordTextContentType = isLocalE2E
-    ? 'password'
+    ? 'none'
     : 'newPassword';
 
   const onSubmit = async () => {

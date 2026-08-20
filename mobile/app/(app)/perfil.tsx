@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useTheme } from '../../src/theme';
+import { useTheme, useTabBarSpace } from '../../src/theme';
 import { useAuth } from '../../src/context/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
@@ -15,6 +15,7 @@ import { isValidPassword } from '../../src/utils/validate';
 
 export default function Perfil() {
   const colors = useTheme();
+  const tabBarSpace = useTabBarSpace();
   const { usuario, logout, updateUsuario } = useAuth();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -84,7 +85,7 @@ export default function Perfil() {
   };
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ paddingTop: insets.top + 16, padding: 16, paddingBottom: 32 }}>
+    <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ paddingTop: insets.top + 16, padding: 16, paddingBottom: tabBarSpace }}>
       <View style={{ alignItems: 'center', marginBottom: 24 }}>
         <LinearGradient
           colors={[colors.brand, colors.brandDeep]}

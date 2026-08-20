@@ -6,7 +6,7 @@ import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tansta
 import contaFinanceiraService, { contaGerenciada } from '../../../src/services/contaFinanceiraService';
 import { TIPO_MOVIMENTO_LABEL, formatCurrency, formatDateTime, parseCurrencyBR, maskCurrencyInput } from '../../../src/utils/format';
 import { ContaFinanceira, ContaFinanceiraRequest, SubtipoContaFinanceira } from '../../../src/types';
-import { useTheme } from '../../../src/theme';
+import { useTheme, useTabBarSpace } from '../../../src/theme';
 import BackButton from '../../../src/components/ui/BackButton';
 import SkeletonBox from '../../../src/components/ui/SkeletonBox';
 
@@ -18,6 +18,7 @@ const SUBTIPO_LABEL: Record<SubtipoContaFinanceira, string> = {
 
 function ExtratoModal({ carteira, onClose }: { carteira: ContaFinanceira | null; onClose: () => void }) {
   const colors = useTheme();
+  const tabBarSpace = useTabBarSpace();
   const {
     data,
     isLoading,
@@ -90,7 +91,7 @@ function ExtratoModal({ carteira, onClose }: { carteira: ContaFinanceira | null;
         <FlatList
           data={movimentos}
           keyExtractor={m => m.id.toString()}
-          contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: tabBarSpace }}
           onEndReached={() => { if (hasNextPage && !isFetchingNextPage) fetchNextPage(); }}
           onEndReachedThreshold={0.4}
           ListFooterComponent={isFetchingNextPage ? (

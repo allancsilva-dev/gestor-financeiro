@@ -2,14 +2,14 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
-import { useTheme } from '../../../src/theme';
-import BackButton from '../../../src/components/ui/BackButton';
-import relatorioService from '../../../src/services/relatorioService';
-import { formatCurrency, formatDate, formatPercent } from '../../../src/utils/format';
-import Card from '../../../src/components/ui/Card';
-import Chip from '../../../src/components/ui/Chip';
-import IconTile from '../../../src/components/ui/IconTile';
-import SkeletonBox from '../../../src/components/ui/SkeletonBox';
+import { useTheme, useTabBarSpace } from '../../src/theme';
+import BackButton from '../../src/components/ui/BackButton';
+import relatorioService from '../../src/services/relatorioService';
+import { formatCurrency, formatDate, formatPercent } from '../../src/utils/format';
+import Card from '../../src/components/ui/Card';
+import Chip from '../../src/components/ui/Chip';
+import IconTile from '../../src/components/ui/IconTile';
+import SkeletonBox from '../../src/components/ui/SkeletonBox';
 
 type Periodo = 'mes' | 'mesPassado' | 'tresMeses' | 'ano';
 
@@ -41,6 +41,7 @@ function intervalo(periodo: Periodo): { inicio: string; fim: string } {
 
 export default function RelatorioScreen() {
   const colors = useTheme();
+  const tabBarSpace = useTabBarSpace();
   const insets = useSafeAreaInsets();
   const [periodo, setPeriodo] = useState<Periodo>('mes');
   const { inicio, fim } = intervalo(periodo);
@@ -76,7 +77,7 @@ export default function RelatorioScreen() {
         <BackButton />
         <Text style={{ color: colors.textPrimary, fontSize: 23, fontWeight: '800', letterSpacing: -0.4 }}>Relatórios</Text>
         <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>
-          {formatDate(inicio + 'T00:00:00')} até {formatDate(fim + 'T00:00:00')}
+          {formatDate(inicio)} até {formatDate(fim)}
         </Text>
       </View>
 
@@ -109,7 +110,7 @@ export default function RelatorioScreen() {
           </Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 96, gap: 16 }}>
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: tabBarSpace, gap: 16 }}>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {[
               { l: 'Entradas', v: data.totalEntradas, c: colors.success },
@@ -278,7 +279,7 @@ export default function RelatorioScreen() {
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <Text style={{ color: colors.textPrimary, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>{d.descricao}</Text>
                       <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 2 }}>
-                        {d.categoriaNome || 'Sem categoria'} · {formatDate(d.data.length === 10 ? `${d.data}T00:00:00` : d.data)}
+                        {d.categoriaNome || 'Sem categoria'} · {formatDate(d.data)}
                       </Text>
                     </View>
                     <Text style={{ color: colors.danger, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] }}>

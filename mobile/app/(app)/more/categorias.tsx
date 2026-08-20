@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { categoriaService } from '../../../src/services/categoriaService';
 import { CATEGORY_COLORS, formatCurrency } from '../../../src/utils/format';
 import { Categoria, CategoriaRequest } from '../../../src/types';
-import { useTheme } from '../../../src/theme';
+import { useTheme, useTabBarSpace } from '../../../src/theme';
 import BackButton from '../../../src/components/ui/BackButton';
 import SkeletonBox from '../../../src/components/ui/SkeletonBox';
 import Field from '../../../src/components/ui/Field';
@@ -13,6 +13,7 @@ import Fab from '../../../src/components/ui/Fab';
 
 export default function CategoriasScreen() {
   const colors = useTheme();
+  const tabBarSpace = useTabBarSpace();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [modalVisible, setModalVisible] = useState(false);
@@ -60,6 +61,7 @@ export default function CategoriasScreen() {
       ) : (
         <FlatList
           data={categorias}
+          contentContainerStyle={{ paddingBottom: tabBarSpace }}
           keyExtractor={item => item.id.toString()}
           renderItem={({ item: cat }) => (
             <View style={{ height: 56, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>

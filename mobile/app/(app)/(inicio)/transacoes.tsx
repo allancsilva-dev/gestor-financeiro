@@ -3,16 +3,16 @@ import { View, Text, FlatList, RefreshControl, TouchableOpacity, TextInput, Acti
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { transacaoService } from '../../src/services/transacaoService';
-import relatorioService from '../../src/services/relatorioService';
-import { useTheme } from '../../src/theme';
-import { formatCurrency, formatDate } from '../../src/utils/format';
-import { TipoTransacao, Transacao } from '../../src/types';
-import SkeletonBox from '../../src/components/ui/SkeletonBox';
-import ListRow from '../../src/components/ui/ListRow';
-import Chip from '../../src/components/ui/Chip';
-import Card from '../../src/components/ui/Card';
-import EditarTransacaoModal from '../../src/components/EditarTransacaoModal';
+import { transacaoService } from '../../../src/services/transacaoService';
+import relatorioService from '../../../src/services/relatorioService';
+import { useTheme, useTabBarSpace } from '../../../src/theme';
+import { formatCurrency, formatDate } from '../../../src/utils/format';
+import { TipoTransacao, Transacao } from '../../../src/types';
+import SkeletonBox from '../../../src/components/ui/SkeletonBox';
+import ListRow from '../../../src/components/ui/ListRow';
+import Chip from '../../../src/components/ui/Chip';
+import Card from '../../../src/components/ui/Card';
+import EditarTransacaoModal from '../../../src/components/EditarTransacaoModal';
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
@@ -27,6 +27,7 @@ const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export default function Transacoes() {
   const colors = useTheme();
+  const tabBarSpace = useTabBarSpace();
   const insets = useSafeAreaInsets();
   // Drill-down (PR-F3-08): filtros/transação chegam por rota (navegação do backend)
   const params = useLocalSearchParams<{ inicio?: string; tipo?: string; transacaoId?: string }>();
@@ -188,7 +189,7 @@ export default function Transacoes() {
       <FlatList
         data={transacoes}
         keyExtractor={item => item.id.toString()}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 32 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: tabBarSpace }}
         refreshControl={<RefreshControl refreshing={isRefetching && !isFetchingNextPage} onRefresh={refetch} tintColor={colors.brand} />}
         onEndReached={() => { if (hasNextPage && !isFetchingNextPage) fetchNextPage(); }}
         onEndReachedThreshold={0.4}

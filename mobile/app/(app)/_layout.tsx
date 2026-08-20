@@ -1,66 +1,63 @@
 import React, { useState } from 'react';
 import { Redirect, Tabs, useRouter } from 'expo-router';
-import { useTheme } from '../../src/theme';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { useReducedMotion } from 'react-native-reanimated';
+import { useTheme, radius, typography, tabBar } from '../../src/theme';
 import NovaTransacaoModal from '../../src/components/NovaTransacaoModal';
 import { useAuth } from '../../src/context/AuthContext';
-import { useReducedMotion } from 'react-native-reanimated';
 
-// Ícones funcionais em Views — sem dependência externa de ícones
-const IconInicio = ({ color }: { color: string }) => (
-  <View style={{ width: 20, height: 18, alignItems: 'center' }}>
-    <View style={{
-      width: 0, height: 0,
-      borderLeftWidth: 9, borderRightWidth: 9, borderBottomWidth: 7,
-      borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: color,
-    }} />
-    <View style={{
-      width: 14, height: 10, borderWidth: 2, borderTopWidth: 0, borderColor: color,
-      borderBottomLeftRadius: 2, borderBottomRightRadius: 2, marginTop: -1,
-    }} />
-  </View>
-);
+// Medidas da referência (mobile/.design/referencia-home.png, 591px ↔ 360dp):
+// painel flutuante de 69 de altura com 15 de margem lateral, tile da aba ativa
+// 43x24, barra indicadora 38x4 colada no topo do painel e FAB de 53.
+const BARRA_ALTURA = tabBar.altura;
+const BARRA_MARGEM = tabBar.margem;
+const TILE_LARGURA = 43;
+const TILE_ALTURA = 24;
+const INDICADOR_LARGURA = 38;
+const INDICADOR_ALTURA = 4;
+const FAB_TAMANHO = 53;
 
-const IconTransacoes = ({ color }: { color: string }) => (
-  <View style={{ flexDirection: 'row', gap: 5, height: 18, alignItems: 'center' }}>
-    <View style={{ alignItems: 'center' }}>
-      <View style={{
-        width: 0, height: 0,
-        borderLeftWidth: 4, borderRightWidth: 4, borderBottomWidth: 5,
-        borderLeftColor: 'transparent', borderRightColor: 'transparent', borderBottomColor: color,
-      }} />
-      <View style={{ width: 2, height: 10, backgroundColor: color, borderRadius: 1 }} />
+type IconeProps = { color: string; focused: boolean };
+
+/**
+ * Ícone da aba: quando ativa, ganha o tile arredondado ciano atrás e a barra
+ * indicadora no topo do painel — os dois detalhes que a referência usa para
+ * marcar a posição.
+ */
+const ItemAba = ({
+  focused,
+  color,
+  children,
+  tileBg,
+  indicador,
+}: IconeProps & { children: React.ReactNode; tileBg: string; indicador: string }) => (
+  <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+    <View
+      style={{
+        position: 'absolute',
+        top: -((BARRA_ALTURA - TILE_ALTURA) / 2) - INDICADOR_ALTURA + 2,
+        width: INDICADOR_LARGURA,
+        height: INDICADOR_ALTURA,
+        borderRadius: radius.pill,
+        backgroundColor: focused ? indicador : 'transparent',
+      }}
+    />
+    <View
+      style={{
+        width: TILE_LARGURA,
+        height: TILE_ALTURA,
+        borderRadius: radius.md,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: focused ? tileBg : 'transparent',
+      }}
+    >
+      {children}
     </View>
-    <View style={{ alignItems: 'center' }}>
-      <View style={{ width: 2, height: 10, backgroundColor: color, borderRadius: 1 }} />
-      <View style={{
-        width: 0, height: 0,
-        borderLeftWidth: 4, borderRightWidth: 4, borderTopWidth: 5,
-        borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: color,
-      }} />
-    </View>
-  </View>
-);
-
-const IconPlanejamento = ({ color }: { color: string }) => (
-  <View style={{
-    width: 18, height: 18, borderRadius: 9,
-    borderWidth: 2, borderColor: color,
-  }}>
-    <View style={{
-      position: 'absolute', top: -2, right: -2,
-      width: 9, height: 9, borderTopRightRadius: 9, backgroundColor: color,
-    }} />
-  </View>
-);
-
-const IconMais = ({ color }: { color: string }) => (
-  <View style={{ width: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 4, justifyContent: 'center' }}>
-    {[0, 1, 2, 3].map(i => (
-      <View key={i} style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: color }} />
-    ))}
   </View>
 );
 
@@ -74,6 +71,13 @@ export default function AppLayout() {
 
   if (needsOnboarding) return <Redirect href="/onboarding" />;
 
+  const aba = (nome: React.ComponentProps<typeof Ionicons>['name']) =>
+    ({ color, focused }: IconeProps) => (
+      <ItemAba focused={focused} color={color} tileBg={colors.tabActiveBg} indicador={colors.brand}>
+        <Ionicons name={nome} size={20} color={color} />
+      </ItemAba>
+    );
+
   return (
     <>
       <Tabs screenOptions={{
@@ -82,51 +86,72 @@ export default function AppLayout() {
         transitionSpec: reduceMotion ? undefined : { animation: 'timing', config: { duration: 150 } },
         sceneStyle: { backgroundColor: colors.bg },
         tabBarStyle: {
+          position: 'absolute',
+          left: BARRA_MARGEM,
+          right: BARRA_MARGEM,
+          bottom: insets.bottom > 0 ? insets.bottom : 12,
+          height: BARRA_ALTURA,
+          borderRadius: radius.xxl,
           backgroundColor: colors.navBg,
-          borderTopColor: colors.navBorder,
-          borderTopWidth: 1,
-          height: 64 + insets.bottom,
-          paddingBottom: insets.bottom + 8,
-          paddingTop: 6,
+          borderTopWidth: 0,
+          borderWidth: 1,
+          borderColor: colors.navBorder,
+          paddingBottom: 0,
+          paddingTop: 0,
+          elevation: 0,
         },
-        tabBarActiveTintColor: colors.brandFg,
+        tabBarItemStyle: { height: BARRA_ALTURA, paddingVertical: 8 },
+        tabBarActiveTintColor: colors.brand,
         tabBarInactiveTintColor: colors.textSecondary,
-        tabBarLabelStyle: { fontSize: 10, fontWeight: '500' },
+        tabBarLabelStyle: { ...typography.tabLabel, marginTop: 4 },
       }}>
-        <Tabs.Screen name="index" options={{ title: 'Início', tabBarIcon: ({ color }) => <IconInicio color={color} /> }} />
-        <Tabs.Screen name="transacoes" options={{ title: 'Transações', tabBarIcon: ({ color }) => <IconTransacoes color={color} /> }} />
+        <Tabs.Screen name="(inicio)" options={{ title: 'Início', tabBarIcon: aba('home') }} />
+        <Tabs.Screen name="analises" options={{ title: 'Análises', tabBarIcon: aba('stats-chart') }} />
         <Tabs.Screen name="nova" options={{ title: '', tabBarButton: () => (
           <TouchableOpacity
             onPress={() => setNovaTransacaoVisible(true)}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
             accessibilityRole="button"
             accessibilityLabel="Nova transação"
-            style={{ flex: 1, alignItems: 'center' }}
+            style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
           >
             <LinearGradient
-              colors={[colors.brand, colors.brandDeep]}
+              colors={[colors.fabFrom, colors.fabTo]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={{
-                width: 54, height: 54, borderRadius: 27,
-                marginTop: -22, alignItems: 'center', justifyContent: 'center',
-                shadowColor: colors.brand, shadowOpacity: 0.55, shadowRadius: 14,
-                shadowOffset: { width: 0, height: 8 }, elevation: 8,
+                width: FAB_TAMANHO, height: FAB_TAMANHO, borderRadius: FAB_TAMANHO / 2,
+                alignItems: 'center', justifyContent: 'center',
+                shadowColor: colors.brand, shadowOpacity: 0.55, shadowRadius: 16,
+                shadowOffset: { width: 0, height: 6 }, elevation: 10,
               }}
             >
-              <Text style={{ color: '#ffffff', fontSize: 30, lineHeight: 34, fontWeight: '300', marginTop: -2 }}>+</Text>
+              <Ionicons name="add" size={30} color={colors.brandText} />
             </LinearGradient>
           </TouchableOpacity>
         ) }} />
-        <Tabs.Screen name="metas" options={{ title: 'Planejamento', tabBarIcon: ({ color }) => <IconPlanejamento color={color} /> }} />
-        <Tabs.Screen name="more" options={{ title: 'Mais', tabBarIcon: ({ color }) => <IconMais color={color} /> }} />
+        <Tabs.Screen name="metas" options={{
+          title: 'Metas',
+          tabBarIcon: ({ color, focused }: IconeProps) => (
+            <ItemAba focused={focused} color={color} tileBg={colors.tabActiveBg} indicador={colors.brand}>
+              <MaterialCommunityIcons name="target" size={20} color={color} />
+            </ItemAba>
+          ),
+        }} />
+        <Tabs.Screen name="ajustes" options={{ title: 'Ajustes', tabBarIcon: aba('settings-sharp') }} />
+
+        {/* Fora da barra: a referência move a lista de operações para dentro da
+            Home. Transações virou filha da pilha de (inicio), então a aba
+            Início continua marcada durante o drill-down (PR-F3-08). */}
         <Tabs.Screen name="perfil" options={{ href: null }} />
+        <Tabs.Screen name="notificacoes" options={{ href: null }} />
+        <Tabs.Screen name="more" options={{ href: null }} />
       </Tabs>
 
       <NovaTransacaoModal
         visible={novaTransacaoVisible}
         onClose={() => setNovaTransacaoVisible(false)}
-        onSaved={() => router.push('/(app)/transacoes')}
+        onSaved={() => router.push('/transacoes')}
       />
     </>
   );

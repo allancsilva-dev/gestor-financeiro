@@ -5,10 +5,16 @@ import { useTheme } from '../../theme';
 interface FieldProps extends TextInputProps {
   label: string;
   error?: string | null;
+  /**
+   * Ref do TextInput, para encadear foco entre campos
+   * (`onSubmitEditing={() => proximo.current?.focus()}`).
+   * React 19 passa ref como prop comum — não precisa de forwardRef.
+   */
+  ref?: React.Ref<TextInput>;
 }
 
 // Campo com label-eyebrow uppercase (assinatura visual "E-MAIL" / "VALOR") + erro
-export default function Field({ label, error, style, ...rest }: FieldProps) {
+export default function Field({ label, error, style, ref, ...rest }: FieldProps) {
   const colors = useTheme();
   return (
     <View style={{ marginBottom: 16 }}>
@@ -16,11 +22,13 @@ export default function Field({ label, error, style, ...rest }: FieldProps) {
         {label}
       </Text>
       <TextInput
+        ref={ref}
         placeholderTextColor={colors.textMuted}
         accessibilityLabel={label}
         style={[
           {
-            backgroundColor: colors.card,
+            // fieldBg é o token do papel "campo"; card é superfície de cartão
+            backgroundColor: colors.fieldBg,
             borderWidth: 1,
             borderColor: error ? colors.danger : colors.border,
             borderRadius: 12,

@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import api from '../../../src/services/api';
 import metricasService from '../../../src/services/metricasService';
 import { MetricaId, ProjecaoResponse } from '../../../src/types';
-import { useTheme } from '../../../src/theme';
+import { useTheme, useTabBarSpace } from '../../../src/theme';
 import Card from '../../../src/components/ui/Card';
 import ComposicaoMetricaModal from '../../../src/components/ComposicaoMetricaModal';
 import { formatCurrency } from '../../../src/utils/format';
@@ -29,6 +29,7 @@ const DESCRICOES: Record<string, string> = {
 // próprio.
 export default function VisaoFinanceira() {
   const colors = useTheme();
+  const tabBarSpace = useTabBarSpace();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [metricaSelecionada, setMetricaSelecionada] = React.useState<MetricaId | null>(null);
@@ -56,7 +57,7 @@ export default function VisaoFinanceira() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.bg }}
-      contentContainerStyle={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 32 }}
+      contentContainerStyle={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: tabBarSpace }}
       refreshControl={
         <RefreshControl
           refreshing={metricasQuery.isRefetching || projecaoQuery.isRefetching}

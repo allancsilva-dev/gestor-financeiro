@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useTheme } from '../../../src/theme';
+import { useTheme, useTabBarSpace } from '../../../src/theme';
 import BackButton from '../../../src/components/ui/BackButton';
 import { orcamentoService } from '../../../src/services/orcamentoService';
 import { categoriaService } from '../../../src/services/categoriaService';
@@ -19,6 +19,7 @@ function getProgressColor(percentual: number, colors: any): string {
 
 export default function OrcamentoScreen() {
   const colors = useTheme();
+  const tabBarSpace = useTabBarSpace();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const now = new Date();
@@ -73,7 +74,7 @@ export default function OrcamentoScreen() {
   const mesProximo = () => { if (mes === 12) { setMes(1); setAno(ano + 1); } else setMes(mes + 1); };
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.bg }]} contentContainerStyle={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 40 }}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.bg }]} contentContainerStyle={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: tabBarSpace }}>
       <View style={{ paddingBottom: 12 }}>
         <BackButton />
         <Text style={{ color: colors.textPrimary, fontSize: 23, fontWeight: '800', letterSpacing: -0.4 }}>Orçamentos</Text>

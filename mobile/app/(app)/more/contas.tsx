@@ -6,12 +6,13 @@ import cartaoService from '../../../src/services/cartaoService';
 import { formatCurrency, parseCurrencyBR, maskCurrencyInput } from '../../../src/utils/format';
 import { isValidDayOfMonth } from '../../../src/utils/validate';
 import { CartaoRequest } from '../../../src/types';
-import { useTheme } from '../../../src/theme';
+import { useTheme, useTabBarSpace } from '../../../src/theme';
 import BackButton from '../../../src/components/ui/BackButton';
 import SkeletonBox from '../../../src/components/ui/SkeletonBox';
 
 export default function ContasScreen() {
   const colors = useTheme();
+  const tabBarSpace = useTabBarSpace();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [modalVisible, setModalVisible] = useState(false);
@@ -63,6 +64,7 @@ export default function ContasScreen() {
       ) : (
         <FlatList
           data={data?.content ?? []}
+          contentContainerStyle={{ paddingBottom: tabBarSpace }}
           keyExtractor={item => item.id.toString()}
           renderItem={({ item: conta }) => (
             <View style={{ backgroundColor: colors.card, borderRadius: 12, borderWidth: 1, borderColor: colors.border, padding: 14, marginBottom: 8, marginHorizontal: 16 }}>

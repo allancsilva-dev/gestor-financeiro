@@ -5,10 +5,10 @@ import { useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import { File, Paths } from 'expo-file-system';
 import * as DocumentPicker from 'expo-document-picker';
-import { useTheme } from '../../../src/theme';
-import api from '../../../src/services/api';
-import importService from '../../../src/services/importService';
-import Card from '../../../src/components/ui/Card';
+import { useTheme, useTabBarSpace } from '../../src/theme';
+import api from '../../src/services/api';
+import importService from '../../src/services/importService';
+import Card from '../../src/components/ui/Card';
 
 // Grid 2 colunas (DESIGN.md) — tile 44 violeta (navegação é marca, nunca arco-íris), label + subtítulo
 const itens = [
@@ -16,8 +16,8 @@ const itens = [
   { label: 'Contas',       sub: 'Saldos e dinheiro', rota: '/more/carteiras',    icone: '₿' },
   { label: 'Recorrências', sub: 'Entradas e saídas', rota: '/more/contas-fixas', icone: '📅' },
   { label: 'Orçamentos',   sub: 'Por categoria',    rota: '/more/orcamentos',   icone: '📊' },
-  { label: 'Cartão',       sub: 'Faturas',          rota: '/more/faturas',      icone: '💳' },
-  { label: 'Relatórios',   sub: 'Gráficos',         rota: '/more/relatorios',   icone: '📋' },
+  { label: 'Carteira',     sub: 'Cartões e faturas', rota: '/more/faturas',      icone: '💳' },
+  { label: 'Relatórios',   sub: 'Gráficos',         rota: '/analises',   icone: '📋' },
   { label: 'Categorias',   sub: 'Organizar',        rota: '/more/categorias',   icone: '🏷' },
   { label: 'Cartões',      sub: 'Crédito e débito', rota: '/more/contas',       icone: '💳' },
   { label: 'Investimentos', sub: 'Posições',         rota: '/more/investimentos', icone: '◈' },
@@ -83,6 +83,7 @@ const handleImport = async () => {
 
 export default function MoreScreen() {
   const colors = useTheme();
+  const tabBarSpace = useTabBarSpace();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -94,7 +95,7 @@ export default function MoreScreen() {
   };
 
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 32 }}>
+    <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} contentContainerStyle={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: tabBarSpace }}>
       <Text style={{ color: colors.textPrimary, fontSize: 23, fontWeight: '800', letterSpacing: -0.4 }}>Mais</Text>
       <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4, marginBottom: 16 }}>Ferramentas e configurações</Text>
 

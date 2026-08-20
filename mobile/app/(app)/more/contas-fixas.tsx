@@ -11,7 +11,7 @@ import Chip from '../../../src/components/ui/Chip';
 import IconTile from '../../../src/components/ui/IconTile';
 import Field from '../../../src/components/ui/Field';
 import { ContaFixa, ContaFixaRequest } from '../../../src/types';
-import { useTheme } from '../../../src/theme';
+import { useTheme, useTabBarSpace } from '../../../src/theme';
 import BackButton from '../../../src/components/ui/BackButton';
 import { parseCurrencyBR, maskCurrencyInput, formatCurrency, formatNumber } from '../../../src/utils/format';
 import SkeletonBox from '../../../src/components/ui/SkeletonBox';
@@ -19,6 +19,7 @@ import Fab from '../../../src/components/ui/Fab';
 
 export default function ContasFixasScreen() {
   const colors = useTheme();
+  const tabBarSpace = useTabBarSpace();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const [modalPagarVisible, setModalPagarVisible] = useState(false);
@@ -220,7 +221,7 @@ export default function ContasFixasScreen() {
         <FlatList
           data={contas}
           keyExtractor={item => item.id.toString()}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 96 }}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: tabBarSpace }}
           renderItem={renderItem}
           ListEmptyComponent={() => (
             <View style={{ alignItems: 'center', paddingHorizontal: 32, paddingVertical: 48 }}>
