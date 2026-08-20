@@ -1,5 +1,6 @@
 import { DARK_COLORS, LIGHT_COLORS } from '../theme/colors';
 import { contraste } from '../domain/emissores';
+import { paletaDaMeta } from '../theme/metaCores';
 
 /**
  * A barra de limite tem trilha e preenchimento. A trilha precisa ser visível
@@ -44,6 +45,29 @@ describe('paleta', () => {
   it('a ação em destaque (brandFg) passa AA sobre o fundo nos dois temas', () => {
     for (const [nome, cores] of [['escuro', DARK_COLORS], ['claro', LIGHT_COLORS]] as const) {
       expect({ nome, ok: contraste(cores.brandFg, cores.bg) >= 4.5 }).toEqual({ nome, ok: true });
+    }
+  });
+});
+
+describe('paleta por meta', () => {
+  const metas = [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }, { id: 5 }, { id: 6 }, { id: 7, cor: '#a855f7' }];
+
+  it('mantém o percentual legível sobre o card nos dois temas', () => {
+    for (const [nome, cores] of [['dark', DARK_COLORS], ['light', LIGHT_COLORS]] as const) {
+      for (const meta of metas) {
+        const paleta = paletaDaMeta(meta as never, cores.card);
+        expect({ nome, id: meta.id, ok: contraste(paleta.percentual, cores.card) >= 4.5 })
+          .toEqual({ nome, id: meta.id, ok: true });
+      }
+    }
+  });
+
+  it('deixa a trilha visível sobre o card', () => {
+    for (const cores of [DARK_COLORS, LIGHT_COLORS]) {
+      for (const meta of metas) {
+        const paleta = paletaDaMeta(meta as never, cores.card);
+        expect(contraste(paleta.trilha, cores.card)).toBeGreaterThanOrEqual(1.2);
+      }
     }
   });
 });
