@@ -93,6 +93,10 @@ export default function EditarTransacaoModal({ visible, transacao, onClose }: Ed
     queryClient.invalidateQueries({ queryKey: ['carteiras'] });
     queryClient.invalidateQueries({ queryKey: ['contas'] });
     queryClient.invalidateQueries({ queryKey: ['contas-fatura'] });
+    // Compra no cartão mexe no passivo pareado: sem isto, limite disponível e
+    // saldo devedor ficam obsoletos na Carteira. O prefixo ['cartoes'] também
+    // cobre ['cartoes','carteira'].
+    queryClient.invalidateQueries({ queryKey: ['cartoes'] });
     queryClient.invalidateQueries({ queryKey: ['fatura'] });
     queryClient.invalidateQueries({ queryKey: ['categorias'] });
     queryClient.invalidateQueries({ queryKey: ['parcelas', transacao?.id] });

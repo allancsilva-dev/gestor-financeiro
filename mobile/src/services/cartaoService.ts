@@ -1,9 +1,13 @@
 import api from './api';
-import { Cartao, CartaoRequest, PagedResponse } from '../types';
+import { Cartao, CarteiraCartao, CartaoRequest, PagedResponse } from '../types';
 
 const baseUrl = '/v1/cartoes';
 
 const cartaoService = {
+  // Alimenta a tela Carteira inteira num request. Leitura pura no backend:
+  // nao materializa fatura nem dispara rollover.
+  carteira: (meses?: number) =>
+    api.get<CarteiraCartao[]>(`${baseUrl}/carteira`, meses ? { params: { meses } } : undefined).then(r => r.data),
   listar: () => api.get<PagedResponse<Cartao>>(baseUrl, { params: { page: 0, size: 100 } }).then(r => r.data),
   listarTodos: async () => (await cartaoService.listar()).content ?? [],
   buscarPorId: (id: number) => api.get<Cartao>(`${baseUrl}/${id}`).then(r => r.data),

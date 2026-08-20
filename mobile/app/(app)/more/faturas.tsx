@@ -1,88 +1,122 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, StyleSheet, Modal, TextInput } from 'react-native';
+import React, { useMemo, useRef, useState } from 'react';
+import { Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useTheme } from '../../../src/theme';
-import BackButton from '../../../src/components/ui/BackButton';
-import faturaService from '../../../src/services/faturaService';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { useTheme, useTabBarSpace, spacing, typography, radius } from '../../../src/theme';
+import CarrosselCartoes, { useMedidasCartao } from '../../../src/components/carteira/CarrosselCartoes';
+import CartaoFisico from '../../../src/components/carteira/CartaoFisico';
+import ResumoCartao from '../../../src/components/carteira/ResumoCartao';
+import LinhaFatura from '../../../src/components/carteira/LinhaFatura';
+import { posicaoDaFatura } from '../../../src/domain/carteiraFormat';
+import NovaTransacaoModal from '../../../src/components/NovaTransacaoModal';
+import SkeletonBox from '../../../src/components/ui/SkeletonBox';
+import { identidadeDoCartao } from '../../../src/domain/emissores';
+import { useAuth } from '../../../src/context/AuthContext';
 import cartaoService from '../../../src/services/cartaoService';
-import contaFinanceiraService from '../../../src/services/contaFinanceiraService';
-import { FaturaResponse, FaturaLancamento, Cartao, CartaoRequest, ContaFinanceira } from '../../../src/types';
-import { formatCurrency, formatDate, parseCurrencyBR, maskCurrencyInput } from '../../../src/utils/format';
+import { BandeiraCartao, CarteiraCartao, CartaoRequest } from '../../../src/types';
+import Field from '../../../src/components/ui/Field';
+import { CORES_SUGERIDAS } from '../../../src/domain/emissores';
 
-const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+const BANDEIRAS: BandeiraCartao[] = ['VISA', 'MASTERCARD', 'ELO', 'AMEX', 'HIPERCARD', 'OUTRA'];
+const BANDEIRA_ROTULO: Record<BandeiraCartao, string> = {
+  VISA: 'Visa', MASTERCARD: 'Mastercard', ELO: 'Elo',
+  AMEX: 'Amex', HIPERCARD: 'Hipercard', OUTRA: 'Outra',
+};
+import { maskCurrencyInput, parseCurrencyBR } from '../../../src/utils/format';
 
-export default function FaturasScreen() {
+/**
+ * Carteira: carrossel de cartões, resumo do selecionado e as faturas da
+ * janela. Réplica da referência medida em mobile/.design/MEDICOES-carteira.md.
+ *
+ * A rota continua /more/faturas — cinco pontos de navegação apontam para ela
+ * (ajustes, notificações, home, ComposicaoMetricaModal, rotaDaNavegacao).
+ */
+export default function CarteiraScreen() {
   const colors = useTheme();
-  const queryClient = useQueryClient();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
-  const now = new Date();
-  const [mes, setMes] = useState(now.getMonth() + 1);
-  const [ano, setAno] = useState(now.getFullYear());
-  const [cartaoIdx, setCartaoIdx] = useState(0);
-  const [paying, setPaying] = useState(false);
-  const payingRef = useRef(false);
-  const [payError, setPayError] = useState<string | null>(null);
-  const [carteiraPagamentoId, setCarteiraPagamentoId] = useState<number | null>(null);
-  const [valorPagamento, setValorPagamento] = useState('');
+  const tabBarSpace = useTabBarSpace();
+  const queryClient = useQueryClient();
+  const { usuario } = useAuth();
+  const { altura: alturaCartao } = useMedidasCartao();
 
+  const [indice, setIndice] = useState(0);
+  const [novaDespesaVisible, setNovaDespesaVisible] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  /** null = criando; id = editando aquele cartão. */
+  const [editandoId, setEditandoId] = useState<number | null>(null);
   const [nome, setNome] = useState('');
   const [banco, setBanco] = useState('');
   const [limite, setLimite] = useState('');
   const [diaFechamento, setDiaFechamento] = useState('');
   const [diaVencimento, setDiaVencimento] = useState('');
+  const [ultimosDigitos, setUltimosDigitos] = useState('');
+  const [bandeira, setBandeira] = useState<BandeiraCartao | null>(null);
+  const [cor, setCor] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const { data: contasData } = useQuery({
-    queryKey: ['cartoes'],
-    queryFn: () => cartaoService.listar(),
-  });
-  const cartoes = contasData?.content ?? [];
-  const cartaoSelecionado = cartoes[Math.min(cartaoIdx, Math.max(cartoes.length - 1, 0))];
+  // Encadeamento de foco: "próximo" no teclado leva ao campo seguinte, e o
+  // último submete. É o primeiro fluxo do app com foco encadeado.
+  const refBanco = useRef<TextInput>(null);
+  const refLimite = useRef<TextInput>(null);
+  const refDigitos = useRef<TextInput>(null);
+  const refFechamento = useRef<TextInput>(null);
+  const refVencimento = useRef<TextInput>(null);
 
-  const { data: carteirasData } = useQuery({
-    queryKey: ['contas-financeiras-caixa'],
-    queryFn: () => contaFinanceiraService.listarParaCaixa(),
-  });
-  const carteiras = carteirasData ?? [];
-
-  useEffect(() => {
-    if (carteiraPagamentoId == null && carteiras.length > 0) {
-      setCarteiraPagamentoId(carteiras[0].id);
-    }
-  }, [carteiras, carteiraPagamentoId]);
-
-  const { data: fatura, isLoading, refetch } = useQuery<FaturaResponse | null>({
-    queryKey: ['fatura', cartaoSelecionado?.id, mes, ano],
-    queryFn: () => {
-      if (!cartaoSelecionado?.id) return null;
-      if (mes === now.getMonth() + 1 && ano === now.getFullYear())
-        return faturaService.buscarAtual(cartaoSelecionado.id!);
-      return faturaService.buscarPorMes(cartaoSelecionado.id!, mes, ano).catch(() => null);
-    },
-    enabled: !!cartaoSelecionado?.id,
+  // Chave sob o prefixo ['cartoes']: as quatro invalidações que já existem no
+  // app passam a atualizar a carteira sozinhas, sem novo call site.
+  const { data: cartoes = [], isLoading, isError, refetch } = useQuery({
+    queryKey: ['cartoes', 'carteira'],
+    queryFn: () => cartaoService.carteira(),
   });
 
-  useEffect(() => {
-    const restante = Math.max(Number(fatura?.valorTotal ?? 0) - Number(fatura?.valorPago ?? 0), 0);
-    setValorPagamento(restante > 0 ? maskCurrencyInput(Math.round(restante * 100).toString()) : '');
-  }, [fatura?.id, fatura?.valorTotal, fatura?.valorPago]);
+  const selecionado = cartoes[Math.min(indice, Math.max(cartoes.length - 1, 0))];
+  const identidade = useMemo(
+    () => (selecionado ? identidadeDoCartao(selecionado) : null),
+    [selecionado],
+  );
+
+  const hoje = new Date();
+  const hojeMes = hoje.getMonth() + 1;
+  const hojeAno = hoje.getFullYear();
 
   const resetForm = () => {
-    setNome(''); setBanco(''); setLimite(''); setDiaFechamento(''); setDiaVencimento(''); setFormError(null);
+    setEditandoId(null);
+    setNome(''); setBanco(''); setLimite('');
+    setDiaFechamento(''); setDiaVencimento('');
+    setUltimosDigitos(''); setBandeira(null); setCor(null);
+    setFormError(null);
   };
 
-  const criarMutation = useMutation({
-    mutationFn: (req: CartaoRequest) => cartaoService.criar(req),
+  const abrirNovo = () => { resetForm(); setModalVisible(true); };
+
+  const abrirEdicao = (c: CarteiraCartao) => {
+    setEditandoId(c.cartaoId);
+    setNome(c.nome);
+    setBanco(c.banco ?? '');
+    setLimite(maskCurrencyInput(Math.round(Number(c.limiteTotal ?? 0) * 100).toString()));
+    setDiaFechamento(c.diaFechamento != null ? String(c.diaFechamento) : '');
+    setDiaVencimento(c.diaVencimento != null ? String(c.diaVencimento) : '');
+    setUltimosDigitos(c.ultimosDigitos ?? '');
+    setBandeira((c.bandeira as BandeiraCartao) ?? null);
+    setCor(c.cor ?? null);
+    setFormError(null);
+    setModalVisible(true);
+  };
+
+  const salvarMutation = useMutation({
+    mutationFn: (req: CartaoRequest) => (editandoId != null
+      ? cartaoService.atualizar(editandoId, req)
+      : cartaoService.criar(req)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cartoes'] });
       setModalVisible(false);
       resetForm();
     },
-    onError: (err: any) => {
-      setFormError(err?.userMessage ?? 'Erro ao cadastrar cartão.');
-    },
+    onError: (err: any) => setFormError(err?.userMessage
+      ?? (editandoId != null ? 'Erro ao salvar cartão.' : 'Erro ao cadastrar cartão.')),
   });
 
   const salvarCartao = () => {
@@ -94,276 +128,375 @@ export default function FaturasScreen() {
     const venc = parseInt(diaVencimento, 10);
     if (isNaN(fech) || fech < 1 || fech > 31) { setFormError('Dia de fechamento deve estar entre 1 e 31.'); return; }
     if (isNaN(venc) || venc < 1 || venc > 31) { setFormError('Dia de vencimento deve estar entre 1 e 31.'); return; }
-    criarMutation.mutate({
+    // O backend valida ^[0-9]{4}$; vazio é aceito, meio preenchido não.
+    if (ultimosDigitos && ultimosDigitos.length !== 4) {
+      setFormError('Informe os 4 últimos dígitos, ou deixe em branco.'); return;
+    }
+    salvarMutation.mutate({
       nome: nome.trim(),
       limiteTotal: v,
       diaFechamento: fech,
       diaVencimento: venc,
       banco: banco.trim() || undefined,
+      ultimosDigitos: ultimosDigitos || undefined,
+      bandeira: bandeira ?? undefined,
+      cor: cor ?? undefined,
     });
   };
 
-  const handlePagar = async () => {
-    if (payingRef.current) return;
-    if (!fatura || saldoRestante <= 0) return;
-    if (!carteiraPagamentoId) {
-      setPayError('Selecione a conta de pagamento.');
-      return;
-    }
-    const valor = parseCurrencyBR(valorPagamento);
-    if (!Number.isFinite(valor) || valor <= 0) {
-      setPayError('Informe um valor de pagamento válido.');
-      return;
-    }
-    if (valor > saldoRestante) {
-      setPayError(`Valor máximo: ${formatCurrency(saldoRestante)}.`);
-      return;
-    }
-    setPayError(null);
-    payingRef.current = true;
-    setPaying(true);
-    try {
-      const key = `${fatura.id}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
-      await faturaService.pagarFatura(fatura.id, valor, carteiraPagamentoId, key);
-      queryClient.invalidateQueries({ queryKey: ['carteiras'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-projecao'] });
-      queryClient.invalidateQueries({ queryKey: ['cartoes'] });
-      refetch();
-    } catch (err: any) {
-      setPayError(err?.userMessage ?? 'Erro ao pagar fatura.');
-    } finally {
-      payingRef.current = false;
-      setPaying(false);
-    }
+  const salvando = salvarMutation.status === 'pending';
+
+  const abrirFatura = (mes: number, ano: number) => {
+    if (!selecionado) return;
+    router.push({
+      pathname: '/more/fatura',
+      params: { cartaoId: String(selecionado.cartaoId), mes: String(mes), ano: String(ano), nome: selecionado.nome },
+    } as never);
   };
 
-  const mesAnterior = () => { if (mes === 1) { setMes(12); setAno(ano - 1); } else setMes(mes - 1); };
-  const mesProximo = () => { if (mes === 12) { setMes(1); setAno(ano + 1); } else setMes(mes + 1); };
-
-  const limiteTotal = Number(cartaoSelecionado?.limiteTotal ?? 0);
-  const gasto = Number(cartaoSelecionado?.saldoDevedor ?? 0);
-  const creditoCartao = gasto < 0 ? Math.abs(gasto) : 0;
-  const usoLimite = limiteTotal > 0 ? Math.min(Math.max(gasto, 0) / limiteTotal, 1) : 0;
-  const saldoRestante = Math.max(Number(fatura?.valorTotal ?? 0) - Number(fatura?.valorPago ?? 0), 0);
-
-  // Aberta é estado normal, não alerta: vermelho fica só para vencida
-  const statusBadge =
-    fatura?.status === 'PAGA' ? { fg: colors.success, bg: colors.success + '20', label: 'PAGA' }
-    : fatura?.status === 'VENCIDA' ? { fg: colors.danger, bg: colors.danger + '20', label: 'VENCIDA' }
-    : fatura?.status === 'FECHADA' ? { fg: colors.warning, bg: colors.warning + '20', label: 'FECHADA' }
-    : { fg: colors.brandFg, bg: colors.brandBg, label: 'ABERTA' };
+  const campo = {
+    borderWidth: 1, borderRadius: radius.md, padding: spacing.md, fontSize: 15,
+    marginBottom: 14, backgroundColor: colors.fieldBg, borderColor: colors.border,
+    color: colors.textPrimary,
+  };
+  const rotulo = { ...typography.meta, fontWeight: '600' as const, color: colors.textSecondary, marginBottom: 6, marginTop: spacing.xs };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
-        <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 12 }}>
-          <BackButton />
-          <Text style={{ color: colors.textPrimary, fontSize: 23, fontWeight: '800', letterSpacing: -0.4 }}>Faturas</Text>
-          <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>
-            {cartoes.length > 0
-              ? `${cartoes.length} ${cartoes.length === 1 ? 'cartão' : 'cartões'} de crédito`
-              : 'Cartões de crédito e lançamentos'}
+      <ScrollView contentContainerStyle={{ paddingBottom: tabBarSpace }}>
+        <View style={{
+          flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+          paddingTop: insets.top + spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.lg,
+        }}>
+          <Text style={{ color: colors.textPrimary, fontSize: 26, lineHeight: 32, fontWeight: '800', letterSpacing: -0.6 }}>
+            Carteira
           </Text>
+          <TouchableOpacity
+            onPress={abrirNovo}
+            accessibilityRole="button"
+            accessibilityLabel="Cadastrar novo cartão"
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44, paddingLeft: spacing.md }}
+          >
+            <Ionicons name="add" size={20} color={colors.brandFg} />
+            <Text style={{ ...typography.value, color: colors.brandFg }}>Cartão</Text>
+          </TouchableOpacity>
         </View>
 
-        <View style={{ paddingHorizontal: 16 }}>
-          <View style={styles.nav}>
-            <TouchableOpacity onPress={mesAnterior} style={{ padding: 8 }} accessibilityLabel="Mês anterior">
-              <Text style={{ color: colors.textSecondary, fontSize: 18 }}>‹</Text>
-            </TouchableOpacity>
-            <Text style={[styles.mesAno, { color: colors.textPrimary }]}>{MESES[mes - 1]} {ano}</Text>
-            <TouchableOpacity onPress={mesProximo} style={{ padding: 8 }} accessibilityLabel="Próximo mês">
-              <Text style={{ color: colors.textSecondary, fontSize: 18 }}>›</Text>
+        {isLoading ? (
+          <View style={{ gap: spacing.xl }}>
+            <CarrosselCartoes cartoes={[]} indice={0} onIndice={() => {}} carregando />
+            <View style={{ paddingHorizontal: spacing.lg, gap: spacing.md }}>
+              <SkeletonBox width="100%" height={72} borderRadius={radius.md} />
+              <SkeletonBox width="100%" height={72} borderRadius={radius.md} />
+            </View>
+          </View>
+        ) : isError ? (
+          <View style={{ alignItems: 'center', paddingVertical: 56, paddingHorizontal: spacing.xxl }}>
+            <Text style={{ fontSize: 34 }}>📶</Text>
+            <Text style={{ ...typography.cardTitle, color: colors.textPrimary, marginTop: spacing.md, textAlign: 'center' }}>
+              Não deu para carregar sua carteira
+            </Text>
+            <Text style={{ ...typography.body, color: colors.textSecondary, marginTop: spacing.xs, textAlign: 'center' }}>
+              Verifique sua conexão e tente de novo.
+            </Text>
+            <TouchableOpacity
+              onPress={() => refetch()}
+              accessibilityRole="button"
+              accessibilityLabel="Tentar carregar a carteira de novo"
+              style={{
+                marginTop: spacing.lg, paddingHorizontal: spacing.xl, height: 44,
+                borderRadius: radius.md, alignItems: 'center', justifyContent: 'center',
+                backgroundColor: colors.brand,
+              }}
+            >
+              <Text style={{ ...typography.button, color: colors.brandText }}>Tentar de novo</Text>
             </TouchableOpacity>
           </View>
+        ) : cartoes.length === 0 ? (
+          <View style={{ alignItems: 'center', paddingVertical: 56, paddingHorizontal: spacing.xxl }}>
+            <Text style={{ fontSize: 40 }}>💳</Text>
+            <Text style={{ ...typography.cardTitle, color: colors.textPrimary, marginTop: spacing.md, textAlign: 'center' }}>
+              Nenhum cartão cadastrado
+            </Text>
+            <Text style={{ ...typography.body, color: colors.textSecondary, marginTop: spacing.xs, textAlign: 'center' }}>
+              Cadastre seu cartão de crédito com limite, banco e datas de fechamento para acompanhar as faturas.
+            </Text>
+            <TouchableOpacity
+              onPress={abrirNovo}
+              accessibilityRole="button"
+              accessibilityLabel="Cadastrar cartão"
+              style={{
+                marginTop: spacing.lg, paddingHorizontal: spacing.xl, height: 44,
+                borderRadius: radius.md, alignItems: 'center', justifyContent: 'center',
+                backgroundColor: colors.brand,
+              }}
+            >
+              <Text style={{ ...typography.button, color: colors.brandText }}>Cadastrar cartão</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            <CarrosselCartoes
+              cartoes={cartoes}
+              indice={indice}
+              onIndice={setIndice}
+              titular={usuario?.nome}
+            />
 
-          {cartoes.length > 0 && (
-            <View style={{ flexDirection: 'row', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
-              {cartoes.map((c: Cartao, i: number) => (
-                <TouchableOpacity key={c.id} onPress={() => setCartaoIdx(i)} style={[styles.chip, { backgroundColor: i === cartaoIdx ? colors.brand : colors.card, borderColor: i === cartaoIdx ? colors.brand : colors.border }]}>
-                  <Text style={{ color: i === cartaoIdx ? colors.brandText : colors.textSecondary, fontSize: 13, fontWeight: '500' }}>{c.nome}</Text>
-                </TouchableOpacity>
-              ))}
-              <TouchableOpacity onPress={() => setModalVisible(true)} style={[styles.chip, { backgroundColor: colors.brandBg, borderColor: 'transparent' }]} accessibilityLabel="Cadastrar novo cartão">
-                <Text style={{ color: colors.brandFg, fontSize: 13, fontWeight: '600' }}>+ Novo cartão</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {cartoes.length === 0 ? (
-            <View style={{ alignItems: 'center', paddingVertical: 56, paddingHorizontal: 24 }}>
-              <Text style={{ fontSize: 40 }}>💳</Text>
-              <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600', marginTop: 12, textAlign: 'center' }}>Nenhum cartão cadastrado</Text>
-              <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4, textAlign: 'center' }}>
-                Cadastre seu cartão de crédito com limite, banco e datas de fechamento para acompanhar as faturas.
-              </Text>
-              <TouchableOpacity onPress={() => setModalVisible(true)} style={[styles.ctaBtn, { backgroundColor: colors.brand }]}>
-                <Text style={{ color: colors.brandText, fontWeight: '700', fontSize: 14 }}>Cadastrar cartão</Text>
-              </TouchableOpacity>
-            </View>
-          ) : isLoading ? (
-            <ActivityIndicator color={colors.brand} style={{ marginTop: 40 }} />
-          ) : (
-            <View style={{ gap: 16, marginTop: 4 }}>
-              <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <View style={{ flex: 1, paddingRight: 12 }}>
-                    <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700' }}>{cartaoSelecionado?.nome}</Text>
-                    {!!cartaoSelecionado?.banco && (
-                      <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 1 }}>{cartaoSelecionado.banco}</Text>
-                    )}
-                    <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 4 }}>
-                      Fecha: {fatura?.dataFechamento ? formatDate(fatura.dataFechamento) : cartaoSelecionado?.diaFechamento ? `dia ${cartaoSelecionado.diaFechamento}` : '—'}
-                      {' • '}
-                      Vence: {fatura?.dataVencimento ? formatDate(fatura.dataVencimento) : cartaoSelecionado?.diaVencimento ? `dia ${cartaoSelecionado.diaVencimento}` : '—'}
-                    </Text>
-                  </View>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={{ color: colors.textPrimary, fontSize: 22, fontWeight: '800', fontVariant: ['tabular-nums'] }}>{formatCurrency(fatura?.valorTotal ?? 0)}</Text>
-                    {fatura && (
-                      <View style={[styles.badge, { backgroundColor: statusBadge.bg }]}>
-                        <Text style={{ color: statusBadge.fg, fontSize: 10, fontWeight: '600' }}>{statusBadge.label}</Text>
-                      </View>
-                    )}
-                  </View>
+            {selecionado && (
+              <>
+                <View style={{ marginTop: spacing.xl }}>
+                  <ResumoCartao cartao={selecionado} />
                 </View>
 
-                {limiteTotal > 0 && (
-                  <View style={{ marginTop: 12 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <Text style={{ color: colors.textSecondary, fontSize: 11 }}>
-                        {creditoCartao > 0 ? 'Crédito disponível' : 'Limite usado'}
-                      </Text>
-                      <Text style={{ color: colors.textSecondary, fontSize: 11, fontVariant: ['tabular-nums'] }}>
-                        {creditoCartao > 0
-                          ? `${formatCurrency(creditoCartao)} de crédito`
-                          : `${formatCurrency(gasto)} de ${formatCurrency(limiteTotal)}`}
-                      </Text>
-                    </View>
-                    <View style={{ height: 6, borderRadius: 3, backgroundColor: colors.border, overflow: 'hidden' }}>
-                      <View style={{ height: 6, borderRadius: 3, width: `${usoLimite * 100}%`, backgroundColor: usoLimite >= 0.9 ? colors.danger : usoLimite >= 0.7 ? colors.warning : colors.brand }} />
-                    </View>
-                  </View>
-                )}
-              </View>
-
-              {fatura && fatura.status !== 'PAGA' && saldoRestante > 0 && (
-                <View style={{ gap: 10 }}>
-                  <Text style={{ color: colors.textPrimary, fontWeight: '600' }}>Pagar com</Text>
-                  {fatura.valorPago > 0 && (
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
-                      <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Pago: {formatCurrency(fatura.valorPago)}</Text>
-                      <Text style={{ color: colors.textPrimary, fontSize: 12, fontWeight: '700' }}>Restante: {formatCurrency(saldoRestante)}</Text>
-                    </View>
-                  )}
-                  <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
-                    {carteiras.map((c: ContaFinanceira) => (
-                      <TouchableOpacity key={c.id} onPress={() => setCarteiraPagamentoId(c.id)} style={[styles.chip, { backgroundColor: carteiraPagamentoId === c.id ? colors.brand : colors.card, borderColor: carteiraPagamentoId === c.id ? colors.brand : colors.border }]}>
-                        <Text style={{ color: carteiraPagamentoId === c.id ? colors.brandText : colors.textSecondary, fontSize: 13, fontWeight: '500' }}>{c.nome}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                  <TextInput
-                    testID="invoice-payment-value"
-                    accessibilityLabel="Valor do pagamento"
-                    value={valorPagamento}
-                    onChangeText={(t) => setValorPagamento(maskCurrencyInput(t))}
-                    keyboardType="number-pad"
-                    placeholder="0,00"
-                    placeholderTextColor={colors.textMuted}
-                    style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]}
-                  />
-                  {payError && <Text style={{ color: colors.danger, fontSize: 12 }}>{payError}</Text>}
-                  <TouchableOpacity onPress={handlePagar} disabled={paying} style={[styles.payBtn, { backgroundColor: colors.success }]}>
-                    {paying ? <ActivityIndicator color="white" /> : <Text style={{ color: 'white', fontWeight: '700', fontSize: 15 }}>Pagar Fatura</Text>}
+                <View style={{
+                  flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                  paddingHorizontal: spacing.lg, marginTop: spacing.xxl, gap: spacing.md,
+                }}>
+                  <Text numberOfLines={1} style={{ ...typography.section, color: colors.textPrimary, flex: 1 }}>
+                    {selecionado.nome}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => abrirEdicao(selecionado)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Editar cartão ${selecionado.nome}`}
+                    hitSlop={8}
+                    style={{ minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    <Ionicons name="create-outline" size={20} color={colors.textSecondary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setNovaDespesaVisible(true)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Nova despesa no cartão ${selecionado.nome}`}
+                    style={{
+                      flexDirection: 'row', alignItems: 'center', gap: 4,
+                      paddingHorizontal: 14, minHeight: 44, justifyContent: 'center',
+                      borderRadius: radius.pill, borderWidth: 1, borderColor: colors.brand,
+                    }}
+                  >
+                    <Ionicons name="add" size={15} color={colors.brandFg} />
+                    <Text style={{ ...typography.meta, fontWeight: '600', color: colors.brandFg }}>
+                      Nova Despesa
+                    </Text>
                   </TouchableOpacity>
                 </View>
-              )}
 
-              <Text style={{ color: colors.textPrimary, fontWeight: '600', marginTop: 4 }}>Lançamentos</Text>
-              {!fatura || fatura.lancamentos.length === 0 ? (
-                <Text style={{ color: colors.textSecondary, textAlign: 'center', fontSize: 13, padding: 24 }}>
-                  Nenhum lançamento em {MESES[mes - 1].toLowerCase()}
+                <Text style={{ ...typography.body, color: colors.textSecondary, paddingHorizontal: spacing.lg, marginTop: spacing.xs }}>
+                  {selecionado.ultimosDigitos ? `•••• ${selecionado.ultimosDigitos} · ` : ''}
+                  Vence dia {selecionado.diaVencimento ?? '—'}
                 </Text>
-              ) : (
-                fatura.lancamentos.map((l: FaturaLancamento, i: number) => {
-                  // Backend prefixa a descrição com "Estorno:"/"Ajuste:"; o badge assume esse papel
-                  const descricao = l.tipo !== 'COMPRA' ? l.descricao.replace(/^(Estorno|Ajuste):\s*/, '') : l.descricao;
-                  const tipoBadge = l.tipo === 'ESTORNO'
-                    ? { fg: colors.success, bg: colors.success + '20', label: 'ESTORNO' }
-                    : l.tipo === 'AJUSTE'
-                      ? { fg: colors.warning, bg: colors.warning + '20', label: 'AJUSTE' }
-                      : l.tipo === 'CREDITO_ANTERIOR'
-                        ? { fg: colors.success, bg: colors.success + '20', label: 'CRÉDITO ANTERIOR' }
-                        : l.tipo === 'SALDO_DEVEDOR_ANTERIOR'
-                          ? { fg: colors.warning, bg: colors.warning + '20', label: 'SALDO DEVEDOR ANTERIOR' }
-                          : null;
-                  // Saldo devedor rolado é aviso (dívida carregada), não erro: nunca usar a cor de perigo aqui.
-                  const valorColor = l.tipo === 'SALDO_DEVEDOR_ANTERIOR'
-                    ? colors.warning
-                    : l.valor < 0 ? colors.success : colors.danger;
-                  return (
-                    <View key={l.transacaoId || i} style={[styles.lancamento, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                      <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: l.categoriaCor + '20', alignItems: 'center', justifyContent: 'center' }}>
-                        <Text style={{ fontSize: 14 }}>{l.categoriaIcone || '💳'}</Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <Text numberOfLines={1} style={{ color: colors.textPrimary, fontSize: 13, flexShrink: 1 }}>{descricao}</Text>
-                          {tipoBadge && (
-                            <View style={{ backgroundColor: tipoBadge.bg, paddingHorizontal: 6, paddingVertical: 1, borderRadius: 8 }}>
-                              <Text style={{ color: tipoBadge.fg, fontSize: 9, fontWeight: '700' }}>{tipoBadge.label}</Text>
-                            </View>
-                          )}
-                        </View>
-                        <Text style={{ color: colors.textSecondary, fontSize: 11 }}>
-                          {formatDate(l.data)}
-                          {l.totalParcelas ? ` · ${l.parcelaAtual}/${l.totalParcelas}` : ''}
-                        </Text>
-                      </View>
-                      <Text style={{ color: valorColor, fontSize: 13, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{formatCurrency(l.valor)}</Text>
-                    </View>
-                  );
-                })
-              )}
-            </View>
-          )}
-        </View>
+
+                <View style={{ paddingHorizontal: spacing.lg, gap: spacing.md - 2, marginTop: spacing.lg }}>
+                  {selecionado.faturas.map(f => (
+                    <LinhaFatura
+                      key={`${f.ano}-${f.mes}`}
+                      fatura={f}
+                      posicao={posicaoDaFatura(f, hojeMes, hojeAno)}
+                      corDestaque={identidade?.from ?? colors.brand}
+                      onPress={() => abrirFatura(f.mes, f.ano)}
+                    />
+                  ))}
+                </View>
+              </>
+            )}
+          </>
+        )}
       </ScrollView>
 
-      <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => { setModalVisible(false); resetForm(); }}>
+      {selecionado && (
+        <NovaTransacaoModal
+          visible={novaDespesaVisible}
+          onClose={() => setNovaDespesaVisible(false)}
+          cartaoIdInicial={selecionado.cartaoId}
+          onSaved={() => setNovaDespesaVisible(false)}
+        />
+      )}
+
+      <Modal
+        visible={modalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => { setModalVisible(false); resetForm(); }}
+      >
         <View style={{ flex: 1, backgroundColor: colors.bg }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-            <TouchableOpacity onPress={() => { setModalVisible(false); resetForm(); }}>
-              <Text style={{ color: colors.brand, fontSize: 15 }}>Cancelar</Text>
+          <View style={{
+            flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+            padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border,
+          }}>
+            <TouchableOpacity
+              onPress={() => { setModalVisible(false); resetForm(); }}
+              accessibilityRole="button"
+              accessibilityLabel="Cancelar"
+            >
+              <Text style={{ ...typography.value, fontWeight: '500', color: colors.brand }}>Cancelar</Text>
             </TouchableOpacity>
-            <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600' }}>Novo Cartão</Text>
-            <TouchableOpacity disabled={criarMutation.status === 'pending'} onPress={salvarCartao}>
-              <Text style={{ color: criarMutation.status === 'pending' ? colors.textMuted : colors.brand, fontSize: 15, fontWeight: '600' }}>Salvar</Text>
+            <Text style={{ ...typography.cardTitle, color: colors.textPrimary }}>
+              {editandoId != null ? 'Editar Cartão' : 'Novo Cartão'}
+            </Text>
+            <TouchableOpacity
+              disabled={salvando}
+              onPress={salvarCartao}
+              accessibilityRole="button"
+              accessibilityLabel="Salvar cartão"
+              accessibilityState={{ disabled: salvando }}
+            >
+              <Text style={{ ...typography.value, color: salvando ? colors.textMuted : colors.brand }}>
+                Salvar
+              </Text>
             </TouchableOpacity>
           </View>
-          <ScrollView contentContainerStyle={{ padding: 16 }}>
-            <Text style={[styles.label, { color: colors.textSecondary }]}>Nome do cartão</Text>
-            <TextInput accessibilityLabel="Nome do cartão" value={nome} onChangeText={setNome} placeholder="Ex.: Nubank Roxinho" placeholderTextColor={colors.textMuted} style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]} />
 
-            <Text style={[styles.label, { color: colors.textSecondary }]}>Banco</Text>
-            <TextInput accessibilityLabel="Banco do cartão" value={banco} onChangeText={setBanco} placeholder="Ex.: Nubank, Itaú, Inter" placeholderTextColor={colors.textMuted} style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]} />
+          <ScrollView contentContainerStyle={{ padding: spacing.lg }} keyboardShouldPersistTaps="handled">
+            {/* Prévia ao vivo: o cartão toma a identidade do emissor enquanto o
+                usuário digita, com bandeira, final e cor escolhidos. */}
+            <View style={{ alignItems: 'center', marginBottom: spacing.xl, height: alturaCartao }}>
+              <PreviaCartao
+                nome={nome}
+                banco={banco}
+                cor={cor}
+                ultimosDigitos={ultimosDigitos}
+                bandeira={bandeira}
+                titular={usuario?.nome}
+              />
+            </View>
 
-            <Text style={[styles.label, { color: colors.textSecondary }]}>Limite total</Text>
-            <TextInput accessibilityLabel="Limite total" value={limite} onChangeText={(t) => setLimite(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" placeholderTextColor={colors.textMuted} style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]} />
+            <Field
+              label="Nome do cartão"
+              value={nome}
+              onChangeText={setNome}
+              placeholder="Ex.: Nubank Ultravioleta"
+              returnKeyType="next"
+              submitBehavior="submit"
+              onSubmitEditing={() => refBanco.current?.focus()}
+            />
 
-            <View style={{ flexDirection: 'row', gap: 12 }}>
+            <Field
+              ref={refBanco}
+              label="Banco"
+              value={banco}
+              onChangeText={setBanco}
+              placeholder="Ex.: Nubank, Itaú, Inter"
+              autoCapitalize="words"
+              returnKeyType="next"
+              submitBehavior="submit"
+              onSubmitEditing={() => refLimite.current?.focus()}
+            />
+
+            <Field
+              ref={refLimite}
+              label="Limite total"
+              value={limite}
+              onChangeText={t => setLimite(maskCurrencyInput(t))}
+              keyboardType="number-pad"
+              placeholder="0,00"
+              returnKeyType="next"
+              submitBehavior="submit"
+              onSubmitEditing={() => refDigitos.current?.focus()}
+            />
+
+            <Field
+              ref={refDigitos}
+              label="4 últimos dígitos"
+              value={ultimosDigitos}
+              onChangeText={t => setUltimosDigitos(t.replace(/\D/g, '').slice(0, 4))}
+              keyboardType="number-pad"
+              maxLength={4}
+              placeholder="Ex.: 4291"
+              returnKeyType="next"
+              submitBehavior="submit"
+              onSubmitEditing={() => refFechamento.current?.focus()}
+            />
+
+            <View style={{ flexDirection: 'row', gap: spacing.md }}>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>Dia de fechamento</Text>
-                <TextInput accessibilityLabel="Dia de fechamento" value={diaFechamento} onChangeText={(t) => setDiaFechamento(t.replace(/\D/g, '').slice(0, 2))} keyboardType="number-pad" placeholder="Ex.: 28" placeholderTextColor={colors.textMuted} style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]} />
+                <Field
+                  ref={refFechamento}
+                  label="Dia de fechamento"
+                  value={diaFechamento}
+                  onChangeText={t => setDiaFechamento(t.replace(/\D/g, '').slice(0, 2))}
+                  keyboardType="number-pad"
+                  placeholder="Ex.: 28"
+                  returnKeyType="next"
+                  submitBehavior="submit"
+                  onSubmitEditing={() => refVencimento.current?.focus()}
+                />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[styles.label, { color: colors.textSecondary }]}>Dia de vencimento</Text>
-                <TextInput accessibilityLabel="Dia de vencimento" value={diaVencimento} onChangeText={(t) => setDiaVencimento(t.replace(/\D/g, '').slice(0, 2))} keyboardType="number-pad" placeholder="Ex.: 5" placeholderTextColor={colors.textMuted} style={[styles.input, { backgroundColor: colors.card, borderColor: colors.border, color: colors.textPrimary }]} />
+                <Field
+                  ref={refVencimento}
+                  label="Dia de vencimento"
+                  value={diaVencimento}
+                  onChangeText={t => setDiaVencimento(t.replace(/\D/g, '').slice(0, 2))}
+                  keyboardType="number-pad"
+                  placeholder="Ex.: 5"
+                  returnKeyType="done"
+                  onSubmitEditing={salvarCartao}
+                />
               </View>
             </View>
 
-            {formError && <Text style={{ color: colors.danger, marginTop: 4 }}>{formError}</Text>}
+            <Text style={rotulo}>Bandeira</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg }}>
+              {BANDEIRAS.map(b => (
+                <TouchableOpacity
+                  key={b}
+                  onPress={() => setBandeira(bandeira === b ? null : b)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Bandeira ${BANDEIRA_ROTULO[b]}`}
+                  accessibilityState={{ selected: bandeira === b }}
+                  style={{
+                    paddingHorizontal: spacing.md, minHeight: 44, justifyContent: 'center',
+                    borderRadius: radius.pill, borderWidth: 1,
+                    backgroundColor: bandeira === b ? colors.brand : colors.card,
+                    borderColor: bandeira === b ? colors.brand : colors.border,
+                  }}
+                >
+                  <Text style={{
+                    ...typography.chip,
+                    color: bandeira === b ? colors.brandText : colors.textSecondary,
+                  }}>
+                    {BANDEIRA_ROTULO[b]}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={rotulo}>Cor do cartão</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.lg }}>
+              <TouchableOpacity
+                onPress={() => setCor(null)}
+                accessibilityRole="button"
+                accessibilityLabel="Usar a cor do emissor"
+                accessibilityState={{ selected: cor === null }}
+                style={{
+                  minHeight: 44, paddingHorizontal: spacing.md, justifyContent: 'center',
+                  borderRadius: radius.pill, borderWidth: 1,
+                  borderColor: cor === null ? colors.brand : colors.border,
+                  backgroundColor: colors.card,
+                }}
+              >
+                <Text style={{ ...typography.chip, color: cor === null ? colors.brandFg : colors.textSecondary }}>
+                  Do emissor
+                </Text>
+              </TouchableOpacity>
+              {CORES_SUGERIDAS.map(c => (
+                <TouchableOpacity
+                  key={c}
+                  onPress={() => setCor(c)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Cor ${c}`}
+                  accessibilityState={{ selected: cor === c }}
+                  style={{
+                    width: 44, height: 44, borderRadius: 22, backgroundColor: c,
+                    borderWidth: cor === c ? 3 : 1,
+                    borderColor: cor === c ? colors.brand : colors.border,
+                  }}
+                />
+              ))}
+            </View>
+
+            {formError && <Text style={{ ...typography.body, color: colors.danger }}>{formError}</Text>}
           </ScrollView>
         </View>
       </Modal>
@@ -371,16 +504,21 @@ export default function FaturasScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  nav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  mesAno: { fontSize: 16, fontWeight: '700' },
-  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
-  card: { borderRadius: 16, borderWidth: 1, padding: 16 },
-  badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, marginTop: 4 },
-  payBtn: { height: 48, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  ctaBtn: { marginTop: 16, paddingHorizontal: 20, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  lancamento: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 10, borderRadius: 8, borderWidth: 1 },
-  label: { fontSize: 12, fontWeight: '600', marginBottom: 6, marginTop: 4 },
-  input: { borderWidth: 1, borderRadius: 10, padding: 12, fontSize: 15, marginBottom: 14 },
-});
+/** Prévia ao vivo do cartão dentro do formulário de cadastro. */
+const PreviaCartao = ({ nome, banco, cor, ultimosDigitos, bandeira, titular }: {
+  nome: string; banco: string; cor?: string | null;
+  ultimosDigitos?: string | null; bandeira?: string | null; titular?: string | null;
+}) => {
+  const { largura } = useMedidasCartao();
+  return (
+    <CartaoFisico
+      largura={largura}
+      nome={nome || 'Novo cartão'}
+      banco={banco}
+      cor={cor}
+      ultimosDigitos={ultimosDigitos}
+      bandeira={bandeira}
+      titular={titular}
+    />
+  );
+};

@@ -31,6 +31,11 @@ interface NovaTransacaoModalProps {
   onSaved?: () => void;
   initialTipo?: TipoTransacao;
   initialData?: LancamentoInicial | null;
+  /**
+   * Pré-seleciona o cartão sem a semântica de "repetir lançamento" do
+   * initialData: o formulário abre vazio, só já apontando para o cartão.
+   */
+  cartaoIdInicial?: number | null;
 }
 
 const DEBOUNCE_SUGESTAO_MS = 600;
@@ -38,7 +43,7 @@ const DEBOUNCE_SUGESTAO_MS = 600;
 // Sheet "Nova Transação" — aberto pelo + central da tab bar, pelos atalhos da
 // home e pelo "Repetir lançamento". Fluxo principal: valor → descrição →
 // confirmar; data default hoje; observações/parcelamento em "Mais detalhes".
-export default function NovaTransacaoModal({ visible, onClose, onSaved, initialTipo = 'SAIDA', initialData = null }: NovaTransacaoModalProps) {
+export default function NovaTransacaoModal({ visible, onClose, onSaved, initialTipo = 'SAIDA', initialData = null, cartaoIdInicial = null }: NovaTransacaoModalProps) {
   const colors = useTheme();
   const queryClient = useQueryClient();
 
@@ -96,6 +101,12 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
         return;
       }
     }
+    if (cartaoIdInicial != null) {
+      setFormaPagamento('CARTAO');
+      setCartaoId(cartaoIdInicial);
+      prefsAplicadas.current = true;
+      return;
+    }
     if (!prefsAplicadas.current) {
       getLancamentoPrefs().then(prefs => {
         if (!prefs) return;
@@ -105,8 +116,10 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
         prefsAplicadas.current = true;
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible]);
+    // deps de proposito so [visible]: o efeito restaura as prefs uma vez por
+    // abertura do sheet; incluir os setters reaplicaria a pref por cima da
+    // escolha do usuario.
+  }, [visible, cartaoIdInicial]);
 
   const { data: categorias = [] } = useQuery({
     queryKey: ['categorias'],
@@ -161,7 +174,8 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
         .catch(() => setSugestao(null)); // sugestão é opcional: falha não bloqueia o fluxo
     }, DEBOUNCE_SUGESTAO_MS);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // deps de proposito sem categoriaId: a sugestao so deve reagir ao que o
+    // usuario digita, nunca a categoria que ela mesma acabou de definir.
   }, [descricao, tipo, visible]);
 
   const selecionarCategoria = (id: number) => {
