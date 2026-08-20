@@ -42,4 +42,8 @@ public class Usuario {
 
     @Column(name = "consentimento_em")
     private LocalDateTime consentimentoEm;
+
+    /** Avatar enviado pelo usuario. Nulo = a UI cai para as iniciais. */
+    @Column(name = "foto_url", length = 500)
+    private String fotoUrl;
 }

@@ -1,0 +1,14 @@
+-- fatura_lancamentos.tipo nasceu VARCHAR(20) na V18, quando o enum
+-- TipoFaturaLancamento tinha no maximo ESTORNO (7 caracteres).
+--
+-- A V25 introduziu o rollover de fatura com SALDO_DEVEDOR_ANTERIOR, que tem 22
+-- caracteres, e nao alargou a coluna. Resultado: toda vez que
+-- FaturaService.liquidarFaturaAnterior tenta rolar um saldo devedor, o insert
+-- falha com "value too long for type character varying(20)", a sessao do
+-- Hibernate fica inconsistente e os GETs de fatura devolvem 500.
+--
+-- O bug so aparece contra o Postgres real: os testes usam H2 com ddl-auto
+-- create-drop, que gera a coluna a partir do mapeamento e nao reproduz o limite.
+--
+-- Alargamento e nao destrutivo: nenhum dado existente e truncado.
+ALTER TABLE fatura_lancamentos ALTER COLUMN tipo TYPE VARCHAR(40);

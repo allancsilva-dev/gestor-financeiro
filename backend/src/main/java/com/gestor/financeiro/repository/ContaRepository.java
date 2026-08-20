@@ -16,7 +16,10 @@ import java.util.Optional;
 @Repository
 public interface ContaRepository extends JpaRepository<Conta, Long> {
 
-    // Cartoes ativos do usuario
+    // Cartoes ativos do usuario. O EntityGraph e obrigatorio: contaFinanceira e
+    // LAZY e todo caller le o saldo do passivo pareado — sem ele, uma query por
+    // cartao (N+1).
+    @EntityGraph(attributePaths = "contaFinanceira")
     List<Conta> findByUsuarioIdAndAtivoTrue(Long usuarioId);
 
     @EntityGraph(attributePaths = "contaFinanceira")

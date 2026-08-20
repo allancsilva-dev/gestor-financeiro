@@ -47,6 +47,16 @@ public class Conta {
     private String banco;
 
     /**
+     * Quatro ultimos digitos do cartao, para o usuario reconhecer qual e.
+     * NUNCA o numero completo (PAN) — ver V42 e o CHECK na coluna.
+     */
+    @Column(name = "ultimos_digitos", length = 4)
+    private String ultimosDigitos;
+
+    @Column(length = 20)
+    private String bandeira;
+
+    /**
      * Conta financeira passiva do cartao (PR-F2-06, ADR-0008): 1:1 obrigatorio
      * apos a V41. Pareamento ausente e corrupcao de dados e deve falhar.
      */

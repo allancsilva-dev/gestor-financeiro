@@ -9,6 +9,7 @@ import com.gestor.financeiro.model.enums.OrigemMovimentoCarteira;
 import com.gestor.financeiro.model.enums.TipoFaturaLancamento;
 import com.gestor.financeiro.model.enums.TipoMovimentoCarteira;
 import com.gestor.financeiro.model.enums.TipoTransacao;
+import com.gestor.financeiro.util.FaturaDatas;
 import com.gestor.financeiro.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -790,46 +791,22 @@ public class FaturaService {
                 && transacao.getAtiva();
     }
 
+    // Calendário da fatura vive em FaturaDatas: a carteira (CartaoService) precisa
+    // das mesmas regras sem entrar neste serviço, que escreve ao ler (rollover).
     private YearMonth calcularCompetenciaFatura(Conta conta, LocalDate dataCompra) {
-        int diaFechamento = diaValidoOuFimDoMes(conta.getDiaFechamento(), YearMonth.from(dataCompra));
-        YearMonth competencia = YearMonth.from(dataCompra);
-        if (dataCompra.getDayOfMonth() > diaFechamento) {
-            competencia = competencia.plusMonths(1);
-        }
-        return competencia;
+        return FaturaDatas.competencia(conta, dataCompra);
     }
 
     private LocalDate calcularDataFechamento(Conta conta, YearMonth competencia) {
-        int dia = diaValidoOuFimDoMes(conta.getDiaFechamento(), competencia);
-        return competencia.atDay(dia);
+        return FaturaDatas.fechamento(conta, competencia);
     }
 
     private LocalDate calcularDataVencimento(Conta conta, YearMonth competencia) {
-        int diaFechamento = diaValidoOuFimDoMes(conta.getDiaFechamento(), competencia);
-        int diaVencimento = conta.getDiaVencimento() != null ? conta.getDiaVencimento() : 10;
-        YearMonth mesVencimento = diaVencimento <= diaFechamento ? competencia.plusMonths(1) : competencia;
-        return mesVencimento.atDay(Math.min(diaVencimento, mesVencimento.lengthOfMonth()));
-    }
-
-    private int diaValidoOuFimDoMes(Integer dia, YearMonth mes) {
-        if (dia == null) {
-            return mes.lengthOfMonth();
-        }
-        return Math.min(Math.max(dia, 1), mes.lengthOfMonth());
+        return FaturaDatas.vencimento(conta, competencia);
     }
 
     private FaturaStatus statusAtual(FaturaCartao fatura) {
-        if (fatura.getStatus() == FaturaStatus.PAGA) {
-            return FaturaStatus.PAGA;
-        }
-        LocalDate hoje = LocalDate.now(clock);
-        if (fatura.getDataVencimento() != null && fatura.getDataVencimento().isBefore(hoje)) {
-            return FaturaStatus.VENCIDA;
-        }
-        if (fatura.getDataFechamento() != null && fatura.getDataFechamento().isBefore(hoje)) {
-            return FaturaStatus.FECHADA;
-        }
-        return fatura.getStatus();
+        return FaturaDatas.statusAtual(fatura, LocalDate.now(clock));
     }
 
     private static String chaveIdempotenciaPagamento(Long faturaId, BigDecimal novoValorPago, String requestKey) {

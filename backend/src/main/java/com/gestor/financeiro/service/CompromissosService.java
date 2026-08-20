@@ -1,5 +1,7 @@
 package com.gestor.financeiro.service;
 
+import com.gestor.financeiro.dto.CartaoResumoDto;
+import com.gestor.financeiro.dto.CategoriaResumoDto;
 import com.gestor.financeiro.exception.BusinessException;
 import com.gestor.financeiro.model.enums.StatusPagamento;
 import com.gestor.financeiro.model.enums.TipoTransacao;
@@ -56,7 +58,13 @@ public class CompromissosService {
             BigDecimal valor,
             LocalDate vencimento,
             String grupo,       // COMPROMETIDO | PREVISTO
-            String alerta       // FALHA_SALDO | null
+            String alerta,      // FALHA_SALDO | null
+            // estruturados: a UI monta "iPhone 15 (6/10)" e "Visa .... 8034"
+            // sem parsear a descricao. Nulos em CONTA_FIXA.
+            Integer numeroParcela,
+            Integer totalParcelas,
+            CartaoResumoDto cartao,
+            CategoriaResumoDto categoria
     ) {
     }
 
@@ -87,7 +95,8 @@ public class CompromissosService {
         List<CompromissoItem> itens = new ArrayList<>();
         metricasService.obrigacoesComprometidas(usuarioId, horizonte).forEach(o ->
                 itens.add(new CompromissoItem(o.tipo(), o.id(), o.descricao(), o.valor(),
-                        o.vencimento(), GRUPO_COMPROMETIDO, null)));
+                        o.vencimento(), GRUPO_COMPROMETIDO, null, o.numeroParcela(),
+                        o.totalParcelas(), o.cartao(), o.categoria())));
 
         Set<Long> contasComFalha = contaFixaService.listarFalhasPendentes(usuarioId).stream()
                 .map(e -> e.getContaFixa().getId())
@@ -98,7 +107,8 @@ public class CompromissosService {
                 .forEach(c -> itens.add(new CompromissoItem(TIPO_CONTA_FIXA, c.getId(),
                         c.getNome(), c.getValorPlanejado(), c.getDataProximoVencimento(),
                         GRUPO_PREVISTO,
-                        contasComFalha.contains(c.getId()) ? ALERTA_FALHA_SALDO : null)));
+                        contasComFalha.contains(c.getId()) ? ALERTA_FALHA_SALDO : null,
+                        null, null, null, null)));
 
         itens.sort(Comparator
                 .comparing(CompromissoItem::vencimento,

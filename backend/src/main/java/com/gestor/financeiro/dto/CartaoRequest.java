@@ -33,5 +33,14 @@ public record CartaoRequest(
         String cor,
 
         @Size(max = 60, message = "Banco deve ter no máximo 60 caracteres")
-        String banco
+        String banco,
+
+        // Só os quatro últimos dígitos. O número completo do cartão (PAN) não é
+        // aceito nem armazenado em lugar nenhum — minimização de dados (LGPD).
+        @Pattern(regexp = "^[0-9]{4}$", message = "Informe exatamente os 4 últimos dígitos")
+        String ultimosDigitos,
+
+        @Pattern(regexp = "^(VISA|MASTERCARD|ELO|AMEX|HIPERCARD|OUTRA)$",
+                 message = "Bandeira inválida")
+        String bandeira
 ) {}

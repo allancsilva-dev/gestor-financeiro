@@ -15,7 +15,9 @@ public record CartaoResponse(
         Integer diaVencimento,
         Boolean ativo,
         String cor,
-        String banco
+        String banco,
+        String ultimosDigitos,
+        String bandeira
 ) {
     public static CartaoResponse fromEntity(Conta cartao) {
         BigDecimal limite = cartao.getLimiteTotal() == null ? BigDecimal.ZERO : cartao.getLimiteTotal();
@@ -26,6 +28,7 @@ public record CartaoResponse(
                 cartao.getContaFinanceira() == null ? null : cartao.getContaFinanceira().getId(),
                 cartao.getNome(), limite, saldo, limite.subtract(saldo),
                 cartao.getDiaFechamento(), cartao.getDiaVencimento(), cartao.getAtivo(),
-                cartao.getCor(), cartao.getBanco());
+                cartao.getCor(), cartao.getBanco(),
+                cartao.getUltimosDigitos(), cartao.getBandeira());
     }
 }

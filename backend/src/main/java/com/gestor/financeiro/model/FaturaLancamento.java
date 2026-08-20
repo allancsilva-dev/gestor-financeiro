@@ -55,8 +55,9 @@ public class FaturaLancamento {
     @Column(name = "total_parcelas")
     private Integer totalParcelas;
 
+    // 40 e nao 20: SALDO_DEVEDOR_ANTERIOR tem 22 caracteres. Ver V43.
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, length = 40)
     private TipoFaturaLancamento tipo = TipoFaturaLancamento.COMPRA;
 
     @Column(name = "criado_em")

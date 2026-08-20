@@ -1,5 +1,7 @@
 package com.gestor.financeiro.service;
 
+import com.gestor.financeiro.dto.CartaoResumoDto;
+import com.gestor.financeiro.dto.CategoriaResumoDto;
 import com.gestor.financeiro.exception.BusinessException;
 import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Meta;
@@ -181,9 +183,15 @@ public class MetricasService {
         return faturas.add(parcelas);
     }
 
+    /**
+     * `descricao` segue com o texto pronto ("Compra 6/10") usado no drill-down.
+     * Os campos estruturados abaixo existem para a UI montar o carrossel de
+     * parcelas sem parsear string: numero/total da parcela, cartao e categoria.
+     */
     public record ObrigacaoComprometida(
             String tipo, Long id, String descricao, BigDecimal valor, LocalDate vencimento,
-            Long transacaoId) {
+            Long transacaoId, Integer numeroParcela, Integer totalParcelas,
+            CartaoResumoDto cartao, CategoriaResumoDto categoria) {
     }
 
     /**
@@ -199,7 +207,8 @@ public class MetricasService {
                     if (restante.signum() > 0) {
                         itens.add(new ObrigacaoComprometida("FATURA", f.getId(),
                                 "Fatura " + f.getMes() + "/" + f.getAno(), restante,
-                                f.getDataVencimento(), null));
+                                f.getDataVencimento(), null, null, null,
+                                CartaoResumoDto.fromEntity(f.getConta()), null));
                     }
                 });
         parcelaRepository.findComprometidasNoPeriodo(
@@ -208,7 +217,9 @@ public class MetricasService {
                 .forEach(p -> itens.add(new ObrigacaoComprometida("PARCELA", p.getId(),
                         p.getTransacao().getDescricao() + " " + p.getNumeroParcela() + "/"
                                 + p.getTotalParcelas(), p.getValor(), p.getDataVencimento(),
-                        p.getTransacao().getId())));
+                        p.getTransacao().getId(), p.getNumeroParcela(), p.getTotalParcelas(),
+                        CartaoResumoDto.fromEntity(p.getTransacao().getConta()),
+                        CategoriaResumoDto.fromEntity(p.getTransacao().getCategoria()))));
         return itens;
     }
 

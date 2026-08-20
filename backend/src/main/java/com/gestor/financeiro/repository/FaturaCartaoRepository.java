@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -26,6 +27,13 @@ public interface FaturaCartaoRepository extends JpaRepository<FaturaCartao, Long
     List<FaturaCartao> findByContaIdAndUsuarioIdOrderByAnoDescMesDesc(Long contaId, Long usuarioId);
 
     List<FaturaCartao> findByUsuarioId(Long usuarioId);
+
+    // Carteira (tela de cartoes): todas as faturas dos cartoes do usuario numa
+    // query so. Sem isto seria uma consulta por cartao a cada render da tela.
+    @Query("SELECT f FROM FaturaCartao f WHERE f.usuario.id = :usuarioId "
+         + "AND f.conta.id IN :contaIds ORDER BY f.ano DESC, f.mes DESC")
+    List<FaturaCartao> findByContaIdsEUsuario(@Param("usuarioId") Long usuarioId,
+                                              @Param("contaIds") Collection<Long> contaIds);
 
     // Saldo exigivel: pagamento parcial reduz a projecao. Fatura cujo saldo ja foi
     // rolado aparece somente no destino, evitando dupla cobranca.

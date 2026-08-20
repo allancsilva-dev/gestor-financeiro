@@ -1,5 +1,6 @@
 package com.gestor.financeiro.controller;
 
+import com.gestor.financeiro.dto.CarteiraCartaoResponse;
 import com.gestor.financeiro.dto.CartaoRequest;
 import com.gestor.financeiro.dto.CartaoResponse;
 import com.gestor.financeiro.model.Conta;
@@ -16,6 +17,8 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/cartoes")
 @Tag(name = "Cartões", description = "Contrato público canônico de cartões")
@@ -30,6 +33,18 @@ public class CartaoController {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Pageable capped = PaginationUtils.enforceMaxSize(pageable, 100);
         return ResponseEntity.ok(cartaoService.listarCartoesPorUsuario(usuarioId, capped).map(CartaoResponse::fromEntity));
+    }
+
+    /**
+     * Tela Carteira: todos os cartoes ativos com limite, saldo em aberto,
+     * melhor dia de compra e as faturas da janela. Leitura pura — nao
+     * materializa fatura nem dispara rollover.
+     */
+    @GetMapping("/carteira")
+    public ResponseEntity<List<CarteiraCartaoResponse>> carteira(
+            @RequestParam(name = "meses", required = false) Integer meses) {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        return ResponseEntity.ok(cartaoService.montarCarteira(usuarioId, meses));
     }
 
     @GetMapping("/{id}")
@@ -65,6 +80,8 @@ public class CartaoController {
         cartao.setDiaVencimento(request.diaVencimento());
         cartao.setCor(request.cor());
         cartao.setBanco(request.banco());
+        cartao.setUltimosDigitos(request.ultimosDigitos());
+        cartao.setBandeira(request.bandeira());
         return cartao;
     }
 }
