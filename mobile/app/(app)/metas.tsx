@@ -13,10 +13,13 @@ import Card from '../../src/components/ui/Card';
 import IconTile from '../../src/components/ui/IconTile';
 import Badge from '../../src/components/ui/Badge';
 import ProgressBar from '../../src/components/ui/ProgressBar';
-import Fab from '../../src/components/ui/Fab';
 import Field from '../../src/components/ui/Field';
 import Chip from '../../src/components/ui/Chip';
 import { acoesDaMeta, duracaoDaMetaConcluidaEmDias } from '../../src/domain/metaPolicy';
+import CardMeta from '../../src/components/metas/CardMeta';
+import CabecalhoSecao from '../../src/components/metas/CabecalhoSecao';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { e } from '../../src/theme/escala';
 
 // Textos do glossário (ADR-0012) — a escolha é definitiva (PR-F3-11)
 const MODALIDADES: Array<{ id: ModalidadeMeta; titulo: string; descricao: string }> = [
@@ -104,6 +107,11 @@ export default function Metas() {
   };
 
   const abrirEditarMeta = (meta: Meta) => {
+    // O lápis fica sempre visível no card (como na referência); a política decide se abre
+    if (!acoesDaMeta(meta).editar) {
+      Alert.alert('Meta arquivada', `"${meta.nome}" está arquivada e não aceita mais edição.`);
+      return;
+    }
     setEditandoMeta(meta);
     setModalidadeCriar(meta.modalidade ?? 'COFRE_REAL');
     setNomeCriar(meta.nome);
@@ -236,6 +244,13 @@ export default function Metas() {
   });
 
   const confirmarExcluirMeta = (meta: Meta) => {
+    if (meta.status !== 'ATIVA') {
+      Alert.alert(
+        meta.status === 'CONCLUIDA' ? 'Meta concluída' : 'Meta arquivada',
+        `"${meta.nome}" não pode mais ser excluída.`,
+      );
+      return;
+    }
     if (Number(meta.valorReservado ?? 0) > 0) {
       Alert.alert(
         'Meta com dinheiro reservado',
@@ -253,97 +268,58 @@ export default function Metas() {
     );
   };
 
-  const renderItem = ({ item: meta }: { item: Meta }) => {
-    const progresso = Number(meta.valorTotal ?? 0) > 0
-      ? Math.min((Number(meta.valorReservado ?? 0) / Number(meta.valorTotal ?? 0)) * 100, 100)
-      : 0;
+  const renderItem = ({ item: meta }: { item: Meta }) => (
+    <CardMeta
+      meta={meta}
+      onAbrir={m => { setMetaSelecionada(m); setModalDetalheVisible(true); }}
+      onDepositar={m => abrirAdicionarValor(m)}
+      onEditar={abrirEditarMeta}
+      onExcluir={confirmarExcluirMeta}
+    />
+  );
 
-    // status é canônico; fallback pela `ativa` cobre respostas de backend antigo
-    const arquivada = meta.status === 'ARQUIVADA';
-    const concluida = meta.status ? meta.status === 'CONCLUIDA' : (!meta.ativa || progresso >= 100);
-
-    return (
-      <TouchableOpacity
-        activeOpacity={0.82}
-        accessibilityRole="button"
-        accessibilityLabel={`Abrir detalhes da meta ${meta.nome}`}
-        onPress={() => { setMetaSelecionada(meta); setModalDetalheVisible(true); }}
-      >
-      <Card radius={20} style={{ marginBottom: 12 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-          <IconTile tone={concluida ? 'success' : 'brand'} size={44}>{concluida ? '🏆' : '🎯'}</IconTile>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-              <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '700', flex: 1 }} numberOfLines={1}>{meta.nome}</Text>
-              <Badge tone={arquivada ? 'info' : concluida ? 'success' : 'brand'}>
-                {arquivada ? 'Arquivada' : concluida ? 'Concluída' : 'Ativa'}
-              </Badge>
-            </View>
-            <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2, fontVariant: ['tabular-nums'] }}>
-              {formatCurrency(Number(meta.valorReservado ?? 0))} de {formatCurrency(Number(meta.valorTotal ?? 0))}
-            </Text>
-            <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>
-              {meta.modalidade === 'RESERVA_VIRTUAL' ? 'Reserva virtual' : 'Cofre real'}
-            </Text>
-          </View>
-        </View>
-
-        <ProgressBar value={progresso} />
-
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
-          <Text style={{ color: concluida ? colors.success : colors.brandFg, fontSize: 12, fontWeight: '700' }}>{formatPercent(progresso)}</Text>
-          {meta.dataPrevista && <Text style={{ color: colors.textSecondary, fontSize: 11 }}>até {formatDate(meta.dataPrevista)}</Text>}
-        </View>
-
-        {/* Concluída: quando terminou, com quanto e em quantos dias (PR-F3-11) */}
-        {concluida && meta.dataConclusao && (
-          <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 8 }}>
-            Concluída em {formatDateOnlyBR(meta.dataConclusao)} com {formatCurrency(Number(meta.valorReservado ?? 0))}
-            {duracaoDaMetaConcluidaEmDias(meta) != null ? ` · ${duracaoDaMetaConcluidaEmDias(meta)} dias` : ''}
-          </Text>
-        )}
-
-        {acoesDaMeta(meta).verExtratoCofre && (
-          <TouchableOpacity
-            onPress={() => router.push(`/more/carteiras?contaId=${meta.cofreId}` as any)}
-            accessibilityRole="button"
-            accessibilityLabel={`Ver extrato do cofre da meta ${meta.nome}`}
-            style={{ marginTop: 8, alignSelf: 'flex-start', minHeight: 32, justifyContent: 'center' }}
-          >
-            <Text style={{ color: colors.brandFg, fontSize: 12, fontWeight: '600' }}>Ver extrato do cofre ›</Text>
-          </TouchableOpacity>
-        )}
-
-        {acoesDaMeta(meta).adicionar && (
-          <TouchableOpacity
-            onPress={() => abrirAdicionarValor(meta)}
-            accessibilityRole="button"
-            accessibilityLabel={`Adicionar valor à meta ${meta.nome}`}
-            style={{ marginTop: 12, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1, borderColor: colors.brand, alignSelf: 'flex-start' }}
-          >
-            <Text style={{ color: colors.brandFg, fontSize: 12, fontWeight: '600' }}>+ Adicionar</Text>
-          </TouchableOpacity>
-        )}
-      </Card>
-      </TouchableOpacity>
-    );
+  const TITULO_DA_SECAO: Record<StatusMeta, { titulo: string; texto: string }> = {
+    ATIVA: {
+      titulo: 'Suas metas ativas',
+      texto: 'Acompanhe o ritmo, entenda a pressão do mês e escolha onde vale avaliar agora.',
+    },
+    CONCLUIDA: {
+      titulo: 'Suas metas concluídas',
+      texto: 'O que você já fechou. Resgate o valor quando quiser usar o dinheiro.',
+    },
+    ARQUIVADA: {
+      titulo: 'Suas metas arquivadas',
+      texto: 'Metas fora de circulação. Ficam aqui só para consulta.',
+    },
   };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 12 }}>
-        <Text style={{ color: colors.textPrimary, fontSize: 23, fontWeight: '800', letterSpacing: -0.4 }}>Planejamento</Text>
-        <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>Seu progresso rumo aos objetivos</Text>
-        <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-          <Chip label="Ativas" selected={statusFiltro === 'ATIVA'} onPress={() => setStatusFiltro('ATIVA')} />
-          <Chip label="Concluídas" selected={statusFiltro === 'CONCLUIDA'} onPress={() => setStatusFiltro('CONCLUIDA')} />
-          <Chip label="Arquivadas" selected={statusFiltro === 'ARQUIVADA'} onPress={() => setStatusFiltro('ARQUIVADA')} />
-        </View>
+      <View
+        style={{
+          paddingTop: insets.top + e(12), paddingHorizontal: e(16), paddingBottom: e(4),
+          flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        }}
+      >
+        <Text style={{ color: colors.textPrimary, fontSize: e(20), fontWeight: '800', letterSpacing: -0.4 }}>Metas</Text>
+        <TouchableOpacity
+          onPress={abrirCriarMeta}
+          accessibilityRole="button"
+          accessibilityLabel="Criar meta"
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          style={{
+            width: e(33), height: e(33), borderRadius: 999,
+            backgroundColor: colors.overlay, borderWidth: 1, borderColor: colors.border,
+            alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <Ionicons name="add" size={e(20)} color={colors.brandFg} />
+        </TouchableOpacity>
       </View>
 
       {isLoading ? (
-        <View style={{ paddingHorizontal: 16, gap: 12 }}>
-          {[1, 2, 3].map(i => <SkeletonBox key={i} width="100%" height={140} borderRadius={18} />)}
+        <View style={{ paddingHorizontal: e(18), gap: e(33), paddingTop: e(24) }}>
+          {[1, 2, 3].map(i => <SkeletonBox key={i} width="100%" height={e(155)} borderRadius={e(20)} />)}
         </View>
       ) : isError ? (
         <View style={{ alignItems: 'center', padding: 48 }}>
@@ -357,9 +333,23 @@ export default function Metas() {
           data={data?.content ?? []}
           keyExtractor={m => m.id.toString()}
           renderItem={renderItem}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: tabBarSpace }}
+          contentContainerStyle={{ paddingBottom: tabBarSpace }}
+          ListHeaderComponent={
+            <>
+              <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: e(16), paddingTop: e(12) }}>
+                <Chip label="Ativas" selected={statusFiltro === 'ATIVA'} onPress={() => setStatusFiltro('ATIVA')} />
+                <Chip label="Concluídas" selected={statusFiltro === 'CONCLUIDA'} onPress={() => setStatusFiltro('CONCLUIDA')} />
+                <Chip label="Arquivadas" selected={statusFiltro === 'ARQUIVADA'} onPress={() => setStatusFiltro('ARQUIVADA')} />
+              </View>
+              <CabecalhoSecao
+                eyebrow="OBJETIVOS"
+                titulo={TITULO_DA_SECAO[statusFiltro].titulo}
+                texto={TITULO_DA_SECAO[statusFiltro].texto}
+              />
+            </>
+          }
           ListEmptyComponent={() => (
-            <View style={{ alignItems: 'center', padding: 48 }}>
+            <View style={{ alignItems: 'center', paddingHorizontal: 48, paddingBottom: 48 }}>
               <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600' }}>
                 {statusFiltro === 'ATIVA' ? 'Nenhuma meta ainda'
                   : statusFiltro === 'CONCLUIDA' ? 'Nenhuma meta concluída'
@@ -379,8 +369,6 @@ export default function Metas() {
           )}
         />
       )}
-
-      <Fab onPress={abrirCriarMeta} accessibilityLabel="Criar meta" />
 
       <Modal visible={modalDetalheVisible} animationType="slide" presentationStyle="pageSheet">
         <View style={{ flex: 1, backgroundColor: colors.bg }}>

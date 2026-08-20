@@ -1,0 +1,200 @@
+import React, { useMemo, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, LayoutChangeEvent } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Defs, RadialGradient, Rect, Stop } from 'react-native-svg';
+import { Meta } from '../../types';
+import { useTheme, radius, numeric } from '../../theme';
+import { e } from '../../theme/escala';
+import { paletaDaMeta } from '../../theme/metaCores';
+import { acoesDaMeta } from '../../domain/metaPolicy';
+import { rotuloDeRitmo } from '../../domain/metaProjecao';
+import { formatCurrency, formatPercent } from '../../utils/format';
+import Badge from '../ui/Badge';
+import AnelProgresso from './AnelProgresso';
+
+interface Props {
+  meta: Meta;
+  onAbrir: (meta: Meta) => void;
+  onDepositar: (meta: Meta) => void;
+  onEditar: (meta: Meta) => void;
+  onExcluir: (meta: Meta) => void;
+}
+
+// Medidas da referência (360dp), convertidas para a tela atual por `e()`
+const TILE = e(82);
+const ANEL = e(66);
+const TOQUE = { top: 12, bottom: 12, left: 10, right: 10 };
+
+/**
+ * Card de meta da referência (`mobile/.design/referencia-metas.png`).
+ *
+ * Fundo neutro com dois brilhos radiais na cor da meta — topo-direita e
+ * base-esquerda —, anel de progresso dentro de um tile de 82, e rodapé com o ritmo
+ * do mês à esquerda e as ações à direita. Medidas em `.design/MEDICOES-metas.md`.
+ */
+export default function CardMeta({ meta, onAbrir, onDepositar, onEditar, onExcluir }: Props) {
+  const colors = useTheme();
+  // `width="100%"` no Svg resolve contra a caixa de padding do card e deixa uma costura
+  // visível na borda; o tamanho real vem do layout.
+  const [caixa, setCaixa] = useState({ largura: 0, altura: 0 });
+  const medir = (ev: LayoutChangeEvent) =>
+    setCaixa({ largura: ev.nativeEvent.layout.width, altura: ev.nativeEvent.layout.height });
+  const paleta = useMemo(() => paletaDaMeta(meta, colors.card), [meta, colors.card]);
+  const acoes = acoesDaMeta(meta);
+
+  const total = Number(meta.valorTotal ?? 0);
+  const reservado = Number(meta.valorReservado ?? 0);
+  const progresso = total > 0 ? Math.min((reservado / total) * 100, 100) : 0;
+  const ritmo = rotuloDeRitmo(meta);
+  const corDoRitmo = ritmo?.tom === 'atencao' ? colors.warning : colors.brandFg;
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.9}
+      accessibilityRole="button"
+      accessibilityLabel={`Abrir detalhes da meta ${meta.nome}`}
+      onPress={() => onAbrir(meta)}
+      onLayout={medir}
+      style={{
+        borderRadius: e(20),
+        backgroundColor: colors.card,
+        overflow: 'hidden',
+        paddingHorizontal: e(16),
+        paddingVertical: e(10),
+        marginHorizontal: e(18),
+        marginBottom: e(33),
+      }}
+    >
+      <Svg
+        width={caixa.largura}
+        height={caixa.altura}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      >
+        <Defs>
+          <RadialGradient id={`topo-${meta.id}`} cx="92%" cy="4%" rx="62%" ry="82%">
+            <Stop offset="0" stopColor={paleta.tintaTopo} stopOpacity="1" />
+            <Stop offset="1" stopColor={paleta.tintaTopo} stopOpacity="0" />
+          </RadialGradient>
+          <RadialGradient id={`base-${meta.id}`} cx="4%" cy="100%" rx="55%" ry="72%">
+            <Stop offset="0" stopColor={paleta.tintaBase} stopOpacity="1" />
+            <Stop offset="1" stopColor={paleta.tintaBase} stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <Rect x="0" y="0" width={caixa.largura} height={caixa.altura} fill={`url(#topo-${meta.id})`} />
+        <Rect x="0" y="0" width={caixa.largura} height={caixa.altura} fill={`url(#base-${meta.id})`} />
+      </Svg>
+
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <View
+          style={{
+            width: TILE, height: TILE, borderRadius: e(18),
+            borderWidth: 1, borderColor: colors.border,
+            backgroundColor: colors.overlay,
+            alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <AnelProgresso
+            progresso={progresso}
+            paleta={paleta}
+            emoji={meta.icone || '🏷️'}
+            tamanho={ANEL}
+            espessura={e(5)}
+            id={meta.id}
+            accessibilityLabel={`${formatPercent(progresso)} de ${meta.nome}`}
+          />
+        </View>
+
+        <View style={{ flex: 1, minWidth: 0, marginLeft: e(11) }}>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
+            <Text
+              numberOfLines={1}
+              style={{ flex: 1, color: colors.textPrimary, fontSize: e(18), fontWeight: '700', letterSpacing: -0.2 }}
+            >
+              {meta.nome}
+            </Text>
+            <Text style={{ color: paleta.percentual, fontSize: e(17), fontWeight: '800', ...numeric }}>
+              {formatPercent(progresso, 0)}
+            </Text>
+          </View>
+
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', marginTop: e(6) }}>
+            <Text numberOfLines={1} style={{ color: colors.textPrimary, fontSize: e(13), fontWeight: '700', ...numeric }}>
+              {formatCurrency(reservado)}
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={{ flexShrink: 1, color: colors.textSecondary, fontSize: e(12), fontWeight: '500', marginLeft: e(6), ...numeric }}
+            >
+              de {formatCurrency(total)}
+            </Text>
+          </View>
+
+          <View
+            style={{ height: e(6), borderRadius: e(3), backgroundColor: paleta.trilha, marginTop: e(12), overflow: 'hidden' }}
+          >
+            <LinearGradient
+              colors={[paleta.fillDe, paleta.fillPara]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{ width: `${progresso}%`, height: '100%', borderRadius: e(3) }}
+            />
+          </View>
+        </View>
+      </View>
+
+      <View style={{ height: 1, backgroundColor: colors.border, marginTop: e(10) }} />
+
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: e(11) }}>
+        <Text
+          numberOfLines={2}
+          style={{ flex: 1, color: corDoRitmo, fontSize: e(10), lineHeight: e(14), fontWeight: '600', paddingRight: e(4) }}
+        >
+          {ritmo?.texto ?? ''}
+        </Text>
+
+        <TouchableOpacity
+          onPress={() => onExcluir(meta)}
+          hitSlop={TOQUE}
+          accessibilityRole="button"
+          accessibilityLabel={`Excluir a meta ${meta.nome}`}
+          style={{ paddingHorizontal: e(5) }}
+        >
+          <Ionicons name="trash-outline" size={e(16)} color={colors.textMuted} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => onEditar(meta)}
+          hitSlop={TOQUE}
+          accessibilityRole="button"
+          accessibilityLabel={`Editar a meta ${meta.nome}`}
+          style={{ paddingHorizontal: e(5), marginRight: e(6) }}
+        >
+          <Ionicons name="pencil-outline" size={e(16)} color={colors.textMuted} />
+        </TouchableOpacity>
+
+        {acoes.adicionar ? (
+          <TouchableOpacity
+            onPress={() => onDepositar(meta)}
+            hitSlop={{ top: 6, bottom: 6 }}
+            accessibilityRole="button"
+            accessibilityLabel={`Depositar na meta ${meta.nome}`}
+            style={{
+              height: e(33), minWidth: e(91), paddingHorizontal: e(6), borderRadius: radius.pill,
+              backgroundColor: colors.textPrimary,
+              flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: e(5),
+            }}
+          >
+            <Ionicons name="add" size={e(14)} color={colors.bg} />
+            <Text style={{ color: colors.bg, fontSize: e(13), fontWeight: '700' }}>Depositar</Text>
+          </TouchableOpacity>
+        ) : (
+          <Badge tone={meta.status === 'CONCLUIDA' ? 'success' : 'info'}>
+            {meta.status === 'CONCLUIDA' ? 'Concluída' : 'Arquivada'}
+          </Badge>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+}
