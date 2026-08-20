@@ -4,8 +4,29 @@ import { TipoMovimentoCarteira, StatusPagamento } from '../types';
 export const formatCurrency = (value: number): string =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
+// Data ISO (YYYY-MM-DD) para DD/MM/AAAA sem passar por Date — evita o
+// deslocamento de fuso do new Date('YYYY-MM-DD') (UTC) em telas de vencimento
+export const formatDateOnlyBR = (iso: string): string => {
+  const [year, month, day] = iso.split('-');
+  return `${day}/${month}/${year}`;
+};
+
+const ISO_DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+// Strings date-only da API (LocalDate) não passam por Date: new Date('2026-08-19')
+// é meia-noite UTC e volta um dia em UTC-3.
+// Data por extenso do cabeçalho da home: "sábado, 18 de julho"
+export const formatDateLongBR = (date: Date = new Date()): string => {
+  const texto = new Intl.DateTimeFormat('pt-BR', {
+    weekday: 'long', day: 'numeric', month: 'long',
+  }).format(date);
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+};
+
 export const formatDate = (date: Date | string): string =>
-  new Intl.DateTimeFormat('pt-BR').format(new Date(date));
+  typeof date === 'string' && ISO_DATE_ONLY.test(date)
+    ? formatDateOnlyBR(date)
+    : new Intl.DateTimeFormat('pt-BR').format(new Date(date));
 
 export const formatDateTime = (date: Date | string): string =>
   new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(date));
@@ -31,13 +52,6 @@ export const getGreeting = (): string => {
 
 export const getInitials = (nome: string): string =>
   nome.trim().split(' ').slice(0, 2).map(n => n[0].toUpperCase()).join('');
-
-// Data ISO (YYYY-MM-DD) para DD/MM/AAAA sem passar por Date — evita o
-// deslocamento de fuso do new Date('YYYY-MM-DD') (UTC) em telas de vencimento
-export const formatDateOnlyBR = (iso: string): string => {
-  const [year, month, day] = iso.split('-');
-  return `${day}/${month}/${year}`;
-};
 
 // Data de hoje no formato DD/MM/AAAA (default do lançamento rápido, PR-F3-05)
 export const todayBR = (): string => {

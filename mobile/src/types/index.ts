@@ -109,6 +109,8 @@ export interface CategoriaResumo {
 export interface CartaoResumo {
   id: number;
   nome: string;
+  ultimosDigitos?: string | null;
+  bandeira?: string | null;
 }
 
 export interface Transacao {
@@ -251,6 +253,8 @@ export interface ReconciliacaoCarteira {
 }
 
 // ── Cartões ─────────────────────────────────────────────────────────
+export type BandeiraCartao = 'VISA' | 'MASTERCARD' | 'ELO' | 'AMEX' | 'HIPERCARD' | 'OUTRA';
+
 export interface Cartao {
   id: number;
   contaFinanceiraId: number;
@@ -263,6 +267,46 @@ export interface Cartao {
   ativo: boolean;
   cor?: string;
   banco?: string;
+  // Só os 4 últimos dígitos: o número completo (PAN) não é aceito nem
+  // armazenado em lugar nenhum — minimização de dados (LGPD).
+  ultimosDigitos?: string | null;
+  bandeira?: BandeiraCartao | string | null;
+}
+
+// ── Carteira (GET /v1/cartoes/carteira) ────────────────────────────
+export interface FaturaResumo {
+  /** null = competência ainda não materializada; valores zerados, datas reais. */
+  id: number | null;
+  mes: number;
+  ano: number;
+  dataFechamento: string;
+  dataVencimento: string;
+  valorTotal: number;
+  valorPago: number;
+  saldoRestante: number;
+  status: string;
+}
+
+export interface CarteiraCartao {
+  cartaoId: number;
+  nome: string;
+  banco?: string | null;
+  cor?: string | null;
+  ultimosDigitos?: string | null;
+  bandeira?: BandeiraCartao | string | null;
+  diaFechamento?: number | null;
+  diaVencimento?: number | null;
+  limiteTotal: number;
+  limiteDisponivel: number;
+  /** Nunca negativo — crédito a favor vem separado. */
+  emAberto: number;
+  creditoAFavor: number;
+  percentualUso: number;
+  dataVencimentoAtual: string;
+  diasParaVencimento: number;
+  melhorDiaCompra: string;
+  diasParaMelhorDia: number;
+  faturas: FaturaResumo[];
 }
 
 export interface CartaoRequest {
@@ -272,6 +316,8 @@ export interface CartaoRequest {
   diaVencimento: number;
   cor?: string;
   banco?: string;
+  ultimosDigitos?: string;
+  bandeira?: BandeiraCartao;
 }
 
 // ── Contas Fixas ───────────────────────────────────────────────────
@@ -585,4 +631,45 @@ export interface MovimentacaoAtivoRequest {
   precoUnitario: number;
   carteiraId?: number;
   externa: boolean;
+}
+
+// ── Home agregada (V42) ─────────────────────────────────────────────
+export interface ParcelaAgendada {
+  id: number;
+  transacaoId: number | null;
+  descricao: string;
+  numeroParcela: number | null;
+  totalParcelas: number | null;
+  valor: number;
+  vencimento: string;
+  cartao?: CartaoResumo | null;
+  categoria?: CategoriaResumo | null;
+  atrasada: boolean;
+}
+
+export interface HomeResumo {
+  metricas: MetricasFinanceiras;
+  saldoEmConta: number;
+  saldoEmCartoes: number;
+  totalEntradas: number;
+  totalSaidas: number;
+  totalFaturas: number;
+  parcelasAgendadas: ParcelaAgendada[];
+  categorias: CategoriaResumo[];
+  naoLidas: number;
+}
+
+export type TipoNotificacao =
+  | 'FATURA_VENCENDO' | 'PARCELA_AGENDADA' | 'FALHA_SALDO'
+  | 'ORCAMENTO_ESTOURADO' | 'META_ATINGIDA';
+
+export interface Notificacao {
+  id: number;
+  tipo: TipoNotificacao;
+  titulo: string;
+  mensagem: string;
+  destino: string | null;
+  destinoId: number | null;
+  lida: boolean;
+  criadaEm: string;
 }
