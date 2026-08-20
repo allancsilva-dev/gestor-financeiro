@@ -1375,3 +1375,65 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   redesign visual foi descartado por completo em 2026-08-19.
 - **Status:** ABERTO (parcialmente endereçado nesta rodada — ver anotações cravadas em
   BACKLOG-0048 e SYSTEM_OVERVIEW.md).
+
+---
+
+## BACKLOG-0092 — Portar o mesmo bug de fuso horário (`LocalDate` formatado via `Date`/UTC) para o frontend web
+
+- **Titulo:** `frontend` tem o mesmo bug corrigido no mobile pelo BUG-0067, sem helper compartilhado de
+  formatação de data
+- **Prioridade:** P1
+- **Área:** frontend
+- **Motivo:** Em 2026-08-19, ao corrigir BUG-0067 no mobile (`mobile/src/utils/format.ts`), confirmou-se
+  que o `frontend` web tem o mesmo problema — datas `LocalDate` (`YYYY-MM-DD`) formatadas com
+  `new Date(x).toLocaleDateString('pt-BR')` caem no dia anterior em `America/Sao_Paulo` (UTC-3) porque
+  `new Date('YYYY-MM-DD')` é interpretada como meia-noite UTC. Não existe `frontend/src/utils/format.ts`
+  nem equivalente — a formatação é feita inline em cada tela. Confirmado nos seguintes pontos (leitura
+  de código, sem execução/reprodução visual no frontend web nesta rodada):
+  `frontend/src/pages/Transacoes.tsx:612`, `frontend/src/pages/Faturas.tsx:178` e `:278`,
+  `frontend/src/pages/ContasFixas.tsx:445`, `frontend/src/pages/Relatorios.tsx:178`. Já existem
+  workarounds ad-hoc (`T12:00:00`/`T00:00:00`) que contornam o mesmo bug em pontos isolados:
+  `frontend/src/pages/Dashboard.tsx:112`, `frontend/src/pages/Investimentos.tsx:108`,
+  `frontend/src/pages/Metas.tsx:464` — mesmo padrão de contorno disperso que existia no mobile antes do
+  BUG-0067.
+- **Dependências:** Nenhuma técnica. Referência de implementação: `mobile/src/utils/format.ts`
+  (`formatDateOnlyBR` + regex `ISO_DATE_ONLY` em `formatDate`) e `mobile/src/__tests__/format.test.ts`,
+  ambos do BUG-0067.
+- **Critério de aceite:** Novo `frontend/src/utils/date.ts` com helper equivalente a
+  `formatDateOnlyBR`/`formatDate` do mobile (monta a data por componentes, sem depender de
+  `new Date(string)` para strings date-only); teste em `frontend/src/utils/date.test.ts` (Vitest,
+  já é o runner do frontend) cobrindo os casos de virada de dia/mês/ano documentados no teste do mobile;
+  os 5 call sites listados e os 3 workarounds ad-hoc migrados para o helper novo.
+  Consultar `docs/BUGFIX_LOG.md` (BUG-0067) para o mesmo padrão de correção já validado no mobile.
+- **Risco se ficar pendente:** Dado financeiro exibido com data errada no frontend web (mesma classe de
+  impacto do BUG-0067 no mobile — no mobile, a variante em `metas.tsx` chegou a persistir a data errada
+  de volta no backend via round-trip do input de edição; risco equivalente não descartado no web sem
+  auditoria dos formulários de edição que usam datas como default).
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0093 — Lint do mobile falha com regra `react-hooks/exhaustive-deps` não encontrada
+
+- **Titulo:** `npm run lint` do mobile reporta 2 erros pré-existentes e bloqueantes em
+  `NovaTransacaoModal.tsx`, não relacionados a nenhuma mudança recente
+- **Prioridade:** P2
+- **Área:** mobile, infra
+- **Motivo:** Durante a validação do BUG-0067 (2026-08-19), `npm run lint` no `mobile/` retornou 2 erros:
+  "Definition for rule 'react-hooks/exhaustive-deps' was not found" em
+  `mobile/src/components/NovaTransacaoModal.tsx:108` e `:164`. Confirmado que o problema é pré-existente
+  e não foi introduzido pela correção do BUG-0067 — os mesmos 2 erros ocorrem reproduzindo o lint com a
+  árvore de trabalho limpa (`git stash -u`), em um arquivo que a correção do BUG-0067 não tocou. Como o
+  script de lint roda com `--max-warnings=0` e é bloqueante na CI (`.github/workflows/ci.yml`), qualquer
+  PR do mobile — incluindo o do BUG-0067 — fica bloqueado até isso ser resolvido, mesmo sem relação com
+  a mudança em si.
+- **Dependências:** Nenhuma técnica. Provável causa: dependência `eslint-plugin-react-hooks` ausente,
+  desalinhada de versão, ou não referenciada corretamente na config do ESLint do `mobile/` — não
+  investigado a fundo nesta rodada (fora do escopo de `docs-reporter`, que não altera config/deps).
+- **Critério de aceite:** `npm run lint` no `mobile/` executa sem o erro "Definition for rule ... was not
+  found"; a regra `react-hooks/exhaustive-deps` volta a ser aplicada de fato (ativa e funcional, não
+  apenas silenciada) em `NovaTransacaoModal.tsx` e no restante do projeto.
+- **Risco se ficar pendente:** CI do mobile bloqueada para qualquer PR (lint é `--max-warnings=0`);
+  força bypass manual ou espera de correção não relacionada para promover mudanças legítimas, incluindo
+  o BUG-0067.
+- **Status:** ABERTO
