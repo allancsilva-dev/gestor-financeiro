@@ -87,15 +87,21 @@ test -x "$ROOT_DIR/backend/mvnw" || fail "backend/mvnw não é executável."
 test -f "$FLOW_FILE" || fail "flow Maestro ausente: $FLOW_FILE"
 test -d "$MOBILE_DIR/node_modules" || fail "dependências mobile ausentes; execute npm ci em mobile/."
 
+# Porta do backend do e2e. 8081 é o padrão histórico, mas em máquina de dev ela
+# costuma estar ocupada (BlueStacks, outro dev server) — daí ser parametrizável.
+BACKEND_PORT="${GF_E2E_BACKEND_PORT:-8081}"
+
 docker info >/dev/null 2>&1 || fail "Docker não está disponível."
 xcodebuild -version >"$ARTIFACT_DIR/xcode-version.txt" 2>&1 || fail "Xcode não está funcional."
 node --version >"$ARTIFACT_DIR/node-version.txt"
 maestro --version >"$ARTIFACT_DIR/maestro-version.txt" 2>&1 || fail "Maestro não está funcional."
 
-if ! curl -fsS --max-time 2 http://127.0.0.1:8081/actuator/health >/dev/null 2>&1; then
-  :
-else
-  fail "a porta 8081 já está em uso por outro backend."
+# Detecta ocupação de verdade. A versão anterior usava curl no /actuator/health
+# e só abortava se OUTRO Spring saudável respondesse — se a porta estivesse com
+# qualquer outra coisa (um dev server node, por exemplo), o curl falhava, o
+# script seguia e o backend só morria no boot, depois de subir o Postgres.
+if lsof -nP -iTCP:"$BACKEND_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+  fail "a porta $BACKEND_PORT já está em uso. Use GF_E2E_BACKEND_PORT=<outra> para trocar."
 fi
 
 SIMULATOR_UDID="$(xcrun simctl list devices booted | sed -n 's/^[[:space:]]*iPhone 17 Pro (\([0-9A-F-]*\)) (Booted)[[:space:]]*$/\1/p' | head -1)"
@@ -118,7 +124,7 @@ docker exec "$CONTAINER_NAME" pg_isready -U "$DB_USER" -d "$DB_NAME" >/dev/null 
   || fail "PostgreSQL não ficou pronto."
 HOST_PORT="$(docker port "$CONTAINER_NAME" 5432/tcp | sed 's/.*://')"
 
-printf '==> Backend local (porta 8081)\n'
+printf '==> Backend local (porta %s)\n' "$BACKEND_PORT"
 (
   cd "$ROOT_DIR/backend"
   SPRING_PROFILES_ACTIVE=dev \
@@ -127,16 +133,17 @@ printf '==> Backend local (porta 8081)\n'
   DB_PASSWORD="$DB_PASSWORD" \
   JWT_SECRET="mobile_e2e_secret_with_at_least_32_bytes_1234567890" \
   COOKIE_SECURE=false \
+  SERVER_PORT="$BACKEND_PORT" \
   ./mvnw -q spring-boot:run
 ) >"$ARTIFACT_DIR/backend.log" 2>&1 &
 BACKEND_PID=$!
 
 for _ in $(seq 1 90); do
-  curl -fsS http://127.0.0.1:8081/actuator/health >"$ARTIFACT_DIR/backend-health.json" 2>/dev/null && break
+  curl -fsS http://127.0.0.1:$BACKEND_PORT/actuator/health >"$ARTIFACT_DIR/backend-health.json" 2>/dev/null && break
   kill -0 "$BACKEND_PID" 2>/dev/null || fail "backend morreu durante o boot; consulte backend.log."
   sleep 2
 done
-curl -fsS http://127.0.0.1:8081/actuator/health >"$ARTIFACT_DIR/backend-health.json" \
+curl -fsS http://127.0.0.1:$BACKEND_PORT/actuator/health >"$ARTIFACT_DIR/backend-health.json" \
   || fail "backend não respondeu no prazo."
 
 printf '==> App iOS Debug com API local\n'
@@ -144,7 +151,7 @@ if [ ! -d "$MOBILE_DIR/ios" ]; then
   NATIVE_CREATED=1
   (
     cd "$MOBILE_DIR"
-    EXPO_PUBLIC_API_BASE_URL="http://127.0.0.1:8081/api" \
+    EXPO_PUBLIC_API_BASE_URL="http://127.0.0.1:$BACKEND_PORT/api" \
       npx expo prebuild --clean --platform ios --no-install
     cd ios
     pod install
@@ -163,7 +170,7 @@ elif ! rg -q 'unset[[:space:]]+SKIP_BUNDLING' "$XCODE_UPDATES"; then
 fi
 (
   cd "$MOBILE_DIR"
-  EXPO_PUBLIC_API_BASE_URL="http://127.0.0.1:8081/api" \
+  EXPO_PUBLIC_API_BASE_URL="http://127.0.0.1:$BACKEND_PORT/api" \
   APP_ENV=local-e2e \
   APP_RELEASE_SHA="$RUN_ID" \
   FORCE_BUNDLING=1 \
@@ -177,7 +184,7 @@ fi
     CODE_SIGNING_ALLOWED=NO \
     FORCE_BUNDLING=1 \
     "EXTRA_PACKAGER_ARGS=--dev false" \
-    EXPO_PUBLIC_API_BASE_URL="http://127.0.0.1:8081/api" \
+    EXPO_PUBLIC_API_BASE_URL="http://127.0.0.1:$BACKEND_PORT/api" \
     RCT_METRO_PORT=8082 \
     EX_DEV_CLIENT_NETWORK_INSPECTOR=0 \
     APP_ENV=local-e2e \
@@ -190,7 +197,7 @@ test -n "$APP_PATH" || fail "app Debug não encontrado no DerivedData temporári
 test -f "$APP_PATH/main.jsbundle" || fail "bundle JavaScript não foi incorporado ao app Debug."
 APP_CONFIG="$APP_PATH/EXConstants.bundle/app.config"
 test -f "$APP_CONFIG" || fail "configuração Expo não foi incorporada ao app Debug."
-jq -e --arg api "http://127.0.0.1:8081/api" \
+jq -e --arg api "http://127.0.0.1:$BACKEND_PORT/api" \
   '.extra.apiBaseUrl == $api and .extra.appEnv == "local-e2e"' "$APP_CONFIG" >/dev/null \
   || fail "app Debug não contém a API local e o ambiente local-e2e esperados."
 cp "$APP_CONFIG" "$ARTIFACT_DIR/app.config.json"
@@ -200,7 +207,7 @@ E2E_EMAIL="mobile-smoke-$RUN_ID@example.test"
 E2E_PASSWORD="Smoke12345"
 E2E_DATE_INPUT="$(date +%d%m%Y)"
 printf 'run_id=%s\nemail=%s\nsimulator=%s\napi=%s\n' \
-  "$RUN_ID" "$E2E_EMAIL" "$SIMULATOR_UDID" "http://127.0.0.1:8081/api" \
+  "$RUN_ID" "$E2E_EMAIL" "$SIMULATOR_UDID" "http://127.0.0.1:$BACKEND_PORT/api" \
   >"$ARTIFACT_DIR/run.txt"
 
 printf '==> Maestro financial-critical\n'
@@ -219,7 +226,7 @@ printf '==> Maestro financial-critical\n'
 
 printf '==> Reconciliação técnica por API\n'
 LOGIN_JSON="$ARTIFACT_DIR/api-login.json"
-curl -fsS -X POST http://127.0.0.1:8081/api/auth/login \
+curl -fsS -X POST http://127.0.0.1:$BACKEND_PORT/api/auth/login \
   -H 'Content-Type: application/json' \
   -H 'X-Client-Type: mobile' \
   --data "$(jq -cn --arg email "$E2E_EMAIL" --arg password "$E2E_PASSWORD" '{email:$email,password:$password}')" \
@@ -227,7 +234,7 @@ curl -fsS -X POST http://127.0.0.1:8081/api/auth/login \
 TOKEN="$(jq -er '.accessToken' "$LOGIN_JSON")" || fail "login técnico não retornou accessToken."
 
 api_get() {
-  curl -fsS "http://127.0.0.1:8081/api$1" -H "Authorization: Bearer $TOKEN" -H 'X-Client-Type: mobile'
+  curl -fsS "http://127.0.0.1:$BACKEND_PORT/api$1" -H "Authorization: Bearer $TOKEN" -H 'X-Client-Type: mobile'
 }
 
 api_get '/v1/reconciliacao/global' >"$ARTIFACT_DIR/reconciliacao-global.json"
