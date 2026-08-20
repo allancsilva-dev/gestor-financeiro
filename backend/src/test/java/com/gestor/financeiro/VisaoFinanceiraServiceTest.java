@@ -19,11 +19,17 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -41,6 +47,23 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @ActiveProfiles("test")
 @Transactional
 class VisaoFinanceiraServiceTest {
+
+    /**
+     * O cenario e de julho/2026, mas `pagarFatura` carimba `dataPagamento` com
+     * `LocalDate.now(clock)`. Com o relogio de sistema o pagamento cai fora da janela
+     * INICIO..FIM e a visao CAIXA perde os 30,00. Relogio parado em 20/07/2026.
+     */
+    static final Instant AGORA = Instant.parse("2026-07-20T15:00:00Z");
+    static final ZoneId SAO_PAULO = ZoneId.of("America/Sao_Paulo");
+
+    @TestConfiguration
+    static class ClockFixoEmJulho2026 {
+        @Bean
+        @Primary
+        Clock clockFixo() {
+            return Clock.fixed(AGORA, SAO_PAULO);
+        }
+    }
 
     @Autowired VisaoFinanceiraService visaoService;
     @Autowired TransacaoService transacaoService;

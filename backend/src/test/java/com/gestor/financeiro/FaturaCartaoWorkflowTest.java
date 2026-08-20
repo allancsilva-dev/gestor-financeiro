@@ -16,12 +16,18 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -30,6 +36,23 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @ActiveProfiles("test")
 @Transactional
 class FaturaCartaoWorkflowTest {
+
+    /**
+     * As fixtures sao de julho/2026. Sem Clock fixo o teste passa a depender da data
+     * real: a partir de 06/08/2026 a fatura de julho vence e o status derivado vira
+     * VENCIDA. O relogio parado em 20/07/2026 mantem o cenario estavel (ADR-0003).
+     */
+    static final Instant AGORA = Instant.parse("2026-07-20T15:00:00Z");
+    static final ZoneId SAO_PAULO = ZoneId.of("America/Sao_Paulo");
+
+    @TestConfiguration
+    static class ClockFixoEmJulho2026 {
+        @Bean
+        @Primary
+        Clock clockFixo() {
+            return Clock.fixed(AGORA, SAO_PAULO);
+        }
+    }
 
     @Autowired
     private TransacaoService transacaoService;

@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.LocalDateTime;
 
 @Service
@@ -18,11 +19,14 @@ public class LedgerService {
 
     private final CarteiraRepository carteiraRepository;
     private final MovimentoCarteiraRepository movimentoCarteiraRepository;
+    private final Clock clock;
 
     public LedgerService(CarteiraRepository carteiraRepository,
-                         MovimentoCarteiraRepository movimentoCarteiraRepository) {
+                         MovimentoCarteiraRepository movimentoCarteiraRepository,
+                         Clock clock) {
         this.carteiraRepository = carteiraRepository;
         this.movimentoCarteiraRepository = movimentoCarteiraRepository;
+        this.clock = clock;
     }
 
     @Transactional
@@ -71,10 +75,10 @@ public class LedgerService {
         return movimentoCarteiraRepository.save(movimento);
     }
 
-    private static MovimentoCarteira criarMovimento(RegistrarMovimentoCommand command,
-                                                    Carteira carteira,
-                                                    BigDecimal valorAssinado,
-                                                    BigDecimal saldoResultante) {
+    private MovimentoCarteira criarMovimento(RegistrarMovimentoCommand command,
+                                             Carteira carteira,
+                                             BigDecimal valorAssinado,
+                                             BigDecimal saldoResultante) {
         MovimentoCarteira movimento = new MovimentoCarteira();
         movimento.setUsuario(carteira.getUsuario());
         movimento.setCarteira(carteira);
@@ -85,7 +89,13 @@ public class LedgerService {
         movimento.setReferenciaTipo(command.referenciaTipo());
         movimento.setReferenciaId(command.referenciaId());
         movimento.setDescricao(command.descricao());
-        movimento.setDataMovimento(command.dataMovimento());
+        // Sem data explicita o movimento vale agora no fuso de negocio (ADR-0003). O
+        // fallback do @PrePersist da entidade usa o relogio do sistema, sem fuso: em
+        // servidor UTC o movimento das ultimas horas do dia cai no dia seguinte e sai
+        // da janela das visoes COMPRA/COMPETENCIA/CAIXA.
+        movimento.setDataMovimento(command.dataMovimento() != null
+                ? command.dataMovimento()
+                : LocalDateTime.now(clock));
         movimento.setSaldoResultante(saldoResultante);
         movimento.setIdempotencyKey(command.idempotencyKey());
         return movimento;
