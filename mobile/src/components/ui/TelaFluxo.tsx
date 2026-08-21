@@ -10,6 +10,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme, radius, screenPadding, spacing, typography } from '../../theme';
+import Badge, { BadgeTone } from './Badge';
 import Entrance from './Entrance';
 import PassosProgresso from './PassosProgresso';
 
@@ -21,6 +22,8 @@ interface Props {
   totalDePassos?: number;
   /** Ausente = sem voltar (primeira tela do fluxo). */
   onVoltar?: () => void;
+  /** Selo acima do título: "Opcional", "Conta criada" — diz o que é este passo. */
+  selo?: { texto: string; tom?: BadgeTone };
   /** Barra fixa no rodapé: botões de ação do passo. */
   rodape?: React.ReactNode;
   children: React.ReactNode;
@@ -38,6 +41,7 @@ export default function TelaFluxo({
   passo,
   totalDePassos,
   onVoltar,
+  selo,
   rodape,
   children,
 }: Props) {
@@ -95,6 +99,11 @@ export default function TelaFluxo({
           }}
         >
           <Entrance>
+            {selo ? (
+              <View style={{ marginBottom: spacing.sm }}>
+                <Badge tone={selo.tom ?? 'brand'}>{selo.texto}</Badge>
+              </View>
+            ) : null}
             <Text
               accessibilityRole="header"
               style={{ ...typography.screenTitle, color: colors.textPrimary }}

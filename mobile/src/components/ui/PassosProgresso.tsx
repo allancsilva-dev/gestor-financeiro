@@ -1,6 +1,6 @@
 import React from 'react';
-import { View } from 'react-native';
-import { useTheme, radius, spacing } from '../../theme';
+import { Text, View } from 'react-native';
+import { useTheme, radius, spacing, typography } from '../../theme';
 
 interface Props {
   passo: number;
@@ -20,19 +20,24 @@ export default function PassosProgresso({ passo, total }: Props) {
       accessibilityRole="progressbar"
       accessibilityLabel={`Passo ${passo} de ${total}`}
       accessibilityValue={{ min: 1, max: total, now: passo }}
-      style={{ flexDirection: 'row', gap: spacing.xs, flex: 1 }}
+      style={{ flex: 1, gap: spacing.xs }}
     >
-      {Array.from({ length: total }, (_, i) => (
-        <View
-          key={i}
-          style={{
-            flex: 1,
-            height: 4,
-            borderRadius: radius.pill,
-            backgroundColor: i < passo ? colors.brand : colors.trilha,
-          }}
-        />
-      ))}
+      <View style={{ flexDirection: 'row', gap: spacing.xs }}>
+        {Array.from({ length: total }, (_, i) => (
+          <View
+            key={i}
+            style={{
+              flex: 1,
+              height: 4,
+              borderRadius: radius.pill,
+              backgroundColor: i < passo ? colors.brand : colors.trilha,
+            }}
+          />
+        ))}
+      </View>
+      <Text style={{ ...typography.meta, color: colors.textMuted }}>
+        Passo {passo} de {total}
+      </Text>
     </View>
   );
 }

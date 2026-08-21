@@ -183,3 +183,27 @@ describe('resolverEmissor por token', () => {
     expect(identidadeDoCartao({ nome: 'Itaú Gold' }).glifo).toBe('i');
   });
 });
+
+describe('cartão do onboarding: identidade vem do que é digitado', () => {
+  it('reconhece o banco em nomes livres, não só no rótulo exato', () => {
+    for (const digitado of ['itau', 'Itaú Gold', 'meu cartão itaucard', 'ITAÚ']) {
+      expect(identidadeDoCartao({ nome: digitado }).emissor?.slug).toBe('itau');
+    }
+  });
+
+  it('dá cor determinística e legível a um banco fora do catálogo', () => {
+    const id = identidadeDoCartao({ nome: 'Banco Imaginário' });
+    expect(id.emissor).toBeNull();
+    expect(identidadeDoCartao({ nome: 'Banco Imaginário' }).from).toBe(id.from);
+    expect(contraste(id.tinta, id.from)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('Itaú traz a identidade laranja da marca, com tinta legível', () => {
+    const id = identidadeDoCartao({ nome: 'Itaú' });
+    expect(id.emissor?.slug).toBe('itau');
+    expect(id.rotulo).toBe('ITAÚ');
+    expect(id.emissor?.base).toBe('#FF6200');
+    expect([TINTA_CLARA, TINTA_ESCURA]).toContain(id.tinta);
+    expect(contraste(id.tinta, id.from)).toBeGreaterThanOrEqual(4.5);
+  });
+});

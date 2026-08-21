@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import { Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme, radius, spacing, typography, numeric } from '../src/theme';
@@ -7,6 +7,7 @@ import { onboardingService } from '../src/services/onboardingService';
 import { OnboardingFinalizarRequest } from '../src/services/onboardingService';
 import { useAuth } from '../src/context/AuthContext';
 import { CATEGORIAS_INICIAIS } from '../src/domain/categoriasIniciais';
+import CartaoFisico from '../src/components/carteira/CartaoFisico';
 import {
   formatCurrency,
   isValidDateBR,
@@ -74,7 +75,8 @@ type Erros = Partial<Record<CampoDaTela, string>>;
 export default function OnboardingScreen() {
   const colors = useTheme();
   const router = useRouter();
-  const { updateUsuario, logout } = useAuth();
+  const { usuario, updateUsuario, logout } = useAuth();
+  const { width: larguraDaTela } = useWindowDimensions();
 
   const [passo, setPasso] = useState<Passo>('conta');
   const [enviando, setEnviando] = useState(false);
@@ -308,10 +310,19 @@ export default function OnboardingScreen() {
       atual.includes(nome) ? atual.filter((n) => n !== nome) : [...atual, nome],
     );
 
+  // Sem isso o usuário não sabe que pode simplesmente seguir em frente: o botão
+  // "Pular por agora" sozinho não diz que o passo inteiro é opcional.
+  const PASSOS_OPCIONAIS: Passo[] = ['renda', 'categorias', 'cartao', 'meta'];
+  const selo = passo === 'conta'
+    ? { texto: 'CONTA CRIADA', tom: 'success' as const }
+    : PASSOS_OPCIONAIS.includes(passo)
+      ? { texto: 'OPCIONAL', tom: 'info' as const }
+      : undefined;
+
   const cabecalho: Record<Passo, { titulo: string; subtitulo: string }> = {
     conta: {
       titulo: 'Sua conta principal',
-      subtitulo: 'Onde seu dinheiro está hoje. É o único passo obrigatório.',
+      subtitulo: 'Sua conta já existe — falta dizer onde seu dinheiro está hoje. É o único passo obrigatório; os próximos você pode pular.',
     },
     renda: {
       titulo: 'Sua renda mensal',
@@ -367,6 +378,7 @@ export default function OnboardingScreen() {
       passo={indice + 1}
       totalDePassos={PASSOS.length}
       onVoltar={voltar}
+      selo={selo}
       rodape={rodape}
     >
       {passo === 'conta' ? (
@@ -476,12 +488,24 @@ export default function OnboardingScreen() {
 
       {passo === 'cartao' ? (
         <View>
+          {/* A face reage ao que está sendo digitado: o catálogo de emissores
+              reconhece o banco pelo nome ("Itaú", "nubank roxinho", "Inter") e
+              traz cor, monograma e contraste. Sem lista fechada — qualquer nome
+              funciona, e o desconhecido ganha uma cor derivada do próprio nome. */}
+          <View style={{ alignItems: 'center', marginBottom: spacing.lg }}>
+            <CartaoFisico
+              nome={cartaoNome || 'Seu cartão'}
+              titular={usuario?.nome}
+              largura={Math.min(larguraDaTela - spacing.lg * 4, 260)}
+            />
+          </View>
+
           <Field
             testID="onboarding-card-name"
             label="Nome do cartão"
             value={cartaoNome}
             onChangeText={(t) => { setCartaoNome(t); setComCartao(true); limparErro('cartaoNome'); }}
-            placeholder="Ex: Nubank"
+            placeholder="Ex: Itaú, Nubank, Inter…"
             error={erros.cartaoNome}
           />
           <Field
