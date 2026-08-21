@@ -14,6 +14,7 @@ import { CATEGORY_COLORS } from '../utils/format';
 import { isValidDayOfMonth } from '../utils/validate';
 import Chip from './ui/Chip';
 import Field from './ui/Field';
+import { useInvalidarAposTransacao } from '../hooks/useInvalidarAposTransacao';
 
 // Pré-preenchimento do "Repetir lançamento" (PR-F3-05): exige confirmação
 // explícita no Salvar — nunca grava sozinho.
@@ -46,6 +47,7 @@ const DEBOUNCE_SUGESTAO_MS = 600;
 export default function NovaTransacaoModal({ visible, onClose, onSaved, initialTipo = 'SAIDA', initialData = null, cartaoIdInicial = null }: NovaTransacaoModalProps) {
   const colors = useTheme();
   const queryClient = useQueryClient();
+  const invalidarCacheDeTransacao = useInvalidarAposTransacao();
 
   const [salvando, setSalvando] = useState(false);
   const [erroForm, setErroForm] = useState<string | null>(null);
@@ -297,18 +299,7 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
         ? { formaPagamento: 'CARTAO', cartaoId: cartaoId ?? undefined }
         : { formaPagamento: 'CARTEIRA', carteiraId: carteiraId ?? undefined }
       ).catch(() => {}); // preferência é conveniência: falha não bloqueia o salvamento
-      queryClient.invalidateQueries({ queryKey: ['metricas'] });
-      queryClient.invalidateQueries({ queryKey: ['compromissos'] });
-      queryClient.invalidateQueries({ queryKey: ['transacoes'] });
-      queryClient.invalidateQueries({ queryKey: ['relatorio'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-evolucao'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-comparacao-mensal'] });
-      queryClient.invalidateQueries({ queryKey: ['transacoes-recentes'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-projecao'] });
-      queryClient.invalidateQueries({ queryKey: ['carteiras'] });
-      queryClient.invalidateQueries({ queryKey: ['contas'] });
-      queryClient.invalidateQueries({ queryKey: ['contas-fatura'] });
-      queryClient.invalidateQueries({ queryKey: ['fatura'] });
+      invalidarCacheDeTransacao();
       resetForm();
       onClose();
       onSaved?.();

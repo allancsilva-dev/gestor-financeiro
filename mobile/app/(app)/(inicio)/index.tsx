@@ -326,7 +326,6 @@ export default function Home() {
         onSaved={() => {
           setLancarAberto(false);
           setRepetirLancamento(null);
-          atualizar();
         }}
       />
     </ScrollView>

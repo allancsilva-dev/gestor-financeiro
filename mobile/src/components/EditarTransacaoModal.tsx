@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, Modal, TouchableOpacity, ActivityIndicator, ScrollView, Alert } from 'react-native';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { transacaoService } from '../services/transacaoService';
@@ -12,6 +12,7 @@ import { parseDateBR, isValidDateBR, parseCurrencyBR, maskCurrencyInput, maskDat
 import { Transacao, TransacaoRequest } from '../types';
 import Field from './ui/Field';
 import Chip from './ui/Chip';
+import { useInvalidarAposTransacao } from '../hooks/useInvalidarAposTransacao';
 
 interface EditarTransacaoModalProps {
   visible: boolean;
@@ -34,7 +35,7 @@ const bytesLabel = (bytes: number) => {
 // Tipo e forma de pagamento ficam fixos; categoria pode mudar sem recriar lançamento.
 export default function EditarTransacaoModal({ visible, transacao, onClose }: EditarTransacaoModalProps) {
   const colors = useTheme();
-  const queryClient = useQueryClient();
+  const invalidarCacheDeTransacao = useInvalidarAposTransacao();
 
   const [salvando, setSalvando] = useState(false);
   const [excluindo, setExcluindo] = useState(false);
@@ -84,23 +85,10 @@ export default function EditarTransacaoModal({ visible, transacao, onClose }: Ed
   });
 
   const invalidarQueries = () => {
-    queryClient.invalidateQueries({ queryKey: ['transacoes'] });
-    queryClient.invalidateQueries({ queryKey: ['relatorio'] });
-    queryClient.invalidateQueries({ queryKey: ['dashboard-evolucao'] });
-    queryClient.invalidateQueries({ queryKey: ['dashboard-comparacao-mensal'] });
-    queryClient.invalidateQueries({ queryKey: ['transacoes-recentes'] });
-    queryClient.invalidateQueries({ queryKey: ['dashboard-projecao'] });
-    queryClient.invalidateQueries({ queryKey: ['carteiras'] });
-    queryClient.invalidateQueries({ queryKey: ['contas'] });
-    queryClient.invalidateQueries({ queryKey: ['contas-fatura'] });
-    // Compra no cartão mexe no passivo pareado: sem isto, limite disponível e
-    // saldo devedor ficam obsoletos na Carteira. O prefixo ['cartoes'] também
-    // cobre ['cartoes','carteira'].
-    queryClient.invalidateQueries({ queryKey: ['cartoes'] });
-    queryClient.invalidateQueries({ queryKey: ['fatura'] });
-    queryClient.invalidateQueries({ queryKey: ['categorias'] });
-    queryClient.invalidateQueries({ queryKey: ['parcelas', transacao?.id] });
-    queryClient.invalidateQueries({ queryKey: ['anexos', transacao?.id] });
+    invalidarCacheDeTransacao([
+      ['parcelas', transacao?.id],
+      ['anexos', transacao?.id],
+    ]);
   };
 
   const handleToggleParcela = async (parcelaId: number, paga: boolean) => {
