@@ -5,12 +5,16 @@ tags:
 - launchApp:
     clearState: true
 - assertVisible: "Gestor Financeiro"
-- tapOn: "E-mail"
+- tapOn:
+    id: "login-email"
 - inputText: ${E2E_EMAIL}
-- tapOn: "Senha"
+- pressKey: Enter
 - inputText: ${E2E_PASSWORD}
-- hideKeyboard
-- tapOn: "Entrar"
+- tapOn:
+    point: "50%,4%"
+- waitForAnimationToEnd
+- tapOn:
+    id: "login-submit"
 # A tab bar virou painel nativo (react-native-screens) e os rótulos das abas não
 # aparecem na árvore de acessibilidade — a asserção é pelo conteúdo da Home.
 - assertVisible: "Saldo Disponível"

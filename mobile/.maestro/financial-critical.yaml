@@ -11,8 +11,7 @@ tags:
 - tapOn:
     id: "register-name"
 - inputText: "Smoke Financeiro"
-- tapOn:
-    id: "register-email"
+- pressKey: Enter
 - inputText: ${E2E_EMAIL}
 - tapOn:
     id: "register-continuar"
@@ -20,13 +19,12 @@ tags:
     id: "register-password"
 - waitForAnimationToEnd
 - inputText: ${E2E_PASSWORD}
-- tapOn:
-    id: "register-confirm-password"
-- waitForAnimationToEnd
+# Enter salta para a confirmação (onSubmitEditing): tocar no campo com o teclado
+# aberto é impreciso porque o layout sobe.
+- pressKey: Enter
 - inputText: ${E2E_PASSWORD}
 - pressKey: Enter
-- tapOn:
-    id: "register-continuar"
+- waitForAnimationToEnd
 - assertVisible: "Seus dados, suas regras"
 - tapOn: "Aceito a política de privacidade"
 - tapOn:
@@ -65,8 +63,19 @@ tags:
 # Setup pos-onboarding pelas telas: cartao, categoria e meta (nao criados no onboarding minimo)
 - tapOn:
     point: "89%,92%"
+- scrollUntilVisible:
+    element:
+      text: "Categorias"
+    direction: DOWN
+- waitForAnimationToEnd
 - tapOn: "Categorias"
+- waitForAnimationToEnd
 - tapOn: "Nova categoria"
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: "category-name"
+    timeout: 10000
 - tapOn:
     id: "category-name"
 - inputText: "Alimentação"
@@ -77,18 +86,28 @@ tags:
     visible: "Alimentação"
     timeout: 15000
 - tapOn: "Voltar"
+# A home remonta ao voltar: o botão Carteira só existe depois de /v1/home
+- extendedWaitUntil:
+    visible: "Carteira"
+    timeout: 15000
 - tapOn: "Carteira"
 - tapOn: "Cartão"
-- tapOn: "Nome do cartão"
+- tapOn:
+    id: "card-name"
 - inputText: "Cartão Principal"
-- tapOn: "Limite total"
+# O formulário encadeia foco pelo teclado (nome → banco → limite → dígitos →
+# fechamento → vencimento); tocar campo a campo com o teclado aberto erra o alvo.
+- pressKey: Enter
+- pressKey: Enter
 - inputText: "500000"
-- tapOn: "Dia de fechamento"
+- pressKey: Enter
+- pressKey: Enter
 - inputText: "5"
-- tapOn: "Dia de vencimento"
+- pressKey: Enter
 - inputText: "12"
 - tapOn:
     point: "50%,4%"
+- waitForAnimationToEnd
 - tapOn: "Salvar"
 - extendedWaitUntil:
     visible: "Cartão Principal"
@@ -100,15 +119,17 @@ tags:
 - tapOn:
     id: "goal-name"
 - inputText: "Meta Smoke"
-- tapOn:
-    id: "goal-total"
+- pressKey: Enter
 - inputText: "100000"
 - tapOn:
     point: "50%,4%"
 - tapOn: "Salvar"
+- waitForAnimationToEnd
+# O card da meta é composto: o rótulo do nó funde nome, percentual e valores,
+# e o Maestro casa regex por igualdade total.
 - extendedWaitUntil:
-    visible: "Meta Smoke"
-    timeout: 15000
+    visible: ".*Meta Smoke.*"
+    timeout: 30000
 - tapOn:
     point: "10%,92%"
 
@@ -118,22 +139,34 @@ tags:
 - tapOn:
     id: "transaction-value"
 - inputText: "10000"
-- tapOn:
-    id: "transaction-description"
+- pressKey: Enter
 - inputText: "Despesa smoke"
-- tapOn:
-    id: "transaction-date"
+- pressKey: Enter
 - eraseText
 - inputText: ${E2E_DATE_INPUT}
 - tapOn:
     point: "50%,4%"
+# O header do modal fica fora do ScrollView: tocar nele não fecha o teclado, e o
+# teclado cobre os chips de categoria. Tocar um rótulo de dentro fecha.
+- tapOn: "Categoria"
+- waitForAnimationToEnd
 - scrollUntilVisible:
     element:
       text: ".*Alimentação"
     direction: DOWN
+- waitForAnimationToEnd
 - tapOn: ".*Alimentação"
+- waitForAnimationToEnd
 - assertVisible: "Conta Principal"
 - tapOn: "Salvar"
+# O modal precisa fechar: enquanto ele está aberto, "Despesa smoke" e o valor
+# aparecem nos próprios campos e a asserção passa sem a transação existir. O
+# alvo é o campo de valor, que só existe no modal — "Nova Transação" também é o
+# botão da home.
+- extendedWaitUntil:
+    notVisible:
+      id: "transaction-value"
+    timeout: 15000
 - extendedWaitUntil:
     visible: "Despesa smoke"
     timeout: 15000
@@ -151,20 +184,24 @@ tags:
 - tapOn:
     id: "transaction-value"
 - inputText: "7500"
-- tapOn:
-    id: "transaction-description"
+- pressKey: Enter
 - inputText: "Compra cartão smoke"
-- tapOn:
-    id: "transaction-date"
+- pressKey: Enter
 - eraseText
 - inputText: ${E2E_DATE_INPUT}
 - tapOn:
     point: "50%,4%"
+# O header do modal fica fora do ScrollView: tocar nele não fecha o teclado, e o
+# teclado cobre os chips de categoria. Tocar um rótulo de dentro fecha.
+- tapOn: "Categoria"
+- waitForAnimationToEnd
 - scrollUntilVisible:
     element:
       text: ".*Alimentação"
     direction: DOWN
+- waitForAnimationToEnd
 - tapOn: ".*Alimentação"
+- waitForAnimationToEnd
 - scrollUntilVisible:
     element:
       text: "Cartão"
@@ -173,8 +210,13 @@ tags:
 - assertVisible: "Cartão Principal"
 - tapOn: "Salvar"
 - extendedWaitUntil:
-    visible: "Compra cartão smoke"
+    notVisible:
+      id: "transaction-value"
     timeout: 15000
+- scrollUntilVisible:
+    element:
+      text: "Compra cartão smoke"
+    direction: DOWN
 
 # Fatura: lancamento 75, pagamento parcial 25 e restante 50
 - tapOn:
@@ -215,9 +257,9 @@ tags:
 - tapOn:
     point: "70%,92%"
 - extendedWaitUntil:
-    visible: "Meta Smoke"
+    visible: ".*Meta Smoke.*"
     timeout: 15000
-- tapOn: "Adicionar valor à meta Meta Smoke"
+- tapOn: "Depositar"
 - assertVisible: "Adicionar Valor"
 - tapOn:
     id: "goal-add-value"
@@ -273,3 +315,5 @@ tags:
 - assertNotVisible: ".*Erro ao.*"
 - assertNotVisible: ".*Tente novamente.*"
 - assertNotVisible: ".*Falha de integração.*"
+- assertNotVisible: "Selecione um cartão."
+- assertNotVisible: "Selecione uma categoria."

@@ -10,7 +10,10 @@ FLOW_FILE="$MOBILE_DIR/.maestro/financial-critical.yaml"
 APP_ID="com.gestorfinanceiro.mobile"
 RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)-$$"
 ARTIFACT_DIR="/tmp/gf-mobile-smoke-$RUN_ID"
-BUILD_DIR="/tmp/gf-mobile-build-$RUN_ID"
+# DerivedData estável: com um diretório por execução, todo run recompilava o app
+# inteiro (~5 min). Reaproveitar o cache torna a segunda rodada em diante
+# incremental. GF_E2E_CLEAN_BUILD=1 força do zero.
+BUILD_DIR="${GF_E2E_DERIVED_DATA:-$MOBILE_DIR/.e2e-derived-data}"
 CONTAINER_NAME="gf-postgres-mobile-$RUN_ID"
 DB_NAME="gestor_financeiro_mobile_e2e"
 DB_USER="postgres"
@@ -21,6 +24,9 @@ XCODE_UPDATES_CREATED=0
 SIMULATOR_UDID=""
 EXIT_CODE=0
 
+if [ "${GF_E2E_CLEAN_BUILD:-0}" = "1" ]; then
+  rm -rf "$BUILD_DIR"
+fi
 mkdir -p "$ARTIFACT_DIR" "$BUILD_DIR"
 
 cleanup() {
@@ -30,12 +36,20 @@ cleanup() {
     kill "$BACKEND_PID" 2>/dev/null
     wait "$BACKEND_PID" 2>/dev/null
   fi
+  # O spring-boot:run forka um JVM filho que sobrevive ao kill do Maven e mantem
+  # a porta presa para a proxima execucao. A porta e nossa: o script aborta no
+  # inicio se ela ja estiver ocupada.
+  if [ -n "${BACKEND_PORT:-}" ]; then
+    lsof -ti "tcp:$BACKEND_PORT" 2>/dev/null | xargs -r kill 2>/dev/null
+  fi
   docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1
   if [ -n "$SIMULATOR_UDID" ]; then
     xcrun simctl uninstall "$SIMULATOR_UDID" "$APP_ID" >/dev/null 2>&1
   fi
-  rm -rf "$BUILD_DIR"
-  if [ "$NATIVE_CREATED" -eq 1 ]; then
+  # BUILD_DIR e ios/ sobrevivem de proposito: sao o cache do build incremental.
+  # GF_E2E_CLEAN_BUILD=1 limpa o DerivedData no inicio da proxima execucao, e
+  # ios/ pode ser regerado com `npx expo prebuild --clean`.
+  if [ "$NATIVE_CREATED" -eq 1 ] && [ "${GF_E2E_KEEP_NATIVE:-1}" != "1" ]; then
     rm -rf "$MOBILE_DIR/ios"
   elif [ "$XCODE_UPDATES_CREATED" -eq 1 ]; then
     rm -f "$MOBILE_DIR/ios/.xcode.env.updates"

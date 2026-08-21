@@ -39,3 +39,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Cache do DerivedData do smoke iOS (scripts/e2e-mobile-ios.sh)
+/.e2e-derived-data

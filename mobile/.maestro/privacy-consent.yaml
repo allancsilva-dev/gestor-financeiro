@@ -10,8 +10,7 @@ tags:
 - tapOn:
     id: "register-name"
 - inputText: "Consent Smoke"
-- tapOn:
-    id: "register-email"
+- pressKey: Enter
 - inputText: ${E2E_EMAIL}
 - tapOn:
     id: "register-continuar"
@@ -19,13 +18,12 @@ tags:
     id: "register-password"
 - waitForAnimationToEnd
 - inputText: ${E2E_PASSWORD}
-- tapOn:
-    id: "register-confirm-password"
-- waitForAnimationToEnd
+# Enter salta para a confirmação (onSubmitEditing): tocar no campo com o teclado
+# aberto é impreciso porque o layout sobe.
+- pressKey: Enter
 - inputText: ${E2E_PASSWORD}
 - pressKey: Enter
-- tapOn:
-    id: "register-continuar"
+- waitForAnimationToEnd
 - assertVisible: "Aceito a política de privacidade"
 - tapOn: "política de privacidade"
 - assertVisible: "Política de privacidade"
