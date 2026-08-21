@@ -1005,8 +1005,28 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Motivo:** consentimento versionado, exportação e exclusão existem, mas cadastro não oferece acesso real ao texto da política aceita.
 - **Criterio de aceite:** política versionada e publicada; links acessíveis web/mobile antes do aceite; versão registrada corresponde ao documento; exportação/exclusão testadas ponta a ponta; revisão jurídica registrada.
 - **Atualizacao mobile 2026-07-13:** política versão `2026-07` virou tela nativa acessível antes do aceite. Checkbox possui alvo de 44pt, role/state explícitos e link independente. Maestro valida abertura, versão, direitos e retorno ao cadastro.
-- **Pendente:** revisão jurídica/identidade do controlador e E2E real de exportação/exclusão. Publicação web não foi alterada porque a rodada é exclusivamente mobile.
-- **Status:** PARCIAL — acesso e consentimento mobile implementados; validação jurídica e direitos E2E pendentes.
+- **Atualizacao mobile 2026-08-21:** dois avanços no direito de eliminação e no acesso à política
+  para quem já é usuário (antes só era linkável na tela de cadastro, `app/(auth)/privacidade.tsx`):
+  (1) `mobile/app/(app)/ajustes.tsx` ganhou um item "Política de privacidade" (rodapé "Dados e
+  privacidade") navegando para a mesma tela `app/(auth)/privacidade.tsx`, agora alcançável também
+  por quem já tem conta; (2) o endpoint `DELETE /v1/usuarios/me` (já existente no backend, com
+  `UsuarioExclusaoLgpdIT` cobrindo a exclusão em PostgreSQL real — ver PROB-0076) passou a ser
+  consumido pelo mobile pela primeira vez: novo `mobile/src/services/usuarioService.ts` e um fluxo
+  de confirmação dupla (`Alert` de aviso + modal `pageSheet` pedindo a senha atual) em
+  `ajustes.tsx`. Testado ponta a ponta contra backend local (porta 8093, banco `gf_ajustes`): senha
+  errada → 422 `BUSINESS_ERROR`/"Senha incorreta" exibido na tela (ver BUG-0069/PROB-0083 para o
+  contorno de mensagem que isso exigiu); senha certa → 204, e login subsequente com a mesma conta
+  falha, confirmando exclusão real. `mobile/src/__tests__/AjustesScreen.test.tsx` (10 casos) cobre
+  ambos os fluxos com mocks. Exportação de dados (`GET /v1/exportar/completo`, CSV) e importação de
+  extrato (CSV) já existiam antes desta sessão — apenas relocadas visualmente para a mesma tela de
+  "Dados e privacidade", sem mudança de contrato.
+- **Pendente:** revisão jurídica/identidade do controlador (não é algo que `docs-reporter` ou a
+  sessão de implementação possam resolver) e verificação em produção/staging real (a validação de
+  2026-08-21 foi contra backend local, não contra o ambiente implantado). Publicação web da
+  política de privacidade e do fluxo de exclusão de conta continuam fora do escopo mobile.
+- **Status:** PARCIAL — acesso à política (cadastro e, desde 2026-08-21, também para usuário
+  logado) e exclusão de conta ponta a ponta implementados e testados localmente no mobile;
+  validação jurídica, publicação web equivalente e verificação em ambiente implantado pendentes.
 
 ---
 
@@ -1436,4 +1456,44 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Risco se ficar pendente:** CI do mobile bloqueada para qualquer PR (lint é `--max-warnings=0`);
   força bypass manual ou espera de correção não relacionada para promover mudanças legítimas, incluindo
   o BUG-0067.
-- **Status:** ABERTO
+- **Status:** FECHADO — verificado pelo `docs-reporter` em 2026-08-21: `npm run lint` (cwd
+  `mobile/`) roda `eslint app src --ext .ts,.tsx --max-warnings=0` e retorna exit code 0, sem
+  nenhuma ocorrência de "Definition for rule 'react-hooks/exhaustive-deps' was not found". Não foi
+  possível determinar nesta rodada **quando** ou **por qual mudança** o erro deixou de ocorrer —
+  nenhum arquivo de configuração de lint (`.eslintrc*`, `package.json` do mobile) foi tocado pela
+  sessão de implementação corrente (redesign de `ajustes.tsx`), então a correção aconteceu em
+  alguma rodada anterior não documentada por este item. Registrado como fechado por evidência
+  direta de execução, não por relato de terceiros.
+
+---
+
+## BACKLOG-0094 — Corrigir interceptor Axios do mobile para não descartar mensagem de `BusinessException`
+
+- **Titulo:** `mobile/src/services/api.ts` só usa `error.response.data.details` em 400/422; mensagem
+  de `BusinessException` (`{"code":"BUSINESS_ERROR","message":"..."}`) é descartada, virando texto
+  genérico na UI
+- **Prioridade:** P2
+- **Área:** mobile
+- **Motivo:** Descoberto em 2026-08-21 (PROB-0083), durante a implementação do fluxo de exclusão de
+  conta em `mobile/app/(app)/ajustes.tsx`: enviar senha errada para `DELETE /v1/usuarios/me` retorna
+  HTTP 422 com `{"code":"BUSINESS_ERROR","message":"Senha incorreta","details":null}` (confirmado
+  via `curl` contra backend local), mas o interceptor de `mobile/src/services/api.ts` só extrai
+  `error.response.data.details` para montar `userMessage` em 400/422 — sem `details`, cai no
+  fallback fixo "Dados inválidos. Verifique os campos.", escondendo a causa real do erro. O
+  contorno aplicado nesta sessão (BUG-0069) foi local, só em `ajustes.tsx` — qualquer outra tela do
+  app que dependa de mensagem de `BusinessException` em 400/422 sem `details` tem o mesmo problema,
+  não investigado em profundidade nesta rodada.
+- **Dependências:** Nenhuma técnica. Consultar `docs/PROBLEM_LEDGER.md` (PROB-0083) para a causa
+  raiz completa e a evidência de reprodução.
+- **Critério de aceite:** `mobile/src/services/api.ts` passa a usar
+  `error.response.data.message` como mensagem amigável quando `error.response.data.code ===
+  'BUSINESS_ERROR'` (ou, de forma mais geral, sempre que `details` estiver ausente e `message` for
+  uma string não vazia), antes de cair no fallback genérico; varredura das telas do mobile que hoje
+  tratam 400/422 via `err.userMessage` para confirmar que nenhuma regra de negócio ficava mascarada
+  silenciosamente; o contorno local em `ajustes.tsx` (BUG-0069) pode ser removido depois que o
+  interceptor cobrir o caso na origem, sem perda de comportamento.
+- **Risco se ficar pendente:** Usuário continua recebendo mensagens genéricas em vez da causa real
+  de erros de regra de negócio em qualquer tela nova ou existente que não aplique um contorno
+  pontual como o de `ajustes.tsx` — pior experiência de erro e mais chance de o usuário repetir a
+  mesma ação sem entender por que ela falha.
+- **Status:** FECHADO (2026-08-21) — corrigido na origem em `mobile/src/services/api.ts` junto do redesign de inscrição/onboarding; ver BUG-0070 e PROB-0083.

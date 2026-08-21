@@ -2,9 +2,15 @@
 
 Documentacao de alto nivel sobre como o sistema funciona. Mantido pelo `docs-reporter`.
 
-**Ultima atualizacao:** 2026-08-19 (branch `chore/remove-prototipo`, working tree nao commitado: protótipo HTML e redesign visual "Fase 4" dark-first ciano descartados por inteiro por decisao do dono do produto — ver item 25 da lista de decisoes tecnicas, PROB-0082, BACKLOG-0090)
+**Ultima atualizacao:** 2026-08-21 (working tree nao commitado sobre `main` em `12cc447`: redesign de
+`mobile/app/(app)/ajustes.tsx` para o padrao visual de Home/Carteira/Metas, escolha de tema
+claro/escuro/sistema pelo usuario (antes so seguia o SO), exclusao de conta LGPD consumida pela
+primeira vez no mobile via `DELETE /v1/usuarios/me`, e `DESIGN.md` reescrito para refletir a marca
+ciano atual — ver item 26 da lista de decisoes tecnicas, PROB-0083, BACKLOG-0077/0094)
 
-**Atualizacao anterior:** 2026-07-14 (hardening pre-producao P0+P1 commitado em `main`: `5c08ce0`, `0d1e0c0`, `c959dfc`; cadeia de resolucao de IP na stack de proxy corrigida, pagamento de parcela idempotente contra duplo debito, exclusao de carteira sem 500, indices de suporte, headers de seguranca no SPA, reset de senha sem token na query string)
+**Atualizacao anterior:** 2026-08-19 (branch `chore/remove-prototipo`, working tree nao commitado: protótipo HTML e redesign visual "Fase 4" dark-first ciano descartados por inteiro por decisao do dono do produto — ver item 25 da lista de decisoes tecnicas, PROB-0082, BACKLOG-0090). **Nota de consistencia registrada em 2026-08-21:** apos essa reversao, commits legitimos e ja mergeados em `main` (`9a3b205`, `63df4b1`, `73caf8b`, `88ae1ea`, `e3250e9`, `66375e1`, `a8d39df`, `d89bd62`, `12cc447` — navegacao/tema, carteira de cartoes, home, tokens visuais e redesign de metas) substituiram a tab bar `Início · Transações · + · Planejamento · Mais` citada no item 25 pela atual `Início · Análises · + · Metas · Ajustes` (`mobile/app/(app)/_layout.tsx`) e a marca voltou a ser ciano (`mobile/src/theme/colors.ts`, `brand: '#17b3ff'`) — nao ha contradicao real, apenas o item 25 descreve um estado intermediario que ja foi superado por trabalho seguinte nao registrado em detalhe neste arquivo pelas rodadas anteriores do `docs-reporter`. Ver BACKLOG-0091 (mesmo tipo de defasagem documental, ja registrado).
+
+**Atualizacao anterior a essa:** 2026-07-14 (hardening pre-producao P0+P1 commitado em `main`: `5c08ce0`, `0d1e0c0`, `c959dfc`; cadeia de resolucao de IP na stack de proxy corrigida, pagamento de parcela idempotente contra duplo debito, exclusao de carteira sem 500, indices de suporte, headers de seguranca no SPA, reset de senha sem token na query string)
 
 ---
 
@@ -101,9 +107,9 @@ Page (renderizacao, eventos)
 |---|---|
 | `app/` | Expo Router file-based routing: (auth) e (app) |
 | `src/components/ui/` | Componentes reutilizaveis |
-| `src/context/` | AuthContext |
-| `src/services/` | api.ts + 12 domain services |
-| `src/theme/` | Tema dark/light |
+| `src/context/` | AuthContext, TemaContext (desde 2026-08-21 — escolha de tema pelo usuario) |
+| `src/services/` | api.ts + 13 domain services (usuarioService novo em 2026-08-21, exclusao LGPD) |
+| `src/theme/` | Tema dark/light — desde 2026-08-21 o esquema efetivo (`useEsquema()`/`useTheme()` em `theme/index.ts`) le `TemaContext` quando presente (escolha do usuario em Ajustes, persistida em `src/store/temaPreferido.ts` via SecureStore) e cai em `useColorScheme()` do SO quando nao ha provider ou a preferencia e `sistema` — antes so seguia o SO, sem opt-out |
 
 ## Fluxo de autenticacao
 
@@ -198,6 +204,53 @@ O sistema e **single-tenant** — nao ha multi-tenancy corporativa. Cada usuario
 24. **Recomendacoes de auditoria conscientemente rejeitadas quando conflitam com regra de produto ja travada (2026-07-14, PROB-0073/PROB-0074):** um `CHECK (valor_gasto >= 0)` em `contas` e um piso zero em `ContaService.removerGasto` foram propostos por uma auditoria de banco e **nao implementados** — ambos quebrariam o principio documentado de que `Conta.valorGasto` negativo e credito de cartao legitimo (V20:5-8, regra R1 do rollover de fatura). `Conta` ja tem `@Version` desde PROB-0002, tornando lock pessimista adicional redundante. Decisao e justificativa completas em `docs/PROBLEM_LEDGER.md` PROB-0073/PROB-0074.
 25. **Protótipo HTML e redesign visual "Fase 4" (dark-first ciano) descartados por inteiro (2026-08-19, PROB-0082/BACKLOG-0090):** decisão do dono do produto na branch `chore/remove-prototipo` — "ficou horrível e só atrapalha o sistema". `docs/Gestor Financeiro (standalone).html` (protótipo claro lavanda, único protótipo commitado) removido via `git rm`; `docs/prototipo/app.html` (protótipo dark-first ciano, untracked) e `docs/prototipo/legado-claro.html` (rename staged do standalone) deixaram de existir — o diretório `docs/prototipo/` não existe mais. Todo o redesign "Fase 4" não commitado do mobile foi revertido ao estado do commit `ae30d62` via `git stash push --include-untracked`, incluindo tema dark-first ciano, telas `carteira.tsx`/`analises.tsx`, componentes `CardBadge`/`CreditCardArt`/`DiaHeader`/`MerchantLogo`/`ProgressRing`/`TransacaoRow`, `domain/marcas.ts`, `store/themePref.ts`, `utils/color.ts` e testes/Maestro associados — código preservado apenas em `git stash@{0}` (`fase4-prototipo-descartado-2026-08-19`), não commitado (ver PROB-0082 para o risco de perda acidental do stash). `mobile/app/(app)/more/relatorios.tsx` (apagado pelo redesign) foi restaurado com seu link em `more/index.tsx`; tab bar voltou para `Início · Transações · + · Planejamento · Mais`. `DESIGN.md` e `PRODUCT.md` (raiz do projeto) deixaram de citar o protótipo como fonte canônica de design — a fonte canônica passa a ser `DESIGN.md` + `mobile/src/theme/colors.ts`. Evidência: `npx tsc --noEmit` limpo; `npm test` no mobile 12 suítes / 36 testes PASS; `grep -in "prototipo|standalone" DESIGN.md PRODUCT.md` sem hits. Nenhum protótipo HTML deve ser recriado nem tratado como referência canônica em trabalho futuro (decisão do dono, não sujeita a reversão silenciosa). Ver `docs/REVIEW_REPORTS/2026-08-19_mobile_decisao_reversao-prototipo-fase4.md`.
 
+26. **Ajustes redesenhado para o padrão visual de Home/Carteira/Metas; tema deixa de ser
+    exclusivamente automático; exclusão de conta LGPD passa a ser consumida no mobile
+    (2026-08-21):** o slot "Ajustes" da tab bar (arquivo `mobile/app/(app)/ajustes.tsx`) tinha
+    título visível "Mais" e era um grid de 11 cards de ferramentas com estilo totalmente hardcoded
+    (`fontSize: 23`, `flexBasis: '47%'`, tile `44x44`), sem consumir `mobile/src/theme/tokens.ts`;
+    não havia bloco de conta real (perfil, sair, política de privacidade acessível a quem já tem
+    conta, exclusão de conta). Reescrita em seções: conta (perfil + notificações com badge),
+    APARÊNCIA (tema), FERRAMENTAS (grid 2 colunas), DADOS E PRIVACIDADE (importar/exportar CSV —
+    ambos já existiam antes desta sessão, apenas relocados — e política de privacidade), rodapé
+    com "Sair da conta" e "Excluir minha conta". Três primitivas novas extraídas para
+    `src/components/ui/`: `CabecalhoDeTela` (header inline com safe area, título e ação circular),
+    `SuperficieComBrilho` (base + dois `RadialGradient` SVG, extraída de `CardMeta`, que passou a
+    consumi-la sem mudança visual) e `CabecalhoSecao` (movido de `src/components/metas/`, ganhou a
+    prop `escalar` — o `e()` de `theme/escala` só se aplica onde há mock medido em `.design/`, hoje
+    só a tela de metas). Token novo `typography.screenTitle` em `tokens.ts` substitui o `fontSize`
+    de título de tela que estava solto por tela. **Escolha de tema:** antes o app só seguia
+    `useColorScheme()` do SO, sem opt-out; agora `src/store/temaPreferido.ts` (SecureStore, mesmo
+    molde de `saldoVisivel`/`lancamentoPrefs`) e `src/context/TemaContext.tsx` guardam
+    `sistema | claro | escuro`, e `useTheme()`/`useEsquema()` (`src/theme/index.ts`) leem o
+    contexto quando presente, caindo no comportamento antigo (SO) na ausência de provider —
+    `app/_layout.tsx` passou a envolver a árvore com `TemaProvider`, `src/components/ui/Card.tsx`
+    migrou de `useColorScheme()` direto para `useEsquema()`. **Exclusão de conta LGPD:** o endpoint
+    `DELETE /v1/usuarios/me` já existia no backend, coberto por `UsuarioExclusaoLgpdIT` (ver
+    PROB-0076, corrigido em 2026-07-15), mas nenhum arquivo do mobile o chamava até esta sessão —
+    novo `src/services/usuarioService.ts` e um fluxo de confirmação dupla (`Alert` + modal
+    `pageSheet` pedindo senha) em `ajustes.tsx`. Verificado em runtime contra backend local (porta
+    8093, banco `gf_ajustes`): senha errada → 422 `BUSINESS_ERROR`/"Senha incorreta" (ver
+    BUG-0069/PROB-0083 para o achado de mensagem de erro que isso expôs), senha certa → 204 e login
+    seguinte falhando (exclusão real confirmada). A política de privacidade
+    (`app/(auth)/privacidade.tsx`, já existente) ganhou um segundo ponto de entrada a partir de
+    Ajustes, alcançável também por quem já tem conta (antes só linkável no cadastro). `DESIGN.md`
+    reescrito nesta mesma sessão: estava defasado desde antes (descrevia marca violeta `#7c5cfc`,
+    tema claro por padrão e tab bar "Início/Transações/+/Planejamento/Mais" — o mesmo estado
+    intermediário citado no item 25/nota de consistência acima), passou a descrever a marca ciano
+    real de `mobile/src/theme/colors.ts`, a tab bar atual e o padrão de tela (`CabecalhoDeTela`,
+    `SuperficieComBrilho`, `CabecalhoSecao`, receita de tela). `mobile/.maestro/smoke-auth.yaml`
+    corrigido (BUG-0068): assertava rótulos de aba que não existem mais e que, de todo modo, a tab
+    bar nativa não expõe na árvore de acessibilidade do Maestro — passou a assertar pelo conteúdo
+    da Home ("Saldo Disponível"). Testes novos: `AjustesScreen.test.tsx` (10 casos),
+    `temaPreferido.test.ts` (3 casos). Suite completa do mobile: 172 testes PASS; `npm run lint` e
+    `npm run typecheck` limpos (ver BACKLOG-0093, fechado nesta rodada — o erro pré-existente de
+    `react-hooks/exhaustive-deps` não reproduziu mais). Validação visual: app rodado em simulador
+    iPhone 17 Pro (Release) com a tela conferida na tela, mas **sem rodada formal de Maestro/visual
+    regression** — mesma pendência crítica acumulada desde o Bloco B da Fase 3. Nenhuma migration.
+    Ver `docs/PROBLEM_LEDGER.md` (PROB-0083), `docs/BUGFIX_LOG.md` (BUG-0068, BUG-0069),
+    `docs/BACKLOG.md` (BACKLOG-0077 atualizado, BACKLOG-0093 fechado, BACKLOG-0094 novo).
+
 ## Regra de produto: credito de fatura e saldo devedor rolado (IMPLEMENTADO, 2026-07-11)
 
 > Spec de produto para PROB-0050 / BACKLOG-0059 / BACKLOG-0054. Decisao de produto travada em 2026-07-11 e **implementada no mesmo dia** (BUG-0053). Pagamento parcial *dentro* da fatura aberta ja existia (BUG-0052); este bloco cobre o comportamento no **fechamento** e nos casos de **credito**, agora em producao no codigo.
@@ -248,8 +301,18 @@ Tudo que sobra (credito) ou falta (divida) numa fatura ao fechar **fica no propr
 2. **Sem testes no mobile:** nao ha scripts de test/lint configurados no `mobile/package.json`.
 3. **Cobertura de testes backend limitada:** suite atual passa com 43 testes, mas cobre poucos fluxos comparado ao tamanho do domínio.
 4. **Cobertura de testes frontend limitada:** poucos testes Vitest configurados.
-5. **Sem politica de privacidade documentada:** relevante para conformidade LGPD.
-6. **Sem exportacao de dados do usuario:** nao ha endpoint de portabilidade (LGPD).
+5. **[DESATUALIZADO, corrigido em rodada anterior nao documentada aqui] "Sem politica de privacidade
+   documentada":** nao reflete o estado atual — existe `app/(auth)/privacidade.tsx` (mobile,
+   política versionada `2026-07`) desde pelo menos 2026-07-13 (BACKLOG-0077), e desde 2026-08-21 ela
+   também é alcançável a partir de Ajustes por quem já tem conta. Pendente real: revisão jurídica da
+   política e publicação equivalente no frontend web (ver BACKLOG-0077).
+6. **[DESATUALIZADO, corrigido em rodada anterior nao documentada aqui] "Sem exportacao de dados do
+   usuario":** nao reflete o estado atual — o endpoint `GET /v1/exportar/completo` e o consumo
+   mobile já existiam antes da sessão de 2026-08-21 (confirmado por leitura de
+   `mobile/app/(app)/ajustes.tsx`); esta rodada apenas relocou o botão de exportar/importar CSV
+   visualmente, sem mudar o contrato. Não foi possível determinar nesta rodada em qual PR/commit a
+   exportação foi introduzida — este item permanece impreciso quanto à data de origem, mas
+   incorreto quanto ao estado atual.
 7. **Sem CI/CD:** build e deploy manuais.
 8. **Mobile sem testes e2e:** nao ha Detox, Maestro ou similar.
 9. **CSP basico em `/api/**` (SecurityConfig), separado da CSP do SPA:** o backend (`SecurityConfig.java`) tem uma CSP propria e pouco restritiva para as rotas `/api/**`, nao alterada nesta rodada. Desde 2026-07-14 (PROB-0070/BUG-0063), o SPA (fora de `/api/**`, servido pelo nginx) ganhou sua **propria** CSP restritiva (`default-src 'self'`, sem `unsafe-inline`) diretamente nos configs de nginx — as duas politicas sao independentes e vivem em camadas diferentes; a CSP do backend em `/api/**` continua como debito tecnico de hardening futuro.
