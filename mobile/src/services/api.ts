@@ -10,7 +10,7 @@ import {
   setCsrfToken,
   clearCsrfToken,
 } from '../store/auth';
-import { ApiErrorWithMessage } from '../types';
+import { ApiErrorEnvelope, ApiErrorWithMessage } from '../types';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -97,6 +97,16 @@ api.interceptors.response.use(
       });
     }
 
+    // Envelope do backend: { code, message, timestamp, requestId, details }
+    const envelope = (error.response?.data ?? undefined) as ApiErrorEnvelope | undefined;
+    const campos = envelope?.details ?? undefined;
+    const mensagemDoBackend = typeof envelope?.message === 'string' ? envelope.message.trim() : '';
+    const primeiroCampo = campos ? Object.values(campos)[0] : undefined;
+
+    // Retry-After vem em segundos no 429 (LoginRateLimitFilter e ACCOUNT_LOCKED)
+    const retryAfterHeader = error.response?.headers?.['retry-after'];
+    const retryAfterSegundos = Number(retryAfterHeader);
+
     // Mapeia para mensagem amigável em pt-BR — UI nunca recebe erro técnico
     let userMessage = 'Erro inesperado. Tente novamente.';
     if (!error.response) {
@@ -108,15 +118,38 @@ api.interceptors.response.use(
     } else if (status === 404) {
       userMessage = 'Registro não encontrado.';
     } else if (status === 400 || status === 422) {
-      const details = (error.response?.data as { details?: Record<string, string> } | undefined)?.details;
-      const firstDetail = details && Object.values(details)[0];
-      userMessage = firstDetail ? `Dados inválidos: ${firstDetail}` : 'Dados inválidos. Verifique os campos.';
+      // Regra de precedência (PROB-0083): detalhe de campo > mensagem de negócio
+      // > fallback. Antes, BusinessException sem `details` virava texto genérico
+      // e escondia "Email já cadastrado!" / "Email ou senha incorretos".
+      if (primeiroCampo) {
+        userMessage = `Dados inválidos: ${primeiroCampo}`;
+      } else if (mensagemDoBackend) {
+        userMessage = mensagemDoBackend;
+      } else {
+        userMessage = 'Dados inválidos. Verifique os campos.';
+      }
+    } else if (status === 429) {
+      // Rate limit e bloqueio de conta por tentativas: o backend já manda o
+      // tempo na mensagem; sem ela, monta a partir do Retry-After.
+      if (mensagemDoBackend) {
+        userMessage = mensagemDoBackend;
+      } else if (Number.isFinite(retryAfterSegundos) && retryAfterSegundos > 0) {
+        userMessage = `Muitas tentativas. Aguarde ${Math.ceil(retryAfterSegundos)} segundos e tente de novo.`;
+      } else {
+        userMessage = 'Muitas tentativas. Aguarde um minuto e tente de novo.';
+      }
     } else if (status && status >= 500) {
       userMessage = 'Erro no servidor. Tente novamente em instantes.';
     }
 
     const enrichedError = error as unknown as ApiErrorWithMessage;
     enrichedError.userMessage = userMessage;
+    enrichedError.status = status;
+    enrichedError.codigo = envelope?.code;
+    enrichedError.campos = campos ?? undefined;
+    if (Number.isFinite(retryAfterSegundos) && retryAfterSegundos > 0) {
+      enrichedError.retryAfterSegundos = Math.ceil(retryAfterSegundos);
+    }
     return Promise.reject(enrichedError);
   }
 );

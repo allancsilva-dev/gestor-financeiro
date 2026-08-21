@@ -22,6 +22,11 @@ export const isValidCEP = (cep: string): boolean =>
 export const isValidEmail = (email: string): boolean =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
+// Forma canonica do e-mail: o backend grava minusculo no cadastro, entao o app
+// envia igual — caso contrario `alice@x.com` e `Alice@x.com` viram contas
+// diferentes e o usuario "perde" o acesso.
+export const normalizarEmail = (email: string): string => email.trim().toLowerCase();
+
 // Mesma regra do backend (@ValidPassword): minimo 8, ao menos 1 letra e 1 numero.
 export const isValidPassword = (password: string): boolean =>
   password.length >= 8 && /[A-Za-z]/.test(password) && /\d/.test(password);

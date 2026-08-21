@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
-import { useTheme } from '../../src/theme';
+import { Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import api from '../../src/services/api';
-import { ApiErrorWithMessage } from '../../src/types';
+import { useTheme, spacing, typography } from '../../src/theme';
+import { mensagemDeErro } from '../../src/utils/erros';
+import { isValidEmail, normalizarEmail } from '../../src/utils/validate';
+import { lerUltimoEmail } from '../../src/store/ultimoEmail';
+import Botao from '../../src/components/ui/Botao';
 import Field from '../../src/components/ui/Field';
-import { isValidEmail } from '../../src/utils/validate';
+import TelaFluxo from '../../src/components/ui/TelaFluxo';
 
 export default function ForgotPassword() {
   const colors = useTheme();
@@ -15,18 +18,21 @@ export default function ForgotPassword() {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  React.useEffect(() => {
+    lerUltimoEmail().then((salvo) => { if (salvo) setEmail(salvo); });
+  }, []);
+
   const onSubmit = async () => {
     setError(null);
-    const emailTrim = email.trim();
-    if (!emailTrim) return setError('Informe seu e-mail.');
-    if (!isValidEmail(emailTrim)) return setError('Informe um e-mail válido.');
+    const emailInformado = normalizarEmail(email);
+    if (!emailInformado) return setError('Informe seu e-mail.');
+    if (!isValidEmail(emailInformado)) return setError('Informe um e-mail válido.');
     try {
       setLoading(true);
-      await api.post('/auth/forgot-password', { email: emailTrim });
+      await api.post('/auth/forgot-password', { email: emailInformado });
       setSuccess(true);
     } catch (err) {
-      const e = err as ApiErrorWithMessage;
-      setError(e.userMessage ?? 'Erro ao enviar. Tente novamente.');
+      setError(mensagemDeErro(err, 'Erro ao enviar. Tente novamente.'));
     } finally {
       setLoading(false);
     }
@@ -34,47 +40,53 @@ export default function ForgotPassword() {
 
   if (success) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.bg }]}>
-        <View style={styles.inner}>
-          <Text style={[styles.title, { color: colors.textPrimary }]}>E-mail enviado</Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Se o e-mail estiver cadastrado, você receberá instruções para redefinir sua senha.</Text>
-          <TouchableOpacity onPress={() => router.push('/(auth)/reset-password')} accessibilityRole="button" style={[styles.button, { backgroundColor: colors.brand }]}>
-            <Text style={{ color: colors.brandText, fontWeight: '700' }}>Já recebi o código</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.back()} accessibilityRole="button" style={{ alignSelf: 'center', marginTop: 16, minHeight: 44, justifyContent: 'center' }}>
-            <Text style={{ color: colors.textSecondary, fontSize: 13 }}>Voltar para o login</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      <TelaFluxo
+        titulo="E-mail enviado"
+        subtitulo="Se o e-mail estiver cadastrado, você receberá instruções para redefinir sua senha."
+        onVoltar={() => router.back()}
+        rodape={
+          <>
+            <Botao titulo="Já recebi o código" onPress={() => router.push('/(auth)/reset-password')} />
+            <Botao titulo="Voltar para o login" variante="texto" onPress={() => router.back()} />
+          </>
+        }
+      >
+        <View />
+      </TelaFluxo>
     );
   }
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={[styles.container, { backgroundColor: colors.bg }]}>
-      <View style={styles.inner}>
-        <Text style={[styles.title, { color: colors.textPrimary }]}>Esqueceu a senha?</Text>
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Informe seu e-mail para receber as instruções de recuperação.</Text>
-
-        <Field label="E-mail" value={email} onChangeText={setEmail} placeholder="seu@email.com" autoCapitalize="none" keyboardType="email-address" autoComplete="email" textContentType="emailAddress" />
-
-        {error ? <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={{ color: colors.danger, marginTop: 8 }}>{error}</Text> : null}
-
-        <TouchableOpacity onPress={onSubmit} disabled={loading} accessibilityRole="button" style={[styles.button, { backgroundColor: colors.brand, opacity: loading ? 0.8 : 1 }]}>
-          {loading ? <ActivityIndicator color={colors.brandText} /> : <Text style={{ color: colors.brandText, fontWeight: '700', letterSpacing: 1 }}>ENVIAR</Text>}
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => router.back()} accessibilityRole="button" style={{ alignSelf: 'center', marginTop: 16, minHeight: 44, justifyContent: 'center' }}>
-          <Text style={{ color: colors.textSecondary, fontSize: 13 }}>Voltar para o login</Text>
-        </TouchableOpacity>
+    <TelaFluxo
+      titulo="Esqueceu a senha?"
+      subtitulo="Informe seu e-mail para receber as instruções de recuperação."
+      onVoltar={() => router.back()}
+      rodape={
+        <>
+          <Botao testID="forgot-submit" titulo="Enviar instruções" onPress={onSubmit} carregando={loading} />
+          <Botao titulo="Voltar para o login" variante="texto" onPress={() => router.back()} />
+        </>
+      }
+    >
+      <View>
+        <Field
+          testID="forgot-email"
+          label="E-mail"
+          value={email}
+          onChangeText={setEmail}
+          placeholder="seu@email.com"
+          autoCapitalize="none"
+          keyboardType="email-address"
+          autoComplete="email"
+          textContentType="emailAddress"
+          error={error}
+        />
+        {error ? null : (
+          <Text style={{ ...typography.meta, color: colors.textMuted }}>
+            Por segurança, a resposta é a mesma exista ou não uma conta com esse e-mail.
+          </Text>
+        )}
       </View>
-    </KeyboardAvoidingView>
+    </TelaFluxo>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  inner: { flex: 1, justifyContent: 'center', paddingHorizontal: 24 },
-  title: { fontSize: 24, fontWeight: '700', marginTop: 16 },
-  subtitle: { fontSize: 13, marginBottom: 32 },
-  button: { marginTop: 24, borderRadius: 12, height: 48, alignItems: 'center', justifyContent: 'center' },
-});

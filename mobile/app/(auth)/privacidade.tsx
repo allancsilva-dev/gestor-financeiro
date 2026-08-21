@@ -2,7 +2,7 @@ import React from 'react';
 import { ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BackButton from '../../src/components/ui/BackButton';
-import { useTheme } from '../../src/theme';
+import { useTheme, screenPadding, spacing, typography } from '../../src/theme';
 
 const sections = [
   ['Dados tratados', 'Nome, e-mail, credenciais protegidas e os dados financeiros que você decide cadastrar, como transações, carteiras, contas, metas e anexos.'],
@@ -21,26 +21,30 @@ export default function PrivacyPolicy() {
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.bg }}
-      contentContainerStyle={{ paddingTop: insets.top + 8, paddingHorizontal: 20, paddingBottom: insets.bottom + 32 }}
+      contentContainerStyle={{
+        paddingTop: insets.top + spacing.sm,
+        paddingHorizontal: screenPadding,
+        paddingBottom: insets.bottom + spacing.xxxl,
+      }}
     >
       <BackButton />
-      <Text accessibilityRole="header" style={{ color: colors.textPrimary, fontSize: 26, fontWeight: '800', marginTop: 16 }}>
+      <Text accessibilityRole="header" style={{ ...typography.screenTitle, color: colors.textPrimary, marginTop: spacing.lg }}>
         Política de privacidade
       </Text>
-      <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 6, marginBottom: 22 }}>
+      <Text style={{ ...typography.meta, color: colors.textSecondary, marginTop: spacing.xs, marginBottom: spacing.xxl }}>
         Versão 2026-07 · Gestor Financeiro
       </Text>
 
-      <Text style={{ color: colors.textPrimary, fontSize: 15, lineHeight: 23, marginBottom: 18 }}>
+      <Text style={{ ...typography.body, fontSize: 15, lineHeight: 23, color: colors.textPrimary, marginBottom: spacing.lg }}>
         Esta política explica como seus dados pessoais são tratados no aplicativo Gestor Financeiro, conforme a Lei Geral de Proteção de Dados.
       </Text>
 
       {sections.map(([title, body]) => (
-        <View key={title} style={{ marginBottom: 20 }}>
-          <Text accessibilityRole="header" style={{ color: colors.textPrimary, fontSize: 17, fontWeight: '700', marginBottom: 6 }}>
+        <View key={title} style={{ marginBottom: spacing.xl }}>
+          <Text accessibilityRole="header" style={{ ...typography.cardTitle, fontSize: 17, color: colors.textPrimary, marginBottom: spacing.xs }}>
             {title}
           </Text>
-          <Text style={{ color: colors.textSecondary, fontSize: 15, lineHeight: 23 }}>{body}</Text>
+          <Text style={{ ...typography.body, fontSize: 15, lineHeight: 23, color: colors.textSecondary }}>{body}</Text>
         </View>
       ))}
     </ScrollView>

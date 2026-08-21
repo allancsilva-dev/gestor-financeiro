@@ -1,11 +1,15 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform, StyleSheet, ScrollView } from 'react-native';
-import { useTheme } from '../../src/theme';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { Text, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import Constants from 'expo-constants';
 import api from '../../src/services/api';
-import { ApiErrorWithMessage } from '../../src/types';
-import Field from '../../src/components/ui/Field';
+import { useTheme, spacing, typography } from '../../src/theme';
+import { mensagemDeErro } from '../../src/utils/erros';
 import { isValidPassword } from '../../src/utils/validate';
+import Botao from '../../src/components/ui/Botao';
+import CampoSenha from '../../src/components/ui/CampoSenha';
+import Field from '../../src/components/ui/Field';
+import TelaFluxo from '../../src/components/ui/TelaFluxo';
 
 // Acessível por deep link (gestorfinanceiro://reset-password?token=...) ou
 // pelo fluxo "Esqueceu a senha" com colagem manual do código do e-mail.
@@ -18,20 +22,29 @@ export default function ResetPassword() {
   const [confirmar, setConfirmar] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [erroToken, setErroToken] = useState<string | null>(null);
+  const [erroSenha, setErroSenha] = useState<string | null>(null);
+  const [erroConfirmar, setErroConfirmar] = useState<string | null>(null);
+  const [erroGeral, setErroGeral] = useState<string | null>(null);
+
+  const isLocalE2E = Constants.expoConfig?.extra?.appEnv === 'local-e2e';
 
   const onSubmit = async () => {
-    setError(null);
-    if (!token.trim()) return setError('Cole o código recebido por e-mail.');
-    if (!isValidPassword(novaSenha)) return setError('Senha deve ter no mínimo 8 caracteres, com ao menos 1 letra e 1 número.');
-    if (novaSenha !== confirmar) return setError('As senhas não coincidem.');
+    setErroGeral(null);
+    const semToken = !token.trim();
+    const senhaFraca = !isValidPassword(novaSenha);
+    const naoConfere = novaSenha !== confirmar;
+    setErroToken(semToken ? 'Cole o código recebido por e-mail.' : null);
+    setErroSenha(senhaFraca ? 'Senha deve ter no mínimo 8 caracteres, com ao menos 1 letra e 1 número.' : null);
+    setErroConfirmar(naoConfere ? 'As senhas não coincidem.' : null);
+    if (semToken || senhaFraca || naoConfere) return;
+
     try {
       setLoading(true);
       await api.post('/auth/reset-password', { token: token.trim(), novaSenha });
       setSuccess(true);
     } catch (err) {
-      const e = err as ApiErrorWithMessage;
-      setError(e.userMessage ?? 'Erro ao redefinir a senha. Tente novamente.');
+      setErroGeral(mensagemDeErro(err, 'Erro ao redefinir a senha. Tente novamente.'));
     } finally {
       setLoading(false);
     }
@@ -39,52 +52,77 @@ export default function ResetPassword() {
 
   if (success) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.bg }]}>
-        <View style={styles.inner}>
-          <Text style={[styles.title, { color: colors.textPrimary }]}>Senha redefinida</Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Sua nova senha já está valendo. Entre com ela para continuar.</Text>
-          <TouchableOpacity onPress={() => router.replace('/(auth)/login')} accessibilityRole="button" style={[styles.button, { backgroundColor: colors.brand }]}>
-            <Text style={{ color: colors.brandText, fontWeight: '700', letterSpacing: 1 }}>IR PARA O LOGIN</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      <TelaFluxo
+        titulo="Senha redefinida"
+        subtitulo="Sua nova senha já está valendo. Entre com ela para continuar."
+        rodape={<Botao titulo="Ir para o login" onPress={() => router.replace('/(auth)/login')} />}
+      >
+        <View />
+      </TelaFluxo>
     );
   }
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={[styles.container, { backgroundColor: colors.bg }]}>
-      <ScrollView contentContainerStyle={styles.inner} keyboardShouldPersistTaps="handled">
-        <Text style={[styles.title, { color: colors.textPrimary }]}>Nova senha</Text>
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          {params.token ? 'Escolha sua nova senha.' : 'Cole o código recebido por e-mail e escolha sua nova senha.'}
-        </Text>
-
+    <TelaFluxo
+      titulo="Nova senha"
+      subtitulo={params.token
+        ? 'Escolha sua nova senha.'
+        : 'Cole o código recebido por e-mail e escolha sua nova senha.'}
+      onVoltar={() => router.replace('/(auth)/login')}
+      rodape={
+        <>
+          <Botao testID="reset-submit" titulo="Redefinir senha" onPress={onSubmit} carregando={loading} />
+          <Botao titulo="Voltar para o login" variante="texto" onPress={() => router.replace('/(auth)/login')} />
+        </>
+      }
+    >
+      <View>
         {!params.token && (
-          <Field label="Código de recuperação" value={token} onChangeText={setToken} placeholder="Código do e-mail" autoCapitalize="none" autoCorrect={false} />
+          <Field
+            testID="reset-token"
+            label="Código de recuperação"
+            value={token}
+            onChangeText={(t) => { setToken(t); setErroToken(null); }}
+            placeholder="Código do e-mail"
+            autoCapitalize="none"
+            autoCorrect={false}
+            error={erroToken}
+          />
         )}
 
-        <Field label="Nova senha" value={novaSenha} onChangeText={setNovaSenha} placeholder="Mínimo 8 caracteres, 1 letra e 1 número" secureTextEntry textContentType="newPassword" />
+        <CampoSenha
+          testID="reset-password"
+          label="Nova senha"
+          value={novaSenha}
+          onChangeText={(t) => { setNovaSenha(t); setErroSenha(null); }}
+          placeholder="Mínimo 8 caracteres, 1 letra e 1 número"
+          textContentType={isLocalE2E ? 'none' : 'newPassword'}
+          desprotegido={isLocalE2E}
+          medidor
+          error={erroSenha}
+        />
 
-        <Field label="Confirmar senha" value={confirmar} onChangeText={setConfirmar} placeholder="Repita a senha" secureTextEntry textContentType="newPassword" />
+        <CampoSenha
+          testID="reset-confirm-password"
+          label="Confirmar senha"
+          value={confirmar}
+          onChangeText={(t) => { setConfirmar(t); setErroConfirmar(null); }}
+          placeholder="Repita a senha"
+          textContentType={isLocalE2E ? 'none' : 'newPassword'}
+          desprotegido={isLocalE2E}
+          error={erroConfirmar}
+        />
 
-        {error ? <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={{ color: colors.danger, marginTop: 8 }}>{error}</Text> : null}
-
-        <TouchableOpacity onPress={onSubmit} disabled={loading} accessibilityRole="button" style={[styles.button, { backgroundColor: colors.brand, opacity: loading ? 0.8 : 1 }]}>
-          {loading ? <ActivityIndicator color={colors.brandText} /> : <Text style={{ color: colors.brandText, fontWeight: '700', letterSpacing: 1 }}>REDEFINIR SENHA</Text>}
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => router.replace('/(auth)/login')} accessibilityRole="button" style={{ alignSelf: 'center', marginTop: 16, minHeight: 44, justifyContent: 'center' }}>
-          <Text style={{ color: colors.textSecondary, fontSize: 13 }}>Voltar para o login</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        {erroGeral ? (
+          <Text
+            accessibilityRole="alert"
+            accessibilityLiveRegion="assertive"
+            style={{ ...typography.body, color: colors.danger, marginTop: spacing.md }}
+          >
+            {erroGeral}
+          </Text>
+        ) : null}
+      </View>
+    </TelaFluxo>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  inner: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 32 },
-  title: { fontSize: 24, fontWeight: '700', marginTop: 16 },
-  subtitle: { fontSize: 13, marginBottom: 32 },
-  button: { marginTop: 24, borderRadius: 12, height: 48, alignItems: 'center', justifyContent: 'center' },
-});
