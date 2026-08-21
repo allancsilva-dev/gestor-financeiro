@@ -142,3 +142,31 @@ Sutil e nativa: transição de rota `fade` de 150–180ms, press feedback por `a
 (0.7–0.9), `ui/Entrance` em cascata (fade + 12px, 340ms, ease-out) e shimmer no skeleton.
 Sem bounce, sem haptics. Reduce Motion desliga a animação de rota e leva `Entrance`/`SkeletonBox`
 direto ao estado final.
+
+## Acessibilidade
+
+**O texto visível é o rótulo.** Um `TouchableOpacity` com `accessible` (padrão) colapsa os
+filhos num nó único: se ele tem `accessibilityLabel` próprio, o texto dos `<Text>` de dentro
+some da árvore de acessibilidade — o leitor de tela anuncia só o rótulo e a busca por texto
+(Maestro, testes) deixa de encontrar a palavra que está na tela.
+
+Regra:
+
+- Controle **só com texto**: nada de `accessibilityLabel`. O RN deriva o rótulo dos filhos e o
+  texto continua encontrável.
+- Controle **com ícone + texto**: `accessibilityLabel` **igual ao texto visível**. Sem ele, o iOS
+  concatena o glifo da fonte de ícones no rótulo (`"\uf626, Carteira"`) — o leitor de tela anuncia
+  o glifo e a busca por texto não acha. `accessibilityElementsHidden` no ícone **não** resolve:
+  a composição do rótulo ignora essa prop.
+- Controle **icon-only** (Fab, chevron, olho de senha, badge de sigla): `accessibilityLabel`
+  é obrigatório — não há texto para derivar.
+- Contexto extra ("abre a carteira", "cria a categoria digitada") vai em `accessibilityHint`,
+  nunca sobrescrevendo o rótulo.
+- `accessibilityRole` e `accessibilityState` continuam sempre.
+- Rótulo **nunca** pode divergir do texto visível: era o que escondia "Carteira" atrás de
+  "Abrir carteira" (BACKLOG-0096).
+
+Vale para cards compostos (meta, fatura, parcela): o rótulo curado some, os textos do card
+voltam à árvore, e a ação do card vira `accessibilityHint`. Nesses cards o nó ainda funde vários
+textos num rótulo só, então automação por texto precisa de regex parcial (`.*Meta Smoke.*`) —
+o Maestro casa por igualdade total.

@@ -60,9 +60,27 @@ que é coletado), erro por campo, progresso visível.
   cartão `Roxinho`, categorias `Alimentação`/`Transporte` + `Renda`, conta fixa `Salário` (4.500,00,
   dia 5, ENTRADA) e meta `Reserva` (10.000,00, `COFRE_REAL`).
 
+## Rodada de Maestro no simulador (executada)
+
+iPhone 17 Pro, iOS 26.5, build **Release** com `APP_ENV=local-e2e` e
+`EXPO_PUBLIC_API_BASE_URL=http://localhost:8090/api`, backend local em banco descartável `gf_e2e`.
+
+- `smoke-auth` **PASS** · `privacy-consent` **PASS** · `recovery-navigation` **PASS**
+- `financial-critical`: 119 comandos verdes — cadastro em 3 passos, onboarding em 6, categoria,
+  cartão, meta e primeira transação — e falha no bloco da segunda transação (compra no cartão).
+  Registrado em BACKLOG-0095.
+
+A rodada achou quatro defeitos de UI que nenhum teste unitário pegava (FAB atrás da tab bar em duas
+telas, "Carteira" da home abrindo "Contas", formulários sem encadeamento de foco e medidor de senha
+empurrando o layout) — todos corrigidos, ver BUG-0073. O feedback do dono do produto sobre o
+onboarding gerou BUG-0074 (progresso com "Passo X de N", selo CONTA CRIADA e OPCIONAL) e BUG-0075
+(prévia do cartão reagindo ao banco digitado, sem lista fechada).
+
 ## O que ficou pendente
 
-- **Rodada de simulador e Maestro** — não executada. Os flows `.maestro/*.yaml` foram atualizados
+- **Segunda transação do `financial-critical`** (BACKLOG-0095) e, por consequência, os blocos de
+  fatura/pagamento parcial/reserva que vêm depois dela.
+- ~~Rodada de simulador e Maestro~~ — executada nesta sessão; ver seção acima. Registro original: Os flows `.maestro/*.yaml` foram atualizados
   para a nova UI (passos do cadastro, "Pular por agora"/"Concluir" no onboarding, rótulo `Entrar`),
   mas não rodaram contra simulador. É a mesma pendência crítica acumulada desde o Bloco B da Fase 3.
 - **Validação visual em tema claro/escuro** — tentada via Expo Web (servidor já rodando na 8081) e

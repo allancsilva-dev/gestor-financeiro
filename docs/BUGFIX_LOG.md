@@ -4,6 +4,322 @@ Registro de bugs corrigidos. Mantido pelo `docs-reporter`.
 
 ---
 
+## BUG-0073 — Rodada de Maestro no simulador: quatro defeitos de UI achados e corrigidos
+
+- **Data:** 2026-08-21
+- **Area:** mobile
+- **Origem:** primeira execução real de Maestro em simulador (iPhone 17 Pro, iOS 26.5, Release,
+  backend local na 8090 com banco descartável `gf_e2e`) — a pendência acumulada desde o Bloco B da
+  Fase 3. Os defeitos abaixo só aparecem em aparelho: nenhum deles quebra teste unitário.
+- **Sintomas e correções:**
+  1. **FAB atrás da tab bar** — `ui/Fab` usava `bottom: 24`, abaixo do painel flutuante de navegação
+     (69 de altura + 15 de margem + safe area): em Categorias e Recorrências o botão "+" ficava
+     encoberto e o toque não chegava nele. Agora usa `useTabBarSpace()` e as cores do tema
+     (`fabFrom`/`fabTo`/`fabGlow`) no lugar do violeta cru do protótipo antigo. `more/carteiras.tsx`
+     tinha um FAB inline com o mesmo `bottom: 24` — passou a usar o `ui/Fab`.
+  2. **"Carteira" na home abria "Contas"** — `onCarteira` do `SaldoCard` apontava para
+     `/more/carteiras` (tela Contas). No hub de Ajustes e no checklist, "Carteira" é a tela de
+     cartões e faturas (`/more/faturas`); o destino foi alinhado ao rótulo.
+  3. **Formulários sem encadeamento de foco** — trocar de campo com o teclado aberto é impreciso
+     (o layout sobe); no simulador, o texto do campo seguinte caía no campo anterior. Ganharam
+     `returnKeyType` + `onSubmitEditing`: cadastro (nome→e-mail, senha→confirmação), login
+     (e-mail→senha), criação de meta (nome→valor→mensal→data→descrição) e Nova Transação
+     (valor→descrição→data). O formulário de cartão já encadeava; ganhou apenas `testID`s.
+  4. **Medidor de senha empurrava o layout** — o `CampoSenha` só desenhava a régua depois do
+     primeiro caractere, deslocando o campo de confirmação para baixo enquanto o usuário digitava.
+     Agora o espaço é reservado desde o campo vazio, com a dica da regra no lugar do rótulo.
+- **Arquivos alterados:** `mobile/src/components/ui/{Fab,CampoSenha,PassosProgresso,TelaFluxo}.tsx`,
+  `mobile/app/(app)/(inicio)/index.tsx`, `mobile/app/(app)/metas.tsx`,
+  `mobile/app/(app)/more/{carteiras,faturas}.tsx`, `mobile/app/(auth)/{login,register}.tsx`,
+  `mobile/app/onboarding.tsx`, `mobile/src/components/NovaTransacaoModal.tsx`, `.maestro/*.yaml`
+- **Testes/validacoes executadas:** Maestro no simulador — `smoke-auth`, `privacy-consent` e
+  `recovery-navigation` **PASS**; `financial-critical` avança 119 comandos (cadastro em 3 passos →
+  onboarding em 6 → categoria → cartão → meta → primeira transação) e ainda falha na segunda
+  transação (compra no cartão). Jest 197/197, `tsc --noEmit` e `npm run lint` limpos.
+- **Resultado:** PASS_COM_RESSALVA
+- **Ressalvas:** `financial-critical` continua vermelho no trecho final (compra no cartão) — ver
+  BACKLOG. Os flows tocavam vários elementos por texto que não existe na árvore de acessibilidade
+  (o texto dentro de `Touchable` com `accessibilityLabel` próprio não sobe); foram trocados por
+  `testID` ou pelo label real.
+
+---
+
+## BUG-0074 — Onboarding não dizia onde o usuário estava nem o que era opcional
+
+- **Data:** 2026-08-21
+- **Area:** mobile, UX
+- **Sintoma:** relato do dono do produto após ver o fluxo rodando ("dá para se perder no
+  registro"). Confirmado nas capturas: a barra de progresso do cadastro (3 segmentos) reiniciava
+  como 6 segmentos no onboarding, sem nenhum marco de "conta criada"; e nada indicava que os passos
+  de renda, categorias, cartão e meta eram opcionais — só o botão "Pular por agora" sugeria isso.
+- **Correcao aplicada:** `ui/PassosProgresso` passou a exibir "Passo X de N" em texto ao lado das
+  barras; `ui/TelaFluxo` ganhou um selo acima do título; o onboarding marca o passo 1 com **CONTA
+  CRIADA** (e diz na abertura que os próximos podem ser pulados) e os passos 2–5 com **OPCIONAL**.
+- **Arquivos alterados:** `mobile/src/components/ui/{PassosProgresso,TelaFluxo}.tsx`,
+  `mobile/app/onboarding.tsx`
+- **Resultado:** PASS
+
+---
+
+## BUG-0075 — Passo de cartão do onboarding não mostrava a identidade do banco
+
+- **Data:** 2026-08-21
+- **Area:** mobile, UX
+- **Sintoma:** no onboarding, o cartão era só um formulário de texto; o usuário só descobria a cor
+  e o monograma do banco depois de salvar e abrir a Carteira. O catálogo `src/domain/emissores.ts`
+  (com Itaú, Nubank, Bradesco, BB, Caixa, Inter, C6, XP, BTG e outros) já existia e não era usado
+  ali.
+- **Correcao aplicada:** o passo mostra o mesmo `CartaoFisico` da Carteira, reagindo ao que está
+  sendo digitado — "Itaú" traz laranja `#FF6200`, rótulo ITAÚ e monograma; nome livre ("Nubank
+  Roxinho") também resolve; banco fora do catálogo recebe cor determinística derivada do nome, com
+  contraste garantido. O titular exibido é o nome real do usuário. **Sem lista fechada de bancos**:
+  uma primeira versão com chips de sugestão foi descartada a pedido do dono do produto, porque
+  limitaria às opções listadas.
+- **Arquivos alterados:** `mobile/app/onboarding.tsx`, `mobile/src/__tests__/emissores.test.ts`
+- **Testes/validacoes executadas:** testes novos em `emissores.test.ts` (reconhecimento por nome
+  livre, cor determinística e contraste AA para banco desconhecido, identidade do Itaú) e captura
+  no simulador dos três estados (vazio, Itaú, Nubank Roxinho).
+- **Resultado:** PASS
+
+---
+
+## BUG-0076 — Investimentos sem idempotência: reenvio/duplo clique duplicava movimentação
+
+- **Problema relacionado:** BACKLOG-0081
+- **Data:** 2026-08-21
+- **Area:** backend
+- **Sintoma:** `POST /api/v1/investimentos/{ativoId}/movimentacoes` não aceitava header
+  `Idempotency-Key`, ao contrário de outros fluxos financeiros sensíveis a duplo clique/retry
+  (pagamento de fatura, BUG-0052; pagamento de parcela, BUG-0060) — reenvio da mesma requisição
+  podia duplicar compra/venda/dividendo na posição do ativo.
+- **Causa raiz:** `InvestimentoService.adicionarMovimentacao` não tinha overload com chave de
+  idempotência. A "proteção" existente derivava a chave do ledger/da operação de `mov.getId()`,
+  gerado só depois de persistir — dois cliques produziam ids diferentes e nunca colidiam; era uma
+  proteção falsa.
+- **Correção aplicada:** `InvestimentoController` passa a aceitar o header `Idempotency-Key`
+  (mesmo padrão de `FaturaController`). `InvestimentoService.adicionarMovimentacao` ganhou
+  sobrecarga com a chave, faz exists-check por `findByUsuarioIdAndIdempotencyKey` antes de
+  qualquer efeito colateral e persiste a chave em `movimentacoes_ativo.idempotency_key`. Migration
+  nova `V44__movimentacao_ativo_idempotency.sql` cria a coluna e o índice único parcial
+  `ux_movimentacoes_ativo_usuario_idempotency` (molde de V11). Clientes passaram a enviar o header:
+  `mobile/src/services/investimentoService.ts` + `mobile/app/(app)/more/investimentos.tsx` (chave
+  por abertura do formulário) e `frontend/src/services/investimentoService.ts` +
+  `frontend/src/pages/Investimentos.tsx` (chave mantida até a movimentação entrar).
+- **Arquivos alterados:** `backend/src/main/java/com/gestor/financeiro/controller/InvestimentoController.java`,
+  `backend/src/main/java/com/gestor/financeiro/service/InvestimentoService.java`,
+  `backend/src/main/resources/db/migration/V44__movimentacao_ativo_idempotency.sql`,
+  `mobile/src/services/investimentoService.ts`, `mobile/app/(app)/more/investimentos.tsx`,
+  `frontend/src/services/investimentoService.ts`, `frontend/src/pages/Investimentos.tsx`
+- **Testes/validacoes executadas:** `./mvnw test` — 292 testes, 0 falhas, incluindo
+  `InvestimentoIdempotenciaPaginacaoTest` (5, novo). Migration V44 validada em runtime: PostgreSQL
+  16 efêmero, boot com `SPRING_PROFILES_ACTIVE=dev` e `ddl-auto=validate` — Flyway aplicou 43
+  migrations até v44 e a aplicação subiu; `\d movimentacoes_ativo` mostra o índice único parcial.
+  Contrato HTTP verificado: dois `POST` com o mesmo `Idempotency-Key` retornaram o mesmo `id` e uma
+  única movimentação. Mobile: `npx tsc --noEmit` limpo, Jest 200/200. Frontend: `npx tsc --noEmit`
+  limpo.
+- **Resultado:** PASS
+- **Ressalvas:** nenhuma verificação manual em app/browser real nesta rodada — validado via `curl`
+  contra a instância efêmera e pelos testes automatizados.
+- **Commit:** pendente
+
+---
+
+## BUG-0077 — Investimentos sem paginação: listagem sem limite de página
+
+- **Problema relacionado:** BACKLOG-0082
+- **Data:** 2026-08-21
+- **Area:** backend
+- **Sintoma:** `GET /api/v1/investimentos` e `GET /api/v1/investimentos/{ativoId}/movimentacoes`
+  devolviam lista completa sem paginação, ao contrário de outras listagens do sistema
+  (`TransacaoController`) — risco de payload/consulta crescer sem limite conforme o usuário
+  acumula histórico de movimentações.
+- **Causa raiz:** endpoints implementados antes de a paginação virar convenção do sistema, nunca
+  revisitados.
+- **Correção aplicada:** os dois endpoints passam a devolver `Page` com `@PageableDefault(size =
+  20)` e `PaginationUtils.enforceMaxSize(pageable, 100)`, como `TransacaoController`.
+  Repositórios ganharam variantes paginadas. Os dois clientes consomem `.content ?? []` com
+  `size=100` (padrão já usado em `categoriaService`/`contaFinanceiraService`) — **muda o contrato
+  de API (breaking change)** para qualquer cliente externo não atualizado nesta rodada.
+- **Arquivos alterados:** controller/repositório de investimentos em
+  `backend/src/main/java/com/gestor/financeiro/{controller,repository}/`,
+  `mobile/src/services/investimentoService.ts`, `mobile/app/(app)/more/investimentos.tsx`,
+  `frontend/src/services/investimentoService.ts`, `frontend/src/pages/Investimentos.tsx`
+- **Testes/validacoes executadas:** mesma execução de `./mvnw test` (292/0 falhas):
+  `InvestimentoIdempotenciaPaginacaoTest` cobre paginação; `InvestimentoCustodiaCotacaoTest`
+  ajustado ao retorno paginado. Contrato verificado contra instância efêmera:
+  `GET /v1/investimentos/{id}/movimentacoes` devolve envelope `Page` (`totalElements`, `size=20`);
+  `GET /v1/investimentos?size=500` é capado em `size=100`.
+- **Resultado:** PASS_COM_RESSALVA
+- **Ressalvas:** breaking change de contrato — clientes externos fora de mobile/web não foram
+  (nem poderiam ser) atualizados por esta rodada. `backend/API.md` não documenta os endpoints de
+  investimentos (não documentava antes e continua sem documentar) — ver BACKLOG-0097.
+- **Commit:** pendente
+
+---
+
+## BUG-0078 — `RefreshToken.toString()` vazava hash de token e e-mail (PII) em logs
+
+- **Problema relacionado:** BACKLOG-0083
+- **Data:** 2026-08-21
+- **Area:** backend, seguranca, LGPD
+- **Sintoma:** a descrição original de BACKLOG-0083 (auditoria de 2026-07-14) dizia que a entidade
+  não tinha `toString()` customizado — isso estava errado. A entidade **tem** `toString()`
+  customizado (`model/RefreshToken.java`), e era exatamente ele quem vazava: imprimia 20
+  caracteres do hash SHA-256 do token e `usuario.getEmail()` (PII), além de disparar lazy-load e
+  poder estourar `NullPointerException` no `substring` do token.
+- **Causa raiz:** implementação anterior do `toString()` incluía diretamente o hash do token e o
+  e-mail do usuário associado, sem exclusão de campos sensíveis.
+- **Correção aplicada:** `toString()` agora expõe só `id`, `usuarioId` (via `usuario.getId()`, que
+  não força o lazy load) e `dataExpiracao`/`revogado`.
+- **Arquivos alterados:** `backend/src/main/java/com/gestor/financeiro/model/RefreshToken.java`
+- **Testes/validacoes executadas:** `RefreshTokenToStringTest` (2, novo) dentro de `./mvnw test`
+  292 testes, 0 falhas.
+- **Resultado:** PASS
+- **Ressalvas:** nenhuma identificada.
+- **Commit:** pendente
+
+---
+
+## BUG-0079 — Entidades bidirecionais sem proteção contra recursão em toString/equals/hashCode
+
+- **Problema relacionado:** BACKLOG-0084
+- **Data:** 2026-08-21
+- **Area:** backend
+- **Sintoma:** entidades JPA com relacionamento bidirecional usando Lombok `@Data` (que gera
+  `equals`/`hashCode`/`toString` incluindo os relacionamentos) sem proteção contra recursão
+  infinita quando ambos os lados se referenciam.
+- **Causa raiz:** `grep mappedBy backend/src/main/java/com/gestor/financeiro/model/*.java`
+  confirma exatamente 2 ciclos bidirecionais no modelo: `Ativo` ↔ `MovimentacaoAtivo`
+  (`model/Ativo.java:66`) e `Transacao` ↔ `Parcela` (`model/Transacao.java:80`). O par
+  `Transacao`↔`Parcela` já tinha `@ToString.Exclude`/`@EqualsAndHashCode.Exclude`; o par
+  `Ativo`↔`MovimentacaoAtivo` não tinha nenhuma proteção, nem no JSON.
+- **Correção aplicada:** ambos os pares ganharam `@ToString.Exclude` +
+  `@EqualsAndHashCode.Exclude` nos dois lados; o par de investimentos ganhou também
+  `@JsonIgnoreProperties`.
+- **Arquivos alterados:** `backend/src/main/java/com/gestor/financeiro/model/Ativo.java`,
+  `backend/src/main/java/com/gestor/financeiro/model/MovimentacaoAtivo.java`,
+  `backend/src/main/java/com/gestor/financeiro/model/Transacao.java`,
+  `backend/src/main/java/com/gestor/financeiro/model/Parcela.java`
+- **Testes/validacoes executadas:** `EntidadesBidirecionaisSemRecursaoTest` (2, novo) dentro de
+  `./mvnw test` 292 testes, 0 falhas.
+- **Resultado:** PASS
+- **Ressalvas:** nenhuma identificada.
+- **Commit:** pendente
+
+---
+
+## BUG-0080 — Defaults inseguros remanescentes em `application.properties` base
+
+- **Problema relacionado:** BACKLOG-0085
+- **Data:** 2026-08-21
+- **Area:** backend, seguranca
+- **Sintoma:** perfil base (`application.properties`, herdado por qualquer perfil que não
+  sobrescreva explicitamente) tinha vários defaults voltados para conveniência de desenvolvimento
+  em vez de segurança: `spring.jpa.show-sql=true`, `app.docs.public=true`,
+  `management.endpoint.health.show-details=always`, log em `DEBUG` para o pacote da aplicação e
+  para Spring Security, `cookie.secure=${COOKIE_SECURE:false}` e
+  `cors.allowed.origins=${CORS_ALLOWED_ORIGINS:http://localhost:5173}` como fallback.
+- **Causa raiz:** BACKLOG-0011 (fechado em 2026-07-13) tratou apenas senha de DB e JWT secret
+  default; o restante do arquivo nunca recebeu revisão linha a linha classificando cada default
+  como seguro/exige override/deve ser removido.
+- **Correção aplicada:** defaults do perfil base invertidos para o lado seguro:
+  `spring.jpa.show-sql=false`, `app.docs.public=false`,
+  `management.endpoint.health.show-details=never`, `logging.level.com.gestor.financeiro=INFO`,
+  `logging.level.org.springframework.security=WARN`, `cookie.secure=${COOKIE_SECURE:true}`,
+  `cors.allowed.origins=${CORS_ALLOWED_ORIGINS:}` (sem default de dev).
+  `application-dev.properties` já declarava todos esses valores explicitamente, então o
+  desenvolvimento não muda. `src/test/resources/application-test.properties` passou a declarar
+  `app.docs.public=true` e `show-details=always`, que os testes de infraestrutura exercitam e que
+  antes vinham herdados do base.
+- **Arquivos alterados:** `backend/src/main/resources/application.properties`,
+  `backend/src/test/resources/application-test.properties`
+- **Testes/validacoes executadas:** `./mvnw test` — 292 testes, 0 falhas.
+- **Resultado:** PASS
+- **Ressalvas:** nenhuma identificada nesta rodada; validação de comportamento em produção real
+  depende do gate de deploy já registrado em BACKLOG-0080 (nginx/redes/smoke), item distinto.
+- **Commit:** pendente
+
+---
+
+## BUG-0081 — Textos visíveis escondidos da árvore de acessibilidade por `accessibilityLabel` do container
+
+- **Problema relacionado:** BACKLOG-0096
+- **Data:** 2026-08-21
+- **Area:** mobile, acessibilidade
+- **Sintoma:** vários controles com texto visível também tinham `accessibilityLabel` próprio no
+  `Touchable` pai. Como um `Touchable` `accessible` (padrão) colapsa os filhos num nó único, o
+  `accessibilityLabel` substituía o texto na árvore de acessibilidade — leitor de tela anunciava só
+  o rótulo, e buscas por texto (Maestro, testes) deixavam de encontrar a palavra visível na tela.
+- **Causa raiz:** ausência de convenção documentada sobre quando usar `accessibilityLabel` no
+  container versus deixar o texto dos filhos ser o rótulo.
+- **Correção aplicada:** convenção nova registrada em `DESIGN.md` (seção "Acessibilidade"):
+  controle com texto visível não leva `accessibilityLabel`; `accessibilityLabel` só para
+  controles icon-only; contexto extra vai em `accessibilityHint`; `accessibilityRole`/
+  `accessibilityState` continuam sempre. Aplicada em: `mobile/src/components/home/SaldoCard.tsx`
+  (botões "Nova Transação" e "Carteira", era "Abrir carteira"); `mobile/app/(app)/more/faturas.tsx`
+  (ação "+ Cartão", era "Cadastrar novo cartão", e "Salvar" do formulário de cartão, era "Salvar
+  cartão"); `mobile/src/components/metas/CardMeta.tsx` (card da meta, era "Abrir detalhes da meta
+  X", e botão "Depositar", era "Depositar na meta X"; `AnelProgresso` deixou de repetir o nome da
+  meta no label); `mobile/src/components/NovaTransacaoModal.tsx` (4 botões de setup rápido);
+  `mobile/src/components/home/ParcelasCarrossel.tsx` (2); `mobile/src/components/carteira/LinhaFatura.tsx`
+  (1); `mobile/app/(app)/more/fatura.tsx` ("Pagar Fatura"). Mantidos os labels legítimos de
+  controles icon-only (`ui/Fab`, FAB da tab bar, `ui/BackButton`, badge "OK/Divergente" da tela
+  Contas, ícones de editar/excluir). Flows Maestro voltaram a buscar por texto:
+  `mobile/.maestro/financial-critical.yaml` usa "Carteira", "Cartão", "Salvar", "Meta Smoke",
+  "Depositar" no lugar dos labels de workaround; o comentário de workaround foi removido.
+- **Arquivos alterados:** `mobile/src/components/home/SaldoCard.tsx`,
+  `mobile/app/(app)/more/faturas.tsx`, `mobile/src/components/metas/CardMeta.tsx`,
+  `mobile/src/components/NovaTransacaoModal.tsx`, `mobile/src/components/home/ParcelasCarrossel.tsx`,
+  `mobile/src/components/carteira/LinhaFatura.tsx`, `mobile/app/(app)/more/fatura.tsx`,
+  `mobile/.maestro/financial-critical.yaml`, `DESIGN.md`
+- **Testes/validacoes executadas:** `npx tsc --noEmit` limpo e Jest 200/200 no mobile.
+- **Resultado:** PASS_COM_RESSALVA
+- **Ressalvas:** não houve verificação manual com TalkBack/VoiceOver nesta rodada.
+- **Commit:** pendente
+
+---
+
+## BUG-0082 — Home não atualizava saldo/lista após salvar transação por caminhos que não a Home direta
+
+- **Problema relacionado:** BACKLOG-0095
+- **Data:** 2026-08-21
+- **Area:** mobile
+- **Sintoma:** `financial-critical` falhava ao asseverar a compra no cartão depois de salvá-la — a
+  transação não aparecia na Home. A hipótese original (registrada em BACKLOG-0095) era timing de
+  refetch ou validação silenciosa de cartão.
+- **Causa raiz:** diferente da hipótese original. A validação de cartão existe e é visível
+  (`mobile/src/components/NovaTransacaoModal.tsx:273` seta `pagamentoError`) e `:151`
+  auto-seleciona o primeiro cartão. O problema real: o `invalidateQueries` do modal não incluía
+  `['home']` nem `['operacoes']` — as duas únicas chaves que alimentam a Home — e nenhum outro
+  ponto do app invalidava essas chaves. A Home só atualizava porque o call site dela
+  (`app/(app)/(inicio)/index.tsx`) passava `onSaved` com `refetch()` manual; salvar pelo FAB da tab
+  bar (`app/(app)/_layout.tsx`, `onSaved` navega para `/transacoes`) ou pela tela de faturas
+  deixava a Home com dados velhos. O flow Maestro rola a Home antes de tocar "Nova transação", o
+  `SaldoCard` sai do viewport e o toque acerta o FAB da tab bar — o caminho que não atualizava.
+- **Correção aplicada:** fonte única de invalidação em
+  `mobile/src/hooks/useInvalidarAposTransacao.ts` (`CHAVES_AFETADAS_POR_TRANSACAO` inclui `['home']`
+  e `['operacoes']`), consumida por `NovaTransacaoModal.tsx` e `EditarTransacaoModal.tsx` (que
+  antes duplicavam a lista de chaves cada um). O `onSaved` da Home deixou de fazer `refetch()`
+  manual (pull-to-refresh continua usando `atualizar()`). No flow
+  `mobile/.maestro/financial-critical.yaml`, o `extendedWaitUntil` do bloco "Compra cartão smoke"
+  virou `scrollUntilVisible` (a seção "Parcelas Agendadas" aparece e empurra a lista) e foi
+  acrescentado o guard rail `assertNotVisible: "Selecione um cartão."`.
+- **Arquivos alterados:** `mobile/src/hooks/useInvalidarAposTransacao.ts` (novo),
+  `mobile/src/components/NovaTransacaoModal.tsx`, `mobile/src/components/EditarTransacaoModal.tsx`,
+  `mobile/app/(app)/(inicio)/index.tsx`, `mobile/.maestro/financial-critical.yaml`
+- **Testes/validacoes executadas:** `mobile/src/__tests__/invalidarAposTransacao.test.ts` (3 casos
+  novos — invalida as duas queries da Home; invalida a lista compartilhada mais as chaves extras da
+  edição; sem chave duplicada na lista compartilhada) dentro de Jest 200/200 no mobile;
+  `npx tsc --noEmit` limpo. O flow Maestro `financial-critical` **não foi executado nesta rodada**
+  (sem simulador disponível) — a correção foi validada por leitura de código e pelos testes
+  unitários da invalidação, não pela execução ponta a ponta do flow.
+- **Resultado:** PASS_COM_RESSALVA
+- **Ressalvas:** critério de aceite completo de BACKLOG-0095 (`financial-critical` verde ponta a
+  ponta) depende da execução real do flow em simulador, que fica pendente.
+- **Commit:** pendente
+
+---
+
 ## BUG-0070 — Erros do backend chegavam genéricos ao app (login, cadastro e bloqueio de conta)
 
 - **Problemas relacionados:** PROB-0083, BACKLOG-0094, BUG-0069

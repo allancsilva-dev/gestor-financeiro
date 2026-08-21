@@ -1079,7 +1079,24 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Dependencias:** nenhuma tecnica; decisao de produto sobre se o padrao `Idempotency-Key` ja usado em fatura deve se estender a investimentos.
 - **Criterio de aceite:** `adicionarMovimentacao` aceita e persiste `Idempotency-Key` por requisicao; reenvio da mesma key retorna o resultado original sem duplicar a movimentacao; teste automatizado cobrindo reenvio.
 - **Risco se ficar pendente:** duplo clique ou retry de rede no lancamento de uma movimentacao de investimento pode duplicar compra/venda/dividendo, distorcendo posicao e preco medio do ativo (mesma classe de risco ja corrigida em PROB-0067/BUG-0060 para parcelas).
-- **Status:** ABERTO
+- **Status:** FECHADO (2026-08-21, working tree ainda nao commitado na `main`) — `POST
+  /api/v1/investimentos/{ativoId}/movimentacoes` aceita o header `Idempotency-Key`
+  (`InvestimentoController`, mesmo padrao de `FaturaController`). `InvestimentoService.adicionarMovimentacao`
+  ganhou sobrecarga com a chave, faz exists-check por `findByUsuarioIdAndIdempotencyKey` antes de
+  qualquer efeito colateral e persiste a chave em `movimentacoes_ativo.idempotency_key`. Migration
+  nova `V44__movimentacao_ativo_idempotency.sql` cria a coluna e o indice unico parcial
+  `ux_movimentacoes_ativo_usuario_idempotency` (molde de V11). A "protecao" anterior (chave do
+  ledger/operacao derivada de `mov.getId()`) era falsa — dois cliques geravam ids diferentes e
+  nunca colidiam. Clientes passaram a enviar o header: `mobile/src/services/investimentoService.ts`
+  + `mobile/app/(app)/more/investimentos.tsx` (chave por abertura do formulario) e
+  `frontend/src/services/investimentoService.ts` + `frontend/src/pages/Investimentos.tsx` (chave
+  mantida ate a movimentacao entrar). Evidencia: `./mvnw test` 292 testes/0 falhas, incluindo
+  `InvestimentoIdempotenciaPaginacaoTest` (5, novo); migration V44 validada em runtime (PostgreSQL 16
+  efemero, `SPRING_PROFILES_ACTIVE=dev`, `ddl-auto=validate`, Flyway aplicou 43 migrations ate v44,
+  `\d movimentacoes_ativo` mostra o indice unico parcial); contrato HTTP verificado — dois POSTs com
+  o mesmo `Idempotency-Key` retornaram o mesmo `id` e uma unica movimentacao. Ver BUG-0076.
+  **Ressalva:** flow Maestro `financial-critical` (que exercita este endpoint via app) nao foi
+  executado nesta rodada — ver BACKLOG-0095.
 
 ---
 
@@ -1091,7 +1108,23 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Dependencias:** nenhuma tecnica; ajuste de contrato de API (`API.md`, fora da responsabilidade deste agente de documentacao) e dos clientes (web/mobile) que consomem a listagem.
 - **Criterio de aceite:** endpoint de listagem de investimentos aceita `page`/`size` (ou equivalente ja usado em outras listagens do sistema); resposta inclui metadados de paginacao; clientes web/mobile atualizados para consumir paginado.
 - **Risco se ficar pendente:** degradacao de performance e payload crescente para usuarios com muitas movimentacoes de investimento acumuladas.
-- **Status:** ABERTO
+- **Status:** FECHADO (2026-08-21, working tree ainda nao commitado na `main`) — muda contrato de
+  API (breaking change). `GET /api/v1/investimentos` e `GET
+  /api/v1/investimentos/{ativoId}/movimentacoes` passam a devolver `Page` com
+  `@PageableDefault(size = 20)` e `PaginationUtils.enforceMaxSize(pageable, 100)`, como
+  `TransacaoController`. Repositorios ganharam variantes paginadas. Os dois clientes consomem
+  `.content ?? []` com `size=100` (padrao ja usado em `categoriaService`/`contaFinanceiraService`):
+  `mobile/src/services/investimentoService.ts` + `mobile/app/(app)/more/investimentos.tsx` e
+  `frontend/src/services/investimentoService.ts` + `frontend/src/pages/Investimentos.tsx`.
+  Evidencia: `./mvnw test` 292/0 falhas (`InvestimentoIdempotenciaPaginacaoTest` cobre paginacao;
+  `InvestimentoCustodiaCotacaoTest` ajustado ao retorno paginado); contrato verificado —
+  `GET /v1/investimentos/{id}/movimentacoes` devolve envelope `Page` (`totalElements`, `size=20`);
+  `GET /v1/investimentos?size=500` e capado em `size=100`. Ver BUG-0077.
+  **Pendencia explicita:** o caminho citado na auditoria original (`API.md`) e, na verdade,
+  `backend/API.md` — arquivo que **nao documenta** os endpoints de investimentos (nem antes nem
+  depois desta mudanca; `grep -i investimento backend/API.md` nao retorna nada). Nao foi atualizado
+  por este agente — fora do escopo de arquivos que o `docs-reporter` mantem, e fora do dono correto
+  (`backend/API.md` nao e `docs/`). Ver BACKLOG-0097.
 
 ---
 
@@ -1103,7 +1136,14 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Dependencias:** nenhuma.
 - **Criterio de aceite:** `RefreshToken.toString()` (Lombok `@ToString` ou implementacao manual) exclui explicitamente o campo do token/hash; teste ou verificacao manual confirmando que `toString()` nao contem o valor sensivel.
 - **Risco se ficar pendente:** vazamento de token de refresh (equivalente a sequestro de sessao) em logs de aplicacao, caso a entidade seja logada por engano em algum ponto futuro do codigo.
-- **Status:** ABERTO
+- **Correcao da descricao original (2026-08-21):** a premissa da auditoria de 2026-07-14 estava
+  errada — a entidade **ja tinha** `toString()` customizado (`model/RefreshToken.java`), e era
+  exatamente esse metodo o vazamento: imprimia 20 chars do hash SHA-256 do token e
+  `usuario.getEmail()` (PII), alem de disparar lazy-load e poder estourar NPE no `substring`.
+- **Status:** FECHADO (2026-08-21, working tree ainda nao commitado na `main`) — `toString()` agora
+  expoe so `id`, `usuarioId` (via `usuario.getId()`, que nao forca o lazy load) e
+  `dataExpiracao`/`revogado`. Evidencia: `RefreshTokenToStringTest` (2, novo) dentro de `./mvnw
+  test` 292/0 falhas. Ver BUG-0078.
 
 ---
 
@@ -1115,7 +1155,15 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Dependencias:** identificar exaustivamente os pares afetados (nao levantado nesta rodada de documentacao — a auditoria original apontou o padrao de risco, sem lista fechada de entidades).
 - **Criterio de aceite:** entidades com relacionamento bidirecional usam `@ToString.Exclude`/`@EqualsAndHashCode.Exclude` (ou equivalente manual) no lado que fecha o ciclo; teste ou verificacao manual de que `toString()`/`equals()`/`hashCode()` nao estoura em nenhum par bidirecional do modelo.
 - **Risco se ficar pendente:** `StackOverflowError` em runtime se algum caminho de codigo (log, debug, comparacao) acionar `toString()`/`equals()`/`hashCode()` num objeto com ciclo bidirecional nao protegido.
-- **Status:** ABERTO
+- **Lista fechada (2026-08-21):** `grep mappedBy backend/src/main/java/com/gestor/financeiro/model/*.java`
+  confirma exatamente 2 ciclos bidirecionais no modelo: `Ativo` ↔ `MovimentacaoAtivo`
+  (`model/Ativo.java:66`) e `Transacao` ↔ `Parcela` (`model/Transacao.java:80`).
+- **Status:** FECHADO (2026-08-21, working tree ainda nao commitado na `main`) — os dois pares
+  ganharam `@ToString.Exclude` + `@EqualsAndHashCode.Exclude` nos dois lados; o par de
+  investimentos (`Ativo`/`MovimentacaoAtivo`) ganhou tambem `@JsonIgnoreProperties`, que nao tinha
+  nenhuma protecao antes (nem no JSON) — `Transacao`↔`Parcela` ja tinha. Evidencia:
+  `EntidadesBidirecionaisSemRecursaoTest` (2, novo) dentro de `./mvnw test` 292/0 falhas. Ver
+  BUG-0079.
 
 ---
 
@@ -1127,7 +1175,16 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Dependencias:** BACKLOG-0011 (relacionado, ja fechado — este item e um follow-up mais amplo, nao uma reabertura).
 - **Criterio de aceite:** revisao linha a linha do `application.properties` base classificando cada default como (a) seguro para dev local, (b) exige override obrigatorio em prod (documentado), ou (c) deve ser removido; nenhum default sensivel de producao herdado silenciosamente do perfil base.
 - **Risco se ficar pendente:** configuracao insegura de producao por omissao, caso um profile futuro (`-vps`/`-prod`) deixe de sobrescrever algum default sensivel do perfil base sem que isso seja percebido.
-- **Status:** ABERTO
+- **Status:** FECHADO (2026-08-21, working tree ainda nao commitado na `main`) — defaults do perfil
+  base (`backend/src/main/resources/application.properties`) invertidos para o lado seguro:
+  `spring.jpa.show-sql=false`, `app.docs.public=false`, `management.endpoint.health.show-details=never`,
+  `logging.level.com.gestor.financeiro=INFO`, `logging.level.org.springframework.security=WARN`,
+  `cookie.secure=${COOKIE_SECURE:true}`, `cors.allowed.origins=${CORS_ALLOWED_ORIGINS:}` (sem
+  default de dev). `application-dev.properties` ja declarava todos esses valores explicitamente,
+  entao o desenvolvimento nao muda. `src/test/resources/application-test.properties` passou a
+  declarar `app.docs.public=true` e `show-details=always`, que os testes de infraestrutura
+  exercitam e que antes vinham herdados do base. Evidencia: `./mvnw test` 292/0 falhas. Ver
+  BUG-0080.
 
 >
 > Atualizacao anterior: 2026-07-10 (auditoria backend/non-frontend alto nivel: BACKLOG-0058 a BACKLOG-0069 — ver PROBLEM_LEDGER PROB-0049 a PROB-0060 e relatorio `REVIEW_REPORTS/2026-07-10_backend_nonfrontend_high-level-audit.md`).
@@ -1467,6 +1524,90 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 
 ---
 
+## BACKLOG-0095 — `financial-critical` ainda vermelho no trecho da compra no cartão
+
+- **Titulo:** O flow Maestro `financial-critical` passa 119 comandos e falha ao asseverar
+  "Compra cartão smoke" depois de salvar a segunda transação (compra no cartão)
+- **Prioridade:** P2
+- **Área:** mobile, testes
+- **Motivo (histórico, 2026-08-21, execução em simulador):** Na primeira execução real em
+  simulador (iPhone 17 Pro, iOS 26.5, Release, backend local 8090/`gf_e2e`), o flow passou a
+  cobrir cadastro em 3 passos, onboarding em 6, criação de categoria, cartão, meta e a
+  **primeira** transação. A falha restante era no bloco da segunda transação: o flow seleciona
+  "Cartão" como forma de pagamento, assevera "Cartão Principal" e salva, mas a transação não
+  aparecia na home. Não tinha sido determinado se faltava selecionar o cartão específico (chip
+  separado do "pagar com"), se a validação recusava silenciosamente ou se era timing de refetch.
+- **Causa raiz identificada (2026-08-21, rodada de correção):** diferente da hipótese acima — não
+  é timing nem validação silenciosa. A validação de cartão existe e é visível
+  (`mobile/src/components/NovaTransacaoModal.tsx:273` seta `pagamentoError`) e `:151` auto-seleciona
+  o primeiro cartão. O real problema: o `invalidateQueries` do modal não incluía `['home']` nem
+  `['operacoes']` — as duas únicas chaves que alimentam a Home — e nenhum outro ponto do app
+  invalidava essas chaves. A Home só atualizava porque o call site dela (`app/(app)/(inicio)/index.tsx`)
+  passava `onSaved` com `refetch()` manual; salvar pelo FAB da tab bar (`app/(app)/_layout.tsx`,
+  `onSaved` navega para `/transacoes`) ou pela tela de faturas deixava a Home com dados velhos. O
+  flow rola a Home antes de tocar "Nova transação", o `SaldoCard` sai do viewport e o toque acerta
+  o FAB da tab bar — o caminho que não atualizava.
+- **Correção aplicada (2026-08-21):** fonte única de invalidação em
+  `mobile/src/hooks/useInvalidarAposTransacao.ts` (`CHAVES_AFETADAS_POR_TRANSACAO` inclui `['home']`
+  e `['operacoes']`), consumida por `mobile/src/components/NovaTransacaoModal.tsx` e
+  `mobile/src/components/EditarTransacaoModal.tsx` (que antes duplicavam a lista de chaves cada
+  um). O `onSaved` da Home (`app/(app)/(inicio)/index.tsx`) deixou de fazer `refetch()` manual
+  (pull-to-refresh continua usando `atualizar()`). No flow `mobile/.maestro/financial-critical.yaml`,
+  o `extendedWaitUntil` do bloco "Compra cartão smoke" virou `scrollUntilVisible` (a seção
+  "Parcelas Agendadas" aparece e empurra a lista) e foi acrescentado o guard rail
+  `assertNotVisible: "Selecione um cartão."`. Teste automatizado novo:
+  `mobile/src/__tests__/invalidarAposTransacao.test.ts` (3 casos — invalida as duas queries da
+  Home; invalida a lista compartilhada mais as chaves extras da edição; sem chave duplicada na
+  lista compartilhada).
+- **Dependências:** Nenhuma. Os demais flows (`smoke-auth`, `privacy-consent`,
+  `recovery-navigation`) estão verdes.
+- **Critério de aceite:** `financial-critical` verde ponta a ponta contra backend local, e os
+  passos seguintes (fatura, pagamento parcial, reserva na meta) exercitados pelo menos uma vez.
+- **Risco se ficar pendente:** o trecho financeiro mais sensível (fatura e pagamento parcial)
+  continua sem cobertura E2E executada, embora coberto por testes de backend.
+- **Status:** ABERTO — a causa raiz foi corrigida e validada por `npx tsc --noEmit` limpo e Jest
+  200/200 no mobile (3 testes novos), mas o critério de aceite é `financial-critical` verde ponta
+  a ponta no simulador, e o flow **não foi executado nesta rodada** (sem simulador disponível).
+  Fica pendente só a execução. Ver BUG-0082.
+
+---
+
+## BACKLOG-0096 — Telas com texto invisível para a árvore de acessibilidade
+
+- **Titulo:** Vários rótulos só existem dentro de `Touchable` com `accessibilityLabel` próprio, o
+  que os esconde de leitores de tela e de automação
+- **Prioridade:** P3
+- **Área:** mobile, acessibilidade
+- **Motivo:** Durante a rodada Maestro de 2026-08-21, `tapOn`/`assertVisible` por texto falharam em
+  elementos claramente visíveis: botão "Carteira" do `SaldoCard` (label "Abrir carteira"), ação
+  "+ Cartão" da Carteira ("Cadastrar novo cartão"), "Salvar" do formulário de cartão ("Salvar
+  cartão") e o nome da meta no `CardMeta` ("Abrir detalhes da meta X"). Os flows foram ajustados
+  para usar os labels reais, mas o padrão merece uma revisão: quando o label do container substitui
+  o texto, o conteúdo textual some da árvore.
+- **Critério de aceite:** convenção registrada no DESIGN.md sobre quando usar `accessibilityLabel`
+  no container e quando deixar o texto acessível; telas revisadas conforme a convenção.
+- **Status:** FECHADO (2026-08-21, working tree ainda nao commitado na `main`) — convenção nova
+  registrada em `DESIGN.md` (seção "Acessibilidade"): controle com texto visível não leva
+  `accessibilityLabel` (o RN deriva o rótulo dos filhos); `accessibilityLabel` só para controles
+  icon-only; contexto extra vai em `accessibilityHint`; `accessibilityRole`/`accessibilityState`
+  continuam sempre. Pontos corrigidos (label removido, hint quando havia contexto a preservar):
+  `mobile/src/components/home/SaldoCard.tsx` (botões "Nova Transação" e "Carteira", era "Abrir
+  carteira"); `mobile/app/(app)/more/faturas.tsx` (ação "+ Cartão", era "Cadastrar novo cartão", e
+  "Salvar" do formulário de cartão, era "Salvar cartão"); `mobile/src/components/metas/CardMeta.tsx`
+  (card da meta, era "Abrir detalhes da meta X", e botão "Depositar", era "Depositar na meta X"; o
+  `AnelProgresso` deixou de repetir o nome da meta no label). Mesma regra aplicada em pontos não
+  catalogados originalmente no item: `mobile/src/components/NovaTransacaoModal.tsx` (4 botões de
+  setup rápido), `mobile/src/components/home/ParcelasCarrossel.tsx` (2),
+  `mobile/src/components/carteira/LinhaFatura.tsx` (1), `mobile/app/(app)/more/fatura.tsx` ("Pagar
+  Fatura"). Mantidos os labels legítimos de controles icon-only (`ui/Fab`, FAB da tab bar,
+  `ui/BackButton`, badge "OK/Divergente" da tela Contas, ícones de editar/excluir). Flows Maestro
+  voltaram a buscar por texto: `mobile/.maestro/financial-critical.yaml` usa "Carteira", "Cartão",
+  "Salvar", "Meta Smoke", "Depositar" no lugar dos labels de workaround; o comentário de workaround
+  foi removido. Evidência: `npx tsc --noEmit` limpo e Jest 200/200 no mobile. Ver BUG-0081.
+  **Ressalva:** não houve verificação manual com TalkBack/VoiceOver.
+
+---
+
 ## BACKLOG-0094 — Corrigir interceptor Axios do mobile para não descartar mensagem de `BusinessException`
 
 - **Titulo:** `mobile/src/services/api.ts` só usa `error.response.data.details` em 400/422; mensagem
@@ -1497,3 +1638,31 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   pontual como o de `ajustes.tsx` — pior experiência de erro e mais chance de o usuário repetir a
   mesma ação sem entender por que ela falha.
 - **Status:** FECHADO (2026-08-21) — corrigido na origem em `mobile/src/services/api.ts` junto do redesign de inscrição/onboarding; ver BUG-0070 e PROB-0083.
+
+---
+
+## BACKLOG-0097 — Documentar contrato de investimentos em `backend/API.md` (paginação + `Idempotency-Key`)
+
+- **Titulo:** `backend/API.md` não documenta os endpoints de investimentos; a rodada de 2026-08-21
+  (BACKLOG-0081/BACKLOG-0082) tornou a lacuna mais grave ao mudar o contrato HTTP desses endpoints
+- **Prioridade:** P2
+- **Área:** documentação, backend
+- **Motivo:** Na correção de BACKLOG-0081 (idempotência) e BACKLOG-0082 (paginação) em 2026-08-21,
+  `POST /api/v1/investimentos/{ativoId}/movimentacoes` passou a aceitar o header `Idempotency-Key`
+  e `GET /api/v1/investimentos` / `GET /api/v1/investimentos/{ativoId}/movimentacoes` passaram a
+  devolver um envelope `Page` em vez de lista simples (breaking change de contrato). O arquivo de
+  referência de contrato do backend, `backend/API.md` (não `docs/API.md` — esse caminho não existe
+  no repositório), não documentava investimentos nem antes nem depois dessa mudança
+  (`grep -i investimento backend/API.md` não retorna nada).
+- **Dependências:** Nenhuma técnica. `backend/API.md` está fora dos arquivos que `docs-reporter`
+  mantém (não está em `docs/`) — precisa ser tratado por quem edita `backend/`, ou por decisão
+  explícita de estender a responsabilidade deste agente a esse arquivo.
+- **Critério de aceite:** `backend/API.md` passa a documentar
+  `GET /api/v1/investimentos`, `GET /api/v1/investimentos/{ativoId}/movimentacoes` (envelope
+  `Page`, `page`/`size`, teto `size<=100`) e
+  `POST /api/v1/investimentos/{ativoId}/movimentacoes` (header `Idempotency-Key` opcional,
+  comportamento em reenvio da mesma chave).
+- **Risco se ficar pendente:** clientes externos (fora de mobile/web, que já foram atualizados)
+  integrando contra o contrato antigo (lista simples, sem idempotência) quebram sem aviso
+  documentado; consumidores futuros da API não sabem que o header existe.
+- **Status:** ABERTO
