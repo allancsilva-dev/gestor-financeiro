@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text, TouchableOpacity, StyleProp, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useTheme } from '../../theme';
+import { useTheme, useTabBarSpace } from '../../theme';
 
 interface FabProps {
   onPress: () => void;
@@ -9,9 +9,13 @@ interface FabProps {
   style?: StyleProp<ViewStyle>;
 }
 
-// FAB violeta com gradiente e glow (protótipo: 140deg #7c5cfc→#8b2fff)
+// FAB flutuante das sub-telas (Categorias, Recorrências). Fica ACIMA da tab
+// bar flutuante: com `bottom` fixo ele nascia atrás do painel de navegação e o
+// toque não chegava nele. Cores do tema (fabFrom/fabTo), não o violeta cru do
+// protótipo antigo.
 export default function Fab({ onPress, accessibilityLabel, style }: FabProps) {
   const colors = useTheme();
+  const tabBarSpace = useTabBarSpace();
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -22,8 +26,8 @@ export default function Fab({ onPress, accessibilityLabel, style }: FabProps) {
         {
           position: 'absolute',
           right: 16,
-          bottom: 24,
-          shadowColor: colors.brand,
+          bottom: tabBarSpace,
+          shadowColor: colors.fabGlow,
           shadowOpacity: 0.5,
           shadowRadius: 12,
           shadowOffset: { width: 0, height: 6 },
@@ -33,7 +37,7 @@ export default function Fab({ onPress, accessibilityLabel, style }: FabProps) {
       ]}
     >
       <LinearGradient
-        colors={[colors.brand, '#8b2fff']}
+        colors={[colors.fabFrom, colors.fabTo]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={{ width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' }}

@@ -7,6 +7,7 @@ import contaFinanceiraService, { contaGerenciada } from '../../../src/services/c
 import { TIPO_MOVIMENTO_LABEL, formatCurrency, formatDateTime, parseCurrencyBR, maskCurrencyInput } from '../../../src/utils/format';
 import { ContaFinanceira, ContaFinanceiraRequest, SubtipoContaFinanceira } from '../../../src/types';
 import { useTheme, useTabBarSpace } from '../../../src/theme';
+import Fab from '../../../src/components/ui/Fab';
 import BackButton from '../../../src/components/ui/BackButton';
 import SkeletonBox from '../../../src/components/ui/SkeletonBox';
 
@@ -271,12 +272,7 @@ export default function CarteirasScreen() {
         />
       )}
 
-      <TouchableOpacity
-        onPress={() => setModalVisible(true)}
-        style={{ position: 'absolute', bottom: 24, right: 16, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' }}
-      >
-        <Text style={{ color: colors.brandText, fontSize: 28, lineHeight: 30 }}>+</Text>
-      </TouchableOpacity>
+      <Fab onPress={() => setModalVisible(true)} accessibilityLabel="Nova conta" />
 
       <ExtratoModal carteira={extratoDe} onClose={() => setExtratoDe(null)} />
 

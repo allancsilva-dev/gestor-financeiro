@@ -172,7 +172,7 @@ export default function Home() {
           oculto={oculto}
           onToggleOculto={alternarOculto}
           onNovaTransacao={() => setLancarAberto(true)}
-          onCarteira={() => router.push('/more/carteiras' as never)}
+          onCarteira={() => router.push('/more/faturas' as never)}
           carregando={homeQuery.isLoading}
           erro={homeQuery.isError}
           onTentarNovamente={() => homeQuery.refetch()}
