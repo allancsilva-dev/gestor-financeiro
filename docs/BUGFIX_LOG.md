@@ -4,6 +4,91 @@ Registro de bugs corrigidos. Mantido pelo `docs-reporter`.
 
 ---
 
+## BUG-0070 — Erros do backend chegavam genéricos ao app (login, cadastro e bloqueio de conta)
+
+- **Problemas relacionados:** PROB-0083, BACKLOG-0094, BUG-0069
+- **Data:** 2026-08-21
+- **Area:** mobile, auth
+- **Sintoma:** Três mensagens diferentes chegavam ao usuário como texto genérico:
+  senha errada no login (`422 BUSINESS_ERROR "Email ou senha incorretos"`) e e-mail já cadastrado
+  (`422 BUSINESS_ERROR "Email já cadastrado!"`) viravam "Dados inválidos. Verifique os campos.";
+  rate limit e bloqueio de conta por tentativas (`429 RATE_LIMIT` / `429 ACCOUNT_LOCKED`, com
+  `Retry-After`) viravam "Erro inesperado. Tente novamente." — o usuário era bloqueado por 60s ou
+  15min sem nenhuma explicação.
+- **Causa raiz:** `mobile/src/services/api.ts` colapsava o envelope `ApiError`
+  (`{code, message, details}`) numa única `userMessage`: em 400/422 lia só `details` (ignorando
+  `message` quando `details` era nulo) e não tinha ramo para 429. O mapa `details` (campo→mensagem)
+  também nunca chegava às telas, o que impedia erro por campo em qualquer formulário do app.
+- **Correcao aplicada:** o interceptor passou a preservar o envelope inteiro no erro enriquecido
+  (`codigo`, `campos`, `status`, `retryAfterSegundos`), com precedência explícita em 400/422
+  (detalhe de campo → mensagem de negócio → fallback) e ramo dedicado para 429 (mensagem do
+  backend ou tempo do `Retry-After`). Novo `mobile/src/utils/erros.ts` centraliza a leitura
+  (`mensagemDeErro`, `camposDeErro`, `chavesDeErro`, `ehSessaoExpirada`, `segundosParaTentarDeNovo`).
+  O contorno local do BUG-0069 em `ajustes.tsx` foi removido, já que a origem está corrigida.
+- **Arquivos alterados:** `mobile/src/services/api.ts`, `mobile/src/types/index.ts`,
+  `mobile/src/utils/erros.ts` (novo), `mobile/app/(app)/ajustes.tsx`,
+  `mobile/src/__tests__/AjustesScreen.test.tsx`
+- **Testes/validacoes executadas:** `mobile/src/__tests__/apiErros.test.ts` (7 casos: 422 com e sem
+  `details`, preservação de todos os campos, 429 `ACCOUNT_LOCKED`, 429 só com `Retry-After`, 401 em
+  rota de auth, falha de rede). Verificação em runtime contra backend local (porta 8094, banco
+  descartável `gf_auth_v2`): `422 {"code":"BUSINESS_ERROR","message":"Email ou senha incorretos"}`,
+  `422 "Email já cadastrado!"` e `429 {"code":"RATE_LIMIT","message":"Muitas tentativas. Aguarde 60
+  segundos e tente novamente."}` com `Retry-After: 50`.
+- **Resultado:** PASS
+
+---
+
+## BUG-0071 — Cadastro criava contas duplicadas por diferença de maiúsculas no e-mail
+
+- **Data:** 2026-08-21
+- **Area:** backend, mobile, auth
+- **Sintoma:** `Alice@x.com` e `alice@x.com` criavam duas contas distintas; quem cadastrava com
+  maiúscula e depois digitava minúsculo (ou o contrário) recebia "Email ou senha incorretos" e não
+  conseguia mais entrar na própria conta.
+- **Causa raiz:** nenhuma ponta normalizava o e-mail. `AuthController.register` usava
+  `findByEmail` exato e gravava o valor cru; o índice `UNIQUE` do Postgres é sensível a caixa; o
+  app só fazia `trim()`.
+- **Correcao aplicada:** backend grava `email.trim().toLowerCase()` e checa duplicidade com
+  `existsByEmailIgnoreCase`; login e recuperação de senha passaram por `buscarPorEmail`, que tenta
+  o casamento exato primeiro (preserva contas legadas com maiúsculas) e só cai no
+  `findAllByEmailIgnoreCase` quando existe exatamente uma conta equivalente — nunca escolhe entre
+  duas contas legadas ambíguas. No app, `normalizarEmail` é aplicado no cadastro.
+- **Arquivos alterados:** `backend/.../controller/AuthController.java`,
+  `backend/.../repository/UsuarioRepository.java`, `mobile/src/utils/validate.ts`,
+  `mobile/src/services/authService.ts`, `mobile/app/(auth)/register.tsx`
+- **Testes/validacoes executadas:** `AuthControllerTest` 28/28 PASS, com três casos novos
+  (normalização para minúsculo, duplicidade recusada com caixa diferente, login aceitando caixa
+  diferente da cadastrada). Runtime contra backend local: cadastro de `Ana.Souza@Teste.com` gravou
+  `ana.souza@teste.com`, segundo cadastro em minúsculo devolveu 422 e login com `ANA.souza@teste.com`
+  autenticou.
+- **Resultado:** PASS
+
+---
+
+## BUG-0072 — Checklist "Complete seu setup" sumiu da home no redesign de navegação
+
+- **Data:** 2026-08-21
+- **Area:** mobile
+- **Sintoma:** Usuário novo terminava o onboarding e chegava na home com 1 conta, 0 categorias e 0
+  cartões, sem nenhum convite a continuar o setup. `src/store/homeChecklist.ts` e seu teste
+  continuavam no repositório, mas nenhuma tela importava o store.
+- **Causa raiz:** regressão silenciosa — o checklist entrou em `f0b27de` (PR-F3-10) em
+  `mobile/app/(app)/index.tsx` e foi perdido quando a home mudou de arquivo no redesign de
+  navegação (`9a3b205`), confirmado por `git log -S homeChecklist -- mobile/app`. O checklist era
+  justamente a contrapartida que justificou reduzir o onboarding a uma etapa única (PR-F3-09).
+- **Correcao aplicada:** checklist restaurado em `mobile/app/(app)/(inicio)/index.tsx`, agora no
+  padrão visual novo (`Card` + `ListRow` + `Entrance`) e derivado apenas das queries que a home já
+  faz (nenhum request extra): primeira movimentação, categorias, primeira meta e cartão. Continua
+  dispensável de vez pelo `dismissHomeChecklist` já existente.
+- **Arquivos alterados:** `mobile/app/(app)/(inicio)/index.tsx`
+- **Testes/validacoes executadas:** `npx tsc --noEmit` e `npm run lint` limpos; suíte mobile
+  194/194 PASS. Validação visual em simulador **não executada** (ver ressalva do relatório).
+- **Resultado:** PASS_COM_RESSALVA
+- **Ressalvas:** derivação de "cartão cadastrado" usa `saldoEmCartoes`/`totalFaturas` do agregado
+  `/v1/home` — um cartão sem fatura e sem saldo mantém o item visível até o primeiro uso.
+
+---
+
 ## BUG-0058 — Hardening de release, LGPD e acessibilidade mobile
 
 - **Problemas relacionados:** BACKLOG-0073, BACKLOG-0075, BACKLOG-0076, BACKLOG-0077, BACKLOG-0078, BACKLOG-0079
@@ -1170,6 +1255,77 @@ Registro de bugs corrigidos. Mantido pelo `docs-reporter`.
 - **Testes/validacoes executadas:** Jest → 13 suites / 41 testes PASS. Regressao comprovada manualmente: com `git stash` do `format.ts` corrigido, o novo teste falha com `Expected "19/08/2026" / Received "18/08/2026"`, `"01/01/2026"/"31/12/2025"` e `"31/12/2026"/"30/12/2026"`. `npm run typecheck` → PASS. `npm run lint` → **2 erros pre-existentes** em `mobile/src/components/NovaTransacaoModal.tsx:108` e `:164` ("Definition for rule 'react-hooks/exhaustive-deps' was not found"); confirmado pre-existente reproduzindo o mesmo erro com a arvore limpa (`git stash -u`), em arquivo nao tocado por esta correcao. Evidencia visual no simulador iOS: lista de Transacoes passou a mostrar 19/08/2026; meta "Viagem" com data limite 31/12/2026 exibe "ate 31/12/2026", a tela de edicao reabre com 31/12/2026 e, apos salvar, a API mantem `dataPrevista: 2026-12-31` (round-trip correto).
 - **Resultado:** PASS_COM_RESSALVA
 - **Ressalvas:** (1) Sem commit ainda — mudancas apenas no working tree sobre a baseline `175d8ea` (branch `main`). (2) `npm run lint` do mobile falha por 2 erros pre-existentes e nao relacionados (`react-hooks/exhaustive-deps` nao encontrada) — como o lint e `--max-warnings=0` e bloqueante na CI, isso bloqueia merge ate ser corrigido; ver BACKLOG-0093. (3) Mesmo bug de fuso confirmado no frontend web, sem correcao aplicada nesta rodada (mobile e web nao compartilham helper de formatacao); ver BACKLOG-0092. (4) Armadilha de verificacao registrada: o dev-client do simulador serviu bundle de cache do Metro por 2 tentativas, mostrando o valor antigo mesmo com o codigo corrigido; so apos reiniciar o Metro com `expo start -c` a tela refletiu a correcao — relevante para quem for reproduzir a validacao.
+- **Commit:** pendente
+
+---
+
+---
+
+## BUG-0068 — Maestro `smoke-auth.yaml` asserta rótulos de tab bar que não existem mais
+
+- **Problema relacionado:** N/A
+- **Data:** 2026-08-21
+- **Area:** mobile, documentacao/teste
+- **Sintoma:** `mobile/.maestro/smoke-auth.yaml` fazia `assertVisible` para "Início", "Transações",
+  "Planejamento" e "Mais" logo após o login. Nenhuma dessas quatro strings corresponde à tab bar
+  atual do app (`Início · Análises · + · Metas · Ajustes`, `mobile/app/(app)/_layout.tsx`) — os
+  rótulos "Transações", "Planejamento" e "Mais" não existem em nenhuma tela do app no estado atual
+  do repositório. Descoberto ao revisar o flow como parte do redesign de `ajustes.tsx` na mesma
+  sessão (a antiga tela "Mais" deixou de existir como tal).
+- **Causa raiz:** O flow não foi atualizado nas rodadas anteriores de redesign de navegação/tema
+  (commits `9a3b205`/`63df4b1`/`73caf8b` e seguintes, que trocaram a tab bar) nem na reversão do
+  protótipo "Fase 4" (PROB-0082, 2026-08-19, que restaurou uma tab bar diferente desta). Além
+  disso, a tab bar nativa (`react-native-screens`) não expõe os rótulos das abas na árvore de
+  acessibilidade que o Maestro lê — mesmo corrigindo os textos, `assertVisible` por rótulo de aba
+  não é uma asserção confiável para essa tab bar.
+- **Correcao aplicada:** As quatro asserções por rótulo de aba foram substituídas por
+  `assertVisible: "Saldo Disponível"`, conteúdo real da Home que confirma que o login levou à tela
+  certa, com um comentário no próprio YAML explicando por que a asserção deixou de ser por aba.
+- **Arquivos alterados:** `mobile/.maestro/smoke-auth.yaml`
+- **Testes/validacoes executadas:** Correção lida e conferida por inspeção do arquivo; a execução
+  real do flow em simulador/dispositivo via Maestro **não foi executada nesta rodada** (mesma
+  pendência de rodada Maestro/visual já registrada para o Bloco B da Fase 3 e para o redesign de
+  metas/tema).
+- **Resultado:** PASS_COM_RESSALVA
+- **Ressalvas:** Não executado em Maestro real nesta rodada — só a leitura/edição do YAML foi
+  validada. Outros flows Maestro do projeto (`financial-critical.yaml`, `fase4-visual.yaml` já
+  removido) não foram auditados em busca do mesmo problema nesta sessão.
+- **Commit:** pendente (working tree não commitado sobre a baseline `12cc447` na `main`)
+
+---
+
+## BUG-0069 — Mensagem de erro genérica na exclusão de conta com senha incorreta
+
+- **Problema relacionado:** PROB-0083
+- **Data:** 2026-08-21
+- **Area:** mobile, LGPD
+- **Sintoma:** No fluxo novo de exclusão de conta (`mobile/app/(app)/ajustes.tsx`), enviar a senha
+  errada para `DELETE /v1/usuarios/me` fazia a tela exibir "Dados inválidos. Verifique os campos."
+  em vez de "Senha incorreta" — a mensagem de negócio devolvida pelo backend (HTTP 422,
+  `{"code":"BUSINESS_ERROR","message":"Senha incorreta"}`) era descartada pelo interceptor
+  genérico do Axios (ver PROB-0083, causa raiz completa e não corrigida na origem).
+  Reproduzido contra backend local (porta 8093, banco `gf_ajustes`) via `curl` e via app no
+  simulador iOS.
+- **Causa raiz:** `mobile/src/services/api.ts` só usa `error.response.data.details` para montar a
+  mensagem amigável de 400/422; `BusinessException` sem `details` (`details: null`) nunca chega à
+  UI com o texto real.
+- **Correcao aplicada:** Contorno local, não a correção do interceptor (que fica pendente,
+  BACKLOG-0094): em `mobile/app/(app)/ajustes.tsx`, o handler do modal de exclusão lê
+  `err.response.data.message` diretamente quando `err.response.data.code === 'BUSINESS_ERROR'`,
+  em vez de depender de `err.userMessage` (que o interceptor já teria mascarado).
+- **Arquivos alterados:** `mobile/app/(app)/ajustes.tsx`
+- **Testes/validacoes executadas:** Manual via `curl -X DELETE
+  http://localhost:8093/api/v1/usuarios/me` com senha errada (422, mensagem "Senha incorreta"
+  confirmada no corpo da resposta) e com senha certa (204, seguido de tentativa de login com a
+  mesma conta falhando — confirma exclusão real). Teste automatizado
+  `mobile/src/__tests__/AjustesScreen.test.tsx` (`'mostra o erro do backend e mantém a sessão
+  quando a senha está errada'`) cobre o caminho de erro com mock do Axios. Suite completa do
+  mobile: 172 testes PASS (`npm test`); `npm run lint` e `npm run typecheck` limpos.
+- **Resultado:** PASS_COM_RESSALVA
+- **Ressalvas:** Correção é local a esta tela — qualquer outra tela que dependa de mensagem de
+  `BusinessException` em 400/422 continua recebendo o texto genérico até o interceptor ser
+  corrigido na origem (PROB-0083/BACKLOG-0094). Sem commit ainda — mudanças no working tree sobre
+  a baseline `12cc447` (branch `main`).
 - **Commit:** pendente
 
 ---

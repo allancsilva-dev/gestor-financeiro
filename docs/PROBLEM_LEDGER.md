@@ -1750,3 +1750,87 @@ esta evidência histórica não fecha o problema;
   porque a decisão do dono foi descartar o trabalho — o risco é apenas de perda de opcionalidade
   futura, não de regressão em produção.
 - **Proximo passo:** Ver BACKLOG-0090.
+
+---
+
+## PROB-0084 — Redesign de navegação removeu silenciosamente o checklist de setup da home
+
+- **ID:** PROB-0084
+- **Titulo:** Funcionalidade entregue no PR-F3-10 (`Complete seu setup`) desapareceu da home sem
+  registro, deixando `src/store/homeChecklist.ts` e seu teste órfãos no repositório
+- **Data:** 2026-08-21
+- **Origem:** auditoria do fluxo de inscrição/onboarding (mesma sessão), antes de redesenhar as telas
+- **Severidade:** MEDIUM
+- **Status:** RESOLVIDO (2026-08-21) — checklist restaurado no padrão visual novo; ver BUG-0072
+- **Area:** mobile
+- **Sintoma:** Usuário novo terminava o onboarding mínimo (uma etapa) e chegava na home sem
+  categorias, sem cartão e sem nenhum convite a completar o setup. O store
+  `src/store/homeChecklist.ts` e `src/__tests__/homeChecklist.test.ts` continuavam no repositório,
+  mas `rg 'homeChecklist' --glob '*.tsx'` não retornava nenhum consumidor.
+- **Causa raiz:** o checklist nasceu em `mobile/app/(app)/index.tsx` no commit `f0b27de` (PR-F3-10)
+  e não foi transportado quando a home mudou de arquivo para `app/(app)/(inicio)/index.tsx` no
+  commit `9a3b205` ("feat(mobile): refresh navigation and theme"). `git log -S homeChecklist --
+  mobile/app` mostra exatamente os dois commits: entrada e saída.
+- **Impacto de processo:** o teste unitário do store continuou verde durante todo o período, o que
+  escondeu a perda — a suíte cobria a persistência da dispensa, não a existência do consumidor.
+  Vale como lição para futuras migrações de tela: um store sem importador em `.tsx` é sinal de
+  funcionalidade perdida.
+
+---
+
+## PROB-0083 — Interceptor Axios do mobile descarta mensagem de `BusinessException` em 400/422
+
+- **ID:** PROB-0083
+- **Titulo:** `mobile/src/services/api.ts` só lê `error.response.data.details` para montar
+  `userMessage` em 400/422; respostas no formato `{"code":"BUSINESS_ERROR","message":"...","details":null}`
+  perdem a mensagem de negócio do backend
+- **Data:** 2026-08-21
+- **Origem:** implementação (redesign de `mobile/app/(app)/ajustes.tsx` e fluxo de exclusão de
+  conta LGPD, mesma sessão)
+- **Severidade:** MEDIUM
+- **Status:** RESOLVIDO (2026-08-21) — corrigido na origem em `mobile/src/services/api.ts`; ver
+  BUG-0070. O interceptor passou a preservar o envelope (`code`/`message`/`details`) e a tratar 429;
+  o contorno local de `ajustes.tsx` (BUG-0069) foi removido. Coberto por
+  `mobile/src/__tests__/apiErros.test.ts` e confirmado em runtime contra backend local (porta 8094).
+- **Area:** mobile
+- **Sintoma:** Ao testar `DELETE /v1/usuarios/me` com senha incorreta contra o backend local (porta
+  8093, banco `gf_ajustes`), o backend responde `422` com corpo
+  `{"code":"BUSINESS_ERROR","message":"Senha incorreta","details":null}` (confirmado por `curl`
+  direto, fora do app). No app, esse erro chegava à tela como "Dados inválidos. Verifique os
+  campos." — mensagem genérica, sem relação com a causa real (senha errada). O mesmo padrão de
+  resposta (`BusinessException` sem `details`) é usado por outras regras de negócio do backend, não
+  apenas exclusão de conta.
+- **Causa raiz:** Confirmada por leitura de código — `mobile/src/services/api.ts` (bloco do
+  interceptor de erro, ~linhas 110-113): para `status === 400 || status === 422`, o código só
+  extrai `error.response.data.details` (um mapa de campo→mensagem, usado para erros de validação
+  de DTO com `@Valid`) e ignora por completo `error.response.data.message`, que é onde o
+  `GlobalExceptionHandler` do backend coloca a mensagem de uma `BusinessException` quando não há
+  `details` (`details: null`). Sem `details`, o código cai no fallback fixo `'Dados inválidos.
+  Verifique os campos.'`.
+- **Impacto tecnico:** Qualquer tela que dependa de uma mensagem de regra de negócio vinda do
+  backend em 400/422 sem `details` (não só exclusão de conta) exibe texto genérico ao usuário em
+  vez da causa real — usuário não sabe o que corrigir. Não foi feita uma varredura completa de
+  todas as telas afetadas nesta rodada (fora do escopo desta sessão, que focou em `ajustes.tsx`).
+- **Arquivos ou modulos relacionados:** `mobile/src/services/api.ts` (interceptor de erro, bloco
+  400/422), `backend/src/main/java/com/gestor/financeiro/exception/GlobalExceptionHandler.java`
+  (formato de resposta de `BusinessException`), `mobile/app/(app)/ajustes.tsx` (onde o contorno
+  local foi aplicado).
+- **Solucao proposta:** Ajustar o interceptor para, na ausência de `details`, usar
+  `error.response.data.message` quando `error.response.data.code === 'BUSINESS_ERROR'` (ou de forma
+  mais geral, sempre que `message` existir e for uma string não vazia), antes de cair no fallback
+  genérico. Depois, varrer as telas que hoje dependem do texto genérico de 400/422 para confirmar
+  se alguma regra de negócio ficou mascarada silenciosamente.
+- **Solucao aplicada:** Nenhuma no interceptor (correção global fica pendente — ver BACKLOG-0094).
+  Contorno pontual aplicado apenas em `mobile/app/(app)/ajustes.tsx`: o handler de exclusão de
+  conta lê `err.response.data.message` diretamente quando `err.response.data.code ===
+  'BUSINESS_ERROR'`, sem alterar `api.ts`.
+- **Evidencias ou comandos usados:** `curl -X DELETE http://localhost:8093/api/v1/usuarios/me -H
+  "Authorization: Bearer <token>" -H "Content-Type: application/json" -d
+  '{"senha":"errada"}'` → HTTP 422 `{"code":"BUSINESS_ERROR","message":"Senha incorreta","details":
+  null}`; leitura de `mobile/src/services/api.ts` confirmando o bloco `if (status === 400 ||
+  status === 422)`.
+- **Riscos residuais:** Sem a varredura completa das telas, pode haver outros pontos do app onde o
+  usuário já recebe mensagem genérica em vez da mensagem de negócio real, sem que isso tenha sido
+  percebido como bug — só foi notado aqui porque a tela nova validou o fluxo ponta a ponta contra o
+  backend real.
+- **Proximo passo:** Ver BACKLOG-0094 (correção do interceptor + varredura das telas dependentes).
