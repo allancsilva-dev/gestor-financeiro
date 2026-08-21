@@ -3,6 +3,8 @@ package com.gestor.financeiro.model;
 import com.gestor.financeiro.model.enums.StatusPagamento;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
@@ -20,6 +22,8 @@ public class Parcela {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "transacao_id", nullable = false)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private Transacao transacao;
     
     @Column(nullable = false)

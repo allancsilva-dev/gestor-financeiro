@@ -6,6 +6,8 @@ import com.gestor.financeiro.model.enums.StatusPagamento;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -73,8 +75,12 @@ public class Transacao {
     @Column(precision = 10, scale = 2)
     private BigDecimal valorParcela;
     
+    // @JsonIgnoreProperties cobria so o Jackson; toString/equals/hashCode
+    // continuavam recursando com Parcela (BACKLOG-0084).
     @OneToMany(mappedBy = "transacao", cascade = CascadeType.ALL, orphanRemoval = true)
-    @JsonIgnoreProperties("transacao") // ✅ LINHA ADICIONADA
+    @JsonIgnoreProperties("transacao")
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
     private List<Parcela> parcelas = new ArrayList<>();
     
     @Column

@@ -148,12 +148,16 @@ public class RefreshToken {
         return getClass().hashCode();
     }
 
+    /**
+     * Nunca expoe o hash do token nem o e-mail do usuario (BACKLOG-0083): um
+     * log acidental do objeto vazava segredo e PII. Usa o id da associacao, que
+     * nao dispara o lazy load.
+     */
     @Override
     public String toString() {
         return "RefreshToken{" +
                 "id=" + id +
-                ", usuario=" + (usuario != null ? usuario.getEmail() : "null") +
-                ", token='" + token.substring(0, 20) + "...'" +
+                ", usuarioId=" + (usuario != null ? usuario.getId() : "null") +
                 ", dataExpiracao=" + dataExpiracao +
                 ", revogado=" + revogado +
                 '}';
