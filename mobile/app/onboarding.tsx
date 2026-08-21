@@ -1,133 +1,646 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-  StyleSheet,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useTheme } from '../src/theme';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { useTheme, radius, spacing, typography, numeric } from '../src/theme';
 import { onboardingService } from '../src/services/onboardingService';
-import { ApiErrorWithMessage } from '../src/types';
+import { OnboardingFinalizarRequest } from '../src/services/onboardingService';
 import { useAuth } from '../src/context/AuthContext';
-import { maskCurrencyInput, parseCurrencyBR } from '../src/utils/format';
-import Field from '../src/components/ui/Field';
+import { CATEGORIAS_INICIAIS } from '../src/domain/categoriasIniciais';
+import {
+  formatCurrency,
+  isValidDateBR,
+  maskCurrencyInput,
+  maskDateInput,
+  parseCurrencyBR,
+  parseDateBR,
+} from '../src/utils/format';
+import { isValidDayOfMonth } from '../src/utils/validate';
+import { camposDeErro, chavesDeErro, ehSessaoExpirada, mensagemDeErro } from '../src/utils/erros';
+import { lerRascunho, limparRascunho, salvarRascunho } from '../src/store/onboardingRascunho';
+import Botao from '../src/components/ui/Botao';
+import Card from '../src/components/ui/Card';
 import Chip from '../src/components/ui/Chip';
+import Field from '../src/components/ui/Field';
+import IconTile from '../src/components/ui/IconTile';
+import TelaFluxo from '../src/components/ui/TelaFluxo';
 
 type TipoContaInicial = 'DINHEIRO' | 'CONTA_BANCARIA' | 'POUPANCA';
+type Passo = 'conta' | 'renda' | 'categorias' | 'cartao' | 'meta' | 'revisao';
 
-// Onboarding mínimo (PR-F3-09): etapa única com a conta principal — nome,
-// tipo e saldo inicial (vazio = zero). Envia somente carteira (contrato do
-// PR-F3-03); cartão, categorias, renda e metas viram setup progressivo.
+const PASSOS: Passo[] = ['conta', 'renda', 'categorias', 'cartao', 'meta', 'revisao'];
+
+// Chave do backend (details do 400) → passo dono do campo. Quando a validação
+// falha no envio único, o wizard volta para onde o dado foi digitado em vez de
+// mostrar "dados inválidos" na tela de revisão.
+const PASSO_DO_CAMPO: Record<string, Passo> = {
+  'carteira.nome': 'conta',
+  'carteira.saldo': 'conta',
+  'carteira.subtipo': 'conta',
+  'renda.nome': 'renda',
+  'renda.valor': 'renda',
+  'renda.diaVencimento': 'renda',
+  'cartao.nome': 'cartao',
+  'cartao.limiteTotal': 'cartao',
+  'cartao.diaFechamento': 'cartao',
+  'cartao.diaVencimento': 'cartao',
+  'meta.nome': 'meta',
+  'meta.valorTotal': 'meta',
+};
+
+const MAPA_DE_CAMPOS = {
+  'carteira.nome': 'contaNome',
+  'carteira.saldo': 'contaSaldo',
+  'renda.nome': 'rendaNome',
+  'renda.valor': 'rendaValor',
+  'renda.diaVencimento': 'rendaDia',
+  'cartao.nome': 'cartaoNome',
+  'cartao.limiteTotal': 'cartaoLimite',
+  'cartao.diaFechamento': 'cartaoFechamento',
+  'cartao.diaVencimento': 'cartaoVencimento',
+  'meta.nome': 'metaNome',
+  'meta.valorTotal': 'metaValor',
+} as const;
+
+type CampoDaTela = (typeof MAPA_DE_CAMPOS)[keyof typeof MAPA_DE_CAMPOS];
+type Erros = Partial<Record<CampoDaTela, string>>;
+
+/**
+ * Onboarding: é aqui que os dados do usuário entram pela primeira vez. Um passo
+ * obrigatório (conta principal) e quatro opcionais, puláveis em um toque; tudo
+ * vai num único POST idempotente no fim (`/v1/onboarding/finalizar`, que já
+ * aceita carteira + renda + categorias + cartão + meta desde o PR-F3-03).
+ */
 export default function OnboardingScreen() {
   const colors = useTheme();
   const router = useRouter();
-  const { updateUsuario } = useAuth();
-  const insets = useSafeAreaInsets();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { updateUsuario, logout } = useAuth();
 
-  const [nome, setNome] = useState('Conta Principal');
-  const [tipo, setTipo] = useState<TipoContaInicial>('CONTA_BANCARIA');
-  const [saldo, setSaldo] = useState('');
+  const [passo, setPasso] = useState<Passo>('conta');
+  const [enviando, setEnviando] = useState(false);
+  const [erroGeral, setErroGeral] = useState<string | null>(null);
+  const [sessaoPerdida, setSessaoPerdida] = useState(false);
+  const [erros, setErros] = useState<Erros>({});
+  const rascunhoCarregado = useRef(false);
 
-  const handleComecar = async () => {
-    if (nome.trim().length < 2) {
-      setError('Informe o nome da conta principal.');
-      return;
+  const [contaNome, setContaNome] = useState('Conta Principal');
+  const [contaTipo, setContaTipo] = useState<TipoContaInicial>('CONTA_BANCARIA');
+  const [contaSaldo, setContaSaldo] = useState('');
+
+  const [comRenda, setComRenda] = useState(false);
+  const [rendaNome, setRendaNome] = useState('Salário');
+  const [rendaValor, setRendaValor] = useState('');
+  const [rendaDia, setRendaDia] = useState('');
+
+  const [categoriasEscolhidas, setCategoriasEscolhidas] = useState<string[]>(
+    CATEGORIAS_INICIAIS.map((c) => c.nome),
+  );
+
+  const [comCartao, setComCartao] = useState(false);
+  const [cartaoNome, setCartaoNome] = useState('');
+  const [cartaoLimite, setCartaoLimite] = useState('');
+  const [cartaoFechamento, setCartaoFechamento] = useState('');
+  const [cartaoVencimento, setCartaoVencimento] = useState('');
+
+  const [comMeta, setComMeta] = useState(false);
+  const [metaNome, setMetaNome] = useState('');
+  const [metaValor, setMetaValor] = useState('');
+  const [metaData, setMetaData] = useState('');
+
+  // Restaura o que já tinha sido digitado antes de o app ser fechado
+  useEffect(() => {
+    let ativo = true;
+    lerRascunho().then((rascunho) => {
+      if (!ativo || !rascunho) { rascunhoCarregado.current = true; return; }
+      if (rascunho.conta) {
+        setContaNome(rascunho.conta.nome);
+        setContaTipo(rascunho.conta.tipo as TipoContaInicial);
+        setContaSaldo(rascunho.conta.saldo);
+      }
+      if (rascunho.renda) {
+        setComRenda(true);
+        setRendaNome(rascunho.renda.nome);
+        setRendaValor(rascunho.renda.valor);
+        setRendaDia(rascunho.renda.dia);
+      }
+      if (rascunho.categorias) setCategoriasEscolhidas(rascunho.categorias);
+      if (rascunho.cartao) {
+        setComCartao(true);
+        setCartaoNome(rascunho.cartao.nome);
+        setCartaoLimite(rascunho.cartao.limite);
+        setCartaoFechamento(rascunho.cartao.fechamento);
+        setCartaoVencimento(rascunho.cartao.vencimento);
+      }
+      if (rascunho.meta) {
+        setComMeta(true);
+        setMetaNome(rascunho.meta.nome);
+        setMetaValor(rascunho.meta.valor);
+        setMetaData(rascunho.meta.data);
+      }
+      if (rascunho.passo && PASSOS.includes(rascunho.passo as Passo)) setPasso(rascunho.passo as Passo);
+      rascunhoCarregado.current = true;
+    });
+    return () => { ativo = false; };
+  }, []);
+
+  // Salva o rascunho a cada mudança — só depois da restauração, para não
+  // sobrescrever o que está guardado com os valores iniciais do formulário.
+  useEffect(() => {
+    if (!rascunhoCarregado.current) return;
+    salvarRascunho({
+      passo,
+      conta: { nome: contaNome, tipo: contaTipo, saldo: contaSaldo },
+      renda: comRenda ? { nome: rendaNome, valor: rendaValor, dia: rendaDia } : null,
+      categorias: categoriasEscolhidas,
+      cartao: comCartao
+        ? { nome: cartaoNome, limite: cartaoLimite, fechamento: cartaoFechamento, vencimento: cartaoVencimento }
+        : null,
+      meta: comMeta ? { nome: metaNome, valor: metaValor, data: metaData } : null,
+    });
+  }, [
+    passo, contaNome, contaTipo, contaSaldo,
+    comRenda, rendaNome, rendaValor, rendaDia, categoriasEscolhidas,
+    comCartao, cartaoNome, cartaoLimite, cartaoFechamento, cartaoVencimento,
+    comMeta, metaNome, metaValor, metaData,
+  ]);
+
+  const indice = PASSOS.indexOf(passo);
+  const irPara = (destino: Passo) => { setErroGeral(null); setPasso(destino); };
+  const avancar = () => irPara(PASSOS[Math.min(indice + 1, PASSOS.length - 1)]);
+  const voltar = indice === 0 ? undefined : () => irPara(PASSOS[indice - 1]);
+
+  const limparErro = (campo: CampoDaTela) =>
+    setErros((atual) => (atual[campo] ? { ...atual, [campo]: undefined } : atual));
+
+  const validarConta = (): boolean => {
+    const novos: Erros = {};
+    if (contaNome.trim().length < 2) novos.contaNome = 'Informe o nome da conta (mínimo 2 caracteres).';
+    const saldo = parseCurrencyBR(contaSaldo || '0');
+    if (!Number.isFinite(saldo) || saldo < 0) novos.contaSaldo = 'Saldo deve ser zero ou positivo.';
+    setErros(novos);
+    return Object.keys(novos).length === 0;
+  };
+
+  const validarRenda = (): boolean => {
+    const novos: Erros = {};
+    if (rendaNome.trim().length < 2) novos.rendaNome = 'Informe um nome (mínimo 2 caracteres).';
+    const valor = parseCurrencyBR(rendaValor || '0');
+    if (!Number.isFinite(valor) || valor <= 0) novos.rendaValor = 'Informe um valor maior que zero.';
+    if (!isValidDayOfMonth(rendaDia)) novos.rendaDia = 'Dia deve estar entre 1 e 31.';
+    setErros(novos);
+    return Object.keys(novos).length === 0;
+  };
+
+  const validarCartao = (): boolean => {
+    const novos: Erros = {};
+    if (cartaoNome.trim().length < 2) novos.cartaoNome = 'Informe o nome do cartão.';
+    const limite = parseCurrencyBR(cartaoLimite || '0');
+    if (!Number.isFinite(limite) || limite < 0) novos.cartaoLimite = 'Limite deve ser zero ou positivo.';
+    if (!isValidDayOfMonth(cartaoFechamento)) novos.cartaoFechamento = 'Dia deve estar entre 1 e 31.';
+    if (!isValidDayOfMonth(cartaoVencimento)) novos.cartaoVencimento = 'Dia deve estar entre 1 e 31.';
+    setErros(novos);
+    return Object.keys(novos).length === 0;
+  };
+
+  const validarMeta = (): boolean => {
+    const novos: Erros = {};
+    if (metaNome.trim().length < 2) novos.metaNome = 'Informe o nome da meta.';
+    const valor = parseCurrencyBR(metaValor || '0');
+    if (!Number.isFinite(valor) || valor <= 0) novos.metaValor = 'Informe um valor maior que zero.';
+    setErros(novos);
+    // Data é opcional, mas se veio precisa existir no calendário
+    const dataInvalida = Boolean(metaData) && !isValidDateBR(metaData);
+    if (dataInvalida) setErroGeral('Data inválida. Use o formato DD/MM/AAAA.');
+    return !dataInvalida && Object.keys(novos).length === 0;
+  };
+
+  const continuar = () => {
+    setErroGeral(null);
+    if (passo === 'conta' && !validarConta()) return;
+    if (passo === 'renda' && comRenda && !validarRenda()) return;
+    if (passo === 'cartao' && comCartao && !validarCartao()) return;
+    if (passo === 'meta' && comMeta && !validarMeta()) return;
+    avancar();
+  };
+
+  const pular = () => {
+    setErros({});
+    setErroGeral(null);
+    if (passo === 'renda') setComRenda(false);
+    if (passo === 'categorias') setCategoriasEscolhidas([]);
+    if (passo === 'cartao') setComCartao(false);
+    if (passo === 'meta') setComMeta(false);
+    avancar();
+  };
+
+  const payload = useMemo((): OnboardingFinalizarRequest => {
+    const base: OnboardingFinalizarRequest = {
+      carteira: {
+        nome: contaNome.trim(),
+        subtipo: contaTipo === 'CONTA_BANCARIA' ? 'CORRENTE' : contaTipo,
+        saldo: parseCurrencyBR(contaSaldo || '0'),
+      },
+    };
+    if (comRenda) {
+      base.renda = {
+        nome: rendaNome.trim(),
+        valor: parseCurrencyBR(rendaValor || '0'),
+        diaVencimento: Number(rendaDia),
+      };
     }
-    const saldoNum = parseCurrencyBR(saldo || '0');
-    if (!Number.isFinite(saldoNum) || saldoNum < 0) {
-      setError('Saldo inicial deve ser zero ou positivo.');
-      return;
+    const categorias = CATEGORIAS_INICIAIS.filter((c) => categoriasEscolhidas.includes(c.nome));
+    if (categorias.length > 0) {
+      base.categorias = categorias.map((c) => ({ nome: c.nome, cor: c.cor, icone: c.icone }));
     }
+    if (comCartao) {
+      base.cartao = {
+        nome: cartaoNome.trim(),
+        limiteTotal: parseCurrencyBR(cartaoLimite || '0'),
+        diaFechamento: Number(cartaoFechamento),
+        diaVencimento: Number(cartaoVencimento),
+      };
+    }
+    if (comMeta) {
+      base.meta = {
+        nome: metaNome.trim(),
+        valorTotal: parseCurrencyBR(metaValor || '0'),
+        dataLimite: metaData ? parseDateBR(metaData) : undefined,
+      };
+    }
+    return base;
+  }, [
+    contaNome, contaTipo, contaSaldo, comRenda, rendaNome, rendaValor, rendaDia,
+    categoriasEscolhidas, comCartao, cartaoNome, cartaoLimite, cartaoFechamento,
+    cartaoVencimento, comMeta, metaNome, metaValor, metaData,
+  ]);
 
-    setLoading(true);
-    setError(null);
+  const concluir = async () => {
+    setEnviando(true);
+    setErroGeral(null);
+    setSessaoPerdida(false);
     try {
-      const user = await onboardingService.finalizar({
-        carteira: {
-          nome: nome.trim(),
-          subtipo: tipo === 'CONTA_BANCARIA' ? 'CORRENTE' : tipo,
-          saldo: saldoNum,
-        },
-      });
+      const user = await onboardingService.finalizar(payload);
+      await limparRascunho();
       await updateUsuario(user);
       router.replace('/(app)/');
     } catch (err) {
-      const e = err as ApiErrorWithMessage;
-      setError(e.userMessage ?? 'Não foi possível salvar sua configuração. Tente novamente.');
-    } finally { setLoading(false); }
+      const doBackend = camposDeErro(err, MAPA_DE_CAMPOS);
+      setErros(doBackend);
+      setErroGeral(mensagemDeErro(err, 'Não foi possível salvar sua configuração. Tente novamente.'));
+      if (ehSessaoExpirada(err)) setSessaoPerdida(true);
+
+      // Volta para o passo dono do primeiro campo recusado pelo backend — na
+      // revisão o usuário não teria onde corrigir.
+      const destino = chavesDeErro(err).map((chave) => PASSO_DO_CAMPO[chave]).find(Boolean);
+      if (destino) setPasso(destino);
+    } finally {
+      setEnviando(false);
+    }
   };
 
+  const voltarAoLogin = async () => {
+    await logout();
+    router.replace('/(auth)/login');
+  };
+
+  const alternarCategoria = (nome: string) =>
+    setCategoriasEscolhidas((atual) =>
+      atual.includes(nome) ? atual.filter((n) => n !== nome) : [...atual, nome],
+    );
+
+  const cabecalho: Record<Passo, { titulo: string; subtitulo: string }> = {
+    conta: {
+      titulo: 'Sua conta principal',
+      subtitulo: 'Onde seu dinheiro está hoje. É o único passo obrigatório.',
+    },
+    renda: {
+      titulo: 'Sua renda mensal',
+      subtitulo: 'Entra todo mês na mesma data? Cadastre uma vez e ela se repete.',
+    },
+    categorias: {
+      titulo: 'Categorias de gasto',
+      subtitulo: 'Escolha as que fazem sentido para você. Dá para mudar depois.',
+    },
+    cartao: {
+      titulo: 'Cartão de crédito',
+      subtitulo: 'Com fechamento e vencimento, o app monta a fatura sozinho.',
+    },
+    meta: {
+      titulo: 'Uma meta para começar',
+      subtitulo: 'Um objetivo concreto ajuda a guardar dinheiro de verdade.',
+    },
+    revisao: {
+      titulo: 'Tudo pronto?',
+      subtitulo: 'Confira o que vamos criar agora. O que faltar você adiciona depois.',
+    },
+  };
+
+  const rodape = (
+    <>
+      {passo === 'revisao' ? (
+        <>
+          <Botao
+            testID="onboarding-concluir"
+            titulo="Concluir"
+            onPress={concluir}
+            carregando={enviando}
+          />
+          {sessaoPerdida ? (
+            <Botao titulo="Entrar de novo" variante="secundario" onPress={voltarAoLogin} />
+          ) : null}
+        </>
+      ) : (
+        <>
+          <Botao testID="onboarding-continuar" titulo="Continuar" onPress={continuar} />
+          {passo !== 'conta' ? (
+            <Botao testID="onboarding-pular" titulo="Pular por agora" variante="texto" onPress={pular} />
+          ) : null}
+        </>
+      )}
+    </>
+  );
+
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.bg }]}
-      contentContainerStyle={{ paddingTop: insets.top + 24, paddingHorizontal: 16, paddingBottom: 40 }}
-      keyboardShouldPersistTaps="handled"
+    <TelaFluxo
+      titulo={cabecalho[passo].titulo}
+      subtitulo={cabecalho[passo].subtitulo}
+      passo={indice + 1}
+      totalDePassos={PASSOS.length}
+      onVoltar={voltar}
+      rodape={rodape}
     >
-      <Text style={[styles.title, { color: colors.textPrimary }]}>Sua conta principal</Text>
-      <Text style={[styles.hint, { color: colors.textSecondary }]}>
-        Só isso para começar. Cartão, categorias e metas você adiciona depois, quando precisar.
-      </Text>
-
-      <View style={styles.form}>
-        <Field
-          testID="onboarding-account-name"
-          label="Nome"
-          value={nome}
-          onChangeText={setNome}
-          placeholder="Ex: Conta Principal"
-        />
-        <Text style={[styles.label, { color: colors.textSecondary }]}>TIPO</Text>
-        <View style={styles.chipRow}>
-          {(['CONTA_BANCARIA', 'DINHEIRO', 'POUPANCA'] as TipoContaInicial[]).map((t) => (
-            <Chip
-              key={t}
-              label={t === 'CONTA_BANCARIA' ? 'Bancária' : t === 'DINHEIRO' ? 'Dinheiro' : 'Poupança'}
-              selected={tipo === t}
-              onPress={() => setTipo(t)}
-            />
-          ))}
+      {passo === 'conta' ? (
+        <View>
+          <Field
+            testID="onboarding-account-name"
+            label="Nome"
+            value={contaNome}
+            onChangeText={(t) => { setContaNome(t); limparErro('contaNome'); }}
+            placeholder="Ex: Conta Principal"
+            error={erros.contaNome}
+          />
+          <Text style={{ ...typography.meta, color: colors.textSecondary, marginBottom: spacing.sm, textTransform: 'uppercase', letterSpacing: 0.8 }}>
+            Tipo
+          </Text>
+          <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg }}>
+            {(['CONTA_BANCARIA', 'DINHEIRO', 'POUPANCA'] as TipoContaInicial[]).map((t) => (
+              <Chip
+                key={t}
+                label={t === 'CONTA_BANCARIA' ? 'Bancária' : t === 'DINHEIRO' ? 'Dinheiro' : 'Poupança'}
+                selected={contaTipo === t}
+                onPress={() => setContaTipo(t)}
+              />
+            ))}
+          </View>
+          <Field
+            testID="onboarding-account-balance"
+            label="Saldo inicial (R$)"
+            value={contaSaldo}
+            onChangeText={(t) => { setContaSaldo(maskCurrencyInput(t)); limparErro('contaSaldo'); }}
+            keyboardType="number-pad"
+            placeholder="0,00"
+            error={erros.contaSaldo}
+          />
         </View>
-        <Field
-          testID="onboarding-account-balance"
-          label="Saldo inicial (R$)"
-          value={saldo}
-          onChangeText={(t) => setSaldo(maskCurrencyInput(t))}
-          keyboardType="number-pad"
-          placeholder="0,00"
-        />
-      </View>
+      ) : null}
 
-      {error ? <Text accessibilityRole="alert" accessibilityLiveRegion="assertive" style={{ color: colors.danger, marginTop: 16 }}>{error}</Text> : null}
+      {passo === 'renda' ? (
+        <View>
+          <Field
+            testID="onboarding-income-name"
+            label="Nome"
+            value={rendaNome}
+            onChangeText={(t) => { setRendaNome(t); setComRenda(true); limparErro('rendaNome'); }}
+            placeholder="Ex: Salário"
+            error={erros.rendaNome}
+          />
+          <Field
+            testID="onboarding-income-value"
+            label="Valor (R$)"
+            value={rendaValor}
+            onChangeText={(t) => { setRendaValor(maskCurrencyInput(t)); setComRenda(true); limparErro('rendaValor'); }}
+            keyboardType="number-pad"
+            placeholder="0,00"
+            error={erros.rendaValor}
+          />
+          <Field
+            testID="onboarding-income-day"
+            label="Dia do mês"
+            value={rendaDia}
+            onChangeText={(t) => { setRendaDia(t.replace(/\D/g, '').slice(0, 2)); setComRenda(true); limparErro('rendaDia'); }}
+            keyboardType="number-pad"
+            placeholder="5"
+            error={erros.rendaDia}
+          />
+        </View>
+      ) : null}
 
-      <TouchableOpacity
-        onPress={handleComecar}
-        disabled={loading}
-        accessibilityRole="button"
-        accessibilityLabel="Começar"
-        style={[styles.btnPrimary, { backgroundColor: colors.brand, opacity: loading ? 0.6 : 1 }]}
-      >
-        {loading ? (
-          <ActivityIndicator color={colors.brandText} />
-        ) : (
-          <Text style={{ color: colors.brandText, fontWeight: '700', fontSize: 16 }}>Começar</Text>
-        )}
-      </TouchableOpacity>
-    </ScrollView>
+      {passo === 'categorias' ? (
+        <Card padded={false}>
+          {CATEGORIAS_INICIAIS.map((categoria, i) => {
+            const escolhida = categoriasEscolhidas.includes(categoria.nome);
+            return (
+              <TouchableOpacity
+                key={categoria.nome}
+                onPress={() => alternarCategoria(categoria.nome)}
+                activeOpacity={0.7}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: escolhida }}
+                accessibilityLabel={categoria.nome}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: spacing.md,
+                  minHeight: 56,
+                  paddingHorizontal: spacing.lg,
+                  borderTopWidth: i === 0 ? 0 : 1,
+                  borderTopColor: colors.border,
+                }}
+              >
+                <IconTile tone="neutral" size={36} style={{ backgroundColor: colors.overlay }}>
+                  {categoria.icone}
+                </IconTile>
+                <Text style={{ ...typography.cardTitle, color: colors.textPrimary, flex: 1 }}>
+                  {categoria.nome}
+                </Text>
+                <Ionicons
+                  name={escolhida ? 'checkmark-circle' : 'ellipse-outline'}
+                  size={22}
+                  color={escolhida ? colors.brand : colors.textMuted}
+                />
+              </TouchableOpacity>
+            );
+          })}
+        </Card>
+      ) : null}
+
+      {passo === 'cartao' ? (
+        <View>
+          <Field
+            testID="onboarding-card-name"
+            label="Nome do cartão"
+            value={cartaoNome}
+            onChangeText={(t) => { setCartaoNome(t); setComCartao(true); limparErro('cartaoNome'); }}
+            placeholder="Ex: Nubank"
+            error={erros.cartaoNome}
+          />
+          <Field
+            testID="onboarding-card-limit"
+            label="Limite (R$)"
+            value={cartaoLimite}
+            onChangeText={(t) => { setCartaoLimite(maskCurrencyInput(t)); setComCartao(true); limparErro('cartaoLimite'); }}
+            keyboardType="number-pad"
+            placeholder="0,00"
+            error={erros.cartaoLimite}
+          />
+          <View style={{ flexDirection: 'row', gap: spacing.md }}>
+            <View style={{ flex: 1 }}>
+              <Field
+                testID="onboarding-card-closing"
+                label="Fecha dia"
+                value={cartaoFechamento}
+                onChangeText={(t) => { setCartaoFechamento(t.replace(/\D/g, '').slice(0, 2)); setComCartao(true); limparErro('cartaoFechamento'); }}
+                keyboardType="number-pad"
+                placeholder="20"
+                error={erros.cartaoFechamento}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Field
+                testID="onboarding-card-due"
+                label="Vence dia"
+                value={cartaoVencimento}
+                onChangeText={(t) => { setCartaoVencimento(t.replace(/\D/g, '').slice(0, 2)); setComCartao(true); limparErro('cartaoVencimento'); }}
+                keyboardType="number-pad"
+                placeholder="27"
+                error={erros.cartaoVencimento}
+              />
+            </View>
+          </View>
+        </View>
+      ) : null}
+
+      {passo === 'meta' ? (
+        <View>
+          <Field
+            testID="onboarding-goal-name"
+            label="Nome"
+            value={metaNome}
+            onChangeText={(t) => { setMetaNome(t); setComMeta(true); limparErro('metaNome'); }}
+            placeholder="Ex: Reserva de emergência"
+            error={erros.metaNome}
+          />
+          <Field
+            testID="onboarding-goal-value"
+            label="Quanto quer juntar (R$)"
+            value={metaValor}
+            onChangeText={(t) => { setMetaValor(maskCurrencyInput(t)); setComMeta(true); limparErro('metaValor'); }}
+            keyboardType="number-pad"
+            placeholder="0,00"
+            error={erros.metaValor}
+          />
+          <Field
+            testID="onboarding-goal-date"
+            label="Até quando (opcional)"
+            value={metaData}
+            onChangeText={(t) => { setMetaData(maskDateInput(t)); setComMeta(true); }}
+            keyboardType="number-pad"
+            placeholder="DD/MM/AAAA"
+          />
+        </View>
+      ) : null}
+
+      {passo === 'revisao' ? (
+        <View style={{ gap: spacing.md }}>
+          <ItemDaRevisao
+            titulo="Conta principal"
+            detalhe={`${contaNome.trim()} · ${formatCurrency(parseCurrencyBR(contaSaldo || '0'))}`}
+            onEditar={() => irPara('conta')}
+          />
+          <ItemDaRevisao
+            titulo="Renda mensal"
+            detalhe={comRenda
+              ? `${rendaNome.trim()} · ${formatCurrency(parseCurrencyBR(rendaValor || '0'))} no dia ${rendaDia}`
+              : null}
+            onEditar={() => irPara('renda')}
+          />
+          <ItemDaRevisao
+            titulo="Categorias"
+            detalhe={categoriasEscolhidas.length ? `${categoriasEscolhidas.length} selecionadas` : null}
+            onEditar={() => irPara('categorias')}
+          />
+          <ItemDaRevisao
+            titulo="Cartão"
+            detalhe={comCartao
+              ? `${cartaoNome.trim()} · fecha dia ${cartaoFechamento}, vence dia ${cartaoVencimento}`
+              : null}
+            onEditar={() => irPara('cartao')}
+          />
+          <ItemDaRevisao
+            titulo="Meta"
+            detalhe={comMeta ? `${metaNome.trim()} · ${formatCurrency(parseCurrencyBR(metaValor || '0'))}` : null}
+            onEditar={() => irPara('meta')}
+          />
+        </View>
+      ) : null}
+
+      {erroGeral ? (
+        <Text
+          accessibilityRole="alert"
+          accessibilityLiveRegion="assertive"
+          style={{ ...typography.body, color: colors.danger, marginTop: spacing.lg }}
+        >
+          {erroGeral}
+        </Text>
+      ) : null}
+    </TelaFluxo>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  title: { fontSize: 24, fontWeight: '800', letterSpacing: -0.4, marginBottom: 8 },
-  hint: { fontSize: 14, lineHeight: 20, marginBottom: 24 },
-  form: {},
-  label: { fontSize: 10, letterSpacing: 0.8, textTransform: 'uppercase', marginBottom: 6 },
-  chipRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  btnPrimary: { marginTop: 32, minHeight: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-});
+function ItemDaRevisao({
+  titulo,
+  detalhe,
+  onEditar,
+}: {
+  titulo: string;
+  detalhe: string | null;
+  onEditar: () => void;
+}) {
+  const colors = useTheme();
+  const pulado = detalhe === null;
+
+  return (
+    <Card>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+        <View style={{ flex: 1 }}>
+          <Text style={{ ...typography.cardTitle, color: colors.textPrimary }}>{titulo}</Text>
+          <Text
+            style={{
+              ...typography.meta,
+              ...(pulado ? {} : numeric),
+              color: pulado ? colors.textMuted : colors.textSecondary,
+              marginTop: 2,
+            }}
+          >
+            {pulado ? 'Você pulou — dá para adicionar depois' : detalhe}
+          </Text>
+        </View>
+        <TouchableOpacity
+          onPress={onEditar}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={`Editar ${titulo}`}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          style={{
+            width: 36, height: 36, borderRadius: radius.pill,
+            backgroundColor: colors.overlay,
+            borderWidth: 1, borderColor: colors.border,
+            alignItems: 'center', justifyContent: 'center',
+          }}
+        >
+          <Ionicons name={pulado ? 'add' : 'pencil-outline'} size={16} color={colors.brandFg} />
+        </TouchableOpacity>
+      </View>
+    </Card>
+  );
+}
