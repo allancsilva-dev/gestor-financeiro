@@ -10,8 +10,7 @@ tags:
 - tapOn: "Senha"
 - inputText: ${E2E_PASSWORD}
 - hideKeyboard
-- tapOn: "ENTRAR"
-- assertVisible: "Início"
-- assertVisible: "Transações"
-- assertVisible: "Planejamento"
-- assertVisible: "Mais"
+- tapOn: "Entrar"
+# A tab bar virou painel nativo (react-native-screens) e os rótulos das abas não
+# aparecem na árvore de acessibilidade — a asserção é pelo conteúdo da Home.
+- assertVisible: "Saldo Disponível"

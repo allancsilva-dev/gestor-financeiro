@@ -6,7 +6,7 @@ tags:
 - launchApp:
     clearState: true
 
-# Registro descartavel e consentimento LGPD
+# Registro descartavel em 3 passos (identidade, senha, consentimento LGPD)
 - tapOn: ".*Criar conta"
 - tapOn:
     id: "register-name"
@@ -14,6 +14,8 @@ tags:
 - tapOn:
     id: "register-email"
 - inputText: ${E2E_EMAIL}
+- tapOn:
+    id: "register-continuar"
 - tapOn:
     id: "register-password"
 - waitForAnimationToEnd
@@ -23,6 +25,9 @@ tags:
 - waitForAnimationToEnd
 - inputText: ${E2E_PASSWORD}
 - pressKey: Enter
+- tapOn:
+    id: "register-continuar"
+- assertVisible: "Seus dados, suas regras"
 - tapOn: "Aceito a política de privacidade"
 - tapOn:
     id: "register-submit"
@@ -30,14 +35,28 @@ tags:
     visible: "Sua conta principal"
     timeout: 20000
 
-# Onboarding minimo (PR-F3-09): etapa unica, so conta principal com 1.000
+# Onboarding em etapas: conta principal com 1.000 e o resto pulado
 - assertVisible: "Sua conta principal"
 - tapOn:
     id: "onboarding-account-balance"
 - inputText: "100000"
 - tapOn:
-    point: "50%,4%"
-- tapOn: "Começar"
+    id: "onboarding-continuar"
+- assertVisible: "Sua renda mensal"
+- tapOn:
+    id: "onboarding-pular"
+- assertVisible: "Categorias de gasto"
+- tapOn:
+    id: "onboarding-pular"
+- assertVisible: "Cartão de crédito"
+- tapOn:
+    id: "onboarding-pular"
+- assertVisible: "Uma meta para começar"
+- tapOn:
+    id: "onboarding-pular"
+- assertVisible: "Tudo pronto?"
+- tapOn:
+    id: "onboarding-concluir"
 - extendedWaitUntil:
     visible: "Saldo Disponível"
     timeout: 20000
