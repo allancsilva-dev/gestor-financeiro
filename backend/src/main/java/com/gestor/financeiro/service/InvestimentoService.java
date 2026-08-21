@@ -13,13 +13,14 @@ import com.gestor.financeiro.model.enums.TipoMovimentoCarteira;
 import com.gestor.financeiro.repository.AtivoRepository;
 import com.gestor.financeiro.repository.MovimentacaoAtivoRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Optional;
 
 @Service
 public class InvestimentoService {
@@ -90,9 +91,8 @@ public class InvestimentoService {
         return toResponse(ativo);
     }
 
-    public List<AtivoResponse> listarAtivos(Long usuarioId) {
-        return ativoRepository.findByUsuarioId(usuarioId).stream()
-            .map(this::toResponse).collect(Collectors.toList());
+    public Page<AtivoResponse> listarAtivos(Long usuarioId, Pageable pageable) {
+        return ativoRepository.findByUsuarioId(usuarioId, pageable).map(this::toResponse);
     }
 
     @Transactional
@@ -117,9 +117,30 @@ public class InvestimentoService {
 
     @Transactional
     public MovimentacaoResponse adicionarMovimentacao(Long usuarioId, Long ativoId, MovimentacaoRequest request) {
+        return adicionarMovimentacao(usuarioId, ativoId, request, null);
+    }
+
+    /**
+     * Idempotente por Idempotency-Key (BACKLOG-0081): duplo clique repetia a
+     * posicao e o movimento de caixa. A chave anterior nascia do id da
+     * movimentacao ja salva, entao nunca colidia; agora vem do request e e
+     * garantida pelo indice unico parcial de V44.
+     */
+    @Transactional
+    public MovimentacaoResponse adicionarMovimentacao(Long usuarioId, Long ativoId,
+                                                      MovimentacaoRequest request, String idempotencyKey) {
         Ativo ativo = ativoRepository.findByIdAndUsuarioId(ativoId, usuarioId)
             .orElseThrow(() -> new ResourceNotFoundException("Ativo nao encontrado"));
         Usuario usuario = usuarioRepository.findById(usuarioId).orElseThrow();
+
+        String chaveIdempotencia = chaveIdempotenciaMovimentacao(ativoId, idempotencyKey);
+        if (chaveIdempotencia != null) {
+            Optional<MovimentacaoAtivo> jaRegistrada =
+                movimentacaoRepository.findByUsuarioIdAndIdempotencyKey(usuarioId, chaveIdempotencia);
+            if (jaRegistrada.isPresent()) {
+                return toMovimentacaoResponse(jaRegistrada.get());
+            }
+        }
 
         TipoMovimentacao tipo = parseTipo(request.getTipo());
         BigDecimal quantidade = request.getQuantidade();
@@ -156,13 +177,32 @@ public class InvestimentoService {
         mov.setConciliacao(externa
                 ? com.gestor.financeiro.model.enums.ConciliacaoInvestimento.EXTERNO
                 : com.gestor.financeiro.model.enums.ConciliacaoInvestimento.CONCILIADA);
-        mov = movimentacaoRepository.save(mov);
+        mov.setIdempotencyKey(chaveIdempotencia);
+        // saveAndFlush leva a violacao de ux_movimentacoes_ativo_usuario_idempotency
+        // para ca: duas requisicoes concorrentes com a mesma chave nao duplicam
+        // posicao nem caixa -- a segunda falha antes de qualquer efeito colateral.
+        mov = movimentacaoRepository.saveAndFlush(mov);
 
         updateAtivoPosicao(ativo, tipo, quantidade, valorTotal);
         if (!externa) {
-            integrarCaixa(usuario, ativo, mov, tipo, valorTotal, request);
+            integrarCaixa(usuario, ativo, mov, tipo, valorTotal, request, chaveIdempotencia);
         }
 
+        return toMovimentacaoResponse(mov);
+    }
+
+    /**
+     * Chave derivada do request, nao da linha ja gravada. Sem header o fluxo
+     * segue sem protecao -- o cliente decide.
+     */
+    private static String chaveIdempotenciaMovimentacao(Long ativoId, String requestKey) {
+        if (requestKey == null || requestKey.isBlank()) {
+            return null;
+        }
+        return "investimento:ativo:" + ativoId + ":mov:req:" + requestKey.trim();
+    }
+
+    private static MovimentacaoResponse toMovimentacaoResponse(MovimentacaoAtivo mov) {
         return MovimentacaoResponse.builder()
             .id(mov.getId())
             .tipo(mov.getTipo().name())
@@ -223,7 +263,8 @@ public class InvestimentoService {
 
     // Integra a movimentacao ao caixa quando uma carteira e informada (PROB-0054).
     private void integrarCaixa(Usuario usuario, Ativo ativo, MovimentacaoAtivo mov,
-                               TipoMovimentacao tipo, BigDecimal valorTotal, MovimentacaoRequest request) {
+                               TipoMovimentacao tipo, BigDecimal valorTotal, MovimentacaoRequest request,
+                               String chaveIdempotencia) {
         if (request.getCarteiraId() == null) {
             return; // Movimentacao apenas de posicao, sem efeito de caixa.
         }
@@ -255,7 +296,7 @@ public class InvestimentoService {
                 com.gestor.financeiro.model.enums.OrigemOperacaoFinanceira.MANUAL,
                 request.getData() != null ? request.getData().atStartOfDay() : null,
                 null,
-                "investimento|mov=" + mov.getId(),
+                chaveIdempotencia != null ? chaveIdempotencia : "investimento|mov=" + mov.getId(),
                 tipo.getDescricao() + " de " + ativo.getTicker(),
                 null));
         mov.setOperacao(operacao);
@@ -273,25 +314,15 @@ public class InvestimentoService {
             "ATIVO",
             ativo.getId(),
             tipo.getDescricao() + " de " + ativo.getTicker(),
-            "MOV_ATIVO_" + mov.getId(),
+            chaveIdempotencia != null ? "MOV_ATIVO_REQ_" + chaveIdempotencia : "MOV_ATIVO_" + mov.getId(),
             request.getData() != null ? request.getData().atStartOfDay() : null,
             false
         ), operacao);
     }
 
-    public List<MovimentacaoResponse> listarMovimentacoes(Long usuarioId, Long ativoId) {
-        return movimentacaoRepository.findByAtivoIdAndUsuarioIdOrderByDataDesc(ativoId, usuarioId)
-            .stream().map(m -> MovimentacaoResponse.builder()
-                .id(m.getId())
-                .tipo(m.getTipo().name())
-                .data(m.getData())
-                .quantidade(m.getQuantidade())
-                .precoUnitario(m.getPrecoUnitario())
-                .valorTotal(m.getValorTotal())
-                .conciliacao(m.getConciliacao())
-                .operacaoId(m.getOperacao() == null ? null : m.getOperacao().getId())
-                .build())
-            .collect(Collectors.toList());
+    public Page<MovimentacaoResponse> listarMovimentacoes(Long usuarioId, Long ativoId, Pageable pageable) {
+        return movimentacaoRepository.findByAtivoIdAndUsuarioId(ativoId, usuarioId, pageable)
+            .map(InvestimentoService::toMovimentacaoResponse);
     }
 
     private AtivoResponse toResponse(Ativo a) {

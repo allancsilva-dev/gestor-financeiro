@@ -1,15 +1,19 @@
 package com.gestor.financeiro.controller;
 
 import lombok.RequiredArgsConstructor;
+import com.gestor.financeiro.config.IdempotencyFilter;
 import com.gestor.financeiro.dto.*;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.InvestimentoService;
+import com.gestor.financeiro.util.PaginationUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/investimentos")
@@ -28,9 +32,11 @@ public class InvestimentoController {
 
     @GetMapping
     @Operation(summary = "Listar ativos")
-    public ResponseEntity<List<AtivoResponse>> listar() {
+    public ResponseEntity<Page<AtivoResponse>> listar(
+            @PageableDefault(size = 20, sort = "ticker", direction = Sort.Direction.ASC) Pageable pageable) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
-        return ResponseEntity.ok(investimentoService.listarAtivos(usuarioId));
+        Pageable cappedPageable = PaginationUtils.enforceMaxSize(pageable, 100);
+        return ResponseEntity.ok(investimentoService.listarAtivos(usuarioId, cappedPageable));
     }
 
     @PutMapping("/{id}")
@@ -51,15 +57,21 @@ public class InvestimentoController {
     @PostMapping("/{ativoId}/movimentacoes")
     @Operation(summary = "Adicionar movimentacao")
     public ResponseEntity<MovimentacaoResponse> adicionarMovimentacao(
-            @PathVariable Long ativoId, @RequestBody MovimentacaoRequest request) {
+            @PathVariable Long ativoId,
+            @RequestHeader(value = IdempotencyFilter.HEADER, required = false) String idempotencyKey,
+            @RequestBody MovimentacaoRequest request) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
-        return ResponseEntity.ok(investimentoService.adicionarMovimentacao(usuarioId, ativoId, request));
+        return ResponseEntity.ok(
+                investimentoService.adicionarMovimentacao(usuarioId, ativoId, request, idempotencyKey));
     }
 
     @GetMapping("/{ativoId}/movimentacoes")
     @Operation(summary = "Listar movimentacoes do ativo")
-    public ResponseEntity<List<MovimentacaoResponse>> listarMovimentacoes(@PathVariable Long ativoId) {
+    public ResponseEntity<Page<MovimentacaoResponse>> listarMovimentacoes(
+            @PathVariable Long ativoId,
+            @PageableDefault(size = 20, sort = "data", direction = Sort.Direction.DESC) Pageable pageable) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
-        return ResponseEntity.ok(investimentoService.listarMovimentacoes(usuarioId, ativoId));
+        Pageable cappedPageable = PaginationUtils.enforceMaxSize(pageable, 100);
+        return ResponseEntity.ok(investimentoService.listarMovimentacoes(usuarioId, ativoId, cappedPageable));
     }
 }

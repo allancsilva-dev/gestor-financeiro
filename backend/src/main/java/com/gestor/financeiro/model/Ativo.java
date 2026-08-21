@@ -2,7 +2,10 @@ package com.gestor.financeiro.model;
 
 import com.gestor.financeiro.model.enums.TipoAtivo;
 import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -57,6 +60,12 @@ public class Ativo {
     @Version
     private Long version;
 
+    // Lado inverso do unico ciclo bidirecional de investimentos (BACKLOG-0084):
+    // sem as exclusoes, toString/equals/hashCode recursam entre Ativo e
+    // MovimentacaoAtivo e ainda forcam o lazy load da colecao.
     @OneToMany(mappedBy = "ativo", cascade = CascadeType.ALL, orphanRemoval = true)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    @JsonIgnoreProperties("ativo")
     private List<MovimentacaoAtivo> movimentacoes = new ArrayList<>();
 }

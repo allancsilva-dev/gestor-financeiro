@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, Plus, Trash2, TrendingUp } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Layout from '../components/Layout';
@@ -18,6 +18,9 @@ const label = (value: string) => value.replaceAll('_', ' ').toLocaleLowerCase('p
 
 export default function Investimentos() {
   const [ativos, setAtivos] = useState<Ativo[]>([]);
+  // Chave mantida até a movimentação entrar: duplo clique e retentativa caem na
+  // mesma operação em vez de duplicar posição e caixa (BACKLOG-0081).
+  const chaveMovimentacao = useRef('');
   const [contas, setContas] = useState<ContaFinanceira[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -71,9 +74,13 @@ export default function Investimentos() {
     if (!data) return;
     if (!movForm.externa && !movForm.carteiraId) { toast.error('Escolha a conta de caixa ou marque como externa'); return; }
     try {
+      if (!chaveMovimentacao.current) {
+        chaveMovimentacao.current = `mov:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+      }
       const criada = await investimentoService.adicionarMovimentacao(ativoSelecionado.id!, {
         ...data, externa: movForm.externa, carteiraId: movForm.externa ? undefined : Number(movForm.carteiraId),
-      });
+      }, chaveMovimentacao.current);
+      chaveMovimentacao.current = '';
       toast.success(criada.conciliacao === 'CONCILIADA' ? 'Operação conciliada com o caixa' : 'Snapshot externo registrado');
       setMovimentacoes(await investimentoService.listarMovimentacoes(ativoSelecionado.id!));
       setMovForm(current => ({ ...current, quantidade: '', precoUnitario: '' }));

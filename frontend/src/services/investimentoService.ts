@@ -37,10 +37,15 @@ export interface MovimentacaoInput {
   externa: boolean;
 }
 
+/** Envelope de paginação do backend (Spring Page). */
+interface Pagina<T> {
+  content?: T[];
+}
+
 export const investimentoService = {
   listar: async (): Promise<Ativo[]> => {
-    const response = await api.get('/investimentos');
-    return response.data;
+    const response = await api.get<Pagina<Ativo>>('/investimentos', { params: { size: 100 } });
+    return response.data.content ?? [];
   },
 
   criar: async (data: Partial<Ativo>): Promise<Ativo> => {
@@ -58,12 +63,24 @@ export const investimentoService = {
   },
 
   listarMovimentacoes: async (ativoId: number): Promise<Movimentacao[]> => {
-    const response = await api.get(`/investimentos/${ativoId}/movimentacoes`);
-    return response.data;
+    const response = await api.get<Pagina<Movimentacao>>(
+      `/investimentos/${ativoId}/movimentacoes`,
+      { params: { size: 100 } }
+    );
+    return response.data.content ?? [];
   },
 
-  adicionarMovimentacao: async (ativoId: number, data: MovimentacaoInput): Promise<Movimentacao> => {
-    const response = await api.post(`/investimentos/${ativoId}/movimentacoes`, data);
+  // Idempotency-Key evita duplicar posição e caixa no duplo clique (BACKLOG-0081).
+  adicionarMovimentacao: async (
+    ativoId: number,
+    data: MovimentacaoInput,
+    idempotencyKey?: string
+  ): Promise<Movimentacao> => {
+    const response = await api.post(
+      `/investimentos/${ativoId}/movimentacoes`,
+      data,
+      idempotencyKey ? { headers: { 'Idempotency-Key': idempotencyKey } } : undefined
+    );
     return response.data;
   },
 };

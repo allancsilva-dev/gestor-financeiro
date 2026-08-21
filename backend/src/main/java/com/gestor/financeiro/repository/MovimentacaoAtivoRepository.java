@@ -1,6 +1,8 @@
 package com.gestor.financeiro.repository;
 
 import com.gestor.financeiro.model.MovimentacaoAtivo;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import java.util.List;
@@ -8,6 +10,11 @@ import java.util.List;
 @Repository
 public interface MovimentacaoAtivoRepository extends JpaRepository<MovimentacaoAtivo, Long> {
     List<MovimentacaoAtivo> findByAtivoIdAndUsuarioIdOrderByDataDesc(Long ativoId, Long usuarioId);
+
+    Page<MovimentacaoAtivo> findByAtivoIdAndUsuarioId(Long ativoId, Long usuarioId, Pageable pageable);
+
+    /** Dedupe por Idempotency-Key do request (BACKLOG-0081, indice de V44). */
+    java.util.Optional<MovimentacaoAtivo> findByUsuarioIdAndIdempotencyKey(Long usuarioId, String idempotencyKey);
 
     /** Decomposicao da variacao patrimonial (ADR-0013): soma por tipo no periodo. */
     @org.springframework.data.jpa.repository.Query(

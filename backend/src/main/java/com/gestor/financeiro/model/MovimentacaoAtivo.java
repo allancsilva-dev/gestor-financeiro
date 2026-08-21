@@ -2,7 +2,10 @@ package com.gestor.financeiro.model;
 
 import com.gestor.financeiro.model.enums.TipoMovimentacao;
 import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
@@ -17,6 +20,9 @@ public class MovimentacaoAtivo {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ativo_id", nullable = false)
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    @JsonIgnoreProperties("movimentacoes")
     private Ativo ativo;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -49,4 +55,12 @@ public class MovimentacaoAtivo {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "operacao_id")
     private OperacaoFinanceira operacao;
+
+    /**
+     * Chave de idempotencia derivada do header Idempotency-Key (BACKLOG-0081).
+     * Unicidade garantida por indice parcial (V44); nula quando o cliente nao
+     * envia o header.
+     */
+    @Column(name = "idempotency_key", length = 100)
+    private String idempotencyKey;
 }

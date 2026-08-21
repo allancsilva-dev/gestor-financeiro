@@ -13,6 +13,7 @@ import com.gestor.financeiro.service.InvestimentoService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
@@ -77,7 +78,7 @@ class InvestimentoCustodiaCotacaoTest {
         compra.setExterna(true);
         investimentoService.adicionarMovimentacao(usuario.getId(), criado.getId(), compra);
 
-        AtivoResponse comPosicao = investimentoService.listarAtivos(usuario.getId()).get(0);
+        AtivoResponse comPosicao = investimentoService.listarAtivos(usuario.getId(), PageRequest.of(0, 20)).getContent().get(0);
         // 4 x 25.00 pela ultima cotacao valida
         assertEquals(0, new BigDecimal("100.00").compareTo(comPosicao.getValorMercado()));
     }

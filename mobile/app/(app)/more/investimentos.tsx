@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, Modal, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -116,6 +116,9 @@ function MovimentoModal({ ativo, visible, onClose }: { ativo: Ativo | null; visi
   const [carteiraId, setCarteiraId] = useState<number | undefined>();
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  // Uma chave por abertura do formulário: retentativa reaproveita, movimentação
+  // nova ganha chave nova. É o que impede o duplo clique de duplicar (BACKLOG-0081).
+  const chaveIdempotencia = useRef('');
   const { data: contasCaixa = [] } = useQuery({ queryKey: ['contas-financeiras-caixa'], queryFn: () => contaFinanceiraService.listarParaCaixa() });
 
   useEffect(() => {
@@ -127,6 +130,7 @@ function MovimentoModal({ ativo, visible, onClose }: { ativo: Ativo | null; visi
     setExterna(false);
     setCarteiraId(undefined);
     setErro(null);
+    chaveIdempotencia.current = `mov:${Date.now()}:${Math.random().toString(36).slice(2)}`;
   }, [visible]);
 
   const salvar = async () => {
@@ -151,7 +155,7 @@ function MovimentoModal({ ativo, visible, onClose }: { ativo: Ativo | null; visi
         precoUnitario: preco,
         carteiraId: externa ? undefined : carteiraId,
         externa,
-      });
+      }, chaveIdempotencia.current);
       queryClient.invalidateQueries({ queryKey: ['investimentos'] });
       queryClient.invalidateQueries({ queryKey: ['investimento-movimentacoes', ativo.id] });
       onClose();
