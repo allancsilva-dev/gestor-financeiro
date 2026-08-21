@@ -110,6 +110,77 @@ class AuthControllerTest {
     }
 
     @Test
+    void register_deveNormalizarEmailParaMinusculo() throws Exception {
+        mockMvc.perform(post("/api/auth/register")
+                .with(remoteAddr("10.10.0.60"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "nome", "  Caixa Alta  ",
+                        "email", "Caixa.Alta@Teste.com",
+                        "password", "Senha1234",
+                        "confirmPassword", "Senha1234",
+                        "aceitaTermos", true
+                ))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.email").value("caixa.alta@teste.com"));
+
+        Usuario usuario = usuarioRepository.findByEmail("caixa.alta@teste.com").orElseThrow();
+        assertThat(usuario.getNome()).isEqualTo("Caixa Alta");
+    }
+
+    @Test
+    void register_deveRecusarEmailDuplicadoComCaixaDiferente() throws Exception {
+        mockMvc.perform(post("/api/auth/register")
+                .with(remoteAddr("10.10.0.61"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "nome", "Primeiro",
+                        "email", "duplicado.caixa@teste.com",
+                        "password", "Senha1234",
+                        "confirmPassword", "Senha1234",
+                        "aceitaTermos", true
+                ))))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/auth/register")
+                .with(remoteAddr("10.10.0.62"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "nome", "Segundo",
+                        "email", "Duplicado.Caixa@Teste.com",
+                        "password", "Senha1234",
+                        "confirmPassword", "Senha1234",
+                        "aceitaTermos", true
+                ))))
+            .andExpect(status().isUnprocessableEntity())
+            .andExpect(jsonPath("$.code").value("BUSINESS_ERROR"));
+    }
+
+    @Test
+    void login_deveAceitarEmailComCaixaDiferenteDaCadastrada() throws Exception {
+        mockMvc.perform(post("/api/auth/register")
+                .with(remoteAddr("10.10.0.63"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "nome", "Caixa Login",
+                        "email", "caixa.login@teste.com",
+                        "password", "Senha1234",
+                        "confirmPassword", "Senha1234",
+                        "aceitaTermos", true
+                ))))
+            .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/auth/login")
+                .with(remoteAddr("10.10.0.64"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "email", "Caixa.Login@Teste.com",
+                        "password", "Senha1234"
+                ))))
+            .andExpect(status().isOk());
+    }
+
+    @Test
     void register_deveGravarConsentimentoLgpd() throws Exception {
         mockMvc.perform(post("/api/auth/register")
                 .with(remoteAddr("10.10.0.20"))

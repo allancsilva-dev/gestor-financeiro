@@ -102,14 +102,16 @@ public class AuthController {
     @PostMapping("/register")
     @Operation(summary = "Registrar usuário", description = "Cria uma nova conta de usuário")
     public ResponseEntity<AuthResponses.Register> register(@Valid @RequestBody RegisterRequest request) {
-        Optional<Usuario> usuarioExistente = usuarioRepository.findByEmail(request.getEmail());
-        if (usuarioExistente.isPresent()) {
+        // Forma canonica do e-mail: sem isso "Alice@x.com" e "alice@x.com" viram
+        // contas distintas e o usuario perde o acesso ao voltar com outra caixa.
+        String email = request.getEmail() == null ? null : request.getEmail().trim().toLowerCase();
+        if (email != null && usuarioRepository.existsByEmailIgnoreCase(email)) {
             throw new BusinessException("Email já cadastrado!");
         }
-    
+
     Usuario usuario = new Usuario();
-    usuario.setNome(request.getNome());
-    usuario.setEmail(request.getEmail());
+    usuario.setNome(request.getNome() == null ? null : request.getNome().trim());
+    usuario.setEmail(email);
     usuario.setSenha(passwordEncoder.encode(request.getPassword()));
 
     // LGPD: registra qual versão da política foi aceita e quando
@@ -126,7 +128,7 @@ public class AuthController {
     @PostMapping("/login")
     @Operation(summary = "Realizar login", description = "Autentica e retorna access token com refresh token em cookie HttpOnly")
     public ResponseEntity<AuthResponses.Session> login(@Valid @RequestBody LoginRequest request, HttpServletRequest servletRequest) {
-        Optional<Usuario> usuarioOpt = usuarioRepository.findByEmail(request.getEmail());
+        Optional<Usuario> usuarioOpt = buscarPorEmail(request.getEmail());
         
         if (usuarioOpt.isEmpty()) {
             throw new BusinessException("Email ou senha incorretos");
@@ -265,7 +267,7 @@ public class AuthController {
     @PostMapping("/forgot-password")
     @Operation(summary = "Solicitar recuperação de senha", description = "Gera token temporário para reset de senha")
     public ResponseEntity<String> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
-        Optional<Usuario> usuarioOpt = usuarioRepository.findByEmail(request.getEmail());
+        Optional<Usuario> usuarioOpt = buscarPorEmail(request.getEmail());
         
         if (usuarioOpt.isEmpty()) {
             return ResponseEntity.ok("Se o email existir, você receberá um link de recuperação.");
@@ -337,6 +339,25 @@ public class AuthController {
         }
         
         return ResponseEntity.ok("Token válido!");
+    }
+
+    /**
+     * Busca por e-mail tolerante a caixa: o cadastro grava minusculo, mas contas
+     * criadas antes disso podem ter maiusculas. Casamento exato tem precedencia;
+     * o fallback so vale quando ha exatamente uma conta equivalente, para nunca
+     * escolher entre duas contas legadas que so diferem na caixa.
+     */
+    private Optional<Usuario> buscarPorEmail(String email) {
+        if (email == null) {
+            return Optional.empty();
+        }
+        String informado = email.trim();
+        Optional<Usuario> exato = usuarioRepository.findByEmail(informado);
+        if (exato.isPresent()) {
+            return exato;
+        }
+        java.util.List<Usuario> equivalentes = usuarioRepository.findAllByEmailIgnoreCase(informado);
+        return equivalentes.size() == 1 ? Optional.of(equivalentes.get(0)) : Optional.empty();
     }
 
     private boolean isAccountLocked(Usuario usuario) {

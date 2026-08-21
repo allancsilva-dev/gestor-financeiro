@@ -14,6 +14,15 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
     Optional<Usuario> findByEmail(String email);
 
+    // Cadastro grava e-mail normalizado, mas contas legadas podem ter maiusculas:
+    // a checagem de duplicidade precisa ignorar caixa para nao criar duas contas
+    // para o mesmo endereco.
+    boolean existsByEmailIgnoreCase(String email);
+
+    // Lista (nao Optional) de proposito: bases legadas podem ter duas contas que
+    // so diferem na caixa; quem chama decide o que fazer quando ha mais de uma.
+    List<Usuario> findAllByEmailIgnoreCase(String email);
+
     // Serializa finalizações concorrentes de onboarding (ADR-0002)
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT u FROM Usuario u WHERE u.id = :id")
