@@ -23,9 +23,28 @@ export interface AsyncState<T> {
   error: string | null; // sempre mensagem amigável em pt-BR
 }
 
-// Erro enriquecido pelo interceptor — componentes usam userMessage
+// Envelope de erro do backend (GlobalExceptionHandler)
+export interface ApiErrorEnvelope {
+  code?: string;
+  message?: string;
+  timestamp?: string;
+  requestId?: string;
+  details?: Record<string, string> | null;
+}
+
+/**
+ * Erro enriquecido pelo interceptor. `userMessage` é a mensagem pronta para a
+ * tela; `campos` e `codigo` preservam o envelope do backend para quem precisa
+ * de erro por campo (formulários) ou de decisão por código (conta bloqueada,
+ * rate limit). Antes o interceptor colapsava tudo em `userMessage` e a causa
+ * real se perdia (PROB-0083).
+ */
 export interface ApiErrorWithMessage extends Error {
   userMessage: string;
+  status?: number;
+  codigo?: string;
+  campos?: Record<string, string>;
+  retryAfterSegundos?: number;
 }
 
 // ── Auth ────────────────────────────────────────────────────────────

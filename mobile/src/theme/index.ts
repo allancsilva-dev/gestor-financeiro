@@ -2,12 +2,19 @@ import { useColorScheme } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { spacing, tabBar } from './tokens';
 import { DARK_COLORS, LIGHT_COLORS, AppColors } from './colors';
+import { Esquema, useTemaOpcional } from '../context/TemaContext';
 
-// Segue o tema do sistema automaticamente — sem toggle manual
-export const useTheme = (): AppColors => {
-  const scheme = useColorScheme();
-  return scheme === 'dark' ? DARK_COLORS : LIGHT_COLORS;
+/**
+ * Esquema efetivo: o escolhido em Ajustes quando há `TemaProvider` acima, senão
+ * o do sistema — que era o único comportamento até a escolha de tema existir.
+ */
+export const useEsquema = (): Esquema => {
+  const doSistema = useColorScheme();
+  const tema = useTemaOpcional();
+  return tema ? tema.esquema : doSistema === 'dark' ? 'dark' : 'light';
 };
+
+export const useTheme = (): AppColors => (useEsquema() === 'dark' ? DARK_COLORS : LIGHT_COLORS);
 
 /**
  * Espaço a reservar no fim de toda tela rolável sob a tab bar.

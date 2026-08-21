@@ -28,6 +28,8 @@ export const typography = {
   display: { fontSize: 34, lineHeight: 40, fontWeight: '800', letterSpacing: -1 },
   displayCents: { fontSize: 22, fontWeight: '800' },
   greeting: { fontSize: 22, lineHeight: 28, fontWeight: '800', letterSpacing: -0.4 },
+  // Título de tela de topo (Carteira, Ajustes): era literal inline em cada tela
+  screenTitle: { fontSize: 26, lineHeight: 32, fontWeight: '800', letterSpacing: -0.6 },
   section: { fontSize: 20, lineHeight: 26, fontWeight: '700', letterSpacing: -0.3 },
   cardTitle: { fontSize: 15, lineHeight: 20, fontWeight: '700' },
   label: { fontSize: 14, lineHeight: 18, fontWeight: '500' },

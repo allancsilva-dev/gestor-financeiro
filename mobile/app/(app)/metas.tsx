@@ -17,7 +17,7 @@ import Field from '../../src/components/ui/Field';
 import Chip from '../../src/components/ui/Chip';
 import { acoesDaMeta, duracaoDaMetaConcluidaEmDias } from '../../src/domain/metaPolicy';
 import CardMeta from '../../src/components/metas/CardMeta';
-import CabecalhoSecao from '../../src/components/metas/CabecalhoSecao';
+import CabecalhoSecao from '../../src/components/ui/CabecalhoSecao';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { e } from '../../src/theme/escala';
 
@@ -342,6 +342,7 @@ export default function Metas() {
                 <Chip label="Arquivadas" selected={statusFiltro === 'ARQUIVADA'} onPress={() => setStatusFiltro('ARQUIVADA')} />
               </View>
               <CabecalhoSecao
+                escalar
                 eyebrow="OBJETIVOS"
                 titulo={TITULO_DA_SECAO[statusFiltro].titulo}
                 texto={TITULO_DA_SECAO[statusFiltro].texto}

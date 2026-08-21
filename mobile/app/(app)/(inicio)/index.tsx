@@ -19,6 +19,7 @@ import Entrance from '../../../src/components/ui/Entrance';
 import NovaTransacaoModal, { LancamentoInicial } from '../../../src/components/NovaTransacaoModal';
 import { formatCurrency, formatDateLongBR, getInitials } from '../../../src/utils/format';
 import { isSaldoOculto, setSaldoOculto } from '../../../src/store/saldoVisivel';
+import { dismissHomeChecklist, isHomeChecklistDismissed } from '../../../src/store/homeChecklist';
 
 // Home da referência (mobile/.design/referencia-home.png): cabeçalho com
 // saudação e sino, card de saldo com breakdown e três colunas, carrossel de
@@ -56,6 +57,33 @@ export default function Home() {
   const atualizar = async () => {
     await Promise.all([homeQuery.refetch(), operacoes.query.refetch()]);
   };
+
+  // Checklist de setup (PR-F3-10): o que o usuário pulou no onboarding continua
+  // convidando aqui. Derivado só das queries que a home já faz — nenhum request
+  // extra — e dispensável de vez. Sumiu no redesign de navegação (9a3b205) e
+  // voltou junto com o onboarding em etapas.
+  const [checklistOculto, setChecklistOculto] = React.useState(true);
+  React.useEffect(() => { isHomeChecklistDismissed().then(setChecklistOculto); }, []);
+  const ocultarChecklist = () => {
+    setChecklistOculto(true);
+    dismissHomeChecklist().catch(() => {});
+  };
+
+  const checklistItens: Array<{ label: string; onPress: () => void }> = [];
+  if (!checklistOculto && home && !operacoes.query.isLoading) {
+    if (operacoes.total === 0 && !operacoes.filtrando) {
+      checklistItens.push({ label: 'Lance sua primeira movimentação', onPress: () => setLancarAberto(true) });
+    }
+    if (home.categorias.length === 0) {
+      checklistItens.push({ label: 'Escolha suas categorias', onPress: () => router.push('/more/categorias') });
+    }
+    if (Number(home.metricas.reservado) === 0) {
+      checklistItens.push({ label: 'Crie sua primeira meta', onPress: () => router.push('/metas') });
+    }
+    if (Number(home.saldoEmCartoes) === 0 && Number(home.totalFaturas) === 0) {
+      checklistItens.push({ label: 'Cadastre seu cartão', onPress: () => router.push('/more/faturas') });
+    }
+  }
 
   return (
     <ScrollView
@@ -257,6 +285,39 @@ export default function Home() {
           )}
         </Card>
       </Entrance>
+
+      {/* 6. Checklist de setup: discreto, opcional, nunca bloqueia */}
+      {checklistItens.length > 0 && (
+        <Entrance delay={300}>
+          <Card padded radius={radius.xl} style={{ marginTop: spacing.lg }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ ...typography.meta, color: colors.textSecondary, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase' }}>
+                Complete seu setup
+              </Text>
+              <TouchableOpacity
+                onPress={ocultarChecklist}
+                accessibilityRole="button"
+                accessibilityLabel="Ocultar checklist de setup"
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Text style={{ ...typography.meta, color: colors.textMuted }}>Ocultar</Text>
+              </TouchableOpacity>
+            </View>
+            {checklistItens.map((item, i) => (
+              <ListRow
+                key={item.label}
+                height={48}
+                divider={i < checklistItens.length - 1}
+                icon="›"
+                iconTone="brand"
+                title={item.label}
+                onPress={item.onPress}
+                accessibilityLabel={item.label}
+              />
+            ))}
+          </Card>
+        </Entrance>
+      )}
 
       <NovaTransacaoModal
         visible={lancarAberto || repetirLancamento != null}

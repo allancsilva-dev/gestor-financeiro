@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, ViewProps, useColorScheme } from 'react-native';
-import { useTheme } from '../../theme';
+import { View, ViewProps } from 'react-native';
+import { useEsquema, useTheme } from '../../theme';
 
 interface CardProps extends ViewProps {
   radius?: number;
@@ -10,7 +10,7 @@ interface CardProps extends ViewProps {
 // Card padrão: branco com sombra suave no claro, borda sutil no escuro (DESIGN.md)
 export default function Card({ radius = 18, padded = true, style, children, ...rest }: CardProps) {
   const colors = useTheme();
-  const dark = useColorScheme() === 'dark';
+  const dark = useEsquema() === 'dark';
 
   return (
     <View

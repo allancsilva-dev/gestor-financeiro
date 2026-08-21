@@ -3,6 +3,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '../src/context/AuthContext';
+import { TemaProvider } from '../src/context/TemaContext';
 import { Sentry } from '../src/observability/sentry';
 import { useTheme } from '../src/theme';
 import AppLockGate from '../src/components/AppLockGate';
@@ -36,4 +37,14 @@ function RootLayout() {
   );
 }
 
-export default Sentry.wrap(RootLayout);
+// O TemaProvider fica por fora: `RootLayout` chama `useTheme()` no próprio corpo
+// e precisa do esquema já resolvido.
+function Root() {
+  return (
+    <TemaProvider>
+      <RootLayout />
+    </TemaProvider>
+  );
+}
+
+export default Sentry.wrap(Root);
