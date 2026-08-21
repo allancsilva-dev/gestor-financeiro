@@ -1,6 +1,7 @@
 import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { iconeDecorativo } from '../../utils/acessibilidade';
 import { useTheme, spacing, typography, numeric, radius } from '../../theme';
 import { FaturaResumo } from '../../types';
 import { formatCurrency, formatDateOnlyBR } from '../../utils/format';
@@ -24,7 +25,7 @@ export default function LinhaFatura({ fatura, posicao, corDestaque, onPress }: P
       onPress={onPress}
       activeOpacity={0.85}
       accessibilityRole="button"
-      accessibilityLabel={`${rotulo}, ${formatCurrency(fatura.valorTotal)}, vence ${formatDateOnlyBR(fatura.dataVencimento)}`}
+      accessibilityHint="Abre os detalhes da fatura"
       style={{
         flexDirection: 'row',
         alignItems: 'center',
@@ -68,7 +69,7 @@ export default function LinhaFatura({ fatura, posicao, corDestaque, onPress }: P
       <Text style={{ ...numeric, color: colors.textPrimary, fontSize: 16, fontWeight: '800' }}>
         {formatCurrency(fatura.valorTotal)}
       </Text>
-      <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+      <Ionicons name="chevron-forward" size={18} color={colors.textMuted} {...iconeDecorativo} />
     </TouchableOpacity>
   );
 }

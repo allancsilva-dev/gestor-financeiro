@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { iconeDecorativo } from '../../utils/acessibilidade';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Meta } from '../../types';
 import { useTheme, radius, numeric } from '../../theme';
@@ -48,7 +49,7 @@ export default function CardMeta({ meta, onAbrir, onDepositar, onEditar, onExclu
     <TouchableOpacity
       activeOpacity={0.9}
       accessibilityRole="button"
-      accessibilityLabel={`Abrir detalhes da meta ${meta.nome}`}
+      accessibilityHint="Abre os detalhes da meta"
       onPress={() => onAbrir(meta)}
       style={{ marginHorizontal: e(18), marginBottom: e(33) }}
     >
@@ -75,7 +76,7 @@ export default function CardMeta({ meta, onAbrir, onDepositar, onEditar, onExclu
               tamanho={ANEL}
               espessura={e(5)}
               id={meta.id}
-              accessibilityLabel={`${formatPercent(progresso)} de ${meta.nome}`}
+              accessibilityLabel={`${formatPercent(progresso)} concluído`}
             />
           </View>
 
@@ -152,14 +153,15 @@ export default function CardMeta({ meta, onAbrir, onDepositar, onEditar, onExclu
               onPress={() => onDepositar(meta)}
               hitSlop={{ top: 6, bottom: 6 }}
               accessibilityRole="button"
-              accessibilityLabel={`Depositar na meta ${meta.nome}`}
+              accessibilityLabel="Depositar"
+              accessibilityHint="Deposita um valor nesta meta"
               style={{
                 height: e(33), minWidth: e(91), paddingHorizontal: e(6), borderRadius: radius.pill,
                 backgroundColor: colors.textPrimary,
                 flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: e(5),
               }}
             >
-              <Ionicons name="add" size={e(14)} color={colors.bg} />
+              <Ionicons name="add" size={e(14)} color={colors.bg} {...iconeDecorativo} />
               <Text style={{ color: colors.bg, fontSize: e(13), fontWeight: '700' }}>Depositar</Text>
             </TouchableOpacity>
           ) : (

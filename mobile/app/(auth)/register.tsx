@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import Constants from 'expo-constants';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -56,6 +56,12 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [erros, setErros] = useState<Erros>({});
   const [erroGeral, setErroGeral] = useState<string | null>(null);
+
+  // Encadeamento de foco pelo teclado: trocar de campo pelo toque com o teclado
+  // aberto é impreciso (o layout se move sob o dedo).
+  const emailRef = useRef<TextInput>(null);
+  const senhaRef = useRef<TextInput>(null);
+  const confirmarRef = useRef<TextInput>(null);
 
   const isLocalE2E = Constants.expoConfig?.extra?.appEnv === 'local-e2e';
   // Em local-e2e o AutoFill do iOS sequestra o campo de senha e só o último
@@ -178,9 +184,12 @@ export default function Register() {
             placeholder="Seu nome"
             autoCapitalize="words"
             textContentType="name"
+            returnKeyType="next"
+            onSubmitEditing={() => emailRef.current?.focus()}
             error={erros.nome}
           />
           <Field
+            ref={emailRef}
             testID="register-email"
             label="E-mail"
             value={email}
@@ -189,6 +198,8 @@ export default function Register() {
             autoCapitalize="none"
             keyboardType="email-address"
             textContentType="emailAddress"
+            returnKeyType="next"
+            onSubmitEditing={continuar}
             error={erros.email}
           />
         </View>
@@ -197,6 +208,7 @@ export default function Register() {
       {passo === 2 ? (
         <View>
           <CampoSenha
+            ref={senhaRef}
             testID="register-password"
             label="Senha"
             value={password}
@@ -205,9 +217,12 @@ export default function Register() {
             textContentType={passwordTextContentType}
             desprotegido={isLocalE2E}
             medidor
+            returnKeyType="next"
+            onSubmitEditing={() => confirmarRef.current?.focus()}
             error={erros.password}
           />
           <CampoSenha
+            ref={confirmarRef}
             testID="register-confirm-password"
             label="Confirmar senha"
             value={confirmPassword}
@@ -216,6 +231,7 @@ export default function Register() {
             textContentType={passwordTextContentType}
             desprotegido={isLocalE2E}
             returnKeyType="done"
+            onSubmitEditing={continuar}
             error={erros.confirmPassword}
           />
         </View>

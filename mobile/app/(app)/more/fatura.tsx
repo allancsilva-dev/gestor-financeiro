@@ -205,7 +205,6 @@ export default function FaturaDetalheScreen() {
                   onPress={handlePagar}
                   disabled={paying}
                   accessibilityRole="button"
-                  accessibilityLabel="Pagar Fatura"
                   accessibilityState={{ disabled: paying }}
                   style={{
                     height: 48, borderRadius: radius.md, alignItems: 'center',

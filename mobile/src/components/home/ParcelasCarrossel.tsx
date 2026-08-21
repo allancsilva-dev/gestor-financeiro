@@ -1,9 +1,10 @@
 import React from 'react';
 import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { iconeDecorativo } from '../../utils/acessibilidade';
 import { useTheme, radius, spacing, typography, numeric } from '../../theme';
 import { ParcelaAgendada } from '../../types';
-import { formatCurrency, formatDateOnlyBR } from '../../utils/format';
+import { formatCurrency } from '../../utils/format';
 import SkeletonBox from '../ui/SkeletonBox';
 
 interface Props {
@@ -46,11 +47,12 @@ export default function ParcelasCarrossel({ itens, carregando, onVerTodas, onAbr
         <TouchableOpacity
           onPress={onVerTodas}
           accessibilityRole="button"
-          accessibilityLabel="Ver todas as parcelas"
+          accessibilityLabel="Ver todas"
+          accessibilityHint="Ver todas as parcelas agendadas"
           style={{ flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 44, justifyContent: 'center' }}
         >
           <Text style={{ ...typography.label, color: colors.brandFg }}>Ver todas</Text>
-          <Ionicons name="chevron-forward" size={15} color={colors.brandFg} />
+          <Ionicons name="chevron-forward" size={15} color={colors.brandFg} {...iconeDecorativo} />
         </TouchableOpacity>
       </View>
 
@@ -76,7 +78,7 @@ export default function ParcelasCarrossel({ itens, carregando, onVerTodas, onAbr
                 onPress={() => onAbrir(item)}
                 activeOpacity={0.85}
                 accessibilityRole="button"
-                accessibilityLabel={`${item.descricao}${progresso ? `, parcela ${progresso}` : ''}, ${formatCurrency(item.valor)}, vence ${formatDateOnlyBR(item.vencimento)}`}
+                accessibilityHint="Abre os detalhes da parcela"
                 style={{
                   width: CARTAO_LARGURA,
                   borderRadius: radius.lg,

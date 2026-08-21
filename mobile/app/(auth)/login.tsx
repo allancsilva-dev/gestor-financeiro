@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import Constants from 'expo-constants';
 import { useAuth } from '../../src/context/AuthContext';
@@ -23,6 +23,9 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [erros, setErros] = useState<Partial<Record<Campo, string>>>({});
   const [erroGeral, setErroGeral] = useState<string | null>(null);
+  // Foco encadeado pelo teclado: com o teclado aberto o layout sobe e tocar no
+  // próximo campo vira acerto de coordenada.
+  const senhaRef = useRef<TextInput>(null);
 
   const isLocalE2E = Constants.expoConfig?.extra?.appEnv === 'local-e2e';
 
@@ -80,9 +83,12 @@ export default function Login() {
           keyboardType="email-address"
           autoComplete="email"
           textContentType="emailAddress"
+          returnKeyType="next"
+          onSubmitEditing={() => senhaRef.current?.focus()}
           error={erros.email}
         />
         <CampoSenha
+          ref={senhaRef}
           testID="login-password"
           label="Senha"
           value={password}
@@ -91,6 +97,8 @@ export default function Login() {
           autoComplete="password"
           textContentType={isLocalE2E ? 'none' : 'password'}
           desprotegido={isLocalE2E}
+          returnKeyType="go"
+          onSubmitEditing={onSubmit}
           error={erros.password}
         />
 

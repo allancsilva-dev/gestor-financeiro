@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { iconeDecorativo } from '../../../src/utils/acessibilidade';
 import { useTheme, useTabBarSpace, spacing, typography, radius } from '../../../src/theme';
 import CarrosselCartoes, { useMedidasCartao } from '../../../src/components/carteira/CarrosselCartoes';
 import CartaoFisico from '../../../src/components/carteira/CartaoFisico';
@@ -174,10 +175,11 @@ export default function CarteiraScreen() {
           <TouchableOpacity
             onPress={abrirNovo}
             accessibilityRole="button"
-            accessibilityLabel="Cadastrar novo cartão"
+            accessibilityLabel="Cartão"
+            accessibilityHint="Cadastra um novo cartão"
             style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44, paddingLeft: spacing.md }}
           >
-            <Ionicons name="add" size={20} color={colors.brandFg} />
+            <Ionicons name="add" size={20} color={colors.brandFg} {...iconeDecorativo} />
             <Text style={{ ...typography.value, color: colors.brandFg }}>Cartão</Text>
           </TouchableOpacity>
         </View>
@@ -346,7 +348,6 @@ export default function CarteiraScreen() {
               disabled={salvando}
               onPress={salvarCartao}
               accessibilityRole="button"
-              accessibilityLabel="Salvar cartão"
               accessibilityState={{ disabled: salvando }}
             >
               <Text style={{ ...typography.value, color: salvando ? colors.textMuted : colors.brand }}>
@@ -370,6 +371,7 @@ export default function CarteiraScreen() {
             </View>
 
             <Field
+              testID="card-name"
               label="Nome do cartão"
               value={nome}
               onChangeText={setNome}
@@ -381,6 +383,7 @@ export default function CarteiraScreen() {
 
             <Field
               ref={refBanco}
+              testID="card-bank"
               label="Banco"
               value={banco}
               onChangeText={setBanco}
@@ -393,6 +396,7 @@ export default function CarteiraScreen() {
 
             <Field
               ref={refLimite}
+              testID="card-limit"
               label="Limite total"
               value={limite}
               onChangeText={t => setLimite(maskCurrencyInput(t))}
@@ -405,6 +409,7 @@ export default function CarteiraScreen() {
 
             <Field
               ref={refDigitos}
+              testID="card-digits"
               label="4 últimos dígitos"
               value={ultimosDigitos}
               onChangeText={t => setUltimosDigitos(t.replace(/\D/g, '').slice(0, 4))}
@@ -420,6 +425,7 @@ export default function CarteiraScreen() {
               <View style={{ flex: 1 }}>
                 <Field
                   ref={refFechamento}
+                  testID="card-closing"
                   label="Dia de fechamento"
                   value={diaFechamento}
                   onChangeText={t => setDiaFechamento(t.replace(/\D/g, '').slice(0, 2))}
@@ -433,6 +439,7 @@ export default function CarteiraScreen() {
               <View style={{ flex: 1 }}>
                 <Field
                   ref={refVencimento}
+                  testID="card-due"
                   label="Dia de vencimento"
                   value={diaVencimento}
                   onChangeText={t => setDiaVencimento(t.replace(/\D/g, '').slice(0, 2))}

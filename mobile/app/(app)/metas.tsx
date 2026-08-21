@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Modal, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { View, Text, FlatList, TouchableOpacity, Modal, ScrollView, ActivityIndicator, Alert, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { metaService } from '../../src/services/metaService';
@@ -73,6 +73,13 @@ export default function Metas() {
   const [dataLimiteError, setDataLimiteError] = useState<string | null>(null);
 
   const [statusFiltro, setStatusFiltro] = useState<StatusMeta>('ATIVA');
+
+  // Foco encadeado pelo teclado: com o teclado aberto o formulário sobe e tocar
+  // no campo seguinte vira acerto de coordenada.
+  const refValorTotal = useRef<TextInput>(null);
+  const refValorMensal = useRef<TextInput>(null);
+  const refDataLimite = useRef<TextInput>(null);
+  const refDescricao = useRef<TextInput>(null);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['metas', statusFiltro],
@@ -603,11 +610,11 @@ export default function Metas() {
                 <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>Definida na criação — não pode ser alterada.</Text>
               </View>
             )}
-            <Field testID="goal-name" label="Nome" value={nomeCriar} onChangeText={setNomeCriar} placeholder="Ex: Reserva de emergência" error={nomeError} />
-            <Field testID="goal-total" label="Valor total" value={valorTotalCriar} onChangeText={(t) => setValorTotalCriar(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" error={valorTotalError} />
-            <Field label="Valor mensal (opcional)" value={valorMensalCriar} onChangeText={(t) => setValorMensalCriar(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" error={valorMensalError} />
-            <Field label="Data limite" value={dataLimiteCriar} onChangeText={(t) => setDataLimiteCriar(maskDateInput(t))} placeholder="DD/MM/AAAA" keyboardType="number-pad" error={dataLimiteError} />
-            <Field label="Descrição (opcional)" value={descricaoCriar} onChangeText={setDescricaoCriar} />
+            <Field testID="goal-name" label="Nome" value={nomeCriar} onChangeText={setNomeCriar} placeholder="Ex: Reserva de emergência" error={nomeError} returnKeyType="next" submitBehavior="submit" onSubmitEditing={() => refValorTotal.current?.focus()} />
+            <Field ref={refValorTotal} testID="goal-total" label="Valor total" value={valorTotalCriar} onChangeText={(t) => setValorTotalCriar(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" error={valorTotalError} returnKeyType="next" submitBehavior="submit" onSubmitEditing={() => refValorMensal.current?.focus()} />
+            <Field ref={refValorMensal} label="Valor mensal (opcional)" value={valorMensalCriar} onChangeText={(t) => setValorMensalCriar(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" error={valorMensalError} returnKeyType="next" submitBehavior="submit" onSubmitEditing={() => refDataLimite.current?.focus()} />
+            <Field ref={refDataLimite} label="Data limite" value={dataLimiteCriar} onChangeText={(t) => setDataLimiteCriar(maskDateInput(t))} placeholder="DD/MM/AAAA" keyboardType="number-pad" error={dataLimiteError} returnKeyType="next" submitBehavior="submit" onSubmitEditing={() => refDescricao.current?.focus()} />
+            <Field ref={refDescricao} label="Descrição (opcional)" value={descricaoCriar} onChangeText={setDescricaoCriar} returnKeyType="done" />
             {erroCriar && <Text style={{ color: colors.danger, marginTop: 8 }}>{erroCriar}</Text>}
           </ScrollView>
         </View>

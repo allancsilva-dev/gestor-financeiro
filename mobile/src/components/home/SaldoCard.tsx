@@ -2,6 +2,7 @@ import React from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { iconeDecorativo } from '../../utils/acessibilidade';
 import { useTheme, radius, spacing, typography, numeric } from '../../theme';
 import { formatCurrency } from '../../utils/format';
 import SkeletonBox from '../ui/SkeletonBox';
@@ -145,13 +146,13 @@ export default function SaldoCard({
             onPress={onNovaTransacao}
             activeOpacity={0.85}
             accessibilityRole="button"
-            accessibilityLabel="Nova transação"
+            accessibilityLabel="Nova Transação"
             style={{
               flex: 1, minHeight: 48, borderRadius: radius.pill, backgroundColor: colors.brand,
               flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}
           >
-            <Ionicons name="add" size={19} color={colors.brandText} />
+            <Ionicons name="add" size={19} color={colors.brandText} {...iconeDecorativo} />
             <Text style={{ ...typography.button, color: colors.brandText }}>Nova Transação</Text>
           </TouchableOpacity>
 
@@ -159,14 +160,15 @@ export default function SaldoCard({
             onPress={onCarteira}
             activeOpacity={0.85}
             accessibilityRole="button"
-            accessibilityLabel="Abrir carteira"
+            accessibilityLabel="Carteira"
+            accessibilityHint="Abre sua carteira"
             style={{
               flex: 1, minHeight: 48, borderRadius: radius.pill,
               borderWidth: 1, borderColor: colors.chipBorder,
               flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
             }}
           >
-            <Ionicons name="wallet-outline" size={18} color={colors.textPrimary} />
+            <Ionicons name="wallet-outline" size={18} color={colors.textPrimary} {...iconeDecorativo} />
             <Text style={{ ...typography.button, color: colors.textPrimary }}>Carteira</Text>
           </TouchableOpacity>
         </View>

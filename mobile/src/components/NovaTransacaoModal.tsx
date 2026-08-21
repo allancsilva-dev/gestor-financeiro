@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Modal, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, ActivityIndicator, ScrollView, TextInput } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { transacaoService } from '../services/transacaoService';
 import { categoriaService } from '../services/categoriaService';
@@ -50,6 +50,11 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
   const invalidarCacheDeTransacao = useInvalidarAposTransacao();
 
   const [salvando, setSalvando] = useState(false);
+
+  // Foco encadeado pelo teclado: tocar no campo seguinte com o teclado aberto
+  // erra o alvo, porque o sheet sobe junto.
+  const refDescricao = useRef<TextInput>(null);
+  const refData = useRef<TextInput>(null);
   const [erroForm, setErroForm] = useState<string | null>(null);
   const [descricaoError, setDescricaoError] = useState<string | null>(null);
   const [valorError, setValorError] = useState<string | null>(null);
@@ -337,9 +342,9 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
             ))}
           </View>
 
-          <Field testID="transaction-value" label="Valor" value={valor} onChangeText={(t) => setValor(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" error={valorError} autoFocus />
-          <Field testID="transaction-description" label="Descrição" value={descricao} onChangeText={setDescricao} placeholder="Ex: Mercado" error={descricaoError} />
-          <Field testID="transaction-date" label="Data" value={data} onChangeText={(t) => setData(maskDateInput(t))} placeholder="DD/MM/AAAA" keyboardType="number-pad" error={dataError} />
+          <Field testID="transaction-value" label="Valor" value={valor} onChangeText={(t) => setValor(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" error={valorError} autoFocus returnKeyType="next" submitBehavior="submit" onSubmitEditing={() => refDescricao.current?.focus()} />
+          <Field ref={refDescricao} testID="transaction-description" label="Descrição" value={descricao} onChangeText={setDescricao} placeholder="Ex: Mercado" error={descricaoError} returnKeyType="next" submitBehavior="submit" onSubmitEditing={() => refData.current?.focus()} />
+          <Field ref={refData} testID="transaction-date" label="Data" value={data} onChangeText={(t) => setData(maskDateInput(t))} placeholder="DD/MM/AAAA" keyboardType="number-pad" error={dataError} returnKeyType="done" />
 
           <Text style={{ color: colors.textSecondary, fontSize: 10, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Categoria</Text>
           {sugestao?.categoria && categoriaId === sugestao.categoria.id && !categoriaEscolhidaManualmente.current && (
@@ -367,7 +372,7 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
                 onPress={criarPacoteInicial}
                 disabled={criandoPacote}
                 accessibilityRole="button"
-                accessibilityLabel="Criar pacote inicial de categorias"
+                accessibilityHint="Cria nove categorias de gasto de uma vez"
                 style={{ minHeight: 44, borderRadius: 12, backgroundColor: colors.brandBg, alignItems: 'center', justifyContent: 'center', opacity: criandoPacote ? 0.6 : 1 }}
               >
                 {criandoPacote
@@ -388,7 +393,7 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
                   onPress={criarCategoriaUnica}
                   disabled={criandoCategoria}
                   accessibilityRole="button"
-                  accessibilityLabel="Criar categoria"
+                  accessibilityHint="Cria a categoria digitada acima"
                   style={{ minHeight: 44, marginTop: 22, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', opacity: criandoCategoria ? 0.6 : 1 }}
                 >
                   {criandoCategoria
@@ -434,7 +439,6 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
                   testID="create-card-cta"
                   onPress={() => setCriarCartaoAberto(true)}
                   accessibilityRole="button"
-                  accessibilityLabel="Criar cartão agora"
                   style={{ minHeight: 44, borderRadius: 12, backgroundColor: colors.brandBg, alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}
                 >
                   <Text style={{ color: colors.brandFg, fontWeight: '700' }}>Criar cartão agora</Text>
@@ -456,7 +460,6 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
                     onPress={criarCartaoRapido}
                     disabled={criandoCartao}
                     accessibilityRole="button"
-                    accessibilityLabel="Salvar cartão"
                     style={{ minHeight: 44, borderRadius: 12, backgroundColor: colors.brandBg, alignItems: 'center', justifyContent: 'center', marginTop: 4, opacity: criandoCartao ? 0.6 : 1 }}
                   >
                     {criandoCartao

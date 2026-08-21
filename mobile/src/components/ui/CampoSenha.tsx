@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Text, TextInputProps, TouchableOpacity, View } from 'react-native';
+import { Text, TextInput, TextInputProps, TouchableOpacity, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme, radius, spacing, typography } from '../../theme';
 import Field from './Field';
@@ -13,6 +13,8 @@ interface Props extends Omit<TextInputProps, 'secureTextEntry'> {
   medidor?: boolean;
   /** Fluxo local-e2e: o AutoFill do iOS trunca campo protegido (ver register). */
   desprotegido?: boolean;
+  /** Ref do input, para encadear foco entre campos pelo teclado. */
+  ref?: React.Ref<TextInput>;
 }
 
 /**
@@ -25,6 +27,7 @@ export default function CampoSenha({
   error,
   medidor = false,
   desprotegido = false,
+  ref,
   ...rest
 }: Props) {
   const colors = useTheme();
@@ -37,6 +40,7 @@ export default function CampoSenha({
     <View>
       <View style={{ justifyContent: 'center' }}>
         <Field
+          ref={ref}
           label={label}
           value={value}
           error={error}
@@ -64,7 +68,10 @@ export default function CampoSenha({
         </TouchableOpacity>
       </View>
 
-      {medidor && value.length > 0 ? (
+      {/* O medidor ocupa o mesmo espaço com o campo vazio: se ele aparecesse só
+          ao digitar, o campo seguinte pularia para baixo embaixo do dedo do
+          usuário (e o Maestro tocava na posição antiga). */}
+      {medidor ? (
         <View style={{ marginTop: -spacing.sm, marginBottom: spacing.lg }}>
           <View style={{ flexDirection: 'row', gap: spacing.xs }}>
             {[1, 2, 3, 4].map((n) => (
@@ -74,7 +81,7 @@ export default function CampoSenha({
                   flex: 1,
                   height: 4,
                   borderRadius: radius.pill,
-                  backgroundColor: n <= forca.nivel ? corDoNivel : colors.trilha,
+                  backgroundColor: value.length > 0 && n <= forca.nivel ? corDoNivel : colors.trilha,
                 }}
               />
             ))}
@@ -83,9 +90,11 @@ export default function CampoSenha({
             accessibilityLiveRegion="polite"
             style={{ ...typography.meta, color: colors.textSecondary, marginTop: spacing.xs }}
           >
-            {forca.pendencias.length > 0
-              ? `Falta: ${forca.pendencias.join(', ')}`
-              : `Senha ${forca.rotulo.toLowerCase()}`}
+            {value.length === 0
+              ? 'Mínimo 8 caracteres, 1 letra e 1 número'
+              : forca.pendencias.length > 0
+                ? `Falta: ${forca.pendencias.join(', ')}`
+                : `Senha ${forca.rotulo.toLowerCase()}`}
           </Text>
         </View>
       ) : null}
