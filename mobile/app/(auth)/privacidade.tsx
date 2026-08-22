@@ -35,16 +35,16 @@ export default function PrivacyPolicy() {
         Versão 2026-07 · Gestor Financeiro
       </Text>
 
-      <Text style={{ ...typography.body, fontSize: 15, lineHeight: 23, color: colors.textPrimary, marginBottom: spacing.lg }}>
+      <Text style={{ ...typography.leitura, color: colors.textPrimary, marginBottom: spacing.lg }}>
         Esta política explica como seus dados pessoais são tratados no aplicativo Gestor Financeiro, conforme a Lei Geral de Proteção de Dados.
       </Text>
 
       {sections.map(([title, body]) => (
         <View key={title} style={{ marginBottom: spacing.xl }}>
-          <Text accessibilityRole="header" style={{ ...typography.cardTitle, fontSize: 17, color: colors.textPrimary, marginBottom: spacing.xs }}>
+          <Text accessibilityRole="header" style={{ ...typography.leituraTitulo, color: colors.textPrimary, marginBottom: spacing.xs }}>
             {title}
           </Text>
-          <Text style={{ ...typography.body, fontSize: 15, lineHeight: 23, color: colors.textSecondary }}>{body}</Text>
+          <Text style={{ ...typography.leitura, color: colors.textSecondary }}>{body}</Text>
         </View>
       ))}
     </ScrollView>

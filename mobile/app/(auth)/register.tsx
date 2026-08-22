@@ -246,7 +246,7 @@ export default function Register() {
               { icone: 'trash-outline' as const, texto: 'Você apaga a conta e todos os dados a qualquer momento.' },
             ].map((item) => (
               <View key={item.texto} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md }}>
-                <Ionicons name={item.icone} size={18} color={colors.brandFg} style={{ marginTop: 2 }} />
+                <Ionicons name={item.icone} size={18} color={colors.brandFg} style={{ marginTop: spacing.xxs }} />
                 <Text style={{ ...typography.body, color: colors.textSecondary, flex: 1 }}>{item.texto}</Text>
               </View>
             ))}

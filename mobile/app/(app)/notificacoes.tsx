@@ -151,17 +151,17 @@ export default function Notificacoes() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={{ ...typography.cardTitle, color: colors.textPrimary }}>{n.titulo}</Text>
-                <Text style={{ ...typography.meta, color: colors.textSecondary, marginTop: 2 }}>
+                <Text style={{ ...typography.meta, color: colors.textSecondary, marginTop: spacing.xxs }}>
                   {n.mensagem}
                 </Text>
-                <Text style={{ ...typography.meta, color: colors.textMuted, marginTop: 6 }}>
+                <Text style={{ ...typography.meta, color: colors.textMuted, marginTop: spacing.sm }}>
                   {formatDateOnlyBR(n.criadaEm.slice(0, 10))}
                 </Text>
               </View>
               {!n.lida && (
                 <View style={{
-                  width: 8, height: 8, borderRadius: 4,
-                  backgroundColor: colors.brand, marginTop: 6,
+                  width: 8, height: 8, borderRadius: radius.pill,
+                  backgroundColor: colors.brand, marginTop: spacing.sm,
                 }} />
               )}
             </TouchableOpacity>

@@ -114,7 +114,7 @@ export default function Home() {
             accessibilityRole="button"
             accessibilityLabel="Abrir perfil"
             style={{
-              width: 44, height: 44, borderRadius: 22,
+              width: 44, height: 44, borderRadius: radius.pill,
               backgroundColor: colors.brandBg,
               alignItems: 'center', justifyContent: 'center',
             }}
@@ -128,7 +128,7 @@ export default function Home() {
             <Text style={{ ...typography.greeting, color: colors.accent }}>
               Olá, {primeiroNome}!
             </Text>
-            <Text style={{ ...typography.meta, color: colors.textSecondary, marginTop: 2 }}>
+            <Text style={{ ...typography.meta, color: colors.textSecondary, marginTop: spacing.xxs }}>
               {formatDateLongBR()}
             </Text>
           </View>

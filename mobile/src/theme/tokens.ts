@@ -5,6 +5,9 @@ import type { TextStyle } from 'react-native';
 // DESIGN.md. Antes disso tudo era literal inline em cada tela.
 
 export const spacing = {
+  // Encosto óptico, abaixo do piso da escala: metadado sob título, ponto de
+  // não lido ao lado do texto. Não é espaçamento estrutural.
+  xxs: 2,
   xs: 4,
   sm: 8,
   md: 12,
@@ -39,6 +42,10 @@ export const typography = {
   label: { fontSize: 14, lineHeight: 18, fontWeight: '500' },
   body: { fontSize: 14, lineHeight: 20, fontWeight: '500' },
   meta: { fontSize: 12, lineHeight: 16, fontWeight: '500' },
+  // Leitura corrida longa (política de privacidade, termos): entrelinha maior
+  // que a de UI, porque aqui o usuário lê parágrafos, não varre rótulos
+  leitura: { fontSize: 15, lineHeight: 23, fontWeight: '500' },
+  leituraTitulo: { fontSize: 17, lineHeight: 22, fontWeight: '700' },
   value: { fontSize: 15, lineHeight: 20, fontWeight: '700' },
   // Texto digitado em `ui/Field` — mesmo corpo de `value`, peso de leitura
   input: { fontSize: 15, lineHeight: 20, fontWeight: '500' },

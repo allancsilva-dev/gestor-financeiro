@@ -6,7 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useReducedMotion } from 'react-native-reanimated';
-import { useTheme, radius, typography, tabBar } from '../../src/theme';
+import { useTheme, radius, spacing, typography, tabBar } from '../../src/theme';
 import NovaTransacaoModal from '../../src/components/NovaTransacaoModal';
 import { useAuth } from '../../src/context/AuthContext';
 
@@ -100,10 +100,10 @@ export default function AppLayout() {
           paddingTop: 0,
           elevation: 0,
         },
-        tabBarItemStyle: { height: BARRA_ALTURA, paddingVertical: 8 },
+        tabBarItemStyle: { height: BARRA_ALTURA, paddingVertical: spacing.sm },
         tabBarActiveTintColor: colors.brand,
         tabBarInactiveTintColor: colors.textSecondary,
-        tabBarLabelStyle: { ...typography.tabLabel, marginTop: 4 },
+        tabBarLabelStyle: { ...typography.tabLabel, marginTop: spacing.xs },
       }}>
         <Tabs.Screen name="(inicio)" options={{ title: 'Início', tabBarIcon: aba('home') }} />
         <Tabs.Screen name="analises" options={{ title: 'Análises', tabBarIcon: aba('stats-chart') }} />

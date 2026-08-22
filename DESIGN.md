@@ -61,6 +61,8 @@ faz spread (`{ ...typography.value, ...numeric, color: colors.success }`), não 
 - `greeting` 22/800 · `section` 20/700
 - `cardTitle` 15/700 · `rowTitle` 15/600 (linha de lista) · `input` 15/500 (campo)
 - `label` 14/500 · `body` 14/500 · `meta` 12/500 · `badge` 12/700
+- `leitura` 15/23/500 e `leituraTitulo` 17/700 — texto longo de leitura corrida (privacidade,
+  termos). Entrelinha maior que a de UI: aqui o usuário lê parágrafos, não varre rótulos.
 - Valores monetários: sempre bold + `numeric` (tabular-nums), verde entra / vermelho sai
 
 ## Components
@@ -128,6 +130,8 @@ sempre em hora local — `toISOString()` no meio do caminho move lançamento de 
 
 ## Layout
 
+- Escala de espaço: `spacing` xxs 2 · xs 4 · sm 8 · md 12 · lg 16 · xl 20 · xxl 24 · xxxl 32.
+  O `xxs` é encosto óptico (metadado sob título), não espaçamento estrutural.
 - Padding lateral de tela: `screenPadding` (16)
 - Gap entre cards: 12–16; fim de tela rolável sempre por `useTabBarSpace()`
 - Safe areas por `useSafeAreaInsets()`, nunca `SafeAreaView`
@@ -170,6 +174,17 @@ Sutil e nativa: transição de rota `fade` de 150–180ms, press feedback por `a
 (0.7–0.9), `ui/Entrance` em cascata (fade + 12px, 340ms, ease-out) e shimmer no skeleton.
 Sem bounce, sem haptics. Reduce Motion desliga a animação de rota e leva `Entrance`/`SkeletonBox`
 direto ao estado final.
+
+## O trinco
+
+`src/__tests__/padraoVisual.test.ts` varre `app/**` e falha quando uma tela usa `fontSize`,
+espaçamento ou raio numérico cru, hex literal, `ActivityIndicator` ou `SafeAreaView`. Descrever
+o sistema não impede regressão — as telas antigas nasceram assim porque nada barrava um
+`fontSize: 13` solto. É o mesmo mecanismo de `tema.test.ts`, que trava contraste.
+
+O teste carrega duas listas: exceções permanentes com motivo (hoje só o portão de sessão em
+`app/index.tsx`, que roda antes de existir conteúdo para o skeleton imitar) e as telas ainda
+não migradas, que encolhe a cada PR. Exceção obsoleta também quebra o teste.
 
 ## Acessibilidade
 

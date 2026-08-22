@@ -207,7 +207,7 @@ export default function Ajustes() {
               style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg }}
             >
               <View style={{
-                width: 44, height: 44, borderRadius: 22,
+                width: 44, height: 44, borderRadius: radius.pill,
                 backgroundColor: colors.brandBg,
                 alignItems: 'center', justifyContent: 'center',
               }}>
@@ -219,7 +219,7 @@ export default function Ajustes() {
                 <Text numberOfLines={1} style={{ ...typography.cardTitle, color: colors.textPrimary }}>
                   {usuario?.nome ?? 'Sua conta'}
                 </Text>
-                <Text numberOfLines={1} style={{ ...typography.meta, color: colors.textSecondary, marginTop: 2 }}>
+                <Text numberOfLines={1} style={{ ...typography.meta, color: colors.textSecondary, marginTop: spacing.xxs }}>
                   {usuario?.email ?? 'Dados pessoais e senha'}
                 </Text>
               </View>
@@ -305,7 +305,7 @@ export default function Ajustes() {
                 <Text numberOfLines={1} style={{ ...typography.label, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md }}>
                   {item.label}
                 </Text>
-                <Text numberOfLines={1} style={{ ...typography.meta, color: colors.textSecondary, marginTop: 2 }}>
+                <Text numberOfLines={1} style={{ ...typography.meta, color: colors.textSecondary, marginTop: spacing.xxs }}>
                   {item.sub}
                 </Text>
               </TouchableOpacity>

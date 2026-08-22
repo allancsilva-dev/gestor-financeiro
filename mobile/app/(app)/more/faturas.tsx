@@ -156,12 +156,7 @@ export default function CarteiraScreen() {
     } as never);
   };
 
-  const campo = {
-    borderWidth: 1, borderRadius: radius.md, padding: spacing.md, ...typography.input,
-    marginBottom: 14, backgroundColor: colors.fieldBg, borderColor: colors.border,
-    color: colors.textPrimary,
-  };
-  const rotulo = { ...typography.meta, fontWeight: '600' as const, color: colors.textSecondary, marginBottom: 6, marginTop: spacing.xs };
+  const rotulo = { ...typography.meta, fontWeight: '600' as const, color: colors.textSecondary, marginBottom: spacing.sm, marginTop: spacing.xs };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -430,7 +425,7 @@ export default function CarteiraScreen() {
                   accessibilityLabel={`Cor ${c}`}
                   accessibilityState={{ selected: cor === c }}
                   style={{
-                    width: 44, height: 44, borderRadius: 22, backgroundColor: c,
+                    width: 44, height: 44, borderRadius: radius.pill, backgroundColor: c,
                     borderWidth: cor === c ? 3 : 1,
                     borderColor: cor === c ? colors.brand : colors.border,
                   }}

@@ -248,7 +248,7 @@ export default function FaturaDetalheScreen() {
                       <Text numberOfLines={1} style={{ ...typography.body, color: colors.textPrimary }}>
                         {descricao}
                       </Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm - 2, marginTop: 2 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs + spacing.xxs, marginTop: spacing.xxs }}>
                         <Text style={{ ...typography.meta, color: colors.textSecondary }}>
                           {formatDate(l.data)}
                           {l.totalParcelas ? ` · ${l.parcelaAtual}/${l.totalParcelas}` : ''}

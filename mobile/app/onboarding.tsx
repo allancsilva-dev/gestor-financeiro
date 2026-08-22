@@ -643,7 +643,7 @@ function ItemDaRevisao({
               ...typography.meta,
               ...(pulado ? {} : numeric),
               color: pulado ? colors.textMuted : colors.textSecondary,
-              marginTop: 2,
+              marginTop: spacing.xxs,
             }}
           >
             {pulado ? 'Você pulou — dá para adicionar depois' : detalhe}
