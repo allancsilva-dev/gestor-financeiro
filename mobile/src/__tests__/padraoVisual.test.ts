@@ -69,7 +69,6 @@ const EXCECOES_PERMANENTES: Record<string, string[]> = {
 
 /** Telas que ainda não passaram pela migração visual. Encolhe a cada PR. */
 const AINDA_NAO_MIGRADAS = [
-  '(app)/(inicio)/transacoes.tsx',
   '(app)/metas.tsx', // só os modais internos; a lista já é do padrão novo
   '(app)/more/carteiras.tsx',
   '(app)/more/categorias.tsx',

@@ -1,34 +1,30 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, FlatList, RefreshControl, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, FlatList, RefreshControl, TouchableOpacity } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams } from 'expo-router';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { transacaoService } from '../../../src/services/transacaoService';
 import relatorioService from '../../../src/services/relatorioService';
-import { useTheme, useTabBarSpace } from '../../../src/theme';
+import {
+  useTheme, useTabBarSpace, numeric, radius, screenPadding, spacing, typography,
+} from '../../../src/theme';
 import { formatCurrency, formatDate } from '../../../src/utils/format';
+import { competenciaDe, ehCompetenciaCorrente, intervaloDoMes, somarMeses } from '../../../src/domain/periodo';
 import { TipoTransacao, Transacao } from '../../../src/types';
+import CabecalhoSubTela from '../../../src/components/ui/CabecalhoSubTela';
+import CampoBusca from '../../../src/components/ui/CampoBusca';
 import SkeletonBox from '../../../src/components/ui/SkeletonBox';
 import ListRow from '../../../src/components/ui/ListRow';
 import Chip from '../../../src/components/ui/Chip';
 import Card from '../../../src/components/ui/Card';
+import EstadoVazio from '../../../src/components/ui/EstadoVazio';
 import EditarTransacaoModal from '../../../src/components/EditarTransacaoModal';
-
-const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
-function intervaloDoMes(ref: Date): { inicio: string; fim: string } {
-  return {
-    inicio: iso(new Date(ref.getFullYear(), ref.getMonth(), 1)),
-    fim: iso(new Date(ref.getFullYear(), ref.getMonth() + 1, 0)),
-  };
-}
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export default function Transacoes() {
   const colors = useTheme();
   const tabBarSpace = useTabBarSpace();
-  const insets = useSafeAreaInsets();
   // Drill-down (PR-F3-08): filtros/transação chegam por rota (navegação do backend)
   const params = useLocalSearchParams<{ inicio?: string; tipo?: string; transacaoId?: string }>();
 
@@ -93,89 +89,57 @@ export default function Transacoes() {
   const total = data?.pages[0]?.totalElements ?? 0;
 
   const mesLabel = capitalize(mesRef.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }));
-  const hoje = new Date();
-  const ehMesAtual = mesRef.getFullYear() === hoje.getFullYear() && mesRef.getMonth() === hoje.getMonth();
+  const { mes, ano } = competenciaDe(mesRef);
+  const ehMesAtual = ehCompetenciaCorrente(mes, ano);
 
-  const mudarMes = (delta: number) =>
-    setMesRef(m => new Date(m.getFullYear(), m.getMonth() + delta, 1));
+  const mudarMes = (delta: number) => setMesRef(m => somarMeses(m, delta));
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 4 }}>
-        <Text style={{ color: colors.textPrimary, fontSize: 23, fontWeight: '800', letterSpacing: -0.4 }}>Transações</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
-          <TouchableOpacity
-            onPress={() => mudarMes(-1)}
-            accessibilityRole="button"
-            accessibilityLabel="Mês anterior"
-            style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
-          >
-            <Text style={{ color: colors.brandFg, fontSize: 20, fontWeight: '600' }}>‹</Text>
-          </TouchableOpacity>
-          <View style={{ alignItems: 'center' }}>
-            <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '700' }}>{mesLabel}</Text>
-            <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 1 }}>
-              {isLoading ? ' ' : `${total} ${total === 1 ? 'transação' : 'transações'}`}
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => mudarMes(1)}
-            disabled={ehMesAtual}
-            accessibilityRole="button"
-            accessibilityLabel="Próximo mês"
-            style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', opacity: ehMesAtual ? 0.3 : 1 }}
-          >
-            <Text style={{ color: colors.brandFg, fontSize: 20, fontWeight: '600' }}>›</Text>
-          </TouchableOpacity>
+      <CabecalhoSubTela titulo="Transações" />
+
+      <View style={{
+        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+        paddingHorizontal: screenPadding,
+      }}>
+        <SetaDeMes direcao="anterior" onPress={() => mudarMes(-1)} />
+        <View style={{ alignItems: 'center' }}>
+          <Text style={{ ...typography.value, color: colors.textPrimary }}>{mesLabel}</Text>
+          <Text style={{ ...typography.meta, color: colors.textSecondary }}>
+            {isLoading ? ' ' : `${total} ${total === 1 ? 'transação' : 'transações'}`}
+          </Text>
         </View>
+        {/* O futuro não tem lançamento: avançar além do mês corrente só mostraria
+            uma tela vazia. */}
+        <SetaDeMes direcao="proximo" onPress={() => mudarMes(1)} desabilitada={ehMesAtual} />
       </View>
 
       {/* Resumo do mês: totais do backend (todas as páginas, não só as carregadas) */}
-      <View style={{ flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8 }}>
-        <Card radius={14} style={{ flex: 1, padding: 12 }}>
-          <Text style={{ color: colors.textSecondary, fontSize: 11 }}>Entradas no mês</Text>
-          {resumoQuery.isLoading ? (
-            <View style={{ marginTop: 4 }}><SkeletonBox width={90} height={18} /></View>
-          ) : (
-            <Text style={{ color: colors.success, fontSize: 16, fontWeight: '800', marginTop: 3, fontVariant: ['tabular-nums'] }}>
-              + {formatCurrency(resumoQuery.data?.totalEntradas ?? 0)}
-            </Text>
-          )}
-        </Card>
-        <Card radius={14} style={{ flex: 1, padding: 12 }}>
-          <Text style={{ color: colors.textSecondary, fontSize: 11 }}>Saídas no mês</Text>
-          {resumoQuery.isLoading ? (
-            <View style={{ marginTop: 4 }}><SkeletonBox width={90} height={18} /></View>
-          ) : (
-            <Text style={{ color: colors.danger, fontSize: 16, fontWeight: '800', marginTop: 3, fontVariant: ['tabular-nums'] }}>
-              − {formatCurrency(resumoQuery.data?.totalSaidas ?? 0)}
-            </Text>
-          )}
-        </Card>
-      </View>
-
-      <View style={{ paddingHorizontal: 16, paddingTop: 4 }}>
-        <TextInput
-          value={busca}
-          onChangeText={setBusca}
-          placeholder="Buscar por descrição"
-          placeholderTextColor={colors.textMuted}
-          returnKeyType="search"
-          accessibilityLabel="Buscar transações por descrição"
-          style={{
-            backgroundColor: colors.card,
-            borderWidth: 1,
-            borderColor: colors.border,
-            borderRadius: 12,
-            paddingHorizontal: 12,
-            paddingVertical: 10,
-            color: colors.textPrimary,
-            fontSize: 14,
-          }}
+      <View style={{
+        flexDirection: 'row', gap: spacing.md,
+        paddingHorizontal: screenPadding, paddingVertical: spacing.md,
+      }}>
+        <TotalDoMes
+          rotulo="Entradas no mês"
+          valor={resumoQuery.data?.totalEntradas ?? 0}
+          sinal="+"
+          cor={colors.success}
+          carregando={resumoQuery.isLoading}
+        />
+        <TotalDoMes
+          rotulo="Saídas no mês"
+          valor={resumoQuery.data?.totalSaidas ?? 0}
+          sinal="−"
+          cor={colors.danger}
+          carregando={resumoQuery.isLoading}
         />
       </View>
 
-      <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 10 }}>
+      <View style={{ flexDirection: 'row', paddingHorizontal: screenPadding }}>
+        <CampoBusca valor={busca} onChange={setBusca} placeholder="Buscar por descrição" />
+      </View>
+
+      <View style={{ flexDirection: 'row', gap: spacing.sm, paddingHorizontal: screenPadding, paddingVertical: spacing.md }}>
         {(['TODOS', 'ENTRADA', 'SAIDA'] as Array<'TODOS' | TipoTransacao>).map(ch => (
           <Chip
             key={ch}
@@ -189,38 +153,38 @@ export default function Transacoes() {
       <FlatList
         data={transacoes}
         keyExtractor={item => item.id.toString()}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: tabBarSpace }}
+        contentContainerStyle={{ paddingHorizontal: screenPadding, paddingBottom: tabBarSpace }}
         refreshControl={<RefreshControl refreshing={isRefetching && !isFetchingNextPage} onRefresh={refetch} tintColor={colors.brand} />}
         onEndReached={() => { if (hasNextPage && !isFetchingNextPage) fetchNextPage(); }}
         onEndReachedThreshold={0.4}
         ListFooterComponent={isFetchingNextPage ? (
-          <View style={{ paddingVertical: 16 }}>
-            <ActivityIndicator color={colors.brand} />
+          <View style={{ paddingVertical: spacing.md }}>
+            <SkeletonBox width="100%" height={64} />
           </View>
         ) : null}
         ListEmptyComponent={isLoading ? (
-          <View style={{ paddingTop: 8, gap: 8 }}>
+          <View style={{ gap: spacing.sm }}>
             {[1, 2, 3, 4, 5].map(i => <SkeletonBox key={i} width="100%" height={64} />)}
           </View>
         ) : isError ? (
-          <View style={{ alignItems: 'center', padding: 48 }}>
-            <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600' }}>Erro ao carregar transações</Text>
-            <TouchableOpacity onPress={() => refetch()} style={{ marginTop: 8, minHeight: 44, justifyContent: 'center' }} accessibilityRole="button">
-              <Text style={{ color: colors.brandFg, fontWeight: '600' }}>Tentar novamente</Text>
-            </TouchableOpacity>
-          </View>
+          <EstadoVazio
+            emoji="📶"
+            titulo="Não deu para carregar suas transações"
+            texto="Verifique sua conexão e tente de novo."
+            acao={{ rotulo: 'Tentar de novo', onPress: () => refetch() }}
+          />
         ) : buscaAtiva || filtro !== 'TODOS' ? (
-          <View style={{ alignItems: 'center', padding: 48 }}>
-            <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600' }}>Nada encontrado</Text>
-            <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4, textAlign: 'center' }}>
-              Ajuste a busca ou os filtros para ver outras transações.
-            </Text>
-          </View>
+          <EstadoVazio
+            emoji="🔍"
+            titulo="Nada encontrado"
+            texto="Ajuste a busca ou os filtros para ver outras transações."
+          />
         ) : (
-          <View style={{ alignItems: 'center', padding: 48 }}>
-            <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600' }}>Nenhuma transação em {mesLabel}</Text>
-            <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>Toque no + para lançar a primeira</Text>
-          </View>
+          <EstadoVazio
+            emoji="📄"
+            titulo={`Nenhuma transação em ${mesLabel}`}
+            texto="Toque no + para lançar a primeira"
+          />
         )}
         renderItem={({ item: t }) => (
           <ListRow
@@ -244,3 +208,59 @@ export default function Transacoes() {
     </View>
   );
 }
+
+/** Seta de navegação de mês. Alvo de 44 mesmo com o glifo pequeno. */
+const SetaDeMes = ({ direcao, onPress, desabilitada = false }: {
+  direcao: 'anterior' | 'proximo';
+  onPress: () => void;
+  desabilitada?: boolean;
+}) => {
+  const colors = useTheme();
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      disabled={desabilitada}
+      accessibilityRole="button"
+      accessibilityLabel={direcao === 'anterior' ? 'Mês anterior' : 'Próximo mês'}
+      accessibilityState={{ disabled: desabilitada }}
+      style={{
+        minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center',
+        opacity: desabilitada ? 0.3 : 1,
+      }}
+    >
+      <Ionicons
+        name={direcao === 'anterior' ? 'chevron-back' : 'chevron-forward'}
+        size={20}
+        color={colors.brandFg}
+      />
+    </TouchableOpacity>
+  );
+};
+
+/** Entradas ou saídas do mês inteiro — vem do backend, não da página carregada. */
+const TotalDoMes = ({ rotulo, valor, sinal, cor, carregando }: {
+  rotulo: string;
+  valor: number;
+  sinal: string;
+  cor: string;
+  carregando: boolean;
+}) => {
+  const colors = useTheme();
+  return (
+    <Card radius={radius.lg} style={{ flex: 1, padding: spacing.md }}>
+      <Text style={{ ...typography.meta, color: colors.textSecondary }}>{rotulo}</Text>
+      {carregando ? (
+        <View style={{ marginTop: spacing.xs }}><SkeletonBox width={90} height={18} /></View>
+      ) : (
+        <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.7}
+          style={{ ...typography.value, ...numeric, fontWeight: '800', color: cor, marginTop: spacing.xxs }}
+        >
+          {sinal} {formatCurrency(valor)}
+        </Text>
+      )}
+    </Card>
+  );
+};

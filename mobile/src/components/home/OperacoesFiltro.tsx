@@ -1,7 +1,7 @@
 import React from 'react';
-import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useTheme, radius, spacing, typography, numeric } from '../../theme';
+import CampoBusca from '../ui/CampoBusca';
 import { CategoriaResumo } from '../../types';
 import {
   PERIODO_LABEL, PeriodoPreset, TipoFiltro,
@@ -130,22 +130,7 @@ export default function OperacoesFiltro({
       </ScrollView>
 
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.lg }}>
-        <View style={{
-          flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-          minHeight: 48, paddingHorizontal: spacing.lg,
-          borderRadius: radius.lg, backgroundColor: colors.fieldBg,
-        }}>
-          <Ionicons name="search" size={18} color={colors.textMuted} />
-          <TextInput
-            value={busca}
-            onChangeText={onBusca}
-            placeholder="Buscar transações"
-            placeholderTextColor={colors.textMuted}
-            returnKeyType="search"
-            accessibilityLabel="Buscar transações"
-            style={{ flex: 1, ...typography.body, color: colors.textPrimary, paddingVertical: 0 }}
-          />
-        </View>
+        <CampoBusca valor={busca} onChange={onBusca} placeholder="Buscar transações" />
         <View style={{
           minHeight: 36, paddingHorizontal: spacing.md, justifyContent: 'center',
           borderRadius: radius.pill, borderWidth: 1, borderColor: colors.brand,
