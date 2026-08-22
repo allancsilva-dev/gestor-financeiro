@@ -2,15 +2,21 @@
 
 Documentacao de alto nivel sobre como o sistema funciona. Mantido pelo `docs-reporter`.
 
-**Ultima atualizacao:** 2026-08-21 (working tree nao commitado sobre `main` em `12cc447`: redesign de
+**Ultima atualizacao:** 2026-08-22 (branch `design/pr13-perfil`, commits `9c1335be`..`ad5fc022`,
+mergeada em `main` no intervalo `12571a4..HEAD`: serie de 13 PRs que unificou o padrao visual do
+app mobile — kit `ui/` normalizado, tres telas de referencia (Home/Carteira/Metas) fechadas num so
+padrao, trinco `padraoVisual.test.ts` e migracao das 10 telas restantes de `app/**` para o padrao
+novo — ver item 27 da lista de decisoes tecnicas, BUG-0083 a BUG-0091, BACKLOG-0098/0099/0100/0101)
+
+**Atualizacao anterior:** 2026-08-21 (working tree nao commitado sobre `main` em `12cc447`: redesign de
 `mobile/app/(app)/ajustes.tsx` para o padrao visual de Home/Carteira/Metas, escolha de tema
 claro/escuro/sistema pelo usuario (antes so seguia o SO), exclusao de conta LGPD consumida pela
 primeira vez no mobile via `DELETE /v1/usuarios/me`, e `DESIGN.md` reescrito para refletir a marca
 ciano atual — ver item 26 da lista de decisoes tecnicas, PROB-0083, BACKLOG-0077/0094)
 
-**Atualizacao anterior:** 2026-08-19 (branch `chore/remove-prototipo`, working tree nao commitado: protótipo HTML e redesign visual "Fase 4" dark-first ciano descartados por inteiro por decisao do dono do produto — ver item 25 da lista de decisoes tecnicas, PROB-0082, BACKLOG-0090). **Nota de consistencia registrada em 2026-08-21:** apos essa reversao, commits legitimos e ja mergeados em `main` (`9a3b205`, `63df4b1`, `73caf8b`, `88ae1ea`, `e3250e9`, `66375e1`, `a8d39df`, `d89bd62`, `12cc447` — navegacao/tema, carteira de cartoes, home, tokens visuais e redesign de metas) substituiram a tab bar `Início · Transações · + · Planejamento · Mais` citada no item 25 pela atual `Início · Análises · + · Metas · Ajustes` (`mobile/app/(app)/_layout.tsx`) e a marca voltou a ser ciano (`mobile/src/theme/colors.ts`, `brand: '#17b3ff'`) — nao ha contradicao real, apenas o item 25 descreve um estado intermediario que ja foi superado por trabalho seguinte nao registrado em detalhe neste arquivo pelas rodadas anteriores do `docs-reporter`. Ver BACKLOG-0091 (mesmo tipo de defasagem documental, ja registrado).
+**Atualizacao anterior a essa:** 2026-08-19 (branch `chore/remove-prototipo`, working tree nao commitado: protótipo HTML e redesign visual "Fase 4" dark-first ciano descartados por inteiro por decisao do dono do produto — ver item 25 da lista de decisoes tecnicas, PROB-0082, BACKLOG-0090). **Nota de consistencia registrada em 2026-08-21:** apos essa reversao, commits legitimos e ja mergeados em `main` (`9a3b205`, `63df4b1`, `73caf8b`, `88ae1ea`, `e3250e9`, `66375e1`, `a8d39df`, `d89bd62`, `12cc447` — navegacao/tema, carteira de cartoes, home, tokens visuais e redesign de metas) substituiram a tab bar `Início · Transações · + · Planejamento · Mais` citada no item 25 pela atual `Início · Análises · + · Metas · Ajustes` (`mobile/app/(app)/_layout.tsx`) e a marca voltou a ser ciano (`mobile/src/theme/colors.ts`, `brand: '#17b3ff'`) — nao ha contradicao real, apenas o item 25 descreve um estado intermediario que ja foi superado por trabalho seguinte nao registrado em detalhe neste arquivo pelas rodadas anteriores do `docs-reporter`. Ver BACKLOG-0091 (mesmo tipo de defasagem documental, ja registrado).
 
-**Atualizacao anterior a essa:** 2026-07-14 (hardening pre-producao P0+P1 commitado em `main`: `5c08ce0`, `0d1e0c0`, `c959dfc`; cadeia de resolucao de IP na stack de proxy corrigida, pagamento de parcela idempotente contra duplo debito, exclusao de carteira sem 500, indices de suporte, headers de seguranca no SPA, reset de senha sem token na query string)
+**Registro historico mais antigo:** 2026-07-14 (hardening pre-producao P0+P1 commitado em `main`: `5c08ce0`, `0d1e0c0`, `c959dfc`; cadeia de resolucao de IP na stack de proxy corrigida, pagamento de parcela idempotente contra duplo debito, exclusao de carteira sem 500, indices de suporte, headers de seguranca no SPA, reset de senha sem token na query string)
 
 ---
 
@@ -110,6 +116,8 @@ Page (renderizacao, eventos)
 | `src/context/` | AuthContext, TemaContext (desde 2026-08-21 — escolha de tema pelo usuario) |
 | `src/services/` | api.ts + 13 domain services (usuarioService novo em 2026-08-21, exclusao LGPD) |
 | `src/theme/` | Tema dark/light — desde 2026-08-21 o esquema efetivo (`useEsquema()`/`useTheme()` em `theme/index.ts`) le `TemaContext` quando presente (escolha do usuario em Ajustes, persistida em `src/store/temaPreferido.ts` via SecureStore) e cai em `useColorScheme()` do SO quando nao ha provider ou a preferencia e `sistema` — antes so seguia o SO, sem opt-out |
+| `src/domain/periodo.ts` | Desde 2026-08-21 — `iso`, competencia, aritmetica de mes e intervalo de periodo em hora local, centralizados (antes reescrito inline em 6+ telas); testado em `src/__tests__/periodo.test.ts` |
+| `src/__tests__/padraoVisual.test.ts` | Desde 2026-08-21 — trinco que varre `app/**` e falha em numero cru (fontSize/espacamento/raio), hex literal, `ActivityIndicator` e `SafeAreaView`; nao cobre `src/components/**` (ver BACKLOG-0099) |
 
 ## Fluxo de autenticacao
 
@@ -251,6 +259,83 @@ O sistema e **single-tenant** — nao ha multi-tenancy corporativa. Cada usuario
     Ver `docs/PROBLEM_LEDGER.md` (PROB-0083), `docs/BUGFIX_LOG.md` (BUG-0068, BUG-0069),
     `docs/BACKLOG.md` (BACKLOG-0077 atualizado, BACKLOG-0093 fechado, BACKLOG-0094 novo).
 
+27. **Padrao visual do mobile unificado em 13 PRs; kit `ui/` normalizado; trinco automatizado contra
+    regressao (2026-08-21/22, branch `design/pr13-perfil`, commits `9c1335be`..`ad5fc022`):** o dono
+    do produto pediu que o visual de Home, Cartao/Carteira e Metas virasse o padrao das demais telas
+    e perguntou quais telas ainda faltavam. A revisao encontrou duas coisas que mudaram o plano: (1)
+    as tres telas de referencia nao eram, de fato, o mesmo padrao — tres tamanhos de titulo de tela
+    (26 literal na Carteira, `e(20)` escalado em Metas, `greeting` 22 na Fatura), cinco botoes
+    ad-hoc e tres implementacoes de barra de progresso diferentes; (2) o proprio kit
+    `src/components/ui/` nao seguia o `DESIGN.md` (`ListRow`, `Chip`, `Field`, `Badge`, `Fab`,
+    `BackButton`, `IconTile` com numeros crus). A ordem de execucao foi: fechar o padrao (kit + tres
+    telas de referencia) → travar com teste → so entao propagar para as 10 telas restantes.
+    - **Decisoes do dono cravadas nesta rodada:** (D1) titulo de tela unifica em
+      `typography.screenTitle` (26/800) com acao circular de 36, via `ui/CabecalhoDeTela`; a tela de
+      Metas passa a divergir do mock medido apenas no header (a geometria do card de meta continua
+      seguindo a medicao original) — ressalva registrada no fim de `mobile/.design/MEDICOES-metas.md`.
+      (D2) `ui/Botao` ganha o tamanho `pill`, as variantes `invertido` e `sucesso`, e as props `dica`
+      (`accessibilityHint`) e `hitSlop` — volta a valer que `ui/Botao` e a unica forma de botao do
+      app. (D3) bugs funcionais encontrados durante a migracao de uma tela sao corrigidos no PR da
+      propria tela, nao extraidos para um PR separado — ver BUG-0083 a BUG-0091, todos commitados
+      junto do PR de migracao visual da tela onde foram achados.
+    - **Primitivas novas** (`mobile/src/components/ui/`, exceto a ultima): `CabecalhoSubTela` (voltar
+      + titulo + apoio, para sub-telas de `more/`), `FolhaModal` (barra saida/titulo/acao do
+      `pageSheet`, que estava copiada a mao 17 vezes), `Contador` (bolha de nao lidas), `CampoBusca`
+      (lupa dentro do campo, sem rotulo em cima — nao e `ui/Field`), `RotuloDeGrupo` (titulo de uma
+      fileira de controles que nao e campo de texto, ex.: "Sai de"/"Bandeira"/filtros de status),
+      `NavegadorDeMes` (setas de mes com alvo 44 e `accessibilityRole`, antes duplicado e incompleto
+      em orcamentos); e `mobile/src/domain/periodo.ts` (com teste em
+      `mobile/src/__tests__/periodo.test.ts`) centralizando `iso`, competencia, aritmetica de mes e
+      intervalo de periodo em hora local, que estava reescrito inline em pelo menos 6 telas.
+    - **Trinco (`mobile/src/__tests__/padraoVisual.test.ts`, mesmo mecanismo de `tema.test.ts`):**
+      varre `app/**` e falha quando encontra `fontSize`/espacamento/raio numerico cru, hex literal,
+      `ActivityIndicator` ou `SafeAreaView`. Duas listas: excecoes permanentes com motivo (hoje so
+      `app/index.tsx`, portao de sessao que roda antes de existir conteudo para o skeleton imitar) e
+      telas ainda nao migradas (encolhe a cada PR; ao final da serie, **vazia** — as 28 telas de
+      `app/**` passam). Um arquivo listado que ja esteja limpo tambem quebra o teste, entao excecao
+      obsoleta nao se acumula silenciosamente.
+    - **Telas migradas nesta serie (10):** `analises.tsx`, `(inicio)/transacoes.tsx`, `metas.tsx`
+      (quatro folhas internas), `more/investimentos.tsx`, `more/carteiras.tsx`,
+      `more/contas-fixas.tsx`, `more/orcamentos.tsx`, `more/visao-financeira.tsx`,
+      `more/categorias.tsx`, `perfil.tsx`.
+    - **Divergencias entre `DESIGN.md` e o codigo, fechadas nesta serie:** o token `shadow` estava
+      morto (nao usado); o FAB tinha 56px em vez dos 53 efetivamente medidos; `Chip` usava fonte 13
+      contra `typography.chip` (14); o rotulo do `Field` era CAIXA ALTA de 10pt com tracking manual;
+      `ui/ProgressBar` usava `colors.border` como cor de trilha — o mesmo bug de contraste que
+      `mobile/src/__tests__/tema.test.ts` ja documentava — e havia **cinco** implementacoes
+      independentes da mesma barra de progresso espalhadas pelo app.
+    - **Correcoes nas medicoes de referencia:** `mobile/.design/MEDICOES-metas.md` tinha uma
+      contradicao interna (peso de fonte 700 na tabela, 500 na calibracao) e a trilha da barra de
+      progresso aparecia com tres valores diferentes (28%, 30% e 0.36) em tres lugares do mesmo
+      arquivo.
+    - **Bugs funcionais corrigidos durante a migracao (D3):** ver `docs/BUGFIX_LOG.md` BUG-0083
+      (BLOQUEADOR — falha de rede em `more/orcamentos.tsx` exibida como orcamento inexistente, risco
+      de duplicacao), BUG-0084 (ALTO — `accessibilityLabel` curado apagando conteudo real da arvore
+      de acessibilidade, reincidencia da classe BACKLOG-0096, em `ui/ListRow` e cinco telas), BUG-0085
+      (ALTO — FAB de investimentos atras do painel da tab bar), BUG-0086 (ALTO — troca de senha do
+      perfil com campos crus e erro de negocio roteado para o campo errado), BUG-0087 (MEDIO —
+      encadeamento de folhas de `metas.tsx` sem cleanup de timer), BUG-0088 (MEDIO — erro generico da
+      API sempre jogado no campo Nome em `carteiras.tsx`/`categorias.tsx`), BUG-0089 (MEDIO — secao de
+      projecao de `visao-financeira.tsx` sumindo sem aviso em erro), BUG-0090 (MEDIO — salvamento mudo
+      e setas de mes inacessiveis em `more/orcamentos.tsx`), BUG-0091 (BAIXO — ordenacao assumida e
+      `key={i}` em `analises.tsx`, seletor de cor rotulado por posicao em `categorias.tsx`).
+    - **Maestro:** `mobile/.maestro/financial-critical.yaml` teve 5 passos ajustados ao longo da
+      serie para acompanhar rotulos curados removidos (regex parcial no lugar de rotulo exato), a
+      espera do extrato de conta olhando texto visivel em vez de rotulo de selo, e o guard-rail de
+      erro ganhando `.*Não deu para.*` (as telas migradas deixaram de escrever "Erro ao..."). **Os
+      quatro flows Maestro nao foram executados nesta maquina** — pendencia registrada em
+      BACKLOG-0098.
+    - **Verificacao local executada ao final da serie:** `npm run typecheck`, `npm run lint` e
+      `npm test` do mobile limpos; **244 testes em 29 suites** (eram 200 em 26 suites antes da
+      serie).
+    - **Pendencias registradas:** BACKLOG-0098 (rodar os quatro flows Maestro), BACKLOG-0099 (tres
+      `pageSheet` desenhados a mao em `mobile/src/components/` — `ComposicaoMetricaModal`,
+      `EditarTransacaoModal`, `NovaTransacaoModal` — fora do alcance do trinco, que so varre
+      `app/**`), BACKLOG-0100 (divergencia de nome nao resolvida: a aba se chama "Analises", mas o
+      titulo da tela e a entrada do hub em Ajustes dizem "Relatorios" — decisao do dono pendente),
+      BACKLOG-0101 (aritmetica monetaria em `float` repetida sem util central em `analises.tsx`,
+      `more/investimentos.tsx`, `more/orcamentos.tsx` — divida conhecida, sem erro observado).
+
 ## Regra de produto: credito de fatura e saldo devedor rolado (IMPLEMENTADO, 2026-07-11)
 
 > Spec de produto para PROB-0050 / BACKLOG-0059 / BACKLOG-0054. Decisao de produto travada em 2026-07-11 e **implementada no mesmo dia** (BUG-0053). Pagamento parcial *dentro* da fatura aberta ja existia (BUG-0052); este bloco cobre o comportamento no **fechamento** e nos casos de **credito**, agora em producao no codigo.
@@ -336,6 +421,8 @@ Tudo que sobra (credito) ou falta (divida) numa fatura ao fechar **fica no propr
 26. **[RESOLVIDO 2026-08-21] Idempotencia de investimentos:** `POST /api/v1/investimentos/{ativoId}/movimentacoes` passa a aceitar header `Idempotency-Key` (mesmo padrao de `FaturaController`), com exists-check por `findByUsuarioIdAndIdempotencyKey` antes de qualquer efeito colateral e persistencia da chave em `movimentacoes_ativo.idempotency_key` (migration `V44__movimentacao_ativo_idempotency.sql`, indice unico parcial `ux_movimentacoes_ativo_usuario_idempotency`). A "protecao" anterior via `mov.getId()` era falsa (chave gerada apos persistir, nunca colidia entre dois cliques). Ver BACKLOG-0081 (FECHADO) e BUG-0076.
 27. **[RESOLVIDO 2026-08-21] Listagem de investimentos com paginacao — muda contrato de API:** `GET /api/v1/investimentos` e `GET /api/v1/investimentos/{ativoId}/movimentacoes` passam a devolver `Page` com `@PageableDefault(size = 20)` e `PaginationUtils.enforceMaxSize(pageable, 100)`, como `TransacaoController`. Clientes mobile/web atualizados para consumir `.content` com `size=100`; **breaking change** para qualquer cliente externo nao atualizado. `backend/API.md` (nao `docs/API.md`) nao documenta os endpoints de investimentos nem antes nem depois desta mudanca (pendencia registrada em BACKLOG-0097). Ver BACKLOG-0082 (FECHADO) e BUG-0077.
 28. **Correcao de rate limit/nginx/redes do hardening pre-producao ainda nao validada em ambiente real:** desde 2026-07-14 (PROB-0066/BUG-0059, PROB-0070/BUG-0063), a troca de `forward-headers-strategy` (framework→native), a nova rede Docker interna `web<->API` e os headers de seguranca do SPA foram implementados e testados apenas no nivel de unidade/build — `nginx -t`, recriacao de redes e smoke em staging (X-Forwarded-For forjado, cookie Secure, CSP do SPA carregado de fato) ficam pendentes (BACKLOG-0080).
+29. **Padrao visual do mobile unificado, mas nao verificado em Maestro real (2026-08-21/22):** a serie de 13 PRs que padronizou o visual do app (item 27 em "Principais decisoes tecnicas") foi validada por `npm run typecheck`/`npm run lint`/`npm test` (244 testes/29 suites PASS) e leitura de diff, mas nenhum dos quatro flows Maestro (`financial-critical.yaml`, `smoke-auth.yaml`, `privacy-consent.yaml`, `recovery-navigation.yaml`) foi executado em simulador/dispositivo nesta rodada, apesar de `financial-critical.yaml` ter sido editado 5 vezes para acompanhar rotulos e textos de erro que mudaram (BACKLOG-0098).
+30. **Trinco visual (`padraoVisual.test.ts`) cobre `app/**` mas nao `src/components/**`:** tres modais de alto trafego — `ComposicaoMetricaModal`, `EditarTransacaoModal`, `NovaTransacaoModal` (todos em `mobile/src/components/`) — continuam com `pageSheet` desenhado a mao e podem regredir sem que o build quebre (BACKLOG-0099).
 
 ## Pontos frageis atuais
 
@@ -357,6 +444,7 @@ Tudo que sobra (credito) ou falta (divida) numa fatura ao fechar **fica no propr
 16. **Edicao/cancelamento de compra com fatura paga nunca mais bloqueia:** decisao de bloquear com `BusinessException` (adotada horas antes, mesma sessao) foi substituida por compensacao automatica via lancamento `AJUSTE`/`ESTORNO` na proxima fatura em aberto — fatura paga tratada como imutavel, nunca como trava de operacao do usuario (BUG-0023, BUG-0024, PROB-0044, 2026-07-09).
 17. **Mobile sem cobertura de teste para o fluxo de fatura/transacao:** `EditarTransacaoModal` (BUG-0027) e os badges de status/tipo de fatura (BUG-0028, BUG-0029) foram validados apenas por `tsc --noEmit`, leitura de diff e um teste manual de contrato contra o backend local — sem suite automatizada de UI mobile (limitacao conhecida item 2/8).
 18. **Investimentos com integridade de posicao e integracao de caixa opcional (PROB-0054 resolvido, 2026-07-11):** `InvestimentoService` bloqueia venda acima da posicao atual (`BusinessException`), valida quantidade > 0 e preco >= 0 (> 0 exceto BONIFICACAO), trata DIVIDENDO como provento sem alterar posicao e BONIFICACAO com custo zero. Integracao com carteira/caixa e **opcional**: se `MovimentacaoRequest.carteiraId` for informado, COMPRA debita e VENDA/DIVIDENDO creditam o caixa via `LedgerService` (origem `INVESTIMENTO`, migration `V22__movimentos_carteira_origem_investimento.sql`); sem `carteiraId`, so a posicao e atualizada (compatibilidade com o mobile atual, que ainda nao envia carteira nas movimentacoes de ativo — ver BACKLOG-0063). **Atualizacao 2026-08-21:** `adicionarMovimentacao` ganhou idempotencia por header `Idempotency-Key` e a listagem (`GET /api/v1/investimentos`, `GET /api/v1/investimentos/{ativoId}/movimentacoes`) passou a ser paginada (`Page`, `size` maximo 100) — ver item 26/27 em "Limitacoes conhecidas" acima, BACKLOG-0081/BACKLOG-0082 (FECHADOS) e BUG-0076/BUG-0077.
+19. **Kit visual do mobile (`src/components/ui/`) normalizado, mas rotulo de acessibilidade ainda depende de revisao manual (2026-08-21/22):** a serie de 13 PRs de padronizacao visual (item 27 em "Principais decisoes tecnicas") fechou cinco implementacoes divergentes de barra de progresso numa so (`ui/ProgressBar`) e corrigiu nove ocorrencias de `accessibilityLabel` curado apagando conteudo real da arvore de acessibilidade (BUG-0084) — mas essa classe de bug so foi encontrada por revisao manual durante a migracao de cada tela; o trinco `padraoVisual.test.ts` nao varre `accessibilityLabel`, entao uma nova ocorrencia em tela futura nao quebra o build. Sem verificacao com VoiceOver/TalkBack real em nenhuma das telas corrigidas.
 
 ## Auditoria e estado atual
 

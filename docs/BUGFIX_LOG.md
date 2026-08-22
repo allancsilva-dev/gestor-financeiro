@@ -1646,5 +1646,295 @@ Registro de bugs corrigidos. Mantido pelo `docs-reporter`.
 
 ---
 
+## BUG-0083 — `more/orcamentos.tsx`: falha de rede exibida como "orçamento inexistente", risco de duplicação
+
+- **Problema relacionado:** N/A
+- **Data:** 2026-08-22
+- **Area:** mobile
+- **Sintoma:** O `useQuery` de orçamento não expunha `isError` e o `queryFn` engolia qualquer erro
+  de `GET /v1/orcamentos` (mês passado) com `.catch(() => null)`. Uma falha de rede caía no mesmo
+  ramo visual de "Nenhum orçamento para {mês}", com o botão "Criar Orçamento" desenhado por cima de
+  um orçamento que existia mas não tinha carregado — caminho direto para o usuário criar um
+  orçamento duplicado para o mesmo mês.
+- **Causa raiz:** Confirmada — o contrato real do backend distingue os dois endpoints: `GET
+  /v1/orcamentos` (mês arbitrário) faz `orElseThrow(ResourceNotFoundException)` e retorna 404
+  quando o mês não tem orçamento, enquanto `GET /v1/orcamentos/atual` busca-ou-cria e **nunca**
+  devolve 404 (por isso o mês corrente nunca precisou de tratamento de ausência). A tela tratava
+  qualquer erro, inclusive falha de rede/5xx, como sinônimo de "orçamento ausente" (404).
+- **Correcao aplicada:** `useQuery` passa a expor `isError`; só HTTP 404 é interpretado como
+  ausência de orçamento (habilita "Criar Orçamento"). Qualquer outro erro sobe para um ramo próprio
+  que mostra `EstadoVazio` com `refetch()`, sem oferecer criação. Regressão travada em
+  `mobile/src/__tests__/OrcamentoScreen.test.tsx` (três caminhos: ausência real por 404, falha de
+  rede, sucesso).
+- **Arquivos alterados:** `mobile/app/(app)/more/orcamentos.tsx`,
+  `mobile/src/__tests__/OrcamentoScreen.test.tsx` (novo)
+- **Testes/validacoes executadas:** `mobile/src/__tests__/OrcamentoScreen.test.tsx` cobrindo os três
+  caminhos; conferido que o teste de rede falha sem o ramo de erro (regressão comprovada antes da
+  correção). `npm run typecheck`, `npm run lint` e `npm test` completos do mobile limpos ao final da
+  série de 13 PRs (244 testes em 29 suítes) — ver BUG-0091 para o resumo de execução consolidado.
+- **Resultado:** PASS
+- **Ressalvas:** Nenhuma validação em simulador/Maestro para este fluxo específico nesta rodada
+  (ver BACKLOG-0098).
+- **Commit:** `707df848bcd71e939e5fc33e1e2f6cfd8898196d`
+
+---
+
+## BUG-0084 — `accessibilityLabel` curado apagando conteúdo real da árvore de acessibilidade (reincidência da classe BACKLOG-0096)
+
+- **Problema relacionado:** N/A (mesma classe de defeito de BACKLOG-0096, já fechado; esta é
+  reincidência encontrada durante a migração visual, não o mesmo item reaberto)
+- **Data:** 2026-08-21 a 2026-08-22 (série de 13 PRs de padronização visual)
+- **Area:** mobile, acessibilidade
+- **Sintoma:** Vários pontos do app fabricavam `accessibilityLabel` manualmente para um `Touchable`
+  cujos filhos já tinham texto visível, e esse label sintético **substituía** (não complementava) o
+  texto real na árvore de acessibilidade — leitor de tela lia menos informação do que a pessoa
+  vidente via na tela. Instâncias confirmadas por commit:
+  - `mobile/src/components/ui/ListRow.tsx` (kit, `9c1335be`): fabricava
+    `accessibilityLabel` a partir do título, apagando subtítulo e valor de toda linha de lista do
+    app que usa `ListRow` (afeta todo consumidor do componente, incluindo
+    `(inicio)/transacoes.tsx` a partir de sua própria migração em `a2b0249f`, que herdou a correção
+    já aplicada no kit).
+  - `mobile/app/(app)/metas.tsx` (`e0f2ccf4`): cartões de modalidade de meta com label curado
+    apagando o texto visível da opção.
+  - `mobile/app/(app)/more/investimentos.tsx` (`11a9195b`): card do ativo com
+    `accessibilityLabel="Abrir investimento {ticker}"`, apagando nome, tipo, valor de mercado e
+    rentabilidade.
+  - `mobile/app/(app)/more/carteiras.tsx` (`e04846e5`): card da conta com
+    `accessibilityLabel="Ver extrato da conta {nome}"`, apagando subtipo, saldo e banco.
+  - `mobile/app/(app)/more/contas-fixas.tsx` (`0e65a78c`): os três botões de ação do card
+    (`Editar`/`Pular`/`Pagar`-`Receber`) carregavam `accessibilityLabel` com o nome da conta
+    injetado (`"Editar Aluguel"`, `"Pular Aluguel este mês"`), divergindo do texto visível
+    (`"Editar"`) — o caso que `DESIGN.md:166` nomeia explicitamente como proibido, porque o leitor
+    de tela anuncia uma coisa e a busca por texto (inclusive em teste/Maestro) procura outra.
+  - `mobile/app/(app)/more/visao-financeira.tsx` (`e7714f43`): as nove métricas carregavam
+    `accessibilityLabel="{label}: {valor}. Ver composição"`, apagando `DESCRICOES[id]` (a
+    descrição do glossário ADR-0013) da árvore — justamente o texto que explica o que a métrica
+    significa.
+- **Causa raiz:** Confirmada — padrão repetido de compor `accessibilityLabel` manualmente em vez de
+  deixar o React Native derivar o rótulo dos filhos com texto visível, mesma causa raiz já corrigida
+  uma vez em BACKLOG-0096 (2026-08-21) em outro conjunto de telas, mas não generalizada ao kit nem
+  varrida nas telas que ainda não tinham migrado para o padrão visual novo.
+- **Correcao aplicada:** Em todos os pontos listados, o `accessibilityLabel` curado foi removido
+  (deixando o RN compor o rótulo a partir do conteúdo visível); onde havia contexto extra legítimo
+  a preservar (ex.: nome da conta na ação "Editar"), o contexto foi movido para
+  `accessibilityHint`, seguindo a convenção registrada em `DESIGN.md` (seção "Acessibilidade").
+  `mobile/.maestro/financial-critical.yaml` foi ajustado em paralelo (ver Ressalvas) para parar de
+  depender dos labels curados que deixaram de existir.
+- **Arquivos alterados:** `mobile/src/components/ui/ListRow.tsx`, `mobile/app/(app)/metas.tsx`,
+  `mobile/app/(app)/more/investimentos.tsx`, `mobile/app/(app)/more/carteiras.tsx`,
+  `mobile/app/(app)/more/contas-fixas.tsx`, `mobile/app/(app)/more/visao-financeira.tsx`
+- **Testes/validacoes executadas:** `mobile/src/__tests__/padraoVisual.test.ts` (trinco novo, ver
+  BUG-0091) não varre `accessibilityLabel` diretamente, mas cada tela foi validada por
+  `npm run typecheck` e `npm test` a cada PR; suite final 244 testes / 29 suítes PASS. Sem
+  verificação manual com VoiceOver/TalkBack.
+- **Resultado:** PASS_COM_RESSALVA
+- **Ressalvas:** (1) Não houve verificação manual com leitor de tela real (VoiceOver/TalkBack) para
+  nenhuma das telas listadas. (2) Verificação de que nenhuma outra tela do app ainda tem essa
+  classe de bug não foi feita por varredura automatizada — depende de revisão manual futura, já
+  que o trinco `padraoVisual.test.ts` não cobre `accessibilityLabel`.
+- **Commit:** `9c1335be7ebec9d5bf6ca60e39471fbfd93bda38`, `e0f2ccf42d857c17f1d08207dde9f657e3b8fbad`,
+  `11a9195bbcff8ff63b3fca464927187be6733152`, `e04846e50f48f6ad37381113875a147e493d337b`,
+  `0e65a78c074ab3f04dd1b6fa741bb9910b73a62d`, `e7714f43d3c82e39543f18cb8fa8baafe4859335`
+
+---
+
+## BUG-0085 — `more/investimentos.tsx`: FAB próprio escondido atrás do painel flutuante da tab bar
+
+- **Problema relacionado:** N/A
+- **Data:** 2026-08-22
+- **Area:** mobile
+- **Sintoma:** O botão `+` de cadastrar ativo era um círculo desenhado à mão com `bottom: 24`,
+  posição que fica atrás do painel flutuante da tab bar (que ocupa a faixa inferior da tela) —
+  exatamente o caso que `ui/Fab` já existe para resolver, com `bottom: useTabBarSpace()`.
+- **Causa raiz:** Confirmada — a tela de investimentos não usava o componente `ui/Fab` do kit,
+  reimplementando o botão flutuante com posicionamento fixo que não considera a altura real da tab
+  bar.
+- **Correcao aplicada:** Substituição do círculo próprio por `ui/Fab`.
+- **Arquivos alterados:** `mobile/app/(app)/more/investimentos.tsx`
+- **Testes/validacoes executadas:** `npm run typecheck` e `npm test` do mobile limpos (ver resumo
+  consolidado em BUG-0091). Sem verificação visual em simulador nesta rodada.
+- **Resultado:** PASS_COM_RESSALVA
+- **Ressalvas:** Sem confirmação visual em simulador/dispositivo de que o FAB agora fica acima do
+  painel da tab bar em todos os tamanhos de tela.
+- **Commit:** `11a9195bbcff8ff63b3fca464927187be6733152`
+
+---
+
+## BUG-0086 — `perfil.tsx`: troca de senha com campos crus e erro de negócio no campo errado
+
+- **Problema relacionado:** N/A
+- **Data:** 2026-08-22
+- **Area:** mobile, seguranca
+- **Sintoma:** A troca de senha no perfil era o único formulário de senha do app que não usava
+  `ui/CampoSenha`: os dois campos usavam `Field secureTextEntry` cru, sem olho de mostrar/ocultar e
+  sem medidor de força — a senha se digitava inteiramente às cegas. Além disso, só existia um
+  estado `senhaError`, preso ao campo "Nova senha": quando o backend recusava por
+  `BusinessException` ("Senha atual incorreta", erro sem campo associado no contrato de erro), a
+  mensagem aparecia embaixo do campo "Nova senha", levando o usuário a acreditar que a senha nova
+  estava errada quando o problema era a senha atual.
+- **Causa raiz:** Confirmada — (1) o formulário de troca de senha da tela de perfil nunca tinha sido
+  migrado para `ui/CampoSenha` (usado em login, cadastro, recuperação e exclusão de conta desde
+  antes desta série); (2) o roteamento de erro não distinguia erro de campo (`AlterarSenhaRequest`
+  tem os campos `senhaAtual`/`novaSenha`) de erro de regra de negócio sem campo — todo erro caía no
+  único estado `senhaError` do campo errado.
+- **Correcao aplicada:** Os dois campos passam a `ui/CampoSenha`. O tratamento de erro passa a usar
+  `camposDeErro` (mapa por nome de campo, `senhaAtual`/`novaSenha`) para erros de validação e
+  `mensagemDeErro` (faixa geral, sem campo) para regra de negócio sem campo associado — como
+  `DESIGN.md:127-129` já especificava para o resto do app.
+- **Arquivos alterados:** `mobile/app/(app)/perfil.tsx`
+- **Testes/validacoes executadas:** `npm run typecheck`, `npm run lint` e `npm test` do mobile
+  limpos ao final da série (244 testes / 29 suítes — ver BUG-0091). Sem teste automatizado dedicado
+  ao roteamento de erro deste formulário especificamente.
+- **Resultado:** PASS_COM_RESSALVA
+- **Ressalvas:** Sem verificação manual do fluxo de erro (senha atual incorreta) contra backend real
+  nesta rodada, e sem teste automatizado dedicado ao cenário.
+- **Commit:** `ad5fc0224b1b68742e55b693be2339fd876113e1`
+
+---
+
+## BUG-0087 — `metas.tsx`: encadeamento de folhas sem cleanup e leitura direta de erro Axios
+
+- **Problema relacionado:** N/A
+- **Data:** 2026-08-22
+- **Area:** mobile
+- **Sintoma:** Duas falhas distintas no mesmo arquivo: (1) o encadeamento de folhas modais (fechar
+  uma, abrir a próxima) usava três `setTimeout(…, 350)` soltos, sem cleanup nem cancelamento — um
+  `setState` podia disparar depois da tela já ter saído da árvore, e alternar de folha rapidamente
+  deixava dois agendamentos correndo ao mesmo tempo; (2) `deletarMutation.onError` lia
+  `error.response.data.message` diretamente na mão, contra a regra centralizada em
+  `src/utils/erros.ts`.
+- **Causa raiz:** Confirmada — (1) ausência de um timer único cancelável para a transição entre
+  folhas `pageSheet` (necessária porque o iOS não apresenta uma nova `pageSheet` enquanto a anterior
+  ainda está fechando); (2) acesso direto à forma do erro Axios em vez do helper padrão do projeto.
+- **Correcao aplicada:** (1) Um timer só, guardado em ref, cancelado no desmonte do componente e a
+  cada nova troca de folha antes de agendar a próxima — a espera de 350ms continua existindo (ainda
+  é necessária pelo motivo do iOS), só deixou de vazar; (2) `deletarMutation.onError` passa a usar
+  `mensagemDeErro`, o helper padrão de `src/utils/erros.ts`.
+- **Arquivos alterados:** `mobile/app/(app)/metas.tsx`
+- **Testes/validacoes executadas:** `npm run typecheck` e `npm test` do mobile limpos (resumo
+  consolidado em BUG-0091). Sem teste automatizado dedicado ao cleanup do timer (cenário de
+  race condition não é trivial de reproduzir em teste de unidade/Jest sem fake timers dedicados).
+- **Resultado:** PASS_COM_RESSALVA
+- **Ressalvas:** Sem teste automatizado específico para a condição de corrida do timer antigo; a
+  correção foi validada por leitura de código e pela suíte geral, não por um teste que reproduza o
+  bug original e falhe sem a correção.
+- **Commit:** `e0f2ccf42d857c17f1d08207dde9f657e3b8fbad`
+
+---
+
+## BUG-0088 — `carteiras.tsx` e `categorias.tsx`: erro genérico da API jogado sempre no campo Nome
+
+- **Problema relacionado:** N/A
+- **Data:** 2026-08-22
+- **Area:** mobile
+- **Sintoma:** Em ambas as telas, o `onError` da mutação de criação jogava qualquer erro vindo da
+  API no estado de erro do campo "Nome" (`nomeError`) — um erro de outro campo (ex.: "saldo
+  inválido" em `carteiras.tsx`) aparecia embaixo de "Nome", sem relação com o campo que de fato
+  causou o problema.
+- **Causa raiz:** Confirmada — ausência de separação entre erro de campo específico e erro de faixa
+  geral; o handler assumia que todo erro de criação era sobre o nome. Em `carteiras.tsx` havia ainda
+  uma duplicidade: `handleSalvar` tinha `mutateAsync` dentro de um `try/catch` **e** um `onError` da
+  mutação, os dois escrevendo no mesmo estado.
+- **Correcao aplicada:** Separação de campo e faixa geral via `camposDeErro`/`mensagemDeErro` (mesmo
+  padrão já usado em `register`/`onboarding`), removendo em `carteiras.tsx` a duplicidade
+  `try/catch` + `onError`.
+- **Arquivos alterados:** `mobile/app/(app)/more/carteiras.tsx`, `mobile/app/(app)/more/categorias.tsx`
+- **Testes/validacoes executadas:** `npm run typecheck` e `npm test` do mobile limpos (resumo
+  consolidado em BUG-0091).
+- **Resultado:** PASS_COM_RESSALVA
+- **Ressalvas:** Sem teste automatizado dedicado a este roteamento de erro especificamente em
+  nenhuma das duas telas.
+- **Commit:** `e04846e50f48f6ad37381113875a147e493d337b`, `5bf99a8a66a775f73274e6a963f5772a2923cd74`
+
+---
+
+## BUG-0089 — `more/visao-financeira.tsx`: seção de projeção sumia sem aviso quando a query falhava
+
+- **Problema relacionado:** N/A
+- **Data:** 2026-08-22
+- **Area:** mobile
+- **Sintoma:** `projecaoQuery` não tratava `isLoading` nem `isError`. Quando a projeção falhava, a
+  seção inteira desaparecia da tela sem qualquer aviso, e o usuário não conseguia distinguir "não há
+  projeção para o período" de "a chamada falhou".
+- **Causa raiz:** Confirmada — a seção só renderizava com base em `data`, sem ramos para os estados
+  de carregamento e erro do React Query.
+- **Correcao aplicada:** A seção passa a ter skeleton durante o carregamento, `EstadoVazio` com
+  `refetch()` em caso de erro, e estado vazio explícito quando a API retorna sem dados.
+- **Arquivos alterados:** `mobile/app/(app)/more/visao-financeira.tsx`
+- **Testes/validacoes executadas:** `npm run typecheck` e `npm test` do mobile limpos (resumo
+  consolidado em BUG-0091).
+- **Resultado:** PASS_COM_RESSALVA
+- **Ressalvas:** Sem teste automatizado dedicado aos três ramos (loading/erro/vazio) desta seção
+  específica.
+- **Commit:** `e7714f43d3c82e39543f18cb8fa8baafe4859335`
+
+---
+
+## BUG-0090 — `more/orcamentos.tsx`: salvamento mudo sem limites preenchidos e setas de mês inacessíveis
+
+- **Problema relacionado:** N/A
+- **Data:** 2026-08-22
+- **Area:** mobile, acessibilidade
+- **Sintoma:** Duas falhas distintas no mesmo arquivo, independentes do BUG-0083: (1) `salvar()`
+  retornava silenciosamente, sem nenhum aviso, quando nenhum limite de categoria estava preenchido;
+  (2) as setas de navegação de mês não tinham `accessibilityRole`, não tinham rótulo acessível e o
+  alvo de toque era menor que 44 (só `padding: 8`) — invisíveis para leitor de tela e fora do
+  mínimo de área de toque do app.
+- **Causa raiz:** Confirmada — (1) ausência de validação com feedback antes de `salvar()`; (2) as
+  setas eram um `TouchableOpacity` cru sem os atributos de acessibilidade e sem `hitSlop`/padding
+  suficiente para o alvo mínimo.
+- **Correcao aplicada:** (1) `salvar()` passa a informar o que falta preencher antes de retornar;
+  (2) novo componente `ui/NavegadorDeMes` (alvo de 44, `accessibilityRole`, rótulo e
+  `accessibilityState`) substitui as setas cruas — o mesmo controle já existia correto em
+  `(inicio)/transacoes.tsx`; as duas telas passam a compartilhá-lo.
+- **Arquivos alterados:** `mobile/app/(app)/more/orcamentos.tsx`,
+  `mobile/app/(app)/(inicio)/transacoes.tsx`, `mobile/src/components/ui/NavegadorDeMes.tsx` (novo)
+- **Testes/validacoes executadas:** `npm run typecheck` e `npm test` do mobile limpos (resumo
+  consolidado em BUG-0091).
+- **Resultado:** PASS_COM_RESSALVA
+- **Ressalvas:** Sem verificação manual com leitor de tela para confirmar o comportamento do novo
+  `ui/NavegadorDeMes`.
+- **Commit:** `707df848bcd71e939e5fc33e1e2f6cfd8898196d`
+
+---
+
+## BUG-0091 — `analises.tsx`: barra de categoria assumia ordenação do backend; `categorias.tsx`: seletor de cor rotulado por posição
+
+- **Problema relacionado:** N/A
+- **Data:** 2026-08-21 (`analises.tsx`) e 2026-08-22 (`categorias.tsx`)
+- **Area:** mobile
+- **Sintoma:** Três defeitos de baixo impacto, agrupados por severidade: (1) em `analises.tsx`, a
+  régua de 100% das barras de categoria lia `gastosPorCategoria[0]`, assumindo implicitamente que o
+  backend sempre mandava a lista ordenada por valor — se a ordem mudasse, a barra ficaria incorreta
+  sem erro visível; (2) na mesma tela, uma lista vinda da API usava `key={i}` (índice) em vez de uma
+  chave estável; (3) em `categorias.tsx`, o seletor de cor da categoria rotulava as opções por
+  posição ("Cor 1", "Cor 2", ...) para leitor de tela, então quem usa VoiceOver/TalkBack não sabia
+  qual cor estava escolhendo, apesar de os nomes reais das cores já existirem havia tempo como
+  comentário ao lado do hex em `CATEGORY_COLORS`.
+- **Causa raiz:** Confirmada nos três casos — (1)/(2) suposições implícitas sobre ordenação/chave
+  estável no consumo da API; (3) o rótulo de acessibilidade nunca tinha sido extraído dos
+  comentários já existentes no código para um dado estruturado.
+- **Correcao aplicada:** (1) a régua de 100% passa a ser `Math.max` sobre a lista recebida, honesta
+  independente da ordem; (2) `key={i}` substituído por `mes.periodo`; (3) novo mapa `NOME_DA_COR`
+  em `mobile/src/utils/format.ts`, extraído dos comentários existentes em `CATEGORY_COLORS` — a
+  ordem do array de cores não muda, pois `categoriasIniciais` e `NovaTransacaoModal` continuam
+  escolhendo por índice.
+- **Arquivos alterados:** `mobile/app/(app)/analises.tsx`, `mobile/app/(app)/more/categorias.tsx`,
+  `mobile/src/utils/format.ts`
+- **Testes/validacoes executadas:** `npm run typecheck`, `npm run lint` e `npm test` completos do
+  mobile ao final da série de 13 PRs: **244 testes em 29 suítes PASS** (eram 200 em 26 suítes antes
+  da série). Este é o resumo de verificação local consolidado referenciado pelas demais entradas
+  BUG-0083 a BUG-0090 desta mesma rodada.
+- **Resultado:** PASS_COM_RESSALVA
+- **Ressalvas:** Nenhum dos quatro flows Maestro (`financial-critical.yaml`, `smoke-auth.yaml`,
+  `privacy-consent.yaml`, `recovery-navigation.yaml`) foi executado nesta máquina para validar os
+  ajustes de rótulo feitos em `financial-critical.yaml` ao longo da série (5 passos ajustados: 3 em
+  `e04846e5` para acompanhar o rótulo curado removido de `carteiras.tsx`, 1 em `d44fc43` para o
+  guard-rail de erro reconhecer "Não deu para...", e o restante na unificação de telas de
+  referência em `49e14a0d`). Ver BACKLOG-0098.
+- **Commit:** `d44fc43844a259d90ce5c4b7afbcde30d6887faa`, `5bf99a8a66a775f73274e6a963f5772a2923cd74`
+
+---
+
 > Este arquivo e mantido pelo `docs-reporter`. Bugs corrigidos devem ser registrados com o proximo ID
 > sequencial (BUG-0002, BUG-0003, ...). Para historico de versoes, consulte `docs/CHANGELOG.md`.

@@ -1666,3 +1666,107 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   integrando contra o contrato antigo (lista simples, sem idempotência) quebram sem aviso
   documentado; consumidores futuros da API não sabem que o header existe.
 - **Status:** ABERTO
+
+---
+
+## BACKLOG-0098 — Executar os quatro flows Maestro após a série de padronização visual
+
+- **Titulo:** Validar em simulador/dispositivo os ajustes de rótulo feitos em
+  `mobile/.maestro/financial-critical.yaml` durante a série de 13 PRs de padronização visual
+  (2026-08-21/22), e conferir os outros três flows não tocados
+- **Prioridade:** P1
+- **Área:** mobile, testes
+- **Motivo:** A série de 13 PRs que padronizou o visual do app (kit `ui/`, telas de referência,
+  trinco `padraoVisual.test.ts` e migração de 10 telas) removeu vários `accessibilityLabel`
+  curados (ver BUG-0084) e mudou o texto de erro exibido nas telas migradas (de "Erro ao ..." para
+  "Não deu para ..."). `mobile/.maestro/financial-critical.yaml` foi ajustado 5 vezes ao longo da
+  série para acompanhar essas mudanças: rótulos curados removidos passaram a ser casados por regex
+  parcial, a espera do extrato de conta passou a olhar o texto visível do banner em vez do rótulo do
+  selo, e o guard-rail de erro ganhou `.*Não deu para.*` (o guard antigo só reconhecia `.*Erro
+  ao.*`, cego nas telas já migradas). Nenhum dos quatro flows (`financial-critical.yaml`,
+  `smoke-auth.yaml`, `privacy-consent.yaml`, `recovery-navigation.yaml`) foi executado nesta máquina
+  durante a série — só leitura e edição de YAML.
+- **Dependências:** Simulador iOS/Android disponível (não disponível na máquina onde a série foi
+  implementada); stack local rodando conforme `docs/SYSTEM_OVERVIEW.md`. Este item estende
+  BACKLOG-0095 (já aberto para a execução ponta a ponta de `financial-critical`), mas cobre também
+  os três flows não tocados nesta série e o conjunto completo de ajustes de rótulo desta rodada
+  especificamente.
+- **Critério de aceite:** Os quatro flows executados ao menos uma vez contra o app com o padrão
+  visual novo (10 telas migradas), sem falha nos passos que dependem de texto/rótulo alterado por
+  esta série; qualquer regressão encontrada registrada como novo item em `PROBLEM_LEDGER.md` ou
+  `BUGFIX_LOG.md`.
+- **Risco se ficar pendente:** Regressão de automação silenciosa — um ajuste de rótulo mal calibrado
+  (regex parcial errada, texto de guard-rail que não bate com a tela real) só seria descoberto na
+  próxima tentativa manual de rodar Maestro, potencialmente muito depois da mudança que o causou.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0099 — Três `pageSheet` desenhados à mão fora do alcance do trinco visual
+
+- **Titulo:** `ComposicaoMetricaModal`, `EditarTransacaoModal` e `NovaTransacaoModal` continuam com
+  barra de folha modal desenhada manualmente, não migrados para `ui/FolhaModal`
+- **Prioridade:** P2
+- **Área:** mobile
+- **Motivo:** A série de 13 PRs de padronização visual (2026-08-21/22) criou `ui/FolhaModal` e
+  migrou toda folha `pageSheet` de dentro de `mobile/app/**` para o componente novo. Três modais
+  vivem em `mobile/src/components/` (não em `app/**`) e continuam com a barra saída/título/ação
+  desenhada à mão: `mobile/src/components/ComposicaoMetricaModal.tsx`,
+  `mobile/src/components/EditarTransacaoModal.tsx`, `mobile/src/components/NovaTransacaoModal.tsx`.
+  O trinco `mobile/src/__tests__/padraoVisual.test.ts` só varre `app/**`, então esses três arquivos
+  não são cobertos e uma regressão neles não quebra o build.
+- **Dependências:** Nenhuma técnica. `NovaTransacaoModal.tsx` e `EditarTransacaoModal.tsx` são
+  formulários grandes e usados em múltiplos pontos de entrada (FAB da tab bar, home, faturas,
+  carteiras) — migração exige atenção extra a todos os call sites.
+- **Critério de aceite:** Os três modais passam a usar `ui/FolhaModal`; o trinco
+  `padraoVisual.test.ts` estende a varredura para `mobile/src/components/**` (ou uma lista
+  equivalente) de forma que esses arquivos deixem de ser um ponto cego.
+- **Risco se ficar pendente:** Os três modais são pontos de entrada de alto tráfego (lançamento
+  rápido, edição de transação, composição de métrica) e podem divergir do padrão visual sem que
+  nenhum teste automatizado detecte.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0100 — Divergência de nome entre a aba "Análises" e o título "Relatórios"
+
+- **Titulo:** A aba da tab bar chama-se "Análises", mas o título da própria tela
+  (`mobile/app/(app)/analises.tsx`) e a entrada do hub em Ajustes usam "Relatórios" para o mesmo
+  destino
+- **Prioridade:** P3
+- **Área:** mobile, produto
+- **Motivo:** Descoberto durante a migração visual de `analises.tsx` (commit `d44fc438`, 2026-08-21)
+  e não resolvido nesta rodada por não ser uma decisão técnica — depende de escolha do dono do
+  produto sobre qual nome é o canônico para a funcionalidade.
+- **Dependências:** Decisão do dono do produto sobre o nome definitivo ("Análises" ou "Relatórios").
+- **Critério de aceite:** Um único nome usado consistentemente na aba da tab bar
+  (`mobile/app/(app)/_layout.tsx`), no título da tela (`ui/CabecalhoDeTela` de `analises.tsx`) e em
+  qualquer ponto de entrada do hub de Ajustes que referencie a tela.
+- **Risco se ficar pendente:** Inconsistência de nomenclatura visível ao usuário final (aba diz uma
+  coisa, tela abre dizendo outra); risco baixo de confusão, mas cresce se a tela ganhar mais pontos
+  de entrada com nomes próprios.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0101 — Aritmética monetária em `float` repetida sem util central
+
+- **Titulo:** `analises.tsx`, `more/investimentos.tsx` e `more/orcamentos.tsx` fazem cálculo
+  monetário direto em `number` (float) JavaScript, cada tela com sua própria conta, sem um util
+  central de arredondamento/precisão
+- **Prioridade:** P3
+- **Área:** mobile
+- **Motivo:** Observado durante a série de 13 PRs de padronização visual (2026-08-21/22) como
+  dívida técnica preexistente, não como bug — nenhum erro de arredondamento visível foi encontrado
+  ou reportado nas três telas durante a migração, mas a ausência de um util central significa que
+  qualquer correção futura de precisão precisa ser replicada em três lugares independentes.
+- **Dependências:** Nenhuma técnica. Levantamento de todos os pontos de cálculo monetário no mobile
+  (não só os três encontrados nesta rodada) antes de definir a forma do util central.
+- **Critério de aceite:** Util central de aritmética monetária (mesmo padrão de arredondamento do
+  backend, que usa `BigDecimal` com `HALF_UP` — ver item 12 de "Principais decisões técnicas" em
+  `docs/SYSTEM_OVERVIEW.md`) criado em `mobile/src/utils/` e adotado pelas três telas identificadas;
+  varredura confirma que nenhuma outra tela do mobile faz o mesmo cálculo direto em `float`.
+- **Risco se ficar pendente:** Nenhum erro observado até o momento, mas o padrão de cálculo
+  duplicado e sem teste de precisão dedicado é terreno fértil para divergência de centavos entre
+  telas diferentes mostrando o mesmo valor agregado.
+- **Status:** ABERTO
