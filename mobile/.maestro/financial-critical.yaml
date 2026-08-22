@@ -316,6 +316,9 @@ tags:
 
 # Guard rails de erros visiveis
 - assertNotVisible: ".*Erro ao.*"
+# As telas migradas escrevem "Não deu para carregar/gerar ..." no lugar de
+# "Erro ao ...". Sem esta linha o guard-rail fica cego justamente nelas.
+- assertNotVisible: ".*Não deu para.*"
 - assertNotVisible: ".*Tente novamente.*"
 - assertNotVisible: ".*Falha de integração.*"
 - assertNotVisible: "Selecione um cartão."

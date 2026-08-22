@@ -12,7 +12,7 @@ interface ProgressBarProps {
    * usa a marca — que é o certo para progresso genérico e o errado para uma
    * entidade que já carrega cor própria.
    */
-  paleta?: { trilha: string; fillDe: string; fillPara: string };
+  paleta?: { trilha: string; fillDe: string; fillPara?: string };
   /** Rótulo do que a barra mede, para o leitor de tela. */
   accessibilityLabel?: string;
 }
@@ -33,6 +33,8 @@ export default function ProgressBar({ value, height = 6, paleta, accessibilityLa
 
   const trilha = paleta?.trilha ?? colors.trilha;
   const de = paleta?.fillDe ?? (completa ? colors.success : colors.brand);
+  // Sem a segunda parada, clareia a primeira: quem tem só a cor da entidade
+  // não precisa saber derivar gradiente — nem carregar um hex na tela.
   const para = paleta?.fillPara ?? misturar(de, '#ffffff', 0.35);
 
   return (

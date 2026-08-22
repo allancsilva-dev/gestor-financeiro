@@ -1,50 +1,33 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, ScrollView } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
-import { useTheme, useTabBarSpace } from '../../src/theme';
-import BackButton from '../../src/components/ui/BackButton';
-import relatorioService from '../../src/services/relatorioService';
-import { formatCurrency, formatDate, formatPercent } from '../../src/utils/format';
+import {
+  useTheme, useTabBarSpace, cardRadius, numeric, radius, screenPadding, spacing, typography,
+} from '../../src/theme';
+import Badge from '../../src/components/ui/Badge';
+import CabecalhoDeTela from '../../src/components/ui/CabecalhoDeTela';
 import Card from '../../src/components/ui/Card';
 import Chip from '../../src/components/ui/Chip';
+import Entrance from '../../src/components/ui/Entrance';
+import EstadoVazio from '../../src/components/ui/EstadoVazio';
 import IconTile from '../../src/components/ui/IconTile';
+import ListRow from '../../src/components/ui/ListRow';
+import ProgressBar from '../../src/components/ui/ProgressBar';
 import SkeletonBox from '../../src/components/ui/SkeletonBox';
+import relatorioService from '../../src/services/relatorioService';
+import { PERIODOS, Periodo, intervaloDoPeriodo } from '../../src/domain/periodo';
+import { formatCurrency, formatDate, formatPercent } from '../../src/utils/format';
 
-type Periodo = 'mes' | 'mesPassado' | 'tresMeses' | 'ano';
-
-const PERIODOS: { key: Periodo; label: string }[] = [
-  { key: 'mes', label: 'Este mês' },
-  { key: 'mesPassado', label: 'Mês passado' },
-  { key: 'tresMeses', label: '3 meses' },
-  { key: 'ano', label: 'Este ano' },
-];
-
-const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-
-function intervalo(periodo: Periodo): { inicio: string; fim: string } {
-  const hoje = new Date();
-  switch (periodo) {
-    case 'mes':
-      return { inicio: iso(new Date(hoje.getFullYear(), hoje.getMonth(), 1)), fim: iso(hoje) };
-    case 'mesPassado':
-      return {
-        inicio: iso(new Date(hoje.getFullYear(), hoje.getMonth() - 1, 1)),
-        fim: iso(new Date(hoje.getFullYear(), hoje.getMonth(), 0)),
-      };
-    case 'tresMeses':
-      return { inicio: iso(new Date(hoje.getFullYear(), hoje.getMonth() - 2, 1)), fim: iso(hoje) };
-    case 'ano':
-      return { inicio: iso(new Date(hoje.getFullYear(), 0, 1)), fim: iso(hoje) };
-  }
-}
+/** Altura útil das colunas do gráfico de evolução — geometria, não escala. */
+const ALTURA_BARRA = 96;
+/** Largura de cada coluna do par entradas/saídas. */
+const LARGURA_BARRA = 9;
 
 export default function RelatorioScreen() {
   const colors = useTheme();
   const tabBarSpace = useTabBarSpace();
-  const insets = useSafeAreaInsets();
   const [periodo, setPeriodo] = useState<Periodo>('mes');
-  const { inicio, fim } = intervalo(periodo);
+  const { inicio, fim } = intervaloDoPeriodo(periodo);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['relatorio', inicio, fim],
@@ -61,7 +44,11 @@ export default function RelatorioScreen() {
     queryFn: () => relatorioService.comparacaoMensal(),
   });
 
-  const maiorGasto = data?.gastosPorCategoria[0]?.valorTotal ?? 0;
+  // A barra de cada categoria é relativa à maior do período. Antes isto lia
+  // `gastosPorCategoria[0]`, assumindo que o backend já mandava ordenado — se um
+  // dia mandasse por nome, a régua de 100% viria de uma categoria qualquer.
+  const maiorGasto = Math.max(...(data?.gastosPorCategoria ?? []).map(c => c.valorTotal), 0);
+
   const comparacao = comparacaoQuery.data;
   const mesAnterior = comparacao?.find(m => m.periodo.toLowerCase().includes('anterior')) ?? comparacao?.[0];
   const mesAtual = comparacao?.find(m => m.periodo.toLowerCase().includes('atual')) ?? comparacao?.[1];
@@ -73,225 +60,273 @@ export default function RelatorioScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 12 }}>
-        <BackButton />
-        <Text style={{ color: colors.textPrimary, fontSize: 23, fontWeight: '800', letterSpacing: -0.4 }}>Relatórios</Text>
-        <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>
-          {formatDate(inicio)} até {formatDate(fim)}
-        </Text>
-      </View>
+      <CabecalhoDeTela titulo="Relatórios" />
 
-      <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 16, marginBottom: 16 }}>
+      {/* Os filtros ficam fora do scroll: trocar de período é o que mais se faz
+          aqui, e a régua de datas pertence ao filtro, não ao título. */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ gap: spacing.sm, paddingHorizontal: screenPadding }}
+      >
         {PERIODOS.map(p => (
           <Chip key={p.key} label={p.label} selected={periodo === p.key} onPress={() => setPeriodo(p.key)} />
         ))}
-      </View>
+      </ScrollView>
+      <Text style={{
+        ...typography.meta, color: colors.textSecondary,
+        paddingHorizontal: screenPadding, marginTop: spacing.sm, marginBottom: spacing.lg,
+      }}>
+        {formatDate(inicio)} até {formatDate(fim)}
+      </Text>
 
       {isLoading ? (
-        <View style={{ paddingHorizontal: 16, gap: 12 }}>
-          <SkeletonBox width="100%" height={84} borderRadius={18} />
-          <SkeletonBox width="100%" height={200} borderRadius={18} />
-          <SkeletonBox width="100%" height={160} borderRadius={18} />
+        <View style={{ paddingHorizontal: screenPadding, gap: spacing.md }}>
+          <SkeletonBox width="100%" height={84} borderRadius={cardRadius} />
+          <SkeletonBox width="100%" height={200} borderRadius={cardRadius} />
+          <SkeletonBox width="100%" height={160} borderRadius={cardRadius} />
         </View>
       ) : isError ? (
-        <View style={{ alignItems: 'center', padding: 48 }}>
-          <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600' }}>Erro ao gerar relatório</Text>
-          <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4, textAlign: 'center' }}>Verifique sua conexão e tente novamente.</Text>
-          <TouchableOpacity onPress={() => refetch()} style={{ marginTop: 12, minHeight: 44, justifyContent: 'center' }} accessibilityRole="button">
-            <Text style={{ color: colors.brandFg, fontWeight: '600' }}>Tentar novamente</Text>
-          </TouchableOpacity>
-        </View>
+        <EstadoVazio
+          emoji="📶"
+          titulo="Não deu para gerar o relatório"
+          texto="Verifique sua conexão e tente de novo."
+          acao={{ rotulo: 'Tentar de novo', onPress: () => refetch() }}
+        />
       ) : !data || data.totalTransacoes === 0 ? (
-        <View style={{ alignItems: 'center', paddingHorizontal: 32, paddingVertical: 48 }}>
-          <Text style={{ fontSize: 40, marginBottom: 12 }}>📊</Text>
-          <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600', textAlign: 'center' }}>Nada por aqui neste período</Text>
-          <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4, textAlign: 'center' }}>
-            Lance transações ou escolha outro período para ver o resumo.
-          </Text>
-        </View>
+        <EstadoVazio
+          emoji="📊"
+          titulo="Nada por aqui neste período"
+          texto="Lance transações ou escolha outro período para ver o resumo."
+        />
       ) : (
-        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: tabBarSpace, gap: 16 }}>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            {[
-              { l: 'Entradas', v: data.totalEntradas, c: colors.success },
-              { l: 'Saídas', v: data.totalSaidas, c: colors.danger },
-              { l: 'Saldo', v: data.saldo, c: data.saldo >= 0 ? colors.success : colors.danger },
-            ].map(k => (
-              <Card key={k.l} radius={16} style={{ flex: 1, paddingHorizontal: 10, paddingVertical: 12 }}>
-                <Text style={{ color: colors.textSecondary, fontSize: 11 }}>{k.l}</Text>
-                <Text
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  style={{ color: k.c, fontSize: 16, fontWeight: '700', marginTop: 4, fontVariant: ['tabular-nums'] }}
+        <ScrollView contentContainerStyle={{
+          paddingHorizontal: screenPadding, paddingBottom: tabBarSpace, gap: spacing.lg,
+        }}>
+          <Entrance delay={50}>
+            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+              {[
+                { l: 'Entradas', v: data.totalEntradas, c: colors.success },
+                { l: 'Saídas', v: data.totalSaidas, c: colors.danger },
+                { l: 'Saldo', v: data.saldo, c: data.saldo >= 0 ? colors.success : colors.danger },
+              ].map(k => (
+                <Card
+                  key={k.l}
+                  radius={radius.lg}
+                  style={{ flex: 1, paddingHorizontal: spacing.md, paddingVertical: spacing.md }}
                 >
-                  {formatCurrency(k.v)}
-                </Text>
-              </Card>
-            ))}
-          </View>
+                  <Text style={{ ...typography.meta, color: colors.textSecondary }}>{k.l}</Text>
+                  <Text
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.7}
+                    style={{ ...typography.value, ...numeric, color: k.c, marginTop: spacing.xs }}
+                  >
+                    {formatCurrency(k.v)}
+                  </Text>
+                </Card>
+              ))}
+            </View>
+          </Entrance>
 
           {evolucaoQuery.data && evolucaoQuery.data.some(m => m.entradas > 0 || m.saidas > 0) && (
-            <Card radius={20}>
-              <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '700' }}>Evolução mensal</Text>
-              <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 2, marginBottom: 14 }}>
-                Entradas e saídas · últimos 6 meses
-              </Text>
-              {(() => {
-                const meses = evolucaoQuery.data;
-                const maior = Math.max(...meses.map(m => Math.max(m.entradas, m.saidas)), 1);
-                const ALTURA = 96;
-                return (
-                  <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
-                    {meses.map((m, i) => (
-                      <View
-                        key={`${m.mes}-${i}`}
-                        accessible
-                        accessibilityLabel={`${m.mes}: entradas ${formatCurrency(m.entradas)}, saídas ${formatCurrency(m.saidas)}`}
-                        style={{ flex: 1, alignItems: 'center' }}
-                      >
-                        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: ALTURA }}>
-                          <View style={{ width: 9, borderRadius: 4, backgroundColor: colors.success, height: Math.max((m.entradas / maior) * ALTURA, m.entradas > 0 ? 4 : 2), opacity: m.entradas > 0 ? 1 : 0.2 }} />
-                          <View style={{ width: 9, borderRadius: 4, backgroundColor: colors.danger, height: Math.max((m.saidas / maior) * ALTURA, m.saidas > 0 ? 4 : 2), opacity: m.saidas > 0 ? 1 : 0.2 }} />
-                        </View>
-                        <Text style={{ color: colors.textSecondary, fontSize: 10, marginTop: 6 }}>
-                          {m.mes.replace('.', '')}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                );
-              })()}
-              <View style={{ flexDirection: 'row', gap: 14, marginTop: 12 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.success }} />
-                  <Text style={{ color: colors.textSecondary, fontSize: 11 }}>Entradas</Text>
+            <Entrance delay={100}>
+              <Card radius={radius.xl}>
+                <Text style={{ ...typography.cardTitle, color: colors.textPrimary }}>Evolução mensal</Text>
+                <Text style={{ ...typography.meta, color: colors.textSecondary, marginTop: spacing.xxs, marginBottom: spacing.lg }}>
+                  Entradas e saídas · últimos 6 meses
+                </Text>
+                {(() => {
+                  const meses = evolucaoQuery.data;
+                  const maior = Math.max(...meses.map(m => Math.max(m.entradas, m.saidas)), 1);
+                  return (
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm }}>
+                      {meses.map((m, i) => {
+                        const rotulo = m.mes.replace('.', '');
+                        return (
+                          <View
+                            key={`${m.mes}-${i}`}
+                            accessible
+                            // As colunas não têm texto: sem rótulo curado o leitor
+                            // de tela anuncia só o mês. Começa pelo texto visível.
+                            accessibilityLabel={`${rotulo}: entradas ${formatCurrency(m.entradas)}, saídas ${formatCurrency(m.saidas)}`}
+                            style={{ flex: 1, alignItems: 'center' }}
+                          >
+                            <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: spacing.xxs + 1, height: ALTURA_BARRA }}>
+                              <Coluna valor={m.entradas} maior={maior} cor={colors.success} />
+                              <Coluna valor={m.saidas} maior={maior} cor={colors.danger} />
+                            </View>
+                            <Text style={{ ...typography.meta, color: colors.textSecondary, marginTop: spacing.sm }}>
+                              {rotulo}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  );
+                })()}
+                <View style={{ flexDirection: 'row', gap: spacing.lg, marginTop: spacing.md }}>
+                  <Legenda cor={colors.success} rotulo="Entradas" />
+                  <Legenda cor={colors.danger} rotulo="Saídas" />
                 </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.danger }} />
-                  <Text style={{ color: colors.textSecondary, fontSize: 11 }}>Saídas</Text>
-                </View>
-              </View>
-            </Card>
+              </Card>
+            </Entrance>
           )}
 
           {mesAnterior && mesAtual && comparacao?.some(m => m.entradas > 0 || m.saidas > 0) && (
-            <Card radius={20}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '700' }}>Comparação mensal</Text>
-                  <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 2 }}>
-                    Mês atual contra mês anterior
-                  </Text>
-                </View>
-                <View
-                  style={{
-                    borderRadius: 999,
-                    backgroundColor: variacaoSaldo >= 0 ? colors.successBg : colors.dangerBg,
-                    paddingHorizontal: 10,
-                    paddingVertical: 5,
-                  }}
-                  accessible
-                  accessibilityLabel={`Variação do saldo: ${variacaoSaldo >= 0 ? 'aumento' : 'queda'} de ${formatCurrency(Math.abs(variacaoSaldo))}`}
-                >
-                  <Text style={{ color: variacaoSaldo >= 0 ? colors.success : colors.danger, fontSize: 11, fontWeight: '700' }}>
-                    {variacaoSaldo >= 0 ? '+' : '−'}{formatCurrency(Math.abs(variacaoSaldo))}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={{ marginTop: 14, gap: 12 }}>
-                {[
-                  { item: mesAtual, label: 'Mês atual', saldo: saldoAtual },
-                  { item: mesAnterior, label: 'Mês anterior', saldo: saldoAnterior },
-                ].map(({ item, label, saldo }) => (
-                  <View key={label} style={{ paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.border }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
-                      <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '600' }}>{label}</Text>
-                      <Text
-                        numberOfLines={1}
-                        adjustsFontSizeToFit
-                        style={{ color: saldo >= 0 ? colors.success : colors.danger, fontSize: 18, fontWeight: '800', fontVariant: ['tabular-nums'] }}
-                      >
-                        {formatCurrency(saldo)}
-                      </Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                      <View style={{ flex: 1, borderRadius: 12, backgroundColor: colors.successBg, paddingHorizontal: 10, paddingVertical: 8 }}>
-                        <Text style={{ color: colors.success, fontSize: 10, fontWeight: '700' }}>Entradas</Text>
-                        <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: colors.success, fontSize: 13, fontWeight: '700', marginTop: 2, fontVariant: ['tabular-nums'] }}>
-                          {formatCurrency(item.entradas)}
-                        </Text>
-                      </View>
-                      <View style={{ flex: 1, borderRadius: 12, backgroundColor: colors.dangerBg, paddingHorizontal: 10, paddingVertical: 8 }}>
-                        <Text style={{ color: colors.danger, fontSize: 10, fontWeight: '700' }}>Saídas</Text>
-                        <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: colors.danger, fontSize: 13, fontWeight: '700', marginTop: 2, fontVariant: ['tabular-nums'] }}>
-                          {formatCurrency(item.saidas)}
-                        </Text>
-                      </View>
-                    </View>
+            <Entrance delay={150}>
+              <Card radius={radius.xl}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md, alignItems: 'flex-start' }}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={{ ...typography.cardTitle, color: colors.textPrimary }}>Comparação mensal</Text>
+                    <Text style={{ ...typography.meta, color: colors.textSecondary, marginTop: spacing.xxs }}>
+                      Mês atual contra mês anterior
+                    </Text>
                   </View>
-                ))}
-              </View>
+                  <Badge tone={variacaoSaldo >= 0 ? 'success' : 'danger'}>
+                    {`${variacaoSaldo >= 0 ? '+' : '−'}${formatCurrency(Math.abs(variacaoSaldo))}`}
+                  </Badge>
+                </View>
 
-              {variacaoPercentual !== null && (
-                <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 12 }}>
-                  Saldo {variacaoSaldo >= 0 ? 'subiu' : 'caiu'} {formatPercent(Math.abs(variacaoPercentual), 1)} versus o mês anterior.
-                </Text>
-              )}
-            </Card>
+                <View style={{ marginTop: spacing.lg, gap: spacing.md }}>
+                  {[
+                    { item: mesAtual, label: 'Mês atual', saldo: saldoAtual },
+                    { item: mesAnterior, label: 'Mês anterior', saldo: saldoAnterior },
+                  ].map(({ item, label, saldo }) => (
+                    <View key={label} style={{ paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: colors.border }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: spacing.md }}>
+                        <Text style={{ ...typography.meta, fontWeight: '600', color: colors.textSecondary }}>{label}</Text>
+                        <Text
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.7}
+                          style={{
+                            ...typography.section, ...numeric, fontWeight: '800',
+                            color: saldo >= 0 ? colors.success : colors.danger,
+                          }}
+                        >
+                          {formatCurrency(saldo)}
+                        </Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm }}>
+                        <Metade rotulo="Entradas" valor={item.entradas} cor={colors.success} fundo={colors.successBg} />
+                        <Metade rotulo="Saídas" valor={item.saidas} cor={colors.danger} fundo={colors.dangerBg} />
+                      </View>
+                    </View>
+                  ))}
+                </View>
+
+                {variacaoPercentual !== null && (
+                  <Text style={{ ...typography.meta, color: colors.textSecondary, marginTop: spacing.md }}>
+                    Saldo {variacaoSaldo >= 0 ? 'subiu' : 'caiu'} {formatPercent(Math.abs(variacaoPercentual), 1)} versus o mês anterior.
+                  </Text>
+                )}
+              </Card>
+            </Entrance>
           )}
 
           {data.gastosPorCategoria.length > 0 && (
-            <Card radius={20}>
-              <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '700', marginBottom: 12 }}>Gastos por categoria</Text>
-              <View style={{ gap: 12 }}>
-                {data.gastosPorCategoria.map((c, i) => (
-                  <View key={c.categoriaId ?? `${c.nome}-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                    <IconTile size={36}>{c.icone || '🏷️'}</IconTile>
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
-                        <Text style={{ color: colors.textPrimary, fontSize: 13, fontWeight: '600', flex: 1 }} numberOfLines={1}>{c.nome}</Text>
-                        <Text style={{ color: colors.textPrimary, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
-                          {formatCurrency(c.valorTotal)}
-                        </Text>
-                      </View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 5 }}>
-                        <View style={{ flex: 1, height: 5, borderRadius: 3, backgroundColor: colors.border, overflow: 'hidden' }}>
-                          <View style={{ width: `${maiorGasto > 0 ? Math.max((c.valorTotal / maiorGasto) * 100, 2) : 0}%`, height: '100%', borderRadius: 3, backgroundColor: c.cor }} />
+            <Entrance delay={200}>
+              <Card radius={radius.xl}>
+                <Text style={{ ...typography.cardTitle, color: colors.textPrimary, marginBottom: spacing.md }}>
+                  Gastos por categoria
+                </Text>
+                <View style={{ gap: spacing.md }}>
+                  {data.gastosPorCategoria.map((c, i) => (
+                    <View key={c.categoriaId ?? `${c.nome}-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+                      <IconTile size={36} cor={c.cor}>{c.icone || '🏷️'}</IconTile>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm }}>
+                          <Text numberOfLines={1} style={{ ...typography.rowTitle, color: colors.textPrimary, flex: 1 }}>
+                            {c.nome}
+                          </Text>
+                          <Text style={{ ...typography.value, ...numeric, color: colors.textPrimary }}>
+                            {formatCurrency(c.valorTotal)}
+                          </Text>
                         </View>
-                        <Text style={{ color: colors.textSecondary, fontSize: 11, width: 36, textAlign: 'right', fontVariant: ['tabular-nums'] }}>
-                          {Math.round(c.porcentagem)}%
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs }}>
+                          <View style={{ flex: 1 }}>
+                            {/* Relativa à maior categoria do período, não ao total:
+                                é o que deixa a segunda maior legível. */}
+                            <ProgressBar
+                              value={maiorGasto > 0 ? Math.max((c.valorTotal / maiorGasto) * 100, 2) : 0}
+                              height={5}
+                              paleta={{ trilha: colors.trilha, fillDe: c.cor }}
+                              accessibilityLabel={`${c.nome}, ${Math.round(c.porcentagem)} por cento dos gastos`}
+                            />
+                          </View>
+                          <Text style={{ ...typography.meta, ...numeric, color: colors.textSecondary, textAlign: 'right' }}>
+                            {Math.round(c.porcentagem)}%
+                          </Text>
+                        </View>
                       </View>
                     </View>
-                  </View>
-                ))}
-              </View>
-            </Card>
+                  ))}
+                </View>
+              </Card>
+            </Entrance>
           )}
 
           {data.maioresDespesas.length > 0 && (
-            <Card radius={20}>
-              <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '700', marginBottom: 12 }}>Maiores despesas</Text>
-              <View style={{ gap: 12 }}>
-                {data.maioresDespesas.map(d => (
-                  <View key={d.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text style={{ color: colors.textPrimary, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>{d.descricao}</Text>
-                      <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 2 }}>
-                        {d.categoriaNome || 'Sem categoria'} · {formatDate(d.data)}
-                      </Text>
-                    </View>
-                    <Text style={{ color: colors.danger, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
-                      −{formatCurrency(d.valor)}
-                    </Text>
-                  </View>
+            <Entrance delay={250}>
+              <Card radius={radius.xl}>
+                <Text style={{ ...typography.cardTitle, color: colors.textPrimary, marginBottom: spacing.sm }}>
+                  Maiores despesas
+                </Text>
+                {data.maioresDespesas.map((d, i, arr) => (
+                  <ListRow
+                    key={d.id}
+                    height={56}
+                    divider={i < arr.length - 1}
+                    title={d.descricao}
+                    subtitle={`${d.categoriaNome || 'Sem categoria'} · ${formatDate(d.data)}`}
+                    value={`−${formatCurrency(d.valor)}`}
+                    valueTone="danger"
+                  />
                 ))}
-              </View>
-            </Card>
+              </Card>
+            </Entrance>
           )}
         </ScrollView>
       )}
     </View>
   );
 }
+
+/** Uma coluna do par entradas/saídas. Zero vira um traço fantasma, não some. */
+const Coluna = ({ valor, maior, cor }: { valor: number; maior: number; cor: string }) => (
+  <View
+    style={{
+      width: LARGURA_BARRA,
+      borderRadius: radius.pill,
+      backgroundColor: cor,
+      height: Math.max((valor / maior) * ALTURA_BARRA, valor > 0 ? 4 : 2),
+      opacity: valor > 0 ? 1 : 0.2,
+    }}
+  />
+);
+
+const Legenda = ({ cor, rotulo }: { cor: string; rotulo: string }) => {
+  const colors = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs + 1 }}>
+      <View style={{ width: 8, height: 8, borderRadius: radius.pill, backgroundColor: cor }} />
+      <Text style={{ ...typography.meta, color: colors.textSecondary }}>{rotulo}</Text>
+    </View>
+  );
+};
+
+/** Metade entradas ou saídas dentro do bloco de um mês. */
+const Metade = ({ rotulo, valor, cor, fundo }: { rotulo: string; valor: number; cor: string; fundo: string }) => (
+  <View style={{ flex: 1, borderRadius: radius.md, backgroundColor: fundo, paddingHorizontal: spacing.md, paddingVertical: spacing.sm }}>
+    <Text style={{ ...typography.meta, fontWeight: '700', color: cor }}>{rotulo}</Text>
+    <Text
+      numberOfLines={1}
+      adjustsFontSizeToFit
+      minimumFontScale={0.7}
+      style={{ ...typography.body, ...numeric, fontWeight: '700', color: cor, marginTop: spacing.xxs }}
+    >
+      {formatCurrency(valor)}
+    </Text>
+  </View>
+);

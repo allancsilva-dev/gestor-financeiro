@@ -1,7 +1,6 @@
 import React from 'react';
 import { Text, View } from 'react-native';
 import { useTheme, spacing, typography, numeric } from '../../theme';
-import { misturar } from '../../theme/metaCores';
 import ProgressBar from '../ui/ProgressBar';
 import { CarteiraCartao } from '../../types';
 import { formatCurrency } from '../../utils/format';
@@ -98,11 +97,7 @@ export default function ResumoCartao({ cartao }: { cartao: CarteiraCartao }) {
           <ProgressBar
             value={cartao.percentualUso}
             accessibilityLabel={`Limite usado: ${cartao.percentualUso} por cento`}
-            paleta={{
-              trilha: colors.trilha,
-              fillDe: identidade.from,
-              fillPara: misturar(identidade.from, '#ffffff', 0.35),
-            }}
+            paleta={{ trilha: colors.trilha, fillDe: identidade.from }}
           />
         </View>
       )}
