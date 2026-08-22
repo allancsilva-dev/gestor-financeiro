@@ -1,12 +1,13 @@
-import React, { useRef, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Modal, ScrollView, ActivityIndicator, Alert, TextInput } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Text, FlatList, TouchableOpacity, ScrollView, Alert, TextInput } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { metaService } from '../../src/services/metaService';
 import contaFinanceiraService from '../../src/services/contaFinanceiraService';
-import { useRouter } from 'expo-router';
-import { formatCurrency, formatPercent, formatDate, formatDateOnlyBR, parseDateBR, isValidDateBR, parseCurrencyBR, maskCurrencyInput, maskDateInput } from '../../src/utils/format';
-import { Meta, MetaRequest, ModalidadeMeta, StatusMeta } from '../../src/types';
-import { useTheme, useTabBarSpace } from '../../src/theme';
+import { formatCurrency, formatDate, parseDateBR, isValidDateBR, parseCurrencyBR, maskCurrencyInput, maskDateInput } from '../../src/utils/format';
+import { ContaFinanceira, Meta, MetaRequest, ModalidadeMeta, StatusMeta } from '../../src/types';
+import { useTheme, useTabBarSpace, numeric, radius, screenPadding, spacing, typography } from '../../src/theme';
+import { paletaDaMeta } from '../../src/theme/metaCores';
+import { mensagemDeErro } from '../../src/utils/erros';
 import SkeletonBox from '../../src/components/ui/SkeletonBox';
 import Card from '../../src/components/ui/Card';
 import IconTile from '../../src/components/ui/IconTile';
@@ -14,12 +15,21 @@ import Badge from '../../src/components/ui/Badge';
 import ProgressBar from '../../src/components/ui/ProgressBar';
 import Field from '../../src/components/ui/Field';
 import Chip from '../../src/components/ui/Chip';
-import { acoesDaMeta, duracaoDaMetaConcluidaEmDias } from '../../src/domain/metaPolicy';
+import { acoesDaMeta } from '../../src/domain/metaPolicy';
 import CardMeta from '../../src/components/metas/CardMeta';
 import CabecalhoDeTela from '../../src/components/ui/CabecalhoDeTela';
 import CabecalhoSecao from '../../src/components/ui/CabecalhoSecao';
 import EstadoVazio from '../../src/components/ui/EstadoVazio';
+import Botao from '../../src/components/ui/Botao';
+import FolhaModal from '../../src/components/ui/FolhaModal';
+import RotuloDeGrupo from '../../src/components/ui/RotuloDeGrupo';
 import { e } from '../../src/theme/escala';
+
+/**
+ * O iOS não apresenta uma `pageSheet` enquanto a anterior ainda está fechando:
+ * a segunda simplesmente não aparece. Por isso o encadeamento espera a animação.
+ */
+const ESPERA_FOLHA = 350;
 
 // Textos do glossário (ADR-0012) — a escolha é definitiva (PR-F3-11)
 const MODALIDADES: Array<{ id: ModalidadeMeta; titulo: string; descricao: string }> = [
@@ -38,7 +48,6 @@ const MODALIDADES: Array<{ id: ModalidadeMeta; titulo: string; descricao: string
 export default function Metas() {
   const colors = useTheme();
   const tabBarSpace = useTabBarSpace();
-  const router = useRouter();
   const queryClient = useQueryClient();
 
   const [modalAdicionarVisible, setModalAdicionarVisible] = useState(false);
@@ -79,6 +88,17 @@ export default function Metas() {
   const refValorMensal = useRef<TextInput>(null);
   const refDataLimite = useRef<TextInput>(null);
   const refDescricao = useRef<TextInput>(null);
+
+  // Um timer só, sempre cancelado: sem isso um `setState` disparava depois da
+  // tela sair, e trocar de folha rápido deixava dois agendamentos correndo.
+  const timerFolha = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const aoFecharAFolha = (acao: () => void) => {
+    if (timerFolha.current) clearTimeout(timerFolha.current);
+    timerFolha.current = setTimeout(acao, ESPERA_FOLHA);
+  };
+  useEffect(() => () => {
+    if (timerFolha.current) clearTimeout(timerFolha.current);
+  }, []);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['metas', statusFiltro],
@@ -143,7 +163,7 @@ export default function Metas() {
     setRetornarAoDetalheAposMovimentacao(origemDetalhe);
     if (origemDetalhe) {
       setModalDetalheVisible(false);
-      setTimeout(() => setModalAdicionarVisible(true), 350);
+      aoFecharAFolha(() => setModalAdicionarVisible(true));
       return;
     }
     setModalAdicionarVisible(true);
@@ -157,7 +177,7 @@ export default function Metas() {
     setMetaSelecionada(meta);
     setRetornarAoDetalheAposMovimentacao(true);
     setModalDetalheVisible(false);
-    setTimeout(() => setModalRemoverVisible(true), 350);
+    aoFecharAFolha(() => setModalRemoverVisible(true));
   };
 
   const fecharMovimentacao = (tipo: 'adicionar' | 'remover') => {
@@ -165,7 +185,7 @@ export default function Metas() {
     else setModalRemoverVisible(false);
     const deveRetornar = retornarAoDetalheAposMovimentacao;
     setRetornarAoDetalheAposMovimentacao(false);
-    if (deveRetornar) setTimeout(() => setModalDetalheVisible(true), 350);
+    if (deveRetornar) aoFecharAFolha(() => setModalDetalheVisible(true));
   };
 
   const montarPayloadMeta = (): MetaRequest | null => {
@@ -242,10 +262,11 @@ export default function Metas() {
       setModalDetalheVisible(false);
       setMetaSelecionada(null);
     },
-    onError: (error: any) => {
-      // backend bloqueia exclusão com valor reservado: resgate primeiro (ADR-0004)
-      const mensagem = error?.response?.data?.message ?? 'Não foi possível excluir a meta.';
-      Alert.alert('Meta não excluída', mensagem);
+    onError: (erro: unknown) => {
+      // backend bloqueia exclusão com valor reservado: resgate primeiro (ADR-0004).
+      // A mensagem vem do envelope já normalizado pelo interceptor — ler
+      // `response.data` na mão devolvia `undefined` quando o formato mudava.
+      Alert.alert('Meta não excluída', mensagemDeErro(erro, 'Não foi possível excluir a meta.'));
     },
   });
 
@@ -325,11 +346,18 @@ export default function Metas() {
           contentContainerStyle={{ paddingBottom: tabBarSpace }}
           ListHeaderComponent={
             <>
-              <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: e(16), paddingTop: e(12) }}>
+              {/* A faixa de filtros não está no mock medido — usa token, não `e()`.
+                  Rola na horizontal porque "Concluídas" e "Arquivadas" juntas
+                  espremem os três chips em tela estreita. */}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: spacing.sm, paddingHorizontal: screenPadding, paddingTop: spacing.md }}
+              >
                 <Chip label="Ativas" selected={statusFiltro === 'ATIVA'} onPress={() => setStatusFiltro('ATIVA')} />
                 <Chip label="Concluídas" selected={statusFiltro === 'CONCLUIDA'} onPress={() => setStatusFiltro('CONCLUIDA')} />
                 <Chip label="Arquivadas" selected={statusFiltro === 'ARQUIVADA'} onPress={() => setStatusFiltro('ARQUIVADA')} />
-              </View>
+              </ScrollView>
               <CabecalhoSecao
                 escalar
                 eyebrow="OBJETIVOS"
@@ -355,236 +383,188 @@ export default function Metas() {
         />
       )}
 
-      <Modal visible={modalDetalheVisible} animationType="slide" presentationStyle="pageSheet">
-        <View style={{ flex: 1, backgroundColor: colors.bg }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-            <TouchableOpacity onPress={() => setModalDetalheVisible(false)} accessibilityRole="button">
-              <Text style={{ color: colors.brandFg, fontSize: 15 }}>Fechar</Text>
-            </TouchableOpacity>
-            <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700' }}>Detalhes da Meta</Text>
-            {metaSelecionada && acoesDaMeta(metaSelecionada).editar ? (
-              <TouchableOpacity
-                onPress={() => metaSelecionada && abrirEditarMeta(metaSelecionada)}
-                accessibilityRole="button"
-              >
-                <Text style={{ color: colors.brandFg, fontSize: 15, fontWeight: '700' }}>Editar</Text>
-              </TouchableOpacity>
-            ) : <View style={{ width: 48 }} />}
-          </View>
-          {metaSelecionada && (
-            <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
-              <Card radius={20}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                  <IconTile tone={metaSelecionada.ativa ? 'brand' : 'success'} size={44}>{metaSelecionada.icone || '🎯'}</IconTile>
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={{ color: colors.textPrimary, fontSize: 17, fontWeight: '800' }} numberOfLines={2}>{metaSelecionada.nome}</Text>
-                    <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>
-                      {metaSelecionada.dataPrevista ? `até ${formatDate(metaSelecionada.dataPrevista)}` : 'Sem data limite'}
-                    </Text>
-                  </View>
-                  <Badge tone={metaSelecionada.status === 'ARQUIVADA' ? 'info' : metaSelecionada.status === 'CONCLUIDA' ? 'success' : 'brand'}>
-                    {metaSelecionada.status === 'ARQUIVADA' ? 'Arquivada' : metaSelecionada.status === 'CONCLUIDA' ? 'Concluída' : 'Ativa'}
-                  </Badge>
+      <FolhaModal
+        visible={modalDetalheVisible}
+        titulo="Detalhes da Meta"
+        rotuloFechar="Fechar"
+        onFechar={() => setModalDetalheVisible(false)}
+        acao={metaSelecionada && acoesDaMeta(metaSelecionada).editar
+          ? { rotulo: 'Editar', onPress: () => metaSelecionada && abrirEditarMeta(metaSelecionada) }
+          : undefined}
+      >
+        {metaSelecionada && (
+          <ScrollView contentContainerStyle={{ padding: spacing.lg }} keyboardShouldPersistTaps="handled">
+            <Card radius={radius.xl}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.md }}>
+                <IconTile tone={metaSelecionada.ativa ? 'brand' : 'success'} size={44}>{metaSelecionada.icone || '🎯'}</IconTile>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={{ ...typography.section, color: colors.textPrimary }} numberOfLines={2}>{metaSelecionada.nome}</Text>
+                  <Text style={{ ...typography.meta, color: colors.textSecondary, marginTop: spacing.xxs }}>
+                    {metaSelecionada.dataPrevista ? `até ${formatDate(metaSelecionada.dataPrevista)}` : 'Sem data limite'}
+                  </Text>
                 </View>
-                <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 8, fontVariant: ['tabular-nums'] }}>
-                  {formatCurrency(Number(metaSelecionada.valorReservado ?? 0))} de {formatCurrency(Number(metaSelecionada.valorTotal ?? 0))}
+                <Badge tone={metaSelecionada.status === 'ARQUIVADA' ? 'info' : metaSelecionada.status === 'CONCLUIDA' ? 'success' : 'brand'}>
+                  {metaSelecionada.status === 'ARQUIVADA' ? 'Arquivada' : metaSelecionada.status === 'CONCLUIDA' ? 'Concluída' : 'Ativa'}
+                </Badge>
+              </View>
+              <Text style={{ ...typography.meta, ...numeric, color: colors.textSecondary, marginBottom: spacing.sm }}>
+                {formatCurrency(Number(metaSelecionada.valorReservado ?? 0))} de {formatCurrency(Number(metaSelecionada.valorTotal ?? 0))}
+              </Text>
+              {/* Mesma cor da meta que o card da lista usa: a entidade tem cor
+                  própria, então a barra não vira ciano dentro da folha. */}
+              <ProgressBar
+                value={Number(metaSelecionada.valorTotal ?? 0) > 0 ? Math.min((Number(metaSelecionada.valorReservado ?? 0) / Number(metaSelecionada.valorTotal ?? 0)) * 100, 100) : 0}
+                paleta={paletaDaMeta(metaSelecionada, colors.card)}
+                accessibilityLabel={`Progresso de ${metaSelecionada.nome}`}
+              />
+              {metaSelecionada.valorMensal ? (
+                <Text style={{ ...typography.meta, color: colors.textSecondary, marginTop: spacing.md }}>
+                  Reserva mensal: {formatCurrency(Number(metaSelecionada.valorMensal))}
                 </Text>
-                <ProgressBar value={Number(metaSelecionada.valorTotal ?? 0) > 0 ? Math.min((Number(metaSelecionada.valorReservado ?? 0) / Number(metaSelecionada.valorTotal ?? 0)) * 100, 100) : 0} />
-                {metaSelecionada.valorMensal ? (
-                  <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 10 }}>Reserva mensal: {formatCurrency(Number(metaSelecionada.valorMensal))}</Text>
-                ) : null}
-                {metaSelecionada.descricao ? (
-                  <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 10 }}>{metaSelecionada.descricao}</Text>
-                ) : null}
-              </Card>
+              ) : null}
+              {metaSelecionada.descricao ? (
+                <Text style={{ ...typography.body, color: colors.textSecondary, marginTop: spacing.md }}>{metaSelecionada.descricao}</Text>
+              ) : null}
+            </Card>
 
-              {acoesDaMeta(metaSelecionada).editar && (
-              <View style={{ gap: 10, marginTop: 16 }}>
+            {acoesDaMeta(metaSelecionada).editar && (
+              <View style={{ gap: spacing.md, marginTop: spacing.lg }}>
                 {acoesDaMeta(metaSelecionada).adicionar && (
-                <TouchableOpacity
-                  onPress={() => abrirAdicionarValor(metaSelecionada, true)}
-                  accessibilityRole="button"
-                  style={{ height: 48, borderRadius: 12, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' }}
-                >
-                  <Text style={{ color: '#ffffff', fontSize: 15, fontWeight: '700' }}>Adicionar valor</Text>
-                </TouchableOpacity>
+                  <Botao titulo="Adicionar valor" onPress={() => abrirAdicionarValor(metaSelecionada, true)} />
                 )}
                 {acoesDaMeta(metaSelecionada).resgatar && (
-                <TouchableOpacity
-                  onPress={() => abrirRetirarValor(metaSelecionada)}
-                  accessibilityRole="button"
-                  style={{ height: 48, borderRadius: 12, borderWidth: 1, borderColor: colors.brand, alignItems: 'center', justifyContent: 'center' }}
-                >
-                  <Text style={{ color: colors.brandFg, fontSize: 15, fontWeight: '700' }}>Retirar valor</Text>
-                </TouchableOpacity>
+                  <Botao titulo="Retirar valor" variante="secundario" onPress={() => abrirRetirarValor(metaSelecionada)} />
                 )}
                 {acoesDaMeta(metaSelecionada).excluir && (
-                <TouchableOpacity
-                  onPress={() => confirmarExcluirMeta(metaSelecionada)}
-                  disabled={deletarMutation.status === 'pending'}
-                  accessibilityRole="button"
-                  style={{ height: 48, borderRadius: 12, borderWidth: 1, borderColor: colors.danger, alignItems: 'center', justifyContent: 'center' }}
-                >
-                  {deletarMutation.status === 'pending'
-                    ? <ActivityIndicator color={colors.danger} size="small" />
-                    : <Text style={{ color: colors.danger, fontSize: 15, fontWeight: '700' }}>Excluir meta</Text>}
-                </TouchableOpacity>
+                  <Botao
+                    titulo="Excluir meta"
+                    variante="perigo"
+                    onPress={() => confirmarExcluirMeta(metaSelecionada)}
+                    carregando={deletarMutation.status === 'pending'}
+                  />
                 )}
               </View>
-              )}
-            </ScrollView>
+            )}
+          </ScrollView>
+        )}
+      </FolhaModal>
+
+      <FolhaModal
+        visible={modalAdicionarVisible}
+        titulo="Adicionar Valor"
+        onFechar={() => { fecharMovimentacao('adicionar'); setValorAdicionar(''); setErroAdicionar(null); }}
+        acao={{
+          rotulo: 'Adicionar',
+          carregando: adicionarMutation.status === 'pending',
+          onPress: () => {
+            setErroAdicionar(null); setErroCarteira(null);
+            const v = parseCurrencyBR(valorAdicionar);
+            if (isNaN(v) || v <= 0) { setErroAdicionar('Valor deve ser positivo.'); return; }
+            if (!carteiraOrigemId) { setErroCarteira('Selecione de onde sai o dinheiro.'); return; }
+            adicionarMutation.mutate({ id: metaSelecionada!.id, valor: v, carteiraId: carteiraOrigemId });
+          },
+        }}
+      >
+        <ScrollView contentContainerStyle={{ padding: spacing.lg }} keyboardShouldPersistTaps="handled">
+          <Field testID="goal-add-value" label="Valor" value={valorAdicionar} onChangeText={(t) => setValorAdicionar(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" error={erroAdicionar} autoFocus />
+
+          <RotuloDeGrupo>Sai de</RotuloDeGrupo>
+          <SeletorDeConta
+            contas={carteiras}
+            selecionada={carteiraOrigemId}
+            onSelecionar={id => { setCarteiraOrigemId(id); setErroCarteira(null); }}
+            vazio="Você ainda não tem contas. Crie uma em Mais → Contas para reservar dinheiro."
+          />
+          {erroCarteira && (
+            <Text accessibilityRole="alert" style={{ ...typography.meta, color: colors.danger, marginTop: spacing.sm }}>{erroCarteira}</Text>
           )}
-        </View>
-      </Modal>
+        </ScrollView>
+      </FolhaModal>
 
-      <Modal visible={modalAdicionarVisible} animationType="slide" presentationStyle="pageSheet">
-        <View style={{ flex: 1, backgroundColor: colors.bg }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-            <TouchableOpacity onPress={() => { fecharMovimentacao('adicionar'); setValorAdicionar(''); setErroAdicionar(null); }} accessibilityRole="button">
-              <Text style={{ color: colors.brandFg, fontSize: 15 }}>Cancelar</Text>
-            </TouchableOpacity>
-            <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600' }}>Adicionar Valor</Text>
-            <TouchableOpacity
-              disabled={adicionarMutation.status === 'pending'}
-              accessibilityRole="button"
-              onPress={() => {
-                setErroAdicionar(null); setErroCarteira(null);
-                const v = parseCurrencyBR(valorAdicionar);
-                if (isNaN(v) || v <= 0) { setErroAdicionar('Valor deve ser positivo.'); return; }
-                if (!carteiraOrigemId) { setErroCarteira('Selecione de onde sai o dinheiro.'); return; }
-                adicionarMutation.mutate({ id: metaSelecionada!.id, valor: v, carteiraId: carteiraOrigemId });
-              }}
-            >
-              {adicionarMutation.status === 'pending'
-                ? <ActivityIndicator color={colors.brand} size="small" />
-                : <Text style={{ color: colors.brandFg, fontSize: 15, fontWeight: '600' }}>Adicionar</Text>}
-            </TouchableOpacity>
-          </View>
-          <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
-            <Field testID="goal-add-value" label="Valor" value={valorAdicionar} onChangeText={(t) => setValorAdicionar(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" error={erroAdicionar} autoFocus />
+      <FolhaModal
+        visible={modalRemoverVisible}
+        titulo="Retirar Valor"
+        onFechar={() => { fecharMovimentacao('remover'); setValorRemover(''); setErroRemover(null); }}
+        acao={{
+          rotulo: 'Retirar',
+          carregando: removerMutation.status === 'pending',
+          onPress: () => {
+            setErroRemover(null); setErroCarteiraDestino(null);
+            const v = parseCurrencyBR(valorRemover);
+            if (isNaN(v) || v <= 0) { setErroRemover('Valor deve ser positivo.'); return; }
+            if (metaSelecionada && v > Number(metaSelecionada.valorReservado ?? 0)) { setErroRemover('Valor maior que o reservado.'); return; }
+            if (!carteiraDestinoId) { setErroCarteiraDestino('Selecione para onde volta o dinheiro.'); return; }
+            removerMutation.mutate({ id: metaSelecionada!.id, valor: v, carteiraId: carteiraDestinoId });
+          },
+        }}
+      >
+        <ScrollView contentContainerStyle={{ padding: spacing.lg }} keyboardShouldPersistTaps="handled">
+          <Field label="Valor" value={valorRemover} onChangeText={(t) => setValorRemover(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" error={erroRemover} autoFocus />
 
-            <Text style={{ color: colors.textSecondary, fontSize: 10, letterSpacing: 0.8, marginTop: 8, marginBottom: 6, textTransform: 'uppercase' }}>Sai de</Text>
-            {carteiras.length === 0 ? (
-              <Text style={{ color: colors.textSecondary, fontSize: 13 }}>Você ainda não tem contas. Crie uma em Mais → Contas para reservar dinheiro.</Text>
-            ) : (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} keyboardShouldPersistTaps="handled">
-                {carteiras.map(c => (
-                  <Chip
-                    key={c.id}
-                    label={`${c.nome} · ${formatCurrency(Number(c.saldo ?? 0))}`}
-                    selected={carteiraOrigemId === c.id}
-                    onPress={() => { setCarteiraOrigemId(c.id); setErroCarteira(null); }}
-                  />
-                ))}
-              </ScrollView>
-            )}
-            {erroCarteira && <Text style={{ color: colors.danger, fontSize: 12, marginTop: 8 }}>{erroCarteira}</Text>}
-          </ScrollView>
-        </View>
-      </Modal>
+          <RotuloDeGrupo>Volta para</RotuloDeGrupo>
+          <SeletorDeConta
+            contas={carteiras}
+            selecionada={carteiraDestinoId}
+            onSelecionar={id => { setCarteiraDestinoId(id); setErroCarteiraDestino(null); }}
+            vazio="Você ainda não tem contas. Crie uma em Mais → Contas para receber o valor."
+          />
+          {erroCarteiraDestino && (
+            <Text accessibilityRole="alert" style={{ ...typography.meta, color: colors.danger, marginTop: spacing.sm }}>{erroCarteiraDestino}</Text>
+          )}
+        </ScrollView>
+      </FolhaModal>
 
-      <Modal visible={modalRemoverVisible} animationType="slide" presentationStyle="pageSheet">
-        <View style={{ flex: 1, backgroundColor: colors.bg }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-            <TouchableOpacity onPress={() => { fecharMovimentacao('remover'); setValorRemover(''); setErroRemover(null); }} accessibilityRole="button">
-              <Text style={{ color: colors.brandFg, fontSize: 15 }}>Cancelar</Text>
-            </TouchableOpacity>
-            <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600' }}>Retirar Valor</Text>
-            <TouchableOpacity
-              disabled={removerMutation.status === 'pending'}
-              accessibilityRole="button"
-              onPress={() => {
-                setErroRemover(null); setErroCarteiraDestino(null);
-                const v = parseCurrencyBR(valorRemover);
-                if (isNaN(v) || v <= 0) { setErroRemover('Valor deve ser positivo.'); return; }
-                if (metaSelecionada && v > Number(metaSelecionada.valorReservado ?? 0)) { setErroRemover('Valor maior que o reservado.'); return; }
-                if (!carteiraDestinoId) { setErroCarteiraDestino('Selecione para onde volta o dinheiro.'); return; }
-                removerMutation.mutate({ id: metaSelecionada!.id, valor: v, carteiraId: carteiraDestinoId });
-              }}
-            >
-              {removerMutation.status === 'pending'
-                ? <ActivityIndicator color={colors.brand} size="small" />
-                : <Text style={{ color: colors.brandFg, fontSize: 15, fontWeight: '600' }}>Retirar</Text>}
-            </TouchableOpacity>
-          </View>
-          <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
-            <Field label="Valor" value={valorRemover} onChangeText={(t) => setValorRemover(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" error={erroRemover} autoFocus />
-
-            <Text style={{ color: colors.textSecondary, fontSize: 10, letterSpacing: 0.8, marginTop: 8, marginBottom: 6, textTransform: 'uppercase' }}>Volta para</Text>
-            {carteiras.length === 0 ? (
-              <Text style={{ color: colors.textSecondary, fontSize: 13 }}>Você ainda não tem contas. Crie uma em Mais → Contas para receber o valor.</Text>
-            ) : (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} keyboardShouldPersistTaps="handled">
-                {carteiras.map(c => (
-                  <Chip
-                    key={c.id}
-                    label={`${c.nome} · ${formatCurrency(Number(c.saldo ?? 0))}`}
-                    selected={carteiraDestinoId === c.id}
-                    onPress={() => { setCarteiraDestinoId(c.id); setErroCarteiraDestino(null); }}
-                  />
-                ))}
-              </ScrollView>
-            )}
-            {erroCarteiraDestino && <Text style={{ color: colors.danger, fontSize: 12, marginTop: 8 }}>{erroCarteiraDestino}</Text>}
-          </ScrollView>
-        </View>
-      </Modal>
-
-      <Modal visible={modalCriarVisible} animationType="slide" presentationStyle="pageSheet">
-        <View style={{ flex: 1, backgroundColor: colors.bg }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-            <TouchableOpacity
-              accessibilityRole="button"
-              onPress={() => { setModalCriarVisible(false); resetFormularioMeta(); }}
-            >
-              <Text style={{ color: colors.brandFg, fontSize: 15 }}>Cancelar</Text>
-            </TouchableOpacity>
-            <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600' }}>{editandoMeta ? 'Editar Meta' : 'Criar Meta'}</Text>
-            <TouchableOpacity
-              disabled={criarMutation.status === 'pending' || atualizarMutation.status === 'pending'}
-              accessibilityRole="button"
-              onPress={() => {
-                const payload = montarPayloadMeta();
-                if (!payload) return;
-                if (editandoMeta) {
-                  atualizarMutation.mutate({ id: editandoMeta.id, payload });
-                } else {
-                  criarMutation.mutate(payload);
-                }
-              }}
-            >
-              {criarMutation.status === 'pending' || atualizarMutation.status === 'pending'
-                ? <ActivityIndicator color={colors.brand} size="small" />
-                : <Text style={{ color: colors.brandFg, fontSize: 15, fontWeight: '600' }}>Salvar</Text>}
-            </TouchableOpacity>
-          </View>
-          <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
+      <FolhaModal
+        visible={modalCriarVisible}
+        titulo={editandoMeta ? 'Editar Meta' : 'Criar Meta'}
+        onFechar={() => { setModalCriarVisible(false); resetFormularioMeta(); }}
+        acao={{
+          rotulo: 'Salvar',
+          carregando: criarMutation.status === 'pending' || atualizarMutation.status === 'pending',
+          onPress: () => {
+            const payload = montarPayloadMeta();
+            if (!payload) return;
+            if (editandoMeta) {
+              atualizarMutation.mutate({ id: editandoMeta.id, payload });
+            } else {
+              criarMutation.mutate(payload);
+            }
+          },
+        }}
+      >
+        <ScrollView contentContainerStyle={{ padding: spacing.lg }} keyboardShouldPersistTaps="handled">
             {!editandoMeta ? (
-              <View style={{ marginBottom: 16 }}>
-                <Text style={{ color: colors.textSecondary, fontSize: 10, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Como guardar o dinheiro</Text>
+              <View style={{ marginBottom: spacing.lg }}>
+                <RotuloDeGrupo primeiro>Como guardar o dinheiro</RotuloDeGrupo>
                 {MODALIDADES.map(m => (
                   <TouchableOpacity
                     key={m.id}
                     onPress={() => setModalidadeCriar(m.id)}
                     accessibilityRole="radio"
                     accessibilityState={{ selected: modalidadeCriar === m.id }}
-                    accessibilityLabel={`${m.titulo}: ${m.descricao}`}
-                    style={{ borderWidth: 1.5, borderColor: modalidadeCriar === m.id ? colors.brand : colors.border, backgroundColor: modalidadeCriar === m.id ? colors.brandBg : colors.card, borderRadius: 12, padding: 12, marginBottom: 8 }}
+                    style={{
+                      borderWidth: 1,
+                      borderColor: modalidadeCriar === m.id ? colors.brand : colors.border,
+                      backgroundColor: modalidadeCriar === m.id ? colors.brandBg : colors.card,
+                      borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm,
+                    }}
                   >
-                    <Text style={{ color: modalidadeCriar === m.id ? colors.brandFg : colors.textPrimary, fontSize: 14, fontWeight: '700' }}>{m.titulo}</Text>
-                    <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>{m.descricao}</Text>
+                    <Text style={{ ...typography.body, fontWeight: '700', color: modalidadeCriar === m.id ? colors.brandFg : colors.textPrimary }}>{m.titulo}</Text>
+                    <Text style={{ ...typography.meta, color: colors.textSecondary, marginTop: spacing.xxs }}>{m.descricao}</Text>
                   </TouchableOpacity>
                 ))}
-                <Text style={{ color: colors.textMuted, fontSize: 11 }}>A escolha é definitiva para esta meta.</Text>
-                {modalidadeError && <Text style={{ color: colors.danger, fontSize: 12, marginTop: 4 }}>{modalidadeError}</Text>}
+                <Text style={{ ...typography.meta, color: colors.textMuted }}>A escolha é definitiva para esta meta.</Text>
+                {modalidadeError && (
+                  <Text accessibilityRole="alert" style={{ ...typography.meta, color: colors.danger, marginTop: spacing.xs }}>{modalidadeError}</Text>
+                )}
               </View>
             ) : (
-              <View style={{ marginBottom: 16 }}>
-                <Text style={{ color: colors.textSecondary, fontSize: 10, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Modalidade</Text>
-                <Text style={{ color: colors.textPrimary, fontSize: 14, fontWeight: '600' }}>
+              <View style={{ marginBottom: spacing.lg }}>
+                <RotuloDeGrupo primeiro>Modalidade</RotuloDeGrupo>
+                <Text style={{ ...typography.body, fontWeight: '600', color: colors.textPrimary }}>
                   {editandoMeta.modalidade === 'RESERVA_VIRTUAL' ? 'Reserva virtual' : 'Cofre real'}
                 </Text>
-                <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 2 }}>Definida na criação — não pode ser alterada.</Text>
+                <Text style={{ ...typography.meta, color: colors.textMuted, marginTop: spacing.xxs }}>Definida na criação — não pode ser alterada.</Text>
               </View>
             )}
             <Field testID="goal-name" label="Nome" value={nomeCriar} onChangeText={setNomeCriar} placeholder="Ex: Reserva de emergência" error={nomeError} returnKeyType="next" submitBehavior="submit" onSubmitEditing={() => refValorTotal.current?.focus()} />
@@ -592,10 +572,44 @@ export default function Metas() {
             <Field ref={refValorMensal} label="Valor mensal (opcional)" value={valorMensalCriar} onChangeText={(t) => setValorMensalCriar(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" error={valorMensalError} returnKeyType="next" submitBehavior="submit" onSubmitEditing={() => refDataLimite.current?.focus()} />
             <Field ref={refDataLimite} label="Data limite" value={dataLimiteCriar} onChangeText={(t) => setDataLimiteCriar(maskDateInput(t))} placeholder="DD/MM/AAAA" keyboardType="number-pad" error={dataLimiteError} returnKeyType="next" submitBehavior="submit" onSubmitEditing={() => refDescricao.current?.focus()} />
             <Field ref={refDescricao} label="Descrição (opcional)" value={descricaoCriar} onChangeText={setDescricaoCriar} returnKeyType="done" />
-            {erroCriar && <Text style={{ color: colors.danger, marginTop: 8 }}>{erroCriar}</Text>}
-          </ScrollView>
-        </View>
-      </Modal>
+            {erroCriar && (
+              <Text accessibilityRole="alert" style={{ ...typography.meta, color: colors.danger, marginTop: spacing.sm }}>{erroCriar}</Text>
+            )}
+        </ScrollView>
+      </FolhaModal>
     </View>
   );
 }
+
+/**
+ * Faixa de contas de onde o dinheiro sai ou para onde volta. As duas folhas de
+ * movimentação pediam a mesma coisa, com o mesmo texto de vazio duplicado.
+ */
+const SeletorDeConta = ({ contas, selecionada, onSelecionar, vazio }: {
+  contas: ContaFinanceira[];
+  selecionada: number | null;
+  onSelecionar: (id: number) => void;
+  vazio: string;
+}) => {
+  const colors = useTheme();
+  if (contas.length === 0) {
+    return <Text style={{ ...typography.body, color: colors.textSecondary }}>{vazio}</Text>;
+  }
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ gap: spacing.sm }}
+      keyboardShouldPersistTaps="handled"
+    >
+      {contas.map(c => (
+        <Chip
+          key={c.id}
+          label={`${c.nome} · ${formatCurrency(Number(c.saldo ?? 0))}`}
+          selected={selecionada === c.id}
+          onPress={() => onSelecionar(c.id)}
+        />
+      ))}
+    </ScrollView>
+  );
+};

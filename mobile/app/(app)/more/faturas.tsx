@@ -13,6 +13,7 @@ import NovaTransacaoModal from '../../../src/components/NovaTransacaoModal';
 import Botao from '../../../src/components/ui/Botao';
 import CabecalhoDeTela from '../../../src/components/ui/CabecalhoDeTela';
 import FolhaModal from '../../../src/components/ui/FolhaModal';
+import RotuloDeGrupo from '../../../src/components/ui/RotuloDeGrupo';
 import EstadoVazio from '../../../src/components/ui/EstadoVazio';
 import SkeletonBox from '../../../src/components/ui/SkeletonBox';
 import { identidadeDoCartao } from '../../../src/domain/emissores';
@@ -156,7 +157,6 @@ export default function CarteiraScreen() {
     } as never);
   };
 
-  const rotulo = { ...typography.meta, fontWeight: '600' as const, color: colors.textSecondary, marginBottom: spacing.sm, marginTop: spacing.xs };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -373,7 +373,7 @@ export default function CarteiraScreen() {
               </View>
             </View>
 
-            <Text style={rotulo}>Bandeira</Text>
+            <RotuloDeGrupo>Bandeira</RotuloDeGrupo>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg }}>
               {BANDEIRAS.map(b => (
                 <TouchableOpacity
@@ -399,7 +399,7 @@ export default function CarteiraScreen() {
               ))}
             </View>
 
-            <Text style={rotulo}>Cor do cartão</Text>
+            <RotuloDeGrupo>Cor do cartão</RotuloDeGrupo>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.lg }}>
               <TouchableOpacity
                 onPress={() => setCor(null)}

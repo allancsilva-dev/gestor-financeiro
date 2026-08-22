@@ -93,6 +93,9 @@ faz spread (`{ ...typography.value, ...numeric, color: colors.success }`), não 
 - **Folha modal** (`ui/FolhaModal`): `Modal` `pageSheet` com barra saída / título / ação. Toda
   folha do app passa por aqui — o bloco estava copiado 17 vezes, cada cópia com o seu corpo de
   título e a sua cor de link.
+- **Rótulo de grupo** (`ui/RotuloDeGrupo`): o título de uma fileira de controles que não é um
+  campo de texto — faixa de contas, lista de modalidades, seletor de bandeira. `typography.meta`
+  em caixa normal; cada tela escrevia o seu em CAIXA ALTA de 9 ou 10pt.
 - **Chips/segmentos** (`ui/Chip`): pill radius 999, ativo com borda/fundo de marca, alvo ≥44.
 - **Contador** (`ui/Contador`): bolha de não lidas do sino e da linha de notificações. Não leva
   rótulo próprio: quem anuncia a contagem é o controle que a contém.
@@ -114,6 +117,8 @@ faz spread (`{ ...typography.value, ...numeric, color: colors.success }`), não 
   `typography.input` sobre `colors.fieldBg`, erro em `meta`/`danger` com `accessibilityLiveRegion`.
   O rótulo era um eyebrow de 10pt em CAIXA ALTA com `letterSpacing` — abaixo do piso de 12 da
   escala, e a mesma assinatura que o botão já rejeita.
+- **Busca** (`ui/CampoBusca`): lupa dentro do campo, fundo `fieldBg`, sem rótulo em cima — não
+  é `ui/Field`, porque busca não tem rótulo: o campo é a própria pergunta.
 - **Campo de senha** (`ui/CampoSenha`): envolve `ui/Field` e acrescenta o olho (alvo 44) e o medidor
   opcional de 4 segmentos (`colors.trilha` → `danger`/`warning`/`success`), cujo texto diz o que
   falta para a regra do backend — nunca uma nota abstrata de "força".
