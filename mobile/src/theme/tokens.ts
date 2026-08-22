@@ -27,6 +27,8 @@ export const radius = {
 export const typography = {
   display: { fontSize: 34, lineHeight: 40, fontWeight: '800', letterSpacing: -1 },
   displayCents: { fontSize: 22, fontWeight: '800' },
+  // Valor de destaque de sub-tela (total da fatura): menor que o hero da home
+  subDisplay: { fontSize: 28, lineHeight: 34, fontWeight: '800', letterSpacing: -0.6 },
   greeting: { fontSize: 22, lineHeight: 28, fontWeight: '800', letterSpacing: -0.4 },
   // Título de tela de topo (Carteira, Ajustes): era literal inline em cada tela
   screenTitle: { fontSize: 26, lineHeight: 32, fontWeight: '800', letterSpacing: -0.6 },

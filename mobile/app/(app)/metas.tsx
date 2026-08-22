@@ -1,6 +1,5 @@
 import React, { useRef, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, Modal, ScrollView, ActivityIndicator, Alert, TextInput } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { metaService } from '../../src/services/metaService';
 import contaFinanceiraService from '../../src/services/contaFinanceiraService';
@@ -17,8 +16,9 @@ import Field from '../../src/components/ui/Field';
 import Chip from '../../src/components/ui/Chip';
 import { acoesDaMeta, duracaoDaMetaConcluidaEmDias } from '../../src/domain/metaPolicy';
 import CardMeta from '../../src/components/metas/CardMeta';
+import CabecalhoDeTela from '../../src/components/ui/CabecalhoDeTela';
 import CabecalhoSecao from '../../src/components/ui/CabecalhoSecao';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import EstadoVazio from '../../src/components/ui/EstadoVazio';
 import { e } from '../../src/theme/escala';
 
 // Textos do glossário (ADR-0012) — a escolha é definitiva (PR-F3-11)
@@ -40,7 +40,6 @@ export default function Metas() {
   const tabBarSpace = useTabBarSpace();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const insets = useSafeAreaInsets();
 
   const [modalAdicionarVisible, setModalAdicionarVisible] = useState(false);
   const [modalRemoverVisible, setModalRemoverVisible] = useState(false);
@@ -302,39 +301,22 @@ export default function Metas() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <View
-        style={{
-          paddingTop: insets.top + e(12), paddingHorizontal: e(16), paddingBottom: e(4),
-          flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        }}
-      >
-        <Text style={{ color: colors.textPrimary, fontSize: e(20), fontWeight: '800', letterSpacing: -0.4 }}>Metas</Text>
-        <TouchableOpacity
-          onPress={abrirCriarMeta}
-          accessibilityRole="button"
-          accessibilityLabel="Criar meta"
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          style={{
-            width: e(33), height: e(33), borderRadius: 999,
-            backgroundColor: colors.overlay, borderWidth: 1, borderColor: colors.border,
-            alignItems: 'center', justifyContent: 'center',
-          }}
-        >
-          <Ionicons name="add" size={e(20)} color={colors.brandFg} />
-        </TouchableOpacity>
-      </View>
+      <CabecalhoDeTela
+        titulo="Metas"
+        acao={{ icone: 'add', onPress: abrirCriarMeta, accessibilityLabel: 'Criar meta' }}
+      />
 
       {isLoading ? (
         <View style={{ paddingHorizontal: e(18), gap: e(33), paddingTop: e(24) }}>
           {[1, 2, 3].map(i => <SkeletonBox key={i} width="100%" height={e(155)} borderRadius={e(20)} />)}
         </View>
       ) : isError ? (
-        <View style={{ alignItems: 'center', padding: 48 }}>
-          <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600' }}>Erro ao carregar metas</Text>
-          <TouchableOpacity onPress={() => refetch()} style={{ marginTop: 8 }} accessibilityRole="button">
-            <Text style={{ color: colors.brandFg, fontWeight: '600' }}>Tentar novamente</Text>
-          </TouchableOpacity>
-        </View>
+        <EstadoVazio
+          emoji="📶"
+          titulo="Não deu para carregar suas metas"
+          texto="Verifique sua conexão e tente de novo."
+          acao={{ rotulo: 'Tentar de novo', onPress: () => refetch() }}
+        />
       ) : (
         <FlatList
           data={data?.content ?? []}
@@ -357,23 +339,18 @@ export default function Metas() {
             </>
           }
           ListEmptyComponent={() => (
-            <View style={{ alignItems: 'center', paddingHorizontal: 48, paddingBottom: 48 }}>
-              <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600' }}>
-                {statusFiltro === 'ATIVA' ? 'Nenhuma meta ainda'
-                  : statusFiltro === 'CONCLUIDA' ? 'Nenhuma meta concluída'
-                  : 'Nenhuma meta arquivada'}
-              </Text>
-              {statusFiltro === 'ATIVA' && (
-                <TouchableOpacity
-                  onPress={abrirCriarMeta}
-                  accessibilityRole="button"
-                  accessibilityLabel="Criar primeira meta"
-                  style={{ marginTop: 12, minHeight: 44, paddingHorizontal: 20, borderRadius: 12, backgroundColor: colors.brandBg, alignItems: 'center', justifyContent: 'center' }}
-                >
-                  <Text style={{ color: colors.brandFg, fontWeight: '700' }}>Criar primeira meta</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+            <EstadoVazio
+              emoji="🎯"
+              titulo={statusFiltro === 'ATIVA' ? 'Nenhuma meta ainda'
+                : statusFiltro === 'CONCLUIDA' ? 'Nenhuma meta concluída'
+                : 'Nenhuma meta arquivada'}
+              texto={statusFiltro === 'ATIVA'
+                ? 'Uma meta é um valor com prazo. Comece pela que mais te incomoda hoje.'
+                : undefined}
+              acao={statusFiltro === 'ATIVA'
+                ? { rotulo: 'Criar primeira meta', onPress: abrirCriarMeta }
+                : undefined}
+            />
           )}
         />
       )}

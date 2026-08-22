@@ -9,6 +9,7 @@ import { Notificacao, TipoNotificacao } from '../../src/types';
 import { useTheme, radius, spacing, typography, screenPadding, useTabBarSpace } from '../../src/theme';
 import BackButton from '../../src/components/ui/BackButton';
 import Card from '../../src/components/ui/Card';
+import EstadoVazio from '../../src/components/ui/EstadoVazio';
 import SkeletonBox from '../../src/components/ui/SkeletonBox';
 import { formatDateOnlyBR } from '../../src/utils/format';
 
@@ -106,30 +107,22 @@ export default function Notificacoes() {
         </View>
       ) : query.isError ? (
         <Card padded radius={radius.xl}>
-          <Text style={{ color: colors.textSecondary, textAlign: 'center' }}>
-            Erro ao carregar notificações
-          </Text>
-          <TouchableOpacity
-            onPress={() => query.refetch()}
-            accessibilityRole="button"
-            style={{ marginTop: spacing.sm, minHeight: 44, justifyContent: 'center' }}
-          >
-            <Text style={{ ...typography.button, color: colors.brandFg, textAlign: 'center' }}>
-              Tentar novamente
-            </Text>
-          </TouchableOpacity>
+          <EstadoVazio
+            compacto
+            emoji="📶"
+            titulo="Não deu para carregar suas notificações"
+            texto="Verifique sua conexão e tente de novo."
+            acao={{ rotulo: 'Tentar de novo', onPress: () => query.refetch() }}
+          />
         </Card>
       ) : itens.length === 0 ? (
         <Card padded radius={radius.xl}>
-          <View style={{ alignItems: 'center', paddingVertical: spacing.lg }}>
-            <Ionicons name="notifications-off-outline" size={30} color={colors.textMuted} />
-            <Text style={{ ...typography.cardTitle, color: colors.textPrimary, marginTop: spacing.md }}>
-              Nada por aqui
-            </Text>
-            <Text style={{ ...typography.meta, color: colors.textSecondary, marginTop: 4, textAlign: 'center' }}>
-              Avisamos quando uma fatura vencer, uma parcela chegar ou um orçamento estourar.
-            </Text>
-          </View>
+          <EstadoVazio
+            compacto
+            emoji="🔕"
+            titulo="Nada por aqui"
+            texto="Avisamos quando uma fatura vencer, uma parcela chegar ou um orçamento estourar."
+          />
         </Card>
       ) : (
         <View style={{ gap: spacing.md }}>

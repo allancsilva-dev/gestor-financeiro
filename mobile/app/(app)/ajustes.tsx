@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, Alert, Platform, ScrollView, Modal, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, Alert, Platform, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -19,11 +19,15 @@ import usuarioService from '../../src/services/usuarioService';
 import { getInitials } from '../../src/utils/format';
 import { mensagemDeErro } from '../../src/utils/erros';
 import CabecalhoDeTela from '../../src/components/ui/CabecalhoDeTela';
+import Badge from '../../src/components/ui/Badge';
+import Botao from '../../src/components/ui/Botao';
+import CampoSenha from '../../src/components/ui/CampoSenha';
+import FolhaModal from '../../src/components/ui/FolhaModal';
 import CabecalhoSecao from '../../src/components/ui/CabecalhoSecao';
+import Contador from '../../src/components/ui/Contador';
 import SuperficieComBrilho from '../../src/components/ui/SuperficieComBrilho';
 import Card from '../../src/components/ui/Card';
 import Chip from '../../src/components/ui/Chip';
-import Field from '../../src/components/ui/Field';
 import IconTile from '../../src/components/ui/IconTile';
 import ListRow from '../../src/components/ui/ListRow';
 import Entrance from '../../src/components/ui/Entrance';
@@ -233,16 +237,7 @@ export default function Ajustes() {
             >
               <Ionicons name="notifications-outline" size={20} color={colors.textPrimary} style={{ width: 44, textAlign: 'center' }} />
               <Text style={{ ...typography.label, color: colors.textPrimary, flex: 1 }}>Notificações</Text>
-              {!!naoLidas && (
-                <View style={{
-                  minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6,
-                  backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center',
-                }}>
-                  <Text style={{ ...typography.meta, fontWeight: '700', color: colors.brandText }}>
-                    {naoLidas > 9 ? '9+' : naoLidas}
-                  </Text>
-                </View>
-              )}
+              <Contador valor={naoLidas} />
               <Ionicons name="chevron-forward" size={18} color={colors.textMuted} {...iconeDecorativo} />
             </TouchableOpacity>
           </SuperficieComBrilho>
@@ -305,20 +300,7 @@ export default function Ajustes() {
                   <IconTile tone="neutral" size={40} style={{ backgroundColor: colors.overlay }}>
                     {item.icone}
                   </IconTile>
-                  {item.desabilitado && (
-                    <View style={{
-                      backgroundColor: colors.warningBg,
-                      paddingHorizontal: spacing.sm, paddingVertical: 3,
-                      borderRadius: radius.pill,
-                    }}>
-                      <Text style={{
-                        ...typography.meta, fontSize: 10, fontWeight: '700',
-                        color: colors.warning, textTransform: 'uppercase', letterSpacing: 0.4,
-                      }}>
-                        Em breve
-                      </Text>
-                    </View>
-                  )}
+                  {item.desabilitado && <Badge tone="warning">Em breve</Badge>}
                 </View>
                 <Text numberOfLines={1} style={{ ...typography.label, fontWeight: '700', color: colors.textPrimary, marginTop: spacing.md }}>
                   {item.label}
@@ -395,58 +377,33 @@ export default function Ajustes() {
         </View>
       </ScrollView>
 
-      <Modal visible={modalExcluirVisible} animationType="slide" presentationStyle="pageSheet">
-        <View style={{ flex: 1, backgroundColor: colors.bg }}>
-          <View style={{
-            flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-            padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border,
-          }}>
-            <TouchableOpacity
-              onPress={() => setModalExcluirVisible(false)}
-              accessibilityRole="button"
-              disabled={excluindo}
-            >
-              <Text style={{ ...typography.label, color: colors.brandFg }}>Cancelar</Text>
-            </TouchableOpacity>
-            <Text style={{ ...typography.cardTitle, color: colors.textPrimary }}>Excluir conta</Text>
-            <View style={{ width: 64 }} />
-          </View>
+      <FolhaModal
+        visible={modalExcluirVisible}
+        titulo="Excluir conta"
+        onFechar={() => setModalExcluirVisible(false)}
+      >
+        <ScrollView contentContainerStyle={{ padding: spacing.lg }} keyboardShouldPersistTaps="handled">
+          <Text style={{ ...typography.body, color: colors.textSecondary, marginBottom: spacing.lg }}>
+            Confirme com sua senha. Assim que você continuar, a conta e todos os dados são
+            apagados definitivamente.
+          </Text>
 
-          <ScrollView contentContainerStyle={{ padding: spacing.lg }} keyboardShouldPersistTaps="handled">
-            <Text style={{ ...typography.body, color: colors.textSecondary, marginBottom: spacing.lg }}>
-              Confirme com sua senha. Assim que você continuar, a conta e todos os dados são
-              apagados definitivamente.
-            </Text>
+          <CampoSenha
+            label="Senha atual"
+            value={senhaExcluir}
+            onChangeText={setSenhaExcluir}
+            error={erroExcluir}
+          />
 
-            <Field
-              label="Senha atual"
-              value={senhaExcluir}
-              onChangeText={setSenhaExcluir}
-              secureTextEntry
-              autoCapitalize="none"
-              error={erroExcluir}
-            />
-
-            <TouchableOpacity
-              onPress={confirmarExclusao}
-              disabled={excluindo}
-              activeOpacity={0.85}
-              accessibilityRole="button"
-              accessibilityLabel="Excluir minha conta definitivamente"
-              style={{
-                minHeight: 48, borderRadius: radius.md,
-                backgroundColor: colors.danger,
-                alignItems: 'center', justifyContent: 'center',
-                opacity: excluindo ? 0.6 : 1,
-              }}
-            >
-              {excluindo
-                ? <ActivityIndicator color={colors.brandText} />
-                : <Text style={{ ...typography.button, color: '#ffffff' }}>Excluir definitivamente</Text>}
-            </TouchableOpacity>
-          </ScrollView>
-        </View>
-      </Modal>
+          <Botao
+            titulo="Excluir definitivamente"
+            variante="perigo"
+            onPress={confirmarExclusao}
+            carregando={excluindo}
+            accessibilityLabel="Excluir minha conta definitivamente"
+          />
+        </ScrollView>
+      </FolhaModal>
     </View>
   );
 }

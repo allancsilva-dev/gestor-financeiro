@@ -1,19 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTheme, useTabBarSpace, spacing, typography, numeric, radius } from '../../../src/theme';
-import BackButton from '../../../src/components/ui/BackButton';
 import Badge from '../../../src/components/ui/Badge';
+import Botao from '../../../src/components/ui/Botao';
+import CabecalhoSubTela from '../../../src/components/ui/CabecalhoSubTela';
 import EstadoVazio from '../../../src/components/ui/EstadoVazio';
+import IconTile from '../../../src/components/ui/IconTile';
+import SkeletonBox from '../../../src/components/ui/SkeletonBox';
 import faturaService from '../../../src/services/faturaService';
 import contaFinanceiraService from '../../../src/services/contaFinanceiraService';
 import { ContaFinanceira, FaturaLancamento, FaturaResponse } from '../../../src/types';
 import { formatCurrency, formatDate, maskCurrencyInput, parseCurrencyBR } from '../../../src/utils/format';
-
-const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
-  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+import { ehCompetenciaCorrente, rotuloDeCompetencia } from '../../../src/domain/periodo';
 
 /**
  * Detalhe de uma fatura: lançamentos e pagamento. Saiu de more/faturas.tsx,
@@ -22,7 +22,6 @@ const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
  */
 export default function FaturaDetalheScreen() {
   const colors = useTheme();
-  const insets = useSafeAreaInsets();
   const tabBarSpace = useTabBarSpace();
   const queryClient = useQueryClient();
   const params = useLocalSearchParams<{ cartaoId?: string; mes?: string; ano?: string; nome?: string }>();
@@ -53,15 +52,14 @@ export default function FaturaDetalheScreen() {
   const paramsValidos = Number.isFinite(cartaoId) && Number.isFinite(mes)
     && Number.isFinite(ano) && mes >= 1 && mes <= 12;
 
-  const hoje = new Date();
-  const ehCompetenciaCorrente = mes === hoje.getMonth() + 1 && ano === hoje.getFullYear();
+  const competenciaCorrente = ehCompetenciaCorrente(mes, ano);
 
   const { data: fatura, isLoading, isError, refetch } = useQuery<FaturaResponse>({
     queryKey: ['fatura', cartaoId, mes, ano],
     // Na competência corrente usa /atual: quem decide o mês passa a ser o relógio
     // do servidor (America/Sao_Paulo), não o do aparelho. Sem `.catch`: erro tem
     // que chegar como erro, não virar fatura vazia.
-    queryFn: () => (ehCompetenciaCorrente
+    queryFn: () => (competenciaCorrente
       ? faturaService.buscarAtual(cartaoId)
       : faturaService.buscarPorMes(cartaoId, mes, ano)),
     enabled: paramsValidos,
@@ -110,18 +108,17 @@ export default function FaturaDetalheScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScrollView contentContainerStyle={{ paddingBottom: tabBarSpace }}>
-        <View style={{ paddingTop: insets.top + spacing.lg, paddingHorizontal: spacing.lg, paddingBottom: spacing.md }}>
-          <BackButton />
-          <Text style={{ ...typography.greeting, color: colors.textPrimary }}>
-            {params.nome ?? fatura?.cartaoNome ?? 'Fatura'}
-          </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs }}>
-            <Text style={{ ...typography.body, color: colors.textSecondary }}>
-              {MESES[mes - 1]} de {ano}
-            </Text>
-            {!!fatura && <Badge tone={statusTone}>{fatura.status}</Badge>}
-          </View>
-        </View>
+        <CabecalhoSubTela
+          titulo={params.nome ?? fatura?.cartaoNome ?? 'Fatura'}
+          apoio={
+            <>
+              <Text style={{ ...typography.body, color: colors.textSecondary }}>
+                {rotuloDeCompetencia(mes, ano)}
+              </Text>
+              {!!fatura && <Badge tone={statusTone}>{fatura.status}</Badge>}
+            </>
+          }
+        />
 
         {!paramsValidos ? (
           <EstadoVazio
@@ -130,7 +127,13 @@ export default function FaturaDetalheScreen() {
             texto="A competência não chegou corretamente. Volte para a Carteira e toque na fatura de novo."
           />
         ) : isLoading ? (
-          <ActivityIndicator color={colors.brand} style={{ marginTop: 40 }} />
+          // Skeleton com a forma real: painel do total, depois as linhas
+          <View style={{ paddingHorizontal: spacing.lg, gap: spacing.md }}>
+            <SkeletonBox width="100%" height={132} borderRadius={radius.lg} />
+            <SkeletonBox width="100%" height={64} borderRadius={radius.md} />
+            <SkeletonBox width="100%" height={64} borderRadius={radius.md} />
+            <SkeletonBox width="100%" height={64} borderRadius={radius.md} />
+          </View>
         ) : isError ? (
           <EstadoVazio
             emoji="📶"
@@ -145,7 +148,7 @@ export default function FaturaDetalheScreen() {
               borderWidth: 1, borderColor: colors.border,
             }}>
               <Text style={{ ...typography.body, color: colors.textSecondary }}>Total da fatura</Text>
-              <Text style={{ ...numeric, color: colors.textPrimary, fontSize: 28, fontWeight: '800', letterSpacing: -0.6 }}>
+              <Text style={{ ...typography.subDisplay, ...numeric, color: colors.textPrimary }}>
                 {formatCurrency(fatura?.valorTotal ?? 0)}
               </Text>
               {!!fatura && (
@@ -196,33 +199,22 @@ export default function FaturaDetalheScreen() {
                   placeholder="0,00"
                   placeholderTextColor={colors.textMuted}
                   style={{
-                    borderWidth: 1, borderRadius: radius.md, padding: spacing.md, fontSize: 15,
+                    borderWidth: 1, borderRadius: radius.md, padding: spacing.md, ...typography.input,
                     backgroundColor: colors.fieldBg, borderColor: colors.border, color: colors.textPrimary,
                   }}
                 />
                 {payError && <Text style={{ ...typography.meta, color: colors.danger }}>{payError}</Text>}
-                <TouchableOpacity
-                  onPress={handlePagar}
-                  disabled={paying}
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: paying }}
-                  style={{
-                    height: 48, borderRadius: radius.md, alignItems: 'center',
-                    justifyContent: 'center', backgroundColor: colors.success,
-                  }}
-                >
-                  {paying
-                    ? <ActivityIndicator color={colors.brandText} />
-                    : <Text style={{ ...typography.button, color: colors.brandText }}>Pagar Fatura</Text>}
-                </TouchableOpacity>
+                <Botao titulo="Pagar Fatura" variante="sucesso" onPress={handlePagar} carregando={paying} />
               </View>
             )}
 
             <Text style={{ ...typography.cardTitle, color: colors.textPrimary }}>Lançamentos</Text>
             {!fatura || fatura.lancamentos.length === 0 ? (
-              <Text style={{ ...typography.body, color: colors.textSecondary, textAlign: 'center', padding: spacing.xxl }}>
-                Nenhuma compra nesta fatura ainda
-              </Text>
+              <EstadoVazio
+                emoji="🧾"
+                titulo="Nenhuma compra nesta fatura ainda"
+                texto="As compras deste cartão aparecem aqui assim que forem lançadas."
+              />
             ) : (
               fatura.lancamentos.map((l: FaturaLancamento, i: number) => {
                 // Backend prefixa a descrição com "Estorno:"/"Ajuste:"; o badge assume esse papel
@@ -247,13 +239,9 @@ export default function FaturaDetalheScreen() {
                       backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border,
                     }}
                   >
-                    <View style={{
-                      width: 34, height: 34, borderRadius: radius.sm,
-                      backgroundColor: (l.categoriaCor ?? colors.brand) + '20',
-                      alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      <Text style={{ fontSize: 15 }}>{l.categoriaIcone || '💳'}</Text>
-                    </View>
+                    <IconTile size={34} cor={l.categoriaCor ?? colors.brand}>
+                      {l.categoriaIcone || '💳'}
+                    </IconTile>
                     <View style={{ flex: 1 }}>
                       {/* Descrição sozinha na primeira linha: badges longos como
                           SALDO DEVEDOR ANTERIOR comiam o texto e sobrava "Sal...". */}

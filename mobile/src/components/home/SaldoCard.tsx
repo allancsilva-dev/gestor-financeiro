@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { iconeDecorativo } from '../../utils/acessibilidade';
 import { useTheme, radius, spacing, typography, numeric } from '../../theme';
+import Botao from '../ui/Botao';
 import { formatCurrency } from '../../utils/format';
 import SkeletonBox from '../ui/SkeletonBox';
 
@@ -76,18 +77,13 @@ export default function SaldoCard({
           <Text style={{ ...typography.meta, color: colors.textSecondary, marginTop: 4 }}>
             Não foi possível atualizar seus valores.
           </Text>
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel="Tentar carregar saldo novamente"
-            onPress={onTentarNovamente}
-            style={{
-              marginTop: spacing.md, minHeight: 44, paddingHorizontal: spacing.lg,
-              borderRadius: radius.pill, backgroundColor: colors.brandBg,
-              alignSelf: 'flex-start', justifyContent: 'center',
-            }}
-          >
-            <Text style={{ ...typography.button, color: colors.brandFg }}>Tentar novamente</Text>
-          </TouchableOpacity>
+          <Botao
+            titulo="Tentar novamente"
+            tamanho="pill"
+            onPress={() => onTentarNovamente?.()}
+            dica="Recarrega o saldo"
+            style={{ marginTop: spacing.md, alignSelf: 'flex-start', paddingHorizontal: spacing.lg }}
+          />
         </View>
       );
     }
@@ -142,35 +138,23 @@ export default function SaldoCard({
         </View>
 
         <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.lg }}>
-          <TouchableOpacity
+          {/* Altura 48, não os 44 do `pill`: é a medida da referência do hero */}
+          <Botao
+            titulo="Nova Transação"
+            icone="add"
+            tamanho="pill"
             onPress={onNovaTransacao}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel="Nova Transação"
-            style={{
-              flex: 1, minHeight: 48, borderRadius: radius.pill, backgroundColor: colors.brand,
-              flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-            }}
-          >
-            <Ionicons name="add" size={19} color={colors.brandText} {...iconeDecorativo} />
-            <Text style={{ ...typography.button, color: colors.brandText }}>Nova Transação</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
+            style={{ flex: 1, minHeight: 48 }}
+          />
+          <Botao
+            titulo="Carteira"
+            icone="wallet-outline"
+            variante="secundario"
+            tamanho="pill"
             onPress={onCarteira}
-            activeOpacity={0.85}
-            accessibilityRole="button"
-            accessibilityLabel="Carteira"
-            accessibilityHint="Abre sua carteira"
-            style={{
-              flex: 1, minHeight: 48, borderRadius: radius.pill,
-              borderWidth: 1, borderColor: colors.chipBorder,
-              flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-            }}
-          >
-            <Ionicons name="wallet-outline" size={18} color={colors.textPrimary} {...iconeDecorativo} />
-            <Text style={{ ...typography.button, color: colors.textPrimary }}>Carteira</Text>
-          </TouchableOpacity>
+            dica="Abre sua carteira"
+            style={{ flex: 1, minHeight: 48 }}
+          />
         </View>
       </>
     );

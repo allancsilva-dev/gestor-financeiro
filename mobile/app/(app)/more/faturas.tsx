@@ -1,10 +1,8 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { iconeDecorativo } from '../../../src/utils/acessibilidade';
 import { useTheme, useTabBarSpace, spacing, typography, radius } from '../../../src/theme';
 import CarrosselCartoes, { useMedidasCartao } from '../../../src/components/carteira/CarrosselCartoes';
 import CartaoFisico from '../../../src/components/carteira/CartaoFisico';
@@ -12,6 +10,10 @@ import ResumoCartao from '../../../src/components/carteira/ResumoCartao';
 import LinhaFatura from '../../../src/components/carteira/LinhaFatura';
 import { posicaoDaFatura } from '../../../src/domain/carteiraFormat';
 import NovaTransacaoModal from '../../../src/components/NovaTransacaoModal';
+import Botao from '../../../src/components/ui/Botao';
+import CabecalhoDeTela from '../../../src/components/ui/CabecalhoDeTela';
+import FolhaModal from '../../../src/components/ui/FolhaModal';
+import EstadoVazio from '../../../src/components/ui/EstadoVazio';
 import SkeletonBox from '../../../src/components/ui/SkeletonBox';
 import { identidadeDoCartao } from '../../../src/domain/emissores';
 import { useAuth } from '../../../src/context/AuthContext';
@@ -37,7 +39,6 @@ import { maskCurrencyInput, parseCurrencyBR } from '../../../src/utils/format';
 export default function CarteiraScreen() {
   const colors = useTheme();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const tabBarSpace = useTabBarSpace();
   const queryClient = useQueryClient();
   const { usuario } = useAuth();
@@ -156,7 +157,7 @@ export default function CarteiraScreen() {
   };
 
   const campo = {
-    borderWidth: 1, borderRadius: radius.md, padding: spacing.md, fontSize: 15,
+    borderWidth: 1, borderRadius: radius.md, padding: spacing.md, ...typography.input,
     marginBottom: 14, backgroundColor: colors.fieldBg, borderColor: colors.border,
     color: colors.textPrimary,
   };
@@ -165,24 +166,10 @@ export default function CarteiraScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScrollView contentContainerStyle={{ paddingBottom: tabBarSpace }}>
-        <View style={{
-          flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-          paddingTop: insets.top + spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.lg,
-        }}>
-          <Text style={{ color: colors.textPrimary, fontSize: 26, lineHeight: 32, fontWeight: '800', letterSpacing: -0.6 }}>
-            Carteira
-          </Text>
-          <TouchableOpacity
-            onPress={abrirNovo}
-            accessibilityRole="button"
-            accessibilityLabel="Cartão"
-            accessibilityHint="Cadastra um novo cartão"
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44, paddingLeft: spacing.md }}
-          >
-            <Ionicons name="add" size={20} color={colors.brandFg} {...iconeDecorativo} />
-            <Text style={{ ...typography.value, color: colors.brandFg }}>Cartão</Text>
-          </TouchableOpacity>
-        </View>
+        <CabecalhoDeTela
+          titulo="Carteira"
+          acao={{ icone: 'add', onPress: abrirNovo, accessibilityLabel: 'Cadastrar cartão' }}
+        />
 
         {isLoading ? (
           <View style={{ gap: spacing.xl }}>
@@ -193,49 +180,19 @@ export default function CarteiraScreen() {
             </View>
           </View>
         ) : isError ? (
-          <View style={{ alignItems: 'center', paddingVertical: 56, paddingHorizontal: spacing.xxl }}>
-            <Text style={{ fontSize: 34 }}>📶</Text>
-            <Text style={{ ...typography.cardTitle, color: colors.textPrimary, marginTop: spacing.md, textAlign: 'center' }}>
-              Não deu para carregar sua carteira
-            </Text>
-            <Text style={{ ...typography.body, color: colors.textSecondary, marginTop: spacing.xs, textAlign: 'center' }}>
-              Verifique sua conexão e tente de novo.
-            </Text>
-            <TouchableOpacity
-              onPress={() => refetch()}
-              accessibilityRole="button"
-              accessibilityLabel="Tentar carregar a carteira de novo"
-              style={{
-                marginTop: spacing.lg, paddingHorizontal: spacing.xl, height: 44,
-                borderRadius: radius.md, alignItems: 'center', justifyContent: 'center',
-                backgroundColor: colors.brand,
-              }}
-            >
-              <Text style={{ ...typography.button, color: colors.brandText }}>Tentar de novo</Text>
-            </TouchableOpacity>
-          </View>
+          <EstadoVazio
+            emoji="📶"
+            titulo="Não deu para carregar sua carteira"
+            texto="Verifique sua conexão e tente de novo."
+            acao={{ rotulo: 'Tentar de novo', onPress: () => refetch() }}
+          />
         ) : cartoes.length === 0 ? (
-          <View style={{ alignItems: 'center', paddingVertical: 56, paddingHorizontal: spacing.xxl }}>
-            <Text style={{ fontSize: 40 }}>💳</Text>
-            <Text style={{ ...typography.cardTitle, color: colors.textPrimary, marginTop: spacing.md, textAlign: 'center' }}>
-              Nenhum cartão cadastrado
-            </Text>
-            <Text style={{ ...typography.body, color: colors.textSecondary, marginTop: spacing.xs, textAlign: 'center' }}>
-              Cadastre seu cartão de crédito com limite, banco e datas de fechamento para acompanhar as faturas.
-            </Text>
-            <TouchableOpacity
-              onPress={abrirNovo}
-              accessibilityRole="button"
-              accessibilityLabel="Cadastrar cartão"
-              style={{
-                marginTop: spacing.lg, paddingHorizontal: spacing.xl, height: 44,
-                borderRadius: radius.md, alignItems: 'center', justifyContent: 'center',
-                backgroundColor: colors.brand,
-              }}
-            >
-              <Text style={{ ...typography.button, color: colors.brandText }}>Cadastrar cartão</Text>
-            </TouchableOpacity>
-          </View>
+          <EstadoVazio
+            emoji="💳"
+            titulo="Nenhum cartão cadastrado"
+            texto="Cadastre seu cartão de crédito com limite, banco e datas de fechamento para acompanhar as faturas."
+            acao={{ rotulo: 'Cadastrar cartão', onPress: abrirNovo }}
+          />
         ) : (
           <>
             <CarrosselCartoes
@@ -280,21 +237,18 @@ export default function CarteiraScreen() {
                     {selecionado.ultimosDigitos ? `•••• ${selecionado.ultimosDigitos} · ` : ''}
                     Vence dia {selecionado.diaVencimento ?? '—'}
                   </Text>
-                  <TouchableOpacity
+                  {/* `texto` dá a tinta de marca; o contorno de marca é local —
+                      é a única ação de cartão e precisa ler como botão sem competir
+                      com o CTA sólido do hero. */}
+                  <Botao
+                    titulo="Nova Despesa"
+                    icone="add"
+                    variante="texto"
+                    tamanho="pill"
                     onPress={() => setNovaDespesaVisible(true)}
-                    accessibilityRole="button"
                     accessibilityLabel={`Nova despesa no cartão ${selecionado.nome}`}
-                    style={{
-                      flexDirection: 'row', alignItems: 'center', gap: 4,
-                      paddingHorizontal: 14, minHeight: 44, justifyContent: 'center',
-                      borderRadius: radius.pill, borderWidth: 1, borderColor: colors.brand,
-                    }}
-                  >
-                    <Ionicons name="add" size={15} color={colors.brandFg} />
-                    <Text style={{ ...typography.meta, fontWeight: '600', color: colors.brandFg }}>
-                      Nova Despesa
-                    </Text>
-                  </TouchableOpacity>
+                    style={{ paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.brand }}
+                  />
                 </View>
 
                 <View style={{ paddingHorizontal: spacing.lg, gap: spacing.md - 2, marginTop: spacing.lg }}>
@@ -323,40 +277,13 @@ export default function CarteiraScreen() {
         />
       )}
 
-      <Modal
+      <FolhaModal
         visible={modalVisible}
-        animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => { setModalVisible(false); resetForm(); }}
+        titulo={editandoId != null ? 'Editar Cartão' : 'Novo Cartão'}
+        onFechar={() => { setModalVisible(false); resetForm(); }}
+        acao={{ rotulo: 'Salvar', onPress: salvarCartao, carregando: salvando }}
       >
-        <View style={{ flex: 1, backgroundColor: colors.bg }}>
-          <View style={{
-            flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-            padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border,
-          }}>
-            <TouchableOpacity
-              onPress={() => { setModalVisible(false); resetForm(); }}
-              accessibilityRole="button"
-              accessibilityLabel="Cancelar"
-            >
-              <Text style={{ ...typography.value, fontWeight: '500', color: colors.brand }}>Cancelar</Text>
-            </TouchableOpacity>
-            <Text style={{ ...typography.cardTitle, color: colors.textPrimary }}>
-              {editandoId != null ? 'Editar Cartão' : 'Novo Cartão'}
-            </Text>
-            <TouchableOpacity
-              disabled={salvando}
-              onPress={salvarCartao}
-              accessibilityRole="button"
-              accessibilityState={{ disabled: salvando }}
-            >
-              <Text style={{ ...typography.value, color: salvando ? colors.textMuted : colors.brand }}>
-                Salvar
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView contentContainerStyle={{ padding: spacing.lg }} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={{ padding: spacing.lg }} keyboardShouldPersistTaps="handled">
             {/* Prévia ao vivo: o cartão toma a identidade do emissor enquanto o
                 usuário digita, com bandeira, final e cor escolhidos. */}
             <View style={{ alignItems: 'center', marginBottom: spacing.xl, height: alturaCartao }}>
@@ -512,9 +439,8 @@ export default function CarteiraScreen() {
             </View>
 
             {formError && <Text style={{ ...typography.body, color: colors.danger }}>{formError}</Text>}
-          </ScrollView>
-        </View>
-      </Modal>
+        </ScrollView>
+      </FolhaModal>
     </View>
   );
 }

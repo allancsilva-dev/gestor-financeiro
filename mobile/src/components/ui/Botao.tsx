@@ -3,7 +3,7 @@ import { ActivityIndicator, Text, TouchableOpacity, ViewStyle } from 'react-nati
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme, radius, spacing, typography } from '../../theme';
 
-type Variante = 'primario' | 'secundario' | 'perigo' | 'texto' | 'invertido';
+type Variante = 'primario' | 'secundario' | 'perigo' | 'sucesso' | 'texto' | 'invertido';
 /**
  * `padrao` é o botão de formulário e rodapé de fluxo (altura 52).
  * `pill` é a ação dentro de um card — mais curta e totalmente arredondada,
@@ -21,6 +21,10 @@ interface BotaoProps {
   icone?: React.ComponentProps<typeof Ionicons>['name'];
   testID?: string;
   accessibilityLabel?: string;
+  /** O que o botão faz, quando o rótulo não basta. Nunca substitui o rótulo. */
+  dica?: string;
+  /** Amplia a área de toque quando a geometria medida fica abaixo de 44. */
+  hitSlop?: { top?: number; bottom?: number; left?: number; right?: number };
   style?: ViewStyle;
 }
 
@@ -40,6 +44,8 @@ export default function Botao({
   icone,
   testID,
   accessibilityLabel,
+  dica,
+  hitSlop,
   style,
 }: BotaoProps) {
   const colors = useTheme();
@@ -49,6 +55,8 @@ export default function Botao({
     primario: colors.brand,
     secundario: 'transparent',
     perigo: colors.danger,
+    // Confirmação de dinheiro que sai da conta e quita algo (pagar fatura)
+    sucesso: colors.success,
     texto: 'transparent',
     // Inverte o tema: o único elemento claro-sobre-escuro do card. É assim que o
     // CTA lê como CTA sem gastar a cor da marca numa superfície que já é colorida.
@@ -59,6 +67,7 @@ export default function Botao({
     primario: colors.brandText,
     secundario: colors.textPrimary,
     perigo: colors.brandText,
+    sucesso: colors.brandText,
     texto: colors.brandFg,
     invertido: colors.bg,
   }[variante];
@@ -73,6 +82,8 @@ export default function Botao({
       activeOpacity={0.85}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? titulo}
+      accessibilityHint={dica}
+      hitSlop={hitSlop}
       accessibilityState={{ disabled: inativo, busy: carregando }}
       style={[
         {

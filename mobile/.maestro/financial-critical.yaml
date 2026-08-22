@@ -91,7 +91,10 @@ tags:
     visible: "Carteira"
     timeout: 15000
 - tapOn: "Carteira"
-- tapOn: "Cartão"
+# A ação do header virou botão circular com rótulo próprio (ui/CabecalhoDeTela);
+# na carteira vazia o mesmo rótulo aparece no botão do estado vazio, e os dois
+# abrem o mesmo formulário.
+- tapOn: "Cadastrar cartão"
 - tapOn:
     id: "card-name"
 - inputText: "Cartão Principal"

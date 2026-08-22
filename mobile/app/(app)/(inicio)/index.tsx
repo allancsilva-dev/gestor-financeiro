@@ -14,6 +14,8 @@ import ParcelasCarrossel from '../../../src/components/home/ParcelasCarrossel';
 import OperacoesFiltro from '../../../src/components/home/OperacoesFiltro';
 import Card from '../../../src/components/ui/Card';
 import ListRow from '../../../src/components/ui/ListRow';
+import Contador from '../../../src/components/ui/Contador';
+import EstadoVazio from '../../../src/components/ui/EstadoVazio';
 import SkeletonBox from '../../../src/components/ui/SkeletonBox';
 import Entrance from '../../../src/components/ui/Entrance';
 import NovaTransacaoModal, { LancamentoInicial } from '../../../src/components/NovaTransacaoModal';
@@ -144,16 +146,8 @@ export default function Home() {
           >
             <Ionicons name="notifications-outline" size={25} color={colors.textPrimary} />
             {!!home?.naoLidas && (
-              <View style={{
-                position: 'absolute', top: 2, right: 2,
-                minWidth: 19, height: 19, borderRadius: 10,
-                paddingHorizontal: 5,
-                backgroundColor: colors.brand,
-                alignItems: 'center', justifyContent: 'center',
-              }}>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: colors.brandText }}>
-                  {home.naoLidas > 9 ? '9+' : home.naoLidas}
-                </Text>
+              <View style={{ position: 'absolute', top: 0, right: 0 }}>
+                <Contador valor={home.naoLidas} />
               </View>
             )}
           </TouchableOpacity>
@@ -221,27 +215,22 @@ export default function Home() {
               {[1, 2, 3, 4, 5].map(i => <SkeletonBox key={i} width="100%" height={56} />)}
             </View>
           ) : operacoes.query.isError ? (
-            <View style={{ alignItems: 'center', paddingVertical: spacing.md }}>
-              <Text style={{ color: colors.textSecondary }}>Erro ao carregar operações</Text>
-              <TouchableOpacity
-                onPress={() => operacoes.query.refetch()}
-                accessibilityRole="button"
-                style={{ marginTop: spacing.sm, minHeight: 44, justifyContent: 'center' }}
-              >
-                <Text style={{ ...typography.button, color: colors.brandFg }}>Tentar novamente</Text>
-              </TouchableOpacity>
-            </View>
+            <EstadoVazio
+              compacto
+              emoji="📶"
+              titulo="Não deu para carregar suas operações"
+              texto="Verifique sua conexão e tente de novo."
+              acao={{ rotulo: 'Tentar de novo', onPress: () => operacoes.query.refetch() }}
+            />
           ) : operacoes.itens.length === 0 ? (
-            <View style={{ alignItems: 'center', paddingVertical: spacing.lg }}>
-              <Text style={{ ...typography.cardTitle, color: colors.textPrimary }}>
-                {operacoes.filtrando ? 'Nada com esse filtro' : 'Nenhuma operação ainda'}
-              </Text>
-              <Text style={{ ...typography.meta, color: colors.textSecondary, marginTop: 4 }}>
-                {operacoes.filtrando
-                  ? 'Ajuste os filtros ou a busca para ver outras.'
-                  : 'Toque em Nova Transação para registrar a primeira.'}
-              </Text>
-            </View>
+            <EstadoVazio
+              compacto
+              emoji={operacoes.filtrando ? '🔍' : '📄'}
+              titulo={operacoes.filtrando ? 'Nada com esse filtro' : 'Nenhuma operação ainda'}
+              texto={operacoes.filtrando
+                ? 'Ajuste os filtros ou a busca para ver outras.'
+                : 'Toque em Nova Transação para registrar a primeira.'}
+            />
           ) : (
             operacoes.itens.map((t: Transacao, i, arr) => (
               <ListRow

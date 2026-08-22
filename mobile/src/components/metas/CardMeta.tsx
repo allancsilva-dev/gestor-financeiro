@@ -1,9 +1,9 @@
 import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { iconeDecorativo } from '../../utils/acessibilidade';
 import { Meta } from '../../types';
-import { useTheme, radius, numeric } from '../../theme';
+import { useTheme, numeric } from '../../theme';
+import Botao from '../ui/Botao';
 import ProgressBar from '../ui/ProgressBar';
 import { e } from '../../theme/escala';
 import { paletaDaMeta } from '../../theme/metaCores';
@@ -142,21 +142,16 @@ export default function CardMeta({ meta, onAbrir, onDepositar, onEditar, onExclu
           </TouchableOpacity>
 
           {acoes.adicionar ? (
-            <TouchableOpacity
+            <Botao
+              titulo="Depositar"
+              icone="add"
+              variante="invertido"
+              tamanho="pill"
               onPress={() => onDepositar(meta)}
+              dica="Deposita um valor nesta meta"
               hitSlop={{ top: 6, bottom: 6 }}
-              accessibilityRole="button"
-              accessibilityLabel="Depositar"
-              accessibilityHint="Deposita um valor nesta meta"
-              style={{
-                height: e(33), minWidth: e(91), paddingHorizontal: e(6), borderRadius: radius.pill,
-                backgroundColor: colors.textPrimary,
-                flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: e(5),
-              }}
-            >
-              <Ionicons name="add" size={e(14)} color={colors.bg} {...iconeDecorativo} />
-              <Text style={{ color: colors.bg, fontSize: e(13), fontWeight: '700' }}>Depositar</Text>
-            </TouchableOpacity>
+              style={{ height: e(33), minHeight: e(33), minWidth: e(91), paddingHorizontal: e(6) }}
+            />
           ) : (
             <Badge tone={meta.status === 'CONCLUIDA' ? 'success' : 'info'}>
               {meta.status === 'CONCLUIDA' ? 'Concluída' : 'Arquivada'}

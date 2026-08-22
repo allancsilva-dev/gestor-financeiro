@@ -7,12 +7,17 @@ export type TileTone = 'brand' | 'success' | 'danger' | 'warning' | 'info' | 'ne
 interface IconTileProps {
   children: React.ReactNode;
   tone?: TileTone;
+  /**
+   * Cor da entidade (categoria, meta). Vence o `tone`: entidade com cor própria
+   * não usa a paleta semântica — DESIGN.md, seção Color.
+   */
+  cor?: string | null;
   size?: number;
   style?: StyleProp<ViewStyle>;
 }
 
 // Quadradinho pastel + emoji/glifo — o sistema de ícones de categoria do app
-export default function IconTile({ children, tone = 'brand', size = 40, style }: IconTileProps) {
+export default function IconTile({ children, tone = 'brand', cor, size = 40, style }: IconTileProps) {
   const colors = useTheme();
   const tones: Record<TileTone, { bg: string; fg: string }> = {
     brand: { bg: colors.brandBg, fg: colors.brandFg },
@@ -22,7 +27,8 @@ export default function IconTile({ children, tone = 'brand', size = 40, style }:
     info: { bg: colors.infoBg, fg: colors.info },
     neutral: { bg: colors.card, fg: colors.textSecondary },
   };
-  const t = tones[tone];
+  // 20 em hex = 12.5% de alpha, o mesmo peso dos fundos `*Bg` da paleta
+  const t = cor ? { bg: cor + '20', fg: cor } : tones[tone];
 
   return (
     <View

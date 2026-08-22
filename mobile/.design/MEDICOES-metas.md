@@ -15,10 +15,10 @@ ignora essa faixa.
 
 | Elemento | px | dp |
 |---|---|---|
-| Título "Metas" | x 27, cap y 105–129 | x **16**, fonte **~20**, weight 800 |
-| Botão `+` do header | x 512–565, y 90–143 | **33** de diâmetro, margem direita **16** |
+| Título "Metas" | x 27, cap y 105–129 | x **16**, fonte **~20**, weight 800 — **não implementado**, ver ressalva |
+| Botão `+` do header | x 512–565, y 90–143 | **33** de diâmetro, margem direita **16** — **não implementado**, ver ressalva |
 | Eyebrow "OBJETIVOS" | x 43–139, y 361–372 | fonte **~10**, tracking ~1.2, cap 6.7 |
-| Título "Suas metas ativas" | x 44–348, cap y 392–422 | fonte **~25**, weight 700 |
+| Título "Suas metas ativas" | x 44–348, cap y 392–422 | fonte **~25**, weight **500** (a leitura inicial de 700 foi corrigida na calibração) |
 | Parágrafo de apoio | 2 linhas, y 446 e 477 | fonte **14**, lineHeight **19** |
 | Card de meta: caixa | x 30–560, y 535–790 | x **18**, largura **323**, altura **155** |
 | Card: padding lateral | 27 | **16** |
@@ -51,7 +51,7 @@ card 2 preenche 208→474 = **81.8%** ("82%"). A régua da referência é honest
 | Divisor do card | `#1f273b` sobre `#151d31` | `rgba(255,255,255,0.06)` |
 | Borda do tile | `#3b3e4d` sobre `#182034` | `rgba(255,255,255,0.10)` |
 | Fundo do tile | `#20243d` | `rgba(255,255,255,0.03)` |
-| Trilha da barra / do anel (roxo) | `#44366b` | cor da meta a ~28% sobre o card |
+| Trilha da barra / do anel (roxo) | `#44366b` | cor da meta a ~28% sobre o card — o código usa **0.36** (`metaCores.ts`), calibrado para a trilha não sumir no tema claro |
 | Preenchimento (roxo) | `#9b53dd` → `#ca95fd` | **gradiente**, clareia para a direita |
 | Trilha da barra / do anel (verde) | `#175055` | idem |
 | Preenchimento (verde) | `#04b296` → `#65dbca` | idem |
@@ -140,3 +140,18 @@ O rótulo do card 2 ("Atingindo em 16m · dezembro de 2027") quebra em duas linh
 Divergência assumida: o rótulo de atenção usa `colors.warning` (`#fbbf24`), mais
 amarelo que o âmbar da foto (`#a47436` medido, com croma comido pelo JPEG). Token do
 tema vence pixel de JPEG, como na calibração da carteira.
+
+## Ressalva: o header não segue esta medição
+
+O header desta tela usa `ui/CabecalhoDeTela` — `typography.screenTitle` (26/800) e ação circular
+de 36 —, não os 20/800 e 33 medidos acima.
+
+É decisão de produto, tomada quando o padrão foi fechado: conviviam quatro corpos de título de
+tela (26 na Carteira, 23 em Contas, 22 na Fatura, 20 aqui) e um tamanho por tela não sobrevive a
+treze telas. A escala tipográfica do `DESIGN.md` é a régua; a medição do mock vale para o que é
+específico desta tela.
+
+**O card de meta continua medido** — geometria, cores e a calibração acima valem integralmente.
+A única outra divergência é o texto da pill "Depositar", que passou a usar `typography.button`
+(15/700) ao adotar `ui/Botao`, contra os `e(13)` calibrados; a geometria da pill (`e(33)` × `e(91)`)
+foi mantida.

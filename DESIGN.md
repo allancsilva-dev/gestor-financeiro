@@ -56,7 +56,7 @@ Mesmas chaves, reequilibradas: `bg #eef2f8`, `card #ffffff`, `textPrimary #0b122
 System font (SF Pro / Roboto). Sem fonte customizada. Tokens em `src/theme/tokens.ts` — a tela
 faz spread (`{ ...typography.value, ...numeric, color: colors.success }`), não literal solto.
 
-- `display` 34/800 — saldo do hero
+- `display` 34/800 — saldo do hero · `subDisplay` 28/800 — total de sub-tela (fatura)
 - `screenTitle` 26/800 — título de tela de topo
 - `greeting` 22/800 · `section` 20/700
 - `cardTitle` 15/700 · `rowTitle` 15/600 (linha de lista) · `input` 15/500 (campo)
@@ -71,19 +71,29 @@ faz spread (`{ ...typography.value, ...numeric, color: colors.success }`), não 
 - **Superfície com brilho** (`ui/SuperficieComBrilho`): base neutra + dois brilhos radiais (SVG),
   topo-direita e base-esquerda, centro neutro. É o fundo do card de meta e do bloco de conta em
   Ajustes. Não é gradiente linear — ver `MEDICOES-metas.md`.
-- **Tile de categoria** (`ui/IconTile`): quadradinho 40–44, radius 12, fundo pastel, emoji dentro.
-  Emoji é o sistema de ícones; nada de biblioteca colorida.
+- **Tile de categoria** (`ui/IconTile`): quadradinho 40–44, `radius.md`, fundo pastel, emoji dentro.
+  Emoji é o sistema de ícones; nada de biblioteca colorida. Entidade com cor própria passa `cor`,
+  que tinge o fundo a 12% e vence o `tone` semântico.
 - **Lista** (`ui/ListRow`): linhas em card único com divisores, tile + título (`rowTitle`, 600) +
   metadado, valor (`value` + `numeric`) ou chevron à direita. A linha **não** recebe
   `accessibilityLabel`: é nó composto, e um rótulo curado apagaria subtítulo e valor da árvore.
   O contexto vai na prop `dica` (`accessibilityHint`) e o tile é decorativo.
-- **Cabeçalho de tela** (`ui/CabecalhoDeTela`): título grande à esquerda, ação circular à direita,
-  safe area somada aqui. Não há header nativo (`headerShown: false` em todos os layouts).
+- **Cabeçalho de tela** (`ui/CabecalhoDeTela`): título `screenTitle` à esquerda, ação circular de
+  36 à direita, safe area somada aqui. Não há header nativo (`headerShown: false` em todos os
+  layouts). **Um só corpo de título em todo o app**: conviviam 26, 23, 22 e um 20 escalado.
+  A Home é a única exceção — ali o topo é saudação (`greeting` + avatar), não título de tela.
+- **Cabeçalho de sub-tela** (`ui/CabecalhoSubTela`): o mesmo, com `ui/BackButton` acima do título
+  e uma linha de apoio opcional (competência, status). É o header de tudo em `more/`.
 - **Cabeçalho de seção** (`ui/CabecalhoSecao`): eyebrow curto + título + linha de orientação.
 - **FAB**: círculo 53 com gradiente `fabFrom → fabTo` e glow, centrado na tab bar.
 - **Tab bar**: painel flutuante (altura 69, margem 15, radius 24) com 5 slots — Início, Análises,
   **+**, Metas, Ajustes. Ativo em ciano, com tile e barra indicadora.
+- **Folha modal** (`ui/FolhaModal`): `Modal` `pageSheet` com barra saída / título / ação. Toda
+  folha do app passa por aqui — o bloco estava copiado 17 vezes, cada cópia com o seu corpo de
+  título e a sua cor de link.
 - **Chips/segmentos** (`ui/Chip`): pill radius 999, ativo com borda/fundo de marca, alvo ≥44.
+- **Contador** (`ui/Contador`): bolha de não lidas do sino e da linha de notificações. Não leva
+  rótulo próprio: quem anuncia a contagem é o controle que a contém.
 - **Badges de status** (`ui/Badge`): pill pequeno, fundo semântico a 12%, texto da cor plena.
 - **Barra de progresso** (`ui/ProgressBar`): a única do app. Trilha `colors.trilha`, altura 6,
   `radius.pill`; preenchimento em gradiente (sólido puro fica opaco demais). Aceita `paleta` da
@@ -92,7 +102,7 @@ faz spread (`{ ...typography.value, ...numeric, color: colors.success }`), não 
   sumia no claro. É o caso que `src/__tests__/tema.test.ts` trava.
 - **Botão** (`ui/Botao`): a única forma de botão do app — `primario` (fundo `brand`, texto
   `brandText`), `secundario` (borda `border`), `perigo` (`danger`), `texto` (só `brandFg`) e
-  `invertido` (fundo `textPrimary`, texto `bg`). Dois tamanhos: `padrao` (altura 52, `radius.md`)
+  `sucesso` (`success`, para quitar) e `invertido` (fundo `textPrimary`, texto `bg`). Dois tamanhos: `padrao` (altura 52, `radius.md`)
   para formulário e rodapé de fluxo, e `pill` (altura 44, `radius.pill`) para ação dentro de card —
   é o CTA "Depositar" do card de meta. `typography.button` em caixa normal, nunca `CAIXA ALTA`
   com `letterSpacing`. Estados obrigatórios no próprio componente: normal, pressionado (`activeOpacity`
@@ -110,7 +120,11 @@ faz spread (`{ ...typography.value, ...numeric, color: colors.success }`), não 
   serve, o usuário quer saber quantas telas faltam.
 - **Estados**: `ui/SkeletonBox` com a forma do conteúdo real (nunca spinner no meio da tela),
   `ui/EstadoVazio` para vazio e erro, retry sempre por `refetch()` do react-query. A ação do
-  estado vazio é um `ui/Botao` `pill` — o componente não fabrica botão próprio.
+  estado vazio é um `ui/Botao` `pill` — o componente não fabrica botão próprio. Dentro de um card
+  use `compacto`: a moldura já delimita o vazio e o respiro de tela cheia dobraria a altura.
+
+**Tempo:** competência, intervalo de período e navegação de mês vêm de `src/domain/periodo.ts`,
+sempre em hora local — `toISOString()` no meio do caminho move lançamento de mês.
 
 ## Layout
 
@@ -122,9 +136,8 @@ faz spread (`{ ...typography.value, ...numeric, color: colors.success }`), não 
 ## Receita de tela
 
 Raiz `View flex:1` em `colors.bg` → `ScrollView`/`FlatList` com `paddingBottom: useTabBarSpace()`
-→ `CabecalhoDeTela` (+ `ui/BackButton` nas sub-telas de `more/`) → hero opcional → chips de
-segmento → `CabecalhoSecao` → lista → modais `presentationStyle="pageSheet"` como irmãos do scroll,
-com barra Cancelar / Título / ação e corpo em `ui/Field`.
+→ `CabecalhoDeTela` (ou `CabecalhoSubTela` em `more/`) → hero opcional → chips de segmento →
+`CabecalhoSecao` → lista → `ui/FolhaModal` como irmão do scroll, com o corpo em `ui/Field`.
 
 Cadeia de estados, nesta ordem: `params inválidos → isLoading → isError → vazio → conteúdo`.
 
