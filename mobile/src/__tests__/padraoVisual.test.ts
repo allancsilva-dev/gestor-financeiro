@@ -67,10 +67,14 @@ const EXCECOES_PERMANENTES: Record<string, string[]> = {
   'index.tsx': ['spinner de tela'],
 };
 
-/** Telas que ainda não passaram pela migração visual. Encolhe a cada PR. */
-const AINDA_NAO_MIGRADAS = [
-  '(app)/perfil.tsx',
-];
+/**
+ * Telas que ainda não passaram pela migração visual.
+ *
+ * **A lista está vazia**: todas as telas de `app/**` seguem o padrão. Ela fica
+ * aqui como o lugar certo para uma tela nova entrar temporariamente — e o teste
+ * abaixo garante que ninguém a use para esconder uma tela que já está limpa.
+ */
+const AINDA_NAO_MIGRADAS: string[] = [];
 
 const telas = (): string[] => {
   const achados: string[] = [];
@@ -119,10 +123,12 @@ describe('padrão visual das telas', () => {
     expect(infracoes(arquivo)).toEqual([]);
   });
 
-  it.each(AINDA_NAO_MIGRADAS)('%s ainda está na lista de migração e ainda precisa estar', (arquivo) => {
-    // Se esta falhar, a tela foi migrada: apague a linha dela de AINDA_NAO_MIGRADAS.
-    expect(fs.existsSync(path.join(RAIZ, arquivo))).toBe(true);
-    expect(infracoes(arquivo).length).toBeGreaterThan(0);
+  it('a lista de migração não guarda tela que já está limpa nem arquivo que sumiu', () => {
+    // Exceção obsoleta é dívida invisível: some da lista assim que a tela passa.
+    const obsoletas = AINDA_NAO_MIGRADAS.filter(
+      (arquivo) => !fs.existsSync(path.join(RAIZ, arquivo)) || infracoes(arquivo).length === 0,
+    );
+    expect(obsoletas).toEqual([]);
   });
 
   it('não há exceção permanente apontando para arquivo que sumiu', () => {

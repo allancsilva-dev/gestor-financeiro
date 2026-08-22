@@ -191,8 +191,13 @@ o sistema não impede regressão — as telas antigas nasceram assim porque nada
 `fontSize: 13` solto. É o mesmo mecanismo de `tema.test.ts`, que trava contraste.
 
 O teste carrega duas listas: exceções permanentes com motivo (hoje só o portão de sessão em
-`app/index.tsx`, que roda antes de existir conteúdo para o skeleton imitar) e as telas ainda
-não migradas, que encolhe a cada PR. Exceção obsoleta também quebra o teste.
+`app/index.tsx`, que roda antes de existir conteúdo para o skeleton imitar) e as telas ainda não
+migradas — **hoje vazia**: as 28 telas de `app/**` seguem o padrão. A lista continua ali para uma
+tela nova entrar temporariamente, e o teste quebra se alguém a usar para esconder uma tela que já
+está limpa.
+
+Medida que não é escala — traço de anel, diâmetro de alvo — sai como constante nomeada com o
+porquê, não como número solto. É o que a regra quer: nada de medida anônima.
 
 ## Acessibilidade
 
