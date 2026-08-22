@@ -93,6 +93,9 @@ faz spread (`{ ...typography.value, ...numeric, color: colors.success }`), não 
 - **Folha modal** (`ui/FolhaModal`): `Modal` `pageSheet` com barra saída / título / ação. Toda
   folha do app passa por aqui — o bloco estava copiado 17 vezes, cada cópia com o seu corpo de
   título e a sua cor de link.
+- **Navegação de mês** (`ui/NavegadorDeMes`): setas de 44 com `accessibilityRole`, mês ao centro
+  e linha de apoio opcional. `podeAvancar` trava o futuro — mês que ainda não aconteceu só teria
+  tela vazia.
 - **Rótulo de grupo** (`ui/RotuloDeGrupo`): o título de uma fileira de controles que não é um
   campo de texto — faixa de contas, lista de modalidades, seletor de bandeira. `typography.meta`
   em caixa normal; cada tela escrevia o seu em CAIXA ALTA de 9 ou 10pt.

@@ -70,7 +70,6 @@ const EXCECOES_PERMANENTES: Record<string, string[]> = {
 /** Telas que ainda não passaram pela migração visual. Encolhe a cada PR. */
 const AINDA_NAO_MIGRADAS = [
   '(app)/more/categorias.tsx',
-  '(app)/more/orcamentos.tsx',
   '(app)/more/visao-financeira.tsx',
   '(app)/perfil.tsx',
 ];

@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, FlatList, RefreshControl, TouchableOpacity } from 'react-native';
-import Ionicons from '@expo/vector-icons/Ionicons';
+import { View, Text, FlatList, RefreshControl } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { transacaoService } from '../../../src/services/transacaoService';
@@ -13,6 +12,7 @@ import { competenciaDe, ehCompetenciaCorrente, intervaloDoMes, somarMeses } from
 import { TipoTransacao, Transacao } from '../../../src/types';
 import CabecalhoSubTela from '../../../src/components/ui/CabecalhoSubTela';
 import CampoBusca from '../../../src/components/ui/CampoBusca';
+import NavegadorDeMes from '../../../src/components/ui/NavegadorDeMes';
 import SkeletonBox from '../../../src/components/ui/SkeletonBox';
 import ListRow from '../../../src/components/ui/ListRow';
 import Chip from '../../../src/components/ui/Chip';
@@ -98,20 +98,14 @@ export default function Transacoes() {
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <CabecalhoSubTela titulo="Transações" />
 
-      <View style={{
-        flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: screenPadding,
-      }}>
-        <SetaDeMes direcao="anterior" onPress={() => mudarMes(-1)} />
-        <View style={{ alignItems: 'center' }}>
-          <Text style={{ ...typography.value, color: colors.textPrimary }}>{mesLabel}</Text>
-          <Text style={{ ...typography.meta, color: colors.textSecondary }}>
-            {isLoading ? ' ' : `${total} ${total === 1 ? 'transação' : 'transações'}`}
-          </Text>
-        </View>
-        {/* O futuro não tem lançamento: avançar além do mês corrente só mostraria
-            uma tela vazia. */}
-        <SetaDeMes direcao="proximo" onPress={() => mudarMes(1)} desabilitada={ehMesAtual} />
+      <View style={{ paddingHorizontal: screenPadding }}>
+        <NavegadorDeMes
+          rotulo={mesLabel}
+          apoio={isLoading ? ' ' : `${total} ${total === 1 ? 'transação' : 'transações'}`}
+          onAnterior={() => mudarMes(-1)}
+          onProximo={() => mudarMes(1)}
+          podeAvancar={!ehMesAtual}
+        />
       </View>
 
       {/* Resumo do mês: totais do backend (todas as páginas, não só as carregadas) */}
@@ -209,33 +203,6 @@ export default function Transacoes() {
   );
 }
 
-/** Seta de navegação de mês. Alvo de 44 mesmo com o glifo pequeno. */
-const SetaDeMes = ({ direcao, onPress, desabilitada = false }: {
-  direcao: 'anterior' | 'proximo';
-  onPress: () => void;
-  desabilitada?: boolean;
-}) => {
-  const colors = useTheme();
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      disabled={desabilitada}
-      accessibilityRole="button"
-      accessibilityLabel={direcao === 'anterior' ? 'Mês anterior' : 'Próximo mês'}
-      accessibilityState={{ disabled: desabilitada }}
-      style={{
-        minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center',
-        opacity: desabilitada ? 0.3 : 1,
-      }}
-    >
-      <Ionicons
-        name={direcao === 'anterior' ? 'chevron-back' : 'chevron-forward'}
-        size={20}
-        color={colors.brandFg}
-      />
-    </TouchableOpacity>
-  );
-};
 
 /** Entradas ou saídas do mês inteiro — vem do backend, não da página carregada. */
 const TotalDoMes = ({ rotulo, valor, sinal, cor, carregando }: {
