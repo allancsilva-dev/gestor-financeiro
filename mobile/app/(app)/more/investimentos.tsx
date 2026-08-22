@@ -1,16 +1,23 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Modal, ScrollView, ActivityIndicator, Alert } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, FlatList, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import investimentoService from '../../../src/services/investimentoService';
 import contaFinanceiraService from '../../../src/services/contaFinanceiraService';
 import { Ativo, AtivoRequest, LiquidezContaFinanceira, TipoAtivo, TipoMovimentacaoAtivo } from '../../../src/types';
-import { useTheme, useTabBarSpace } from '../../../src/theme';
-import BackButton from '../../../src/components/ui/BackButton';
+import {
+  useTheme, useTabBarSpace, cardRadius, numeric, radius, screenPadding, spacing, typography,
+} from '../../../src/theme';
+import { mensagemDeErro } from '../../../src/utils/erros';
 import { formatCurrency, formatDate, isValidDateBR, maskCurrencyInput, maskDateInput, parseCurrencyBR, parseDateBR } from '../../../src/utils/format';
+import Botao from '../../../src/components/ui/Botao';
+import CabecalhoSubTela from '../../../src/components/ui/CabecalhoSubTela';
 import Card from '../../../src/components/ui/Card';
 import Chip from '../../../src/components/ui/Chip';
+import EstadoVazio from '../../../src/components/ui/EstadoVazio';
+import Fab from '../../../src/components/ui/Fab';
 import Field from '../../../src/components/ui/Field';
+import FolhaModal from '../../../src/components/ui/FolhaModal';
+import RotuloDeGrupo from '../../../src/components/ui/RotuloDeGrupo';
 import SkeletonBox from '../../../src/components/ui/SkeletonBox';
 
 const TIPO_ATIVO_LABEL: Record<TipoAtivo, string> = {
@@ -30,8 +37,50 @@ const TIPO_MOV_LABEL: Record<TipoMovimentacaoAtivo, string> = {
 
 const hojeBR = () => new Date().toLocaleDateString('pt-BR');
 
-function AtivoModal({ ativo, visible, onClose }: { ativo: Ativo | null; visible: boolean; onClose: () => void }) {
+/** Par rótulo/valor dos painéis de posição. */
+const Metrica = ({ rotulo, valor, cor }: { rotulo: string; valor: string; cor?: string }) => {
   const colors = useTheme();
+  return (
+    <View style={{ flex: 1 }}>
+      <Text style={{ ...typography.meta, color: colors.textSecondary }}>{rotulo}</Text>
+      <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.7}
+        style={{ ...typography.value, ...numeric, fontWeight: '800', color: cor ?? colors.textPrimary, marginTop: spacing.xxs }}
+      >
+        {valor}
+      </Text>
+    </View>
+  );
+};
+
+/** Faixa de chips de escolha única, com o rótulo do grupo em cima. */
+const FaixaDeChips = <T extends string>({ rotulo, opcoes, rotuloDe, atual, onEscolher }: {
+  rotulo: string;
+  opcoes: readonly T[];
+  rotuloDe?: (opcao: T) => string;
+  atual: T | undefined;
+  onEscolher: (opcao: T) => void;
+}) => (
+  <>
+    <RotuloDeGrupo>{rotulo}</RotuloDeGrupo>
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md }}>
+      {opcoes.map(o => (
+        <Chip key={o} label={rotuloDe ? rotuloDe(o) : o} selected={atual === o} onPress={() => onEscolher(o)} />
+      ))}
+    </View>
+  </>
+);
+
+const Erro = ({ texto }: { texto: string }) => {
+  const colors = useTheme();
+  return (
+    <Text accessibilityRole="alert" style={{ ...typography.meta, color: colors.danger }}>{texto}</Text>
+  );
+};
+
+function AtivoModal({ ativo, visible, onClose }: { ativo: Ativo | null; visible: boolean; onClose: () => void }) {
   const queryClient = useQueryClient();
   const [ticker, setTicker] = useState('');
   const [nome, setNome] = useState('');
@@ -67,46 +116,44 @@ function AtivoModal({ ativo, visible, onClose }: { ativo: Ativo | null; visible:
       else await investimentoService.criar(req);
       queryClient.invalidateQueries({ queryKey: ['investimentos'] });
       onClose();
-    } catch (err: any) {
-      setErro(err?.userMessage ?? 'Erro ao salvar ativo.');
+    } catch (err: unknown) {
+      setErro(mensagemDeErro(err, 'Erro ao salvar ativo.'));
     } finally {
       setSalvando(false);
     }
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: colors.bg }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-          <TouchableOpacity onPress={onClose} accessibilityRole="button"><Text style={{ color: colors.brandFg, fontSize: 15 }}>Cancelar</Text></TouchableOpacity>
-          <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700' }}>{ativo ? 'Editar ativo' : 'Novo ativo'}</Text>
-          <TouchableOpacity onPress={salvar} disabled={salvando} accessibilityRole="button">
-            {salvando ? <ActivityIndicator color={colors.brand} size="small" /> : <Text style={{ color: colors.brandFg, fontSize: 15, fontWeight: '700' }}>Salvar</Text>}
-          </TouchableOpacity>
-        </View>
-        <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
-          <Field label="Ticker" value={ticker} onChangeText={setTicker} autoCapitalize="characters" placeholder="PETR4" />
-          <Field label="Nome" value={nome} onChangeText={setNome} placeholder="Petrobras PN" />
-          <Text style={{ color: colors.textSecondary, fontSize: 10, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Tipo</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-            {(Object.keys(TIPO_ATIVO_LABEL) as TipoAtivo[]).map(t => (
-              <Chip key={t} label={TIPO_ATIVO_LABEL[t]} selected={tipo === t} onPress={() => setTipo(t)} />
-            ))}
-          </View>
-          <Field label="Preço atual" value={valorAtual} onChangeText={(v) => setValorAtual(maskCurrencyInput(v))} keyboardType="number-pad" placeholder="0,00" />
-          <Text style={{ color: colors.textSecondary, fontSize: 10, marginBottom: 6 }}>Liquidez</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-            {(['IMEDIATA','D1','D2','CARENCIA','BLOQUEADA'] as LiquidezContaFinanceira[]).map(l => <Chip key={l} label={l} selected={liquidez === l} onPress={() => setLiquidez(l)} />)}
-          </View>
-          {erro && <Text style={{ color: colors.danger, fontSize: 12 }}>{erro}</Text>}
-        </ScrollView>
-      </View>
-    </Modal>
+    <FolhaModal
+      visible={visible}
+      titulo={ativo ? 'Editar ativo' : 'Novo ativo'}
+      onFechar={onClose}
+      acao={{ rotulo: 'Salvar', onPress: salvar, carregando: salvando }}
+    >
+      <ScrollView contentContainerStyle={{ padding: spacing.lg }} keyboardShouldPersistTaps="handled">
+        <Field label="Ticker" value={ticker} onChangeText={setTicker} autoCapitalize="characters" placeholder="PETR4" />
+        <Field label="Nome" value={nome} onChangeText={setNome} placeholder="Petrobras PN" />
+        <FaixaDeChips
+          rotulo="Tipo"
+          opcoes={Object.keys(TIPO_ATIVO_LABEL) as TipoAtivo[]}
+          rotuloDe={t => TIPO_ATIVO_LABEL[t]}
+          atual={tipo}
+          onEscolher={setTipo}
+        />
+        <Field label="Preço atual" value={valorAtual} onChangeText={(v) => setValorAtual(maskCurrencyInput(v))} keyboardType="number-pad" placeholder="0,00" />
+        <FaixaDeChips
+          rotulo="Liquidez"
+          opcoes={['IMEDIATA', 'D1', 'D2', 'CARENCIA', 'BLOQUEADA'] as LiquidezContaFinanceira[]}
+          atual={liquidez}
+          onEscolher={setLiquidez}
+        />
+        {erro && <Erro texto={erro} />}
+      </ScrollView>
+    </FolhaModal>
   );
 }
 
 function MovimentoModal({ ativo, visible, onClose }: { ativo: Ativo | null; visible: boolean; onClose: () => void }) {
-  const colors = useTheme();
   const queryClient = useQueryClient();
   const [tipo, setTipo] = useState<TipoMovimentacaoAtivo>('COMPRA');
   const [data, setData] = useState(hojeBR());
@@ -159,45 +206,49 @@ function MovimentoModal({ ativo, visible, onClose }: { ativo: Ativo | null; visi
       queryClient.invalidateQueries({ queryKey: ['investimentos'] });
       queryClient.invalidateQueries({ queryKey: ['investimento-movimentacoes', ativo.id] });
       onClose();
-    } catch (err: any) {
-      setErro(err?.userMessage ?? 'Erro ao registrar movimentação.');
+    } catch (err: unknown) {
+      setErro(mensagemDeErro(err, 'Erro ao registrar movimentação.'));
     } finally {
       setSalvando(false);
     }
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: colors.bg }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-          <TouchableOpacity onPress={onClose} accessibilityRole="button"><Text style={{ color: colors.brandFg, fontSize: 15 }}>Cancelar</Text></TouchableOpacity>
-          <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700' }}>Movimentação</Text>
-          <TouchableOpacity onPress={salvar} disabled={salvando} accessibilityRole="button">
-            {salvando ? <ActivityIndicator color={colors.brand} size="small" /> : <Text style={{ color: colors.brandFg, fontSize: 15, fontWeight: '700' }}>Salvar</Text>}
-          </TouchableOpacity>
+    <FolhaModal
+      visible={visible}
+      titulo="Movimentação"
+      onFechar={onClose}
+      acao={{ rotulo: 'Salvar', onPress: salvar, carregando: salvando }}
+    >
+      <ScrollView contentContainerStyle={{ padding: spacing.lg }} keyboardShouldPersistTaps="handled">
+        <FaixaDeChips
+          rotulo="Tipo"
+          opcoes={Object.keys(TIPO_MOV_LABEL) as TipoMovimentacaoAtivo[]}
+          rotuloDe={t => TIPO_MOV_LABEL[t]}
+          atual={tipo}
+          onEscolher={setTipo}
+        />
+        <Field label="Data" value={data} onChangeText={(v) => setData(maskDateInput(v))} keyboardType="number-pad" placeholder="DD/MM/AAAA" />
+        <Field label="Quantidade" value={quantidade} onChangeText={(v) => setQuantidade(v.replace(/[^0-9,.]/g, ''))} keyboardType="decimal-pad" placeholder="0" />
+        <Field label="Preço unitário" value={precoUnitario} onChangeText={(v) => setPrecoUnitario(maskCurrencyInput(v))} keyboardType="number-pad" placeholder="0,00" />
+
+        <RotuloDeGrupo>Origem da operação</RotuloDeGrupo>
+        <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
+          <Chip label="Conta real" selected={!externa} onPress={() => setExterna(false)} />
+          <Chip label="Snapshot externo" selected={externa} onPress={() => { setExterna(true); setCarteiraId(undefined); }} />
         </View>
-        <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
-          <Text style={{ color: colors.textSecondary, fontSize: 10, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Tipo</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-            {(Object.keys(TIPO_MOV_LABEL) as TipoMovimentacaoAtivo[]).map(t => (
-              <Chip key={t} label={TIPO_MOV_LABEL[t]} selected={tipo === t} onPress={() => setTipo(t)} />
+
+        {/* Bonificação não move caixa: não há conta de onde o dinheiro saia. */}
+        {!externa && tipo !== 'BONIFICACAO' && (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md }}>
+            {contasCaixa.map(c => (
+              <Chip key={c.id} label={c.nome} selected={carteiraId === c.id} onPress={() => setCarteiraId(c.id)} />
             ))}
           </View>
-          <Field label="Data" value={data} onChangeText={(v) => setData(maskDateInput(v))} keyboardType="number-pad" placeholder="DD/MM/AAAA" />
-          <Field label="Quantidade" value={quantidade} onChangeText={(v) => setQuantidade(v.replace(/[^0-9,.]/g, ''))} keyboardType="decimal-pad" placeholder="0" />
-          <Field label="Preço unitário" value={precoUnitario} onChangeText={(v) => setPrecoUnitario(maskCurrencyInput(v))} keyboardType="number-pad" placeholder="0,00" />
-          <Text style={{ color: colors.textSecondary, fontSize: 10, marginBottom: 6 }}>Origem da operação</Text>
-          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
-            <Chip label="Conta real" selected={!externa} onPress={() => setExterna(false)} />
-            <Chip label="Snapshot externo" selected={externa} onPress={() => { setExterna(true); setCarteiraId(undefined); }} />
-          </View>
-          {!externa && tipo !== 'BONIFICACAO' && <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
-            {contasCaixa.map(c => <Chip key={c.id} label={c.nome} selected={carteiraId === c.id} onPress={() => setCarteiraId(c.id)} />)}
-          </View>}
-          {erro && <Text style={{ color: colors.danger, fontSize: 12 }}>{erro}</Text>}
-        </ScrollView>
-      </View>
-    </Modal>
+        )}
+        {erro && <Erro texto={erro} />}
+      </ScrollView>
+    </FolhaModal>
   );
 }
 
@@ -225,8 +276,8 @@ function DetalheAtivoModal({ ativo, onClose, onEdit }: { ativo: Ativo | null; on
             await investimentoService.deletar(ativo.id);
             queryClient.invalidateQueries({ queryKey: ['investimentos'] });
             onClose();
-          } catch (err: any) {
-            Alert.alert('Investimentos', err?.userMessage ?? 'Erro ao excluir ativo.');
+          } catch (err: unknown) {
+            Alert.alert('Investimentos', mensagemDeErro(err, 'Erro ao excluir ativo.'));
           } finally {
             setExcluindo(false);
           }
@@ -236,80 +287,100 @@ function DetalheAtivoModal({ ativo, onClose, onEdit }: { ativo: Ativo | null; on
   };
 
   return (
-    <Modal visible={ativo != null} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: colors.bg }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700' }}>{ativo?.ticker}</Text>
-            <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>{ativo?.nome}</Text>
-          </View>
-          <TouchableOpacity onPress={onClose} accessibilityRole="button"><Text style={{ color: colors.brandFg, fontSize: 15, fontWeight: '600' }}>Fechar</Text></TouchableOpacity>
-        </View>
-        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>
-          {ativo && (
-            <Card radius={16} style={{ marginBottom: 12 }}>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: colors.textSecondary, fontSize: 11 }}>Quantidade</Text>
-                  <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '800', marginTop: 2 }}>{Number(ativo.quantidade ?? 0).toFixed(4)}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: colors.textSecondary, fontSize: 11 }}>Resultado</Text>
-                  <Text style={{ color: Number(ativo.lucroPrejuizo ?? 0) >= 0 ? colors.success : colors.danger, fontSize: 16, fontWeight: '800', marginTop: 2 }}>
-                    {formatCurrency(Number(ativo.lucroPrejuizo ?? 0))}
-                  </Text>
-                </View>
-              </View>
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-                <TouchableOpacity onPress={() => setMovimentoVisible(true)} accessibilityRole="button" style={{ flex: 1, minHeight: 44, borderRadius: 999, backgroundColor: colors.brandBg, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ color: colors.brandFg, fontSize: 13, fontWeight: '700' }}>Movimentar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => onEdit(ativo)} accessibilityRole="button" style={{ flex: 1, minHeight: 44, borderRadius: 999, backgroundColor: colors.infoBg, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ color: colors.info, fontSize: 13, fontWeight: '700' }}>Editar</Text>
-                </TouchableOpacity>
-              </View>
-              <TouchableOpacity onPress={excluir} disabled={excluindo} accessibilityRole="button" style={{ marginTop: 10, minHeight: 44, borderRadius: 999, backgroundColor: colors.dangerBg, alignItems: 'center', justifyContent: 'center' }}>
-                {excluindo ? <ActivityIndicator color={colors.danger} size="small" /> : <Text style={{ color: colors.danger, fontSize: 13, fontWeight: '700' }}>Excluir ativo</Text>}
-              </TouchableOpacity>
-            </Card>
-          )}
-
-          <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '700', marginBottom: 10 }}>Movimentações</Text>
-          {isLoading ? (
-            <View style={{ gap: 8 }}>{[1, 2, 3].map(i => <SkeletonBox key={i} width="100%" height={56} />)}</View>
-          ) : isError ? (
-            <TouchableOpacity onPress={() => refetch()} accessibilityRole="button" style={{ paddingVertical: 12 }}>
-              <Text style={{ color: colors.brandFg, fontWeight: '600' }}>Tentar novamente</Text>
-            </TouchableOpacity>
-          ) : data.length === 0 ? (
-            <Text style={{ color: colors.textSecondary, fontSize: 13 }}>Nenhuma movimentação registrada.</Text>
-          ) : (
-            <View style={{ gap: 8 }}>
-              {data.map(m => (
-                <View key={m.id} style={{ backgroundColor: colors.card, borderRadius: 12, borderWidth: 1, borderColor: colors.border, padding: 12 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 10 }}>
-                    <Text style={{ color: colors.textPrimary, fontSize: 13, fontWeight: '700' }}>{TIPO_MOV_LABEL[m.tipo]} · {m.conciliacao}</Text>
-                    <Text style={{ color: colors.textPrimary, fontSize: 13, fontWeight: '700' }}>{formatCurrency(Number(m.valorTotal ?? 0))}</Text>
-                  </View>
-                  {m.operacaoId != null && <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 4 }}>Operação #{m.operacaoId}</Text>}
-                  <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 3 }}>
-                    {formatDate(m.data)} · {Number(m.quantidade ?? 0)} x {formatCurrency(Number(m.precoUnitario ?? 0))}
-                  </Text>
-                </View>
-              ))}
+    <FolhaModal
+      visible={ativo != null}
+      titulo={ativo?.ticker ?? 'Ativo'}
+      rotuloFechar="Fechar"
+      onFechar={onClose}
+    >
+      <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxxl }}>
+        {ativo && (
+          <Card radius={radius.lg} style={{ marginBottom: spacing.md }}>
+            <Text style={{ ...typography.body, color: colors.textSecondary, marginBottom: spacing.md }}>
+              {ativo.nome} · {TIPO_ATIVO_LABEL[ativo.tipo]}
+            </Text>
+            <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+              <Metrica rotulo="Quantidade" valor={Number(ativo.quantidade ?? 0).toFixed(4)} />
+              <Metrica
+                rotulo="Resultado"
+                valor={formatCurrency(Number(ativo.lucroPrejuizo ?? 0))}
+                cor={Number(ativo.lucroPrejuizo ?? 0) >= 0 ? colors.success : colors.danger}
+              />
             </View>
-          )}
-        </ScrollView>
-        <MovimentoModal ativo={ativo} visible={movimentoVisible} onClose={() => setMovimentoVisible(false)} />
-      </View>
-    </Modal>
+            <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md }}>
+              <Botao titulo="Movimentar" tamanho="pill" onPress={() => setMovimentoVisible(true)} style={{ flex: 1 }} />
+              <Botao titulo="Editar" variante="secundario" tamanho="pill" onPress={() => onEdit(ativo)} style={{ flex: 1 }} />
+            </View>
+            <Botao
+              titulo="Excluir ativo"
+              variante="perigo"
+              tamanho="pill"
+              onPress={excluir}
+              carregando={excluindo}
+              style={{ marginTop: spacing.md }}
+            />
+          </Card>
+        )}
+
+        <Text style={{ ...typography.cardTitle, color: colors.textPrimary, marginBottom: spacing.md }}>Movimentações</Text>
+        {isLoading ? (
+          <View style={{ gap: spacing.sm }}>
+            {[1, 2, 3].map(i => <SkeletonBox key={i} width="100%" height={56} borderRadius={radius.md} />)}
+          </View>
+        ) : isError ? (
+          <EstadoVazio
+            compacto
+            emoji="📶"
+            titulo="Não deu para carregar as movimentações"
+            texto="Verifique sua conexão e tente de novo."
+            acao={{ rotulo: 'Tentar de novo', onPress: () => refetch() }}
+          />
+        ) : data.length === 0 ? (
+          <EstadoVazio
+            compacto
+            emoji="🧾"
+            titulo="Nenhuma movimentação registrada"
+            texto="Compras, vendas e proventos deste ativo aparecem aqui."
+          />
+        ) : (
+          <View style={{ gap: spacing.sm }}>
+            {data.map(m => (
+              <View
+                key={m.id}
+                style={{
+                  backgroundColor: colors.card, borderRadius: radius.md,
+                  borderWidth: 1, borderColor: colors.border, padding: spacing.md,
+                }}
+              >
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md }}>
+                  <Text style={{ ...typography.rowTitle, fontWeight: '700', color: colors.textPrimary }}>
+                    {TIPO_MOV_LABEL[m.tipo]} · {m.conciliacao}
+                  </Text>
+                  <Text style={{ ...typography.rowTitle, ...numeric, fontWeight: '700', color: colors.textPrimary }}>
+                    {formatCurrency(Number(m.valorTotal ?? 0))}
+                  </Text>
+                </View>
+                {m.operacaoId != null && (
+                  <Text style={{ ...typography.meta, color: colors.textSecondary, marginTop: spacing.xs }}>
+                    Operação #{m.operacaoId}
+                  </Text>
+                )}
+                <Text style={{ ...typography.meta, ...numeric, color: colors.textSecondary, marginTop: spacing.xxs }}>
+                  {formatDate(m.data)} · {Number(m.quantidade ?? 0)} x {formatCurrency(Number(m.precoUnitario ?? 0))}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+      </ScrollView>
+      <MovimentoModal ativo={ativo} visible={movimentoVisible} onClose={() => setMovimentoVisible(false)} />
+    </FolhaModal>
   );
 }
 
 export default function InvestimentosScreen() {
   const colors = useTheme();
   const tabBarSpace = useTabBarSpace();
-  const insets = useSafeAreaInsets();
   const [ativoModal, setAtivoModal] = useState<Ativo | null>(null);
   const [ativoModalVisible, setAtivoModalVisible] = useState(false);
   const [detalhe, setDetalhe] = useState<Ativo | null>(null);
@@ -336,61 +407,80 @@ export default function InvestimentosScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 12 }}>
-        <BackButton />
-        <Text style={{ color: colors.textPrimary, fontSize: 23, fontWeight: '800', letterSpacing: -0.4 }}>Investimentos</Text>
-        <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>Ativos, posição e movimentações</Text>
-      </View>
+      <CabecalhoSubTela
+        titulo="Investimentos"
+        apoio={<Text style={{ ...typography.body, color: colors.textSecondary }}>Ativos, posição e movimentações</Text>}
+      />
 
       {isLoading ? (
-        <View style={{ padding: 16, gap: 8 }}>{[1, 2, 3, 4].map(i => <SkeletonBox key={i} width="100%" height={72} />)}</View>
-      ) : isError ? (
-        <View style={{ alignItems: 'center', padding: 48 }}>
-          <Text style={{ color: colors.textSecondary }}>Erro ao carregar investimentos</Text>
-          <TouchableOpacity onPress={() => refetch()} style={{ marginTop: 8 }} accessibilityRole="button"><Text style={{ color: colors.brandFg, fontWeight: '600' }}>Tentar novamente</Text></TouchableOpacity>
+        <View style={{ paddingHorizontal: screenPadding, gap: spacing.sm }}>
+          {[1, 2, 3, 4].map(i => <SkeletonBox key={i} width="100%" height={72} borderRadius={cardRadius} />)}
         </View>
+      ) : isError ? (
+        <EstadoVazio
+          emoji="📶"
+          titulo="Não deu para carregar seus investimentos"
+          texto="Verifique sua conexão e tente de novo."
+          acao={{ rotulo: 'Tentar de novo', onPress: () => refetch() }}
+        />
       ) : (
         <FlatList
           data={data}
           keyExtractor={item => item.id.toString()}
-          contentContainerStyle={{ padding: 16, paddingBottom: tabBarSpace }}
+          contentContainerStyle={{ padding: screenPadding, paddingBottom: tabBarSpace }}
           ListHeaderComponent={(
-            <Card radius={18} style={{ marginBottom: 12 }}>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: colors.textSecondary, fontSize: 11 }}>Mercado</Text>
-                  <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '800', marginTop: 2 }}>{formatCurrency(resumo.mercado)}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: colors.textSecondary, fontSize: 11 }}>Resultado</Text>
-                  <Text numberOfLines={1} adjustsFontSizeToFit style={{ color: resumo.resultado >= 0 ? colors.success : colors.danger, fontSize: 16, fontWeight: '800', marginTop: 2 }}>{formatCurrency(resumo.resultado)}</Text>
-                </View>
+            <Card style={{ marginBottom: spacing.md }}>
+              <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                <Metrica rotulo="Mercado" valor={formatCurrency(resumo.mercado)} />
+                <Metrica
+                  rotulo="Resultado"
+                  valor={formatCurrency(resumo.resultado)}
+                  cor={resumo.resultado >= 0 ? colors.success : colors.danger}
+                />
               </View>
             </Card>
           )}
           ListEmptyComponent={(
-            <View style={{ alignItems: 'center', paddingVertical: 48 }}>
-              <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600' }}>Nenhum ativo cadastrado</Text>
-              <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4, textAlign: 'center' }}>Toque em + para cadastrar o primeiro investimento.</Text>
-            </View>
+            <EstadoVazio
+              emoji="📈"
+              titulo="Nenhum ativo cadastrado"
+              texto="Toque em + para cadastrar o primeiro investimento."
+              acao={{ rotulo: 'Cadastrar ativo', onPress: abrirNovo }}
+            />
           )}
           renderItem={({ item }) => {
             const mercado = Number(item.quantidade ?? 0) * Number(item.valorAtual ?? 0);
+            const rentabilidade = Number(item.rentabilidade ?? 0);
             return (
-              <TouchableOpacity onPress={() => setDetalhe(item)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={`Abrir investimento ${item.ticker}`}>
-                <Card radius={14} style={{ marginBottom: 8 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '800' }}>{item.ticker}</Text>
-                      <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }} numberOfLines={1}>{item.nome} · {TIPO_ATIVO_LABEL[item.tipo]}</Text>
-                    </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={{ color: colors.textPrimary, fontSize: 14, fontWeight: '800' }}>{formatCurrency(mercado)}</Text>
-                      <Text style={{ color: Number(item.rentabilidade ?? 0) >= 0 ? colors.success : colors.danger, fontSize: 11, marginTop: 2 }}>
-                        {Number(item.rentabilidade ?? 0).toFixed(2)}%
-                      </Text>
-                    </View>
+              // Card composto: sem `accessibilityLabel` curado, o nó funde os textos
+              // do card e o leitor de tela lê ticker, nome, tipo, valor e
+              // rentabilidade — o conteúdo real (DESIGN.md:169-172).
+              <TouchableOpacity
+                onPress={() => setDetalhe(item)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityHint="Abre a posição e as movimentações do ativo"
+              >
+                <Card radius={radius.lg} style={{ marginBottom: spacing.sm }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md }}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={{ ...typography.rowTitle, fontWeight: '800', color: colors.textPrimary }}>{item.ticker}</Text>
+                    <Text numberOfLines={1} style={{ ...typography.meta, color: colors.textSecondary, marginTop: spacing.xxs }}>
+                      {item.nome} · {TIPO_ATIVO_LABEL[item.tipo]}
+                    </Text>
                   </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ ...typography.body, ...numeric, fontWeight: '800', color: colors.textPrimary }}>
+                      {formatCurrency(mercado)}
+                    </Text>
+                    <Text style={{
+                      ...typography.meta, ...numeric, marginTop: spacing.xxs,
+                      color: rentabilidade >= 0 ? colors.success : colors.danger,
+                    }}>
+                      {rentabilidade.toFixed(2)}%
+                    </Text>
+                  </View>
+                </View>
                 </Card>
               </TouchableOpacity>
             );
@@ -398,14 +488,7 @@ export default function InvestimentosScreen() {
         />
       )}
 
-      <TouchableOpacity
-        onPress={abrirNovo}
-        accessibilityRole="button"
-        accessibilityLabel="Novo investimento"
-        style={{ position: 'absolute', bottom: 24, right: 16, width: 56, height: 56, borderRadius: 28, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' }}
-      >
-        <Text style={{ color: colors.brandText, fontSize: 28, lineHeight: 30 }}>+</Text>
-      </TouchableOpacity>
+      <Fab onPress={abrirNovo} accessibilityLabel="Novo investimento" />
 
       <AtivoModal ativo={ativoModal} visible={ativoModalVisible} onClose={() => setAtivoModalVisible(false)} />
       <DetalheAtivoModal

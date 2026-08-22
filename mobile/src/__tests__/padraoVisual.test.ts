@@ -72,7 +72,6 @@ const AINDA_NAO_MIGRADAS = [
   '(app)/more/carteiras.tsx',
   '(app)/more/categorias.tsx',
   '(app)/more/contas-fixas.tsx',
-  '(app)/more/investimentos.tsx',
   '(app)/more/orcamentos.tsx',
   '(app)/more/visao-financeira.tsx',
   '(app)/perfil.tsx',
