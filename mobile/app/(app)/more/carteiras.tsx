@@ -1,20 +1,40 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, FlatList, Modal, ScrollView, TextInput, ActivityIndicator } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, TouchableOpacity, FlatList, ScrollView } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import contaFinanceiraService, { contaGerenciada } from '../../../src/services/contaFinanceiraService';
 import { TIPO_MOVIMENTO_LABEL, formatCurrency, formatDateTime, parseCurrencyBR, maskCurrencyInput } from '../../../src/utils/format';
+import { camposDeErro, mensagemDeErro } from '../../../src/utils/erros';
 import { ContaFinanceira, ContaFinanceiraRequest, SubtipoContaFinanceira } from '../../../src/types';
-import { useTheme, useTabBarSpace } from '../../../src/theme';
+import {
+  useTheme, useTabBarSpace, numeric, radius, screenPadding, spacing, typography,
+} from '../../../src/theme';
+import Badge from '../../../src/components/ui/Badge';
+import CabecalhoSubTela from '../../../src/components/ui/CabecalhoSubTela';
+import Card from '../../../src/components/ui/Card';
+import Chip from '../../../src/components/ui/Chip';
+import EstadoVazio from '../../../src/components/ui/EstadoVazio';
 import Fab from '../../../src/components/ui/Fab';
-import BackButton from '../../../src/components/ui/BackButton';
+import Field from '../../../src/components/ui/Field';
+import FolhaModal from '../../../src/components/ui/FolhaModal';
+import RotuloDeGrupo from '../../../src/components/ui/RotuloDeGrupo';
 import SkeletonBox from '../../../src/components/ui/SkeletonBox';
 
 // Extrato do ledger — fonte de confiança do saldo da conta
 const SUBTIPO_LABEL: Record<SubtipoContaFinanceira, string> = {
   DINHEIRO: 'Dinheiro', CORRENTE: 'Conta corrente', POUPANCA: 'Poupança',
   PAGAMENTO: 'Conta de pagamento', COFRE: 'Cofre', CUSTODIA: 'Custódia', CARTAO: 'Cartão',
+};
+
+/** Tipos que o usuário cria à mão. Cofre, custódia e cartão nascem de outro módulo. */
+const SUBTIPOS_CRIAVEIS: ContaFinanceiraRequest['subtipo'][] = ['DINHEIRO', 'CORRENTE', 'POUPANCA', 'PAGAMENTO'];
+
+type CampoDaConta = 'nome' | 'tipo' | 'saldo';
+
+const MAPA_DE_CAMPOS: Record<string, CampoDaConta> = {
+  nome: 'nome',
+  subtipo: 'tipo',
+  saldoInicial: 'saldo',
 };
 
 function ExtratoModal({ carteira, onClose }: { carteira: ContaFinanceira | null; onClose: () => void }) {
@@ -47,108 +67,109 @@ function ExtratoModal({ carteira, onClose }: { carteira: ContaFinanceira | null;
   const reconciliacaoOk = reconciliacao?.status === 'OK';
 
   return (
-    <Modal visible={carteira != null} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: colors.bg }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700' }} numberOfLines={1}>{carteira?.nome}</Text>
-            <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>
-              Extrato · saldo {formatCurrency(Number(carteira?.saldo ?? 0))}
-            </Text>
-          </View>
-          {reconciliacao && (
-            <View
-              style={{
-                borderRadius: 999,
-                backgroundColor: reconciliacaoOk ? colors.successBg : colors.dangerBg,
-                paddingHorizontal: 10,
-                paddingVertical: 5,
-                marginRight: 10,
-              }}
-              accessible
-              accessibilityLabel={reconciliacaoOk ? 'Saldo reconciliado com o ledger' : 'Saldo divergente do ledger'}
-            >
-              <Text style={{ color: reconciliacaoOk ? colors.success : colors.danger, fontSize: 11, fontWeight: '700' }}>
-                {reconciliacaoOk ? 'OK' : 'Divergente'}
-              </Text>
-            </View>
-          )}
-          <TouchableOpacity onPress={onClose} accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }}>
-            <Text style={{ color: colors.brand, fontSize: 15, fontWeight: '600' }}>Fechar</Text>
-          </TouchableOpacity>
-        </View>
-
-        {reconciliacao && (
-          <View style={{ marginHorizontal: 16, marginTop: 12, borderRadius: 12, borderWidth: 1, borderColor: reconciliacaoOk ? colors.successBg : colors.danger, backgroundColor: reconciliacaoOk ? colors.successBg : colors.dangerBg, padding: 12 }}>
-            <Text style={{ color: reconciliacaoOk ? colors.success : colors.danger, fontSize: 13, fontWeight: '700' }}>
-              {reconciliacaoOk ? 'Saldo conferido' : 'Saldo precisa de revisão'}
-            </Text>
-            <Text style={{ color: colors.textSecondary, fontSize: 11, marginTop: 4 }}>
-              Conta: {formatCurrency(Number(reconciliacao.saldoMaterializado ?? 0))} · Ledger: {formatCurrency(Number(reconciliacao.saldoLedger ?? 0))} · Diferença: {formatCurrency(Number(reconciliacao.diferenca ?? 0))}
-            </Text>
-          </View>
+    <FolhaModal
+      visible={carteira != null}
+      titulo={carteira?.nome ?? 'Extrato'}
+      rotuloFechar="Fechar"
+      onFechar={onClose}
+    >
+      <View style={{
+        flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+        paddingHorizontal: screenPadding, paddingTop: spacing.md,
+      }}>
+        <Text style={{ ...typography.meta, ...numeric, color: colors.textSecondary, flex: 1 }}>
+          Extrato · saldo {formatCurrency(Number(carteira?.saldo ?? 0))}
+        </Text>
+        {!!reconciliacao && (
+          <Badge tone={reconciliacaoOk ? 'success' : 'danger'}>
+            {reconciliacaoOk ? 'OK' : 'Divergente'}
+          </Badge>
         )}
-
-        <FlatList
-          data={movimentos}
-          keyExtractor={m => m.id.toString()}
-          contentContainerStyle={{ padding: 16, paddingBottom: tabBarSpace }}
-          onEndReached={() => { if (hasNextPage && !isFetchingNextPage) fetchNextPage(); }}
-          onEndReachedThreshold={0.4}
-          ListFooterComponent={isFetchingNextPage ? (
-            <View style={{ paddingVertical: 16 }}><ActivityIndicator color={colors.brand} /></View>
-          ) : null}
-          ListEmptyComponent={isLoading ? (
-            <View style={{ gap: 8 }}>
-              {[1, 2, 3, 4, 5].map(i => <SkeletonBox key={i} width="100%" height={64} />)}
-            </View>
-          ) : isError ? (
-            <View style={{ alignItems: 'center', padding: 48 }}>
-              <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600' }}>Erro ao carregar extrato</Text>
-              <TouchableOpacity onPress={() => refetch()} accessibilityRole="button" style={{ marginTop: 8, minHeight: 44, justifyContent: 'center' }}>
-                <Text style={{ color: colors.brand, fontWeight: '600' }}>Tentar novamente</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={{ alignItems: 'center', padding: 48 }}>
-              <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600' }}>Sem movimentos ainda</Text>
-              <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4, textAlign: 'center' }}>
-                Transações e ajustes nesta conta aparecem aqui.
-              </Text>
-            </View>
-          )}
-          renderItem={({ item: m }) => {
-            const credita = Number(m.valorAssinado) >= 0;
-            return (
-              <View style={{ backgroundColor: colors.card, borderRadius: 12, borderWidth: 1, borderColor: colors.border, padding: 12, marginBottom: 8 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
-                  <Text style={{ color: colors.textPrimary, fontSize: 14, fontWeight: '600', flex: 1 }} numberOfLines={1}>
-                    {m.descricao || TIPO_MOVIMENTO_LABEL[m.tipo]}
-                  </Text>
-                  <Text style={{ color: credita ? colors.success : colors.danger, fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
-                    {credita ? '+' : '−'} {formatCurrency(Math.abs(Number(m.valorAssinado)))}
-                  </Text>
-                </View>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8, marginTop: 4 }}>
-                  <Text style={{ color: colors.textSecondary, fontSize: 11 }}>
-                    {TIPO_MOVIMENTO_LABEL[m.tipo]} · {formatDateTime(m.dataMovimento)}
-                  </Text>
-                  <Text style={{ color: colors.textSecondary, fontSize: 11, fontVariant: ['tabular-nums'] }}>
-                    Saldo: {formatCurrency(Number(m.saldoResultante))}
-                  </Text>
-                </View>
-              </View>
-            );
-          }}
-        />
       </View>
-    </Modal>
+
+      {/* O saldo da conta é materializado; o ledger é a verdade. Quando divergem,
+          a conta precisa de revisão — e o usuário precisa ver os dois números. */}
+      {!!reconciliacao && (
+        <View style={{
+          marginHorizontal: screenPadding, marginTop: spacing.md,
+          borderRadius: radius.md, borderWidth: 1,
+          borderColor: reconciliacaoOk ? colors.successBg : colors.danger,
+          backgroundColor: reconciliacaoOk ? colors.successBg : colors.dangerBg,
+          padding: spacing.md,
+        }}>
+          <Text style={{ ...typography.rowTitle, fontWeight: '700', color: reconciliacaoOk ? colors.success : colors.danger }}>
+            {reconciliacaoOk ? 'Saldo conferido' : 'Saldo precisa de revisão'}
+          </Text>
+          <Text style={{ ...typography.meta, ...numeric, color: colors.textSecondary, marginTop: spacing.xs }}>
+            Conta: {formatCurrency(Number(reconciliacao.saldoMaterializado ?? 0))} · Ledger: {formatCurrency(Number(reconciliacao.saldoLedger ?? 0))} · Diferença: {formatCurrency(Number(reconciliacao.diferenca ?? 0))}
+          </Text>
+        </View>
+      )}
+
+      <FlatList
+        data={movimentos}
+        keyExtractor={m => m.id.toString()}
+        contentContainerStyle={{ padding: screenPadding, paddingBottom: tabBarSpace }}
+        onEndReached={() => { if (hasNextPage && !isFetchingNextPage) fetchNextPage(); }}
+        onEndReachedThreshold={0.4}
+        ListFooterComponent={isFetchingNextPage ? (
+          <View style={{ paddingVertical: spacing.md }}>
+            <SkeletonBox width="100%" height={64} borderRadius={radius.md} />
+          </View>
+        ) : null}
+        ListEmptyComponent={isLoading ? (
+          <View style={{ gap: spacing.sm }}>
+            {[1, 2, 3, 4, 5].map(i => <SkeletonBox key={i} width="100%" height={64} borderRadius={radius.md} />)}
+          </View>
+        ) : isError ? (
+          <EstadoVazio
+            emoji="📶"
+            titulo="Não deu para carregar o extrato"
+            texto="Verifique sua conexão e tente de novo."
+            acao={{ rotulo: 'Tentar de novo', onPress: () => refetch() }}
+          />
+        ) : (
+          <EstadoVazio
+            emoji="🧾"
+            titulo="Sem movimentos ainda"
+            texto="Transações e ajustes nesta conta aparecem aqui."
+          />
+        )}
+        renderItem={({ item: m }) => {
+          const credita = Number(m.valorAssinado) >= 0;
+          return (
+            <View style={{
+              backgroundColor: colors.card, borderRadius: radius.md,
+              borderWidth: 1, borderColor: colors.border,
+              padding: spacing.md, marginBottom: spacing.sm,
+            }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm }}>
+                <Text numberOfLines={1} style={{ ...typography.body, fontWeight: '600', color: colors.textPrimary, flex: 1 }}>
+                  {m.descricao || TIPO_MOVIMENTO_LABEL[m.tipo]}
+                </Text>
+                <Text style={{ ...typography.body, ...numeric, fontWeight: '700', color: credita ? colors.success : colors.danger }}>
+                  {credita ? '+' : '−'} {formatCurrency(Math.abs(Number(m.valorAssinado)))}
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm, marginTop: spacing.xs }}>
+                <Text style={{ ...typography.meta, color: colors.textSecondary }}>
+                  {TIPO_MOVIMENTO_LABEL[m.tipo]} · {formatDateTime(m.dataMovimento)}
+                </Text>
+                <Text style={{ ...typography.meta, ...numeric, color: colors.textSecondary }}>
+                  Saldo: {formatCurrency(Number(m.saldoResultante))}
+                </Text>
+              </View>
+            </View>
+          );
+        }}
+      />
+    </FolhaModal>
   );
 }
 
 export default function CarteirasScreen() {
   const colors = useTheme();
-  const insets = useSafeAreaInsets();
+  const tabBarSpace = useTabBarSpace();
   const queryClient = useQueryClient();
   const [modalVisible, setModalVisible] = useState(false);
   const [extratoDe, setExtratoDe] = useState<ContaFinanceira | null>(null);
@@ -158,9 +179,8 @@ export default function CarteirasScreen() {
   const [nome, setNome] = useState('');
   const [tipo, setTipo] = useState<ContaFinanceiraRequest['subtipo'] | null>('DINHEIRO');
   const [saldo, setSaldo] = useState('');
-  const [nomeError, setNomeError] = useState<string | null>(null);
-  const [tipoError, setTipoError] = useState<string | null>(null);
-  const [saldoError, setSaldoError] = useState<string | null>(null);
+  const [erros, setErros] = useState<Partial<Record<CampoDaConta, string>>>({});
+  const [erroGeral, setErroGeral] = useState<string | null>(null);
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['contas-financeiras'],
@@ -181,94 +201,115 @@ export default function CarteirasScreen() {
     }
   }, [contaId, data?.content]);
 
+  const fecharFormulario = () => {
+    setModalVisible(false);
+    setNome(''); setSaldo(''); setTipo('DINHEIRO');
+    setErros({}); setErroGeral(null);
+  };
+
   const criarMutation = useMutation({
     mutationFn: (req: ContaFinanceiraRequest) => contaFinanceiraService.criar(req),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contas-financeiras'] });
-      setModalVisible(false);
-      setNome(''); setSaldo(''); setTipo('DINHEIRO');
+      fecharFormulario();
     },
-    onError: (err: any) => {
-      setNomeError(err?.userMessage ?? 'Erro ao criar conta.');
+    onError: (err: unknown) => {
+      // Erro de campo mora no campo; o resto vai para a faixa geral. Antes tudo
+      // caía em `nomeError`, então "saldo inválido" aparecia sob o nome.
+      setErros(camposDeErro(err, MAPA_DE_CAMPOS));
+      setErroGeral(mensagemDeErro(err, 'Erro ao criar conta.'));
     },
   });
 
-  const handleSalvar = async () => {
-    setNomeError(null); setTipoError(null); setSaldoError(null);
-    let hasError = false;
-    if (!nome.trim()) { setNomeError('Nome obrigatório.'); hasError = true; }
-    if (!tipo) { setTipoError('Tipo obrigatório.'); hasError = true; }
+  const handleSalvar = () => {
+    setErros({}); setErroGeral(null);
+    const local: Partial<Record<CampoDaConta, string>> = {};
+    if (!nome.trim()) local.nome = 'Nome obrigatório.';
+    if (!tipo) local.tipo = 'Tipo obrigatório.';
     const v = parseCurrencyBR(saldo || '0');
-    if (isNaN(v) || v < 0) { setSaldoError('Saldo deve ser >= 0.'); hasError = true; }
-    if (hasError) return;
-    const req: ContaFinanceiraRequest = {
+    if (isNaN(v) || v < 0) local.saldo = 'Saldo deve ser maior ou igual a zero.';
+    if (Object.keys(local).length > 0) { setErros(local); return; }
+
+    criarMutation.mutate({
       nome: nome.trim(), natureza: 'ATIVO', subtipo: tipo!, liquidez: 'IMEDIATA',
       moeda: 'BRL', saldoInicial: Number(v),
-    };
-    try {
-      await criarMutation.mutateAsync(req);
-    } catch (err: any) {
-      setNomeError(err?.userMessage ?? 'Erro ao criar conta.');
-    }
+    });
   };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 12 }}>
-        <BackButton />
-        <Text style={{ color: colors.textPrimary, fontSize: 23, fontWeight: '800', letterSpacing: -0.4 }}>Contas</Text>
-        <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>Onde seu dinheiro está guardado</Text>
-      </View>
+      <CabecalhoSubTela
+        titulo="Contas"
+        apoio={<Text style={{ ...typography.body, color: colors.textSecondary }}>Onde seu dinheiro está guardado</Text>}
+      />
 
       {isLoading ? (
-        <View style={{ padding: 16 }}>
-          {[1,2,3].map(i => <SkeletonBox key={i} width="100%" height={64} />)}
+        <View style={{ paddingHorizontal: screenPadding, gap: spacing.sm }}>
+          {[1, 2, 3].map(i => <SkeletonBox key={i} width="100%" height={96} borderRadius={radius.lg} />)}
         </View>
       ) : isError ? (
-        <View style={{ alignItems: 'center', padding: 48 }}>
-          <Text style={{ color: colors.textSecondary }}>Erro ao carregar contas</Text>
-          <TouchableOpacity onPress={() => refetch()} style={{ marginTop: 8 }}>
-            <Text style={{ color: colors.brand }}>Tentar novamente</Text>
-          </TouchableOpacity>
-        </View>
+        <EstadoVazio
+          emoji="📶"
+          titulo="Não deu para carregar suas contas"
+          texto="Verifique sua conexão e tente de novo."
+          acao={{ rotulo: 'Tentar de novo', onPress: () => refetch() }}
+        />
       ) : (
         <FlatList
           data={contasOrdenadas}
           keyExtractor={item => item.id.toString()}
-          renderItem={({ item: c, index }) => (
-            <>
-            {(index === 0 || contasOrdenadas[index - 1]?.natureza !== c.natureza) && (
-              <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '700', marginHorizontal: 16, marginTop: index === 0 ? 4 : 12, marginBottom: 8 }}>
-                {c.natureza === 'ATIVO' ? 'Ativos' : 'Passivos'}
-              </Text>
-            )}
-            <TouchableOpacity
-              onPress={() => setExtratoDe(c)}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityLabel={`Ver extrato da conta ${c.nome}`}
-              style={{ backgroundColor: colors.card, borderRadius: 12, borderWidth: 1, borderColor: colors.border, padding: 14, marginBottom: 8, marginHorizontal: 16 }}
-            >
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600' }}>{c.nome}</Text>
-                  <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
-                    {SUBTIPO_LABEL[c.subtipo]} · {c.liquidez} · {c.estadoConciliacao}
-                  </Text>
-                </View>
-                <Text style={{ color: colors.textSecondary, fontSize: 12 }}>Extrato ›</Text>
-              </View>
-              <Text style={{ color: colors.textPrimary, fontSize: 18, fontWeight: '700', marginTop: 8 }}>{formatCurrency(Number(c.saldo ?? 0))}</Text>
-              {c.banco && <Text style={{ color: colors.textMuted, fontSize: 11, marginTop: 6 }}>{c.banco}</Text>}
-              {contaGerenciada(c) && <Text style={{ color: colors.brandFg, fontSize: 11, marginTop: 6 }}>Somente leitura · gerenciada no módulo de origem</Text>}
-            </TouchableOpacity>
-            </>
+          contentContainerStyle={{ paddingHorizontal: screenPadding, paddingBottom: tabBarSpace }}
+          ListEmptyComponent={(
+            <EstadoVazio
+              emoji="🏦"
+              titulo="Nenhuma conta cadastrada"
+              texto="Cadastre onde seu dinheiro fica guardado para acompanhar o saldo."
+              acao={{ rotulo: 'Criar conta', onPress: () => setModalVisible(true) }}
+            />
           )}
-          ListEmptyComponent={() => (
-            <View style={{ alignItems: 'center', padding: 48 }}>
-              <Text style={{ color: colors.textSecondary }}>Nenhuma conta encontrada</Text>
-            </View>
-          )}
+          renderItem={({ item: c, index }) => {
+            const primeiroDaNatureza = index === 0 || contasOrdenadas[index - 1]?.natureza !== c.natureza;
+            return (
+              <>
+                {primeiroDaNatureza && (
+                  <RotuloDeGrupo primeiro={index === 0}>
+                    {c.natureza === 'ATIVO' ? 'Ativos' : 'Passivos'}
+                  </RotuloDeGrupo>
+                )}
+                {/* Card composto: sem rótulo curado, o leitor de tela lê nome,
+                    subtipo, saldo e banco — antes só "Ver extrato da conta X". */}
+                <TouchableOpacity
+                  onPress={() => setExtratoDe(c)}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityHint="Abre o extrato da conta"
+                >
+                  <Card radius={radius.md} style={{ marginBottom: spacing.sm }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.sm }}>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text numberOfLines={1} style={{ ...typography.rowTitle, color: colors.textPrimary }}>{c.nome}</Text>
+                        <Text numberOfLines={1} style={{ ...typography.meta, color: colors.textSecondary }}>
+                          {SUBTIPO_LABEL[c.subtipo]} · {c.liquidez} · {c.estadoConciliacao}
+                        </Text>
+                      </View>
+                      <Text style={{ ...typography.meta, color: colors.textSecondary }}>Extrato ›</Text>
+                    </View>
+                    <Text style={{ ...typography.section, ...numeric, color: colors.textPrimary, marginTop: spacing.sm }}>
+                      {formatCurrency(Number(c.saldo ?? 0))}
+                    </Text>
+                    {!!c.banco && (
+                      <Text style={{ ...typography.meta, color: colors.textMuted, marginTop: spacing.xs }}>{c.banco}</Text>
+                    )}
+                    {contaGerenciada(c) && (
+                      <Text style={{ ...typography.meta, color: colors.brandFg, marginTop: spacing.xs }}>
+                        Somente leitura · gerenciada no módulo de origem
+                      </Text>
+                    )}
+                  </Card>
+                </TouchableOpacity>
+              </>
+            );
+          }}
         />
       )}
 
@@ -276,38 +317,49 @@ export default function CarteirasScreen() {
 
       <ExtratoModal carteira={extratoDe} onClose={() => setExtratoDe(null)} />
 
-      <Modal visible={modalVisible} animationType="slide" presentationStyle="pageSheet">
-        <View style={{ flex: 1, backgroundColor: colors.bg }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-            <TouchableOpacity onPress={() => { setModalVisible(false); setNome(''); setSaldo(''); setTipo('DINHEIRO'); setNomeError(null); setTipoError(null); setSaldoError(null); }}>
-              <Text style={{ color: colors.brand, fontSize: 15 }}>Cancelar</Text>
-            </TouchableOpacity>
-            <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600' }}>Nova Conta</Text>
-            <TouchableOpacity onPress={handleSalvar} disabled={criarMutation.status === 'pending'}>
-              {criarMutation.status === 'pending' ? <ActivityIndicator color={colors.brand} size="small" /> : <Text style={{ color: colors.brand, fontSize: 15, fontWeight: '600' }}>Salvar</Text>}
-            </TouchableOpacity>
+      <FolhaModal
+        visible={modalVisible}
+        titulo="Nova Conta"
+        onFechar={fecharFormulario}
+        acao={{ rotulo: 'Salvar', onPress: handleSalvar, carregando: criarMutation.status === 'pending' }}
+      >
+        <ScrollView contentContainerStyle={{ padding: screenPadding }} keyboardShouldPersistTaps="handled">
+          <Field
+            label="Nome"
+            value={nome}
+            onChangeText={setNome}
+            placeholder="Ex.: Conta corrente"
+            error={erros.nome}
+          />
+
+          <RotuloDeGrupo>Tipo</RotuloDeGrupo>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md }}>
+            {SUBTIPOS_CRIAVEIS.map(t => (
+              <Chip key={t} label={SUBTIPO_LABEL[t]} selected={tipo === t} onPress={() => setTipo(t)} />
+            ))}
           </View>
-          <ScrollView contentContainerStyle={{ padding: 16 }}>
-            <Text style={{ color: colors.textSecondary, fontSize: 9, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Nome</Text>
-            <TextInput accessibilityLabel="Nome da carteira" value={nome} onChangeText={setNome} placeholderTextColor={colors.textMuted} style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, color: colors.textPrimary, fontSize: 15, marginBottom: 8 }} />
-            {nomeError && <Text style={{ color: colors.danger, marginBottom: 8 }}>{nomeError}</Text>}
+          {!!erros.tipo && (
+            <Text accessibilityRole="alert" style={{ ...typography.meta, color: colors.danger, marginBottom: spacing.sm }}>
+              {erros.tipo}
+            </Text>
+          )}
 
-            <Text style={{ color: colors.textSecondary, fontSize: 9, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Tipo</Text>
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
-              {(['DINHEIRO','CORRENTE','POUPANCA','PAGAMENTO'] as ContaFinanceiraRequest['subtipo'][]).map(t => (
-                <TouchableOpacity key={t} onPress={() => setTipo(t)} style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, backgroundColor: tipo === t ? colors.brand + '26' : colors.card, borderWidth: 1, borderColor: tipo === t ? colors.brand : colors.border }}>
-                  <Text style={{ color: tipo === t ? colors.brand : colors.textSecondary }}>{SUBTIPO_LABEL[t]}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {tipoError && <Text style={{ color: colors.danger, marginBottom: 8 }}>{tipoError}</Text>}
+          <Field
+            label="Saldo inicial"
+            value={saldo}
+            onChangeText={(t) => setSaldo(maskCurrencyInput(t))}
+            keyboardType="number-pad"
+            placeholder="0,00"
+            error={erros.saldo}
+          />
 
-            <Text style={{ color: colors.textSecondary, fontSize: 9, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Saldo inicial</Text>
-            <TextInput accessibilityLabel="Saldo inicial" value={saldo} onChangeText={(t) => setSaldo(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" placeholderTextColor={colors.textMuted} style={{ backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border, borderRadius: 8, padding: 12, color: colors.textPrimary, fontSize: 15, marginBottom: 8 }} />
-            {saldoError && <Text style={{ color: colors.danger, marginBottom: 8 }}>{saldoError}</Text>}
-          </ScrollView>
-        </View>
-      </Modal>
+          {!!erroGeral && (
+            <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={{ ...typography.meta, color: colors.danger }}>
+              {erroGeral}
+            </Text>
+          )}
+        </ScrollView>
+      </FolhaModal>
     </View>
   );
 }

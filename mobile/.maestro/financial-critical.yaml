@@ -280,17 +280,21 @@ tags:
 - tapOn:
     point: "89%,92%"
 - tapOn: "Contas"
+# Cards de conta são compostos: regex parcial, nunca igualdade total
 - extendedWaitUntil:
-    visible: "Cofre: Meta Smoke"
+    visible: ".*Cofre: Meta Smoke.*"
     timeout: 15000
 - assertVisible: ".*50,00"
 
 # Extrato confiavel da conta principal
-- tapOn: "Ver extrato da conta Conta Principal"
+# O card da conta é composto: o rótulo do nó funde nome, subtipo, saldo e banco,
+# e o Maestro casa regex por igualdade total. Antes havia um rótulo curado, que
+# escondia saldo e subtipo do leitor de tela.
+- tapOn: ".*Conta Principal.*"
 - extendedWaitUntil:
-    visible: "Saldo reconciliado com o ledger"
+    visible: "Saldo conferido"
     timeout: 15000
-- assertVisible: "Saldo conferido"
+- assertVisible: ".*Ledger.*"
 - takeScreenshot: "05-extrato-reconciliado"
 - tapOn: "Fechar"
 
