@@ -1,13 +1,17 @@
 import React from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
 import api from '../../../src/services/api';
 import metricasService from '../../../src/services/metricasService';
 import { MetricaId, ProjecaoResponse } from '../../../src/types';
-import { useTheme, useTabBarSpace } from '../../../src/theme';
+import {
+  useTheme, useTabBarSpace, numeric, radius, screenPadding, spacing, typography,
+} from '../../../src/theme';
+import CabecalhoSubTela from '../../../src/components/ui/CabecalhoSubTela';
 import Card from '../../../src/components/ui/Card';
+import EstadoVazio from '../../../src/components/ui/EstadoVazio';
+import ListRow from '../../../src/components/ui/ListRow';
+import SkeletonBox from '../../../src/components/ui/SkeletonBox';
 import ComposicaoMetricaModal from '../../../src/components/ComposicaoMetricaModal';
 import { formatCurrency } from '../../../src/utils/format';
 
@@ -24,14 +28,14 @@ const DESCRICOES: Record<string, string> = {
   VARIACAO_PATRIMONIAL: 'Diferença de patrimônio no mês, decomposta',
 };
 
+const dataCurta = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString('pt-BR');
+
 // Visão financeira (PR-F3-06): as 9 métricas oficiais vindas SOMENTE de
 // /v1/metricas, cada uma com drill de composição; projeção mantém endpoint
 // próprio.
 export default function VisaoFinanceira() {
   const colors = useTheme();
   const tabBarSpace = useTabBarSpace();
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
   const [metricaSelecionada, setMetricaSelecionada] = React.useState<MetricaId | null>(null);
 
   const metricasQuery = useQuery({ queryKey: ['metricas'], queryFn: () => metricasService.obter() });
@@ -54,10 +58,12 @@ export default function VisaoFinanceira() {
     ['VARIACAO_PATRIMONIAL', 'Variação patrimonial', m.variacaoPatrimonial.total],
   ] : [];
 
+  const projecao = projecaoQuery.data?.meses ?? [];
+
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.bg }}
-      contentContainerStyle={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: tabBarSpace }}
+      contentContainerStyle={{ paddingBottom: tabBarSpace }}
       refreshControl={
         <RefreshControl
           refreshing={metricasQuery.isRefetching || projecaoQuery.isRefetching}
@@ -66,79 +72,129 @@ export default function VisaoFinanceira() {
         />
       }
     >
-      <TouchableOpacity onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Voltar" style={{ marginBottom: 8, minHeight: 44, justifyContent: 'center' }}>
-        <Text style={{ color: colors.brandFg, fontSize: 15 }}>‹ Voltar</Text>
-      </TouchableOpacity>
-      <Text style={{ color: colors.textPrimary, fontSize: 23, fontWeight: '800', letterSpacing: -0.4 }}>Visão financeira</Text>
-      <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4, marginBottom: 16 }}>
-        Métricas oficiais — toque para ver a composição
-      </Text>
+      <CabecalhoSubTela
+        titulo="Visão financeira"
+        apoio={
+          <Text style={{ ...typography.body, color: colors.textSecondary }}>
+            Métricas oficiais — toque para ver a composição
+          </Text>
+        }
+      />
 
-      {metricasQuery.isLoading ? (
-        <ActivityIndicator color={colors.brand} style={{ marginTop: 48 }} />
-      ) : metricasQuery.isError ? (
-        <TouchableOpacity onPress={() => metricasQuery.refetch()} style={{ alignItems: 'center', padding: 48 }} accessibilityRole="button">
-          <Text style={{ color: colors.brandFg, fontWeight: '700' }}>Tentar novamente</Text>
-        </TouchableOpacity>
-      ) : (
-        <View style={{ gap: 8 }}>
-          {metricas.map(([id, label, valor]) => (
-            <TouchableOpacity
-              key={id}
-              onPress={() => setMetricaSelecionada(id)}
-              accessibilityRole="button"
-              accessibilityLabel={`${label}: ${formatCurrency(Number(valor))}. Ver composição`}
-            >
-              <Card padded radius={16} style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <View style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
-                  <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600' }}>{label}</Text>
-                  <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>{DESCRICOES[id]}</Text>
-                </View>
-                <Text numberOfLines={1} style={{ color: Number(valor) < 0 ? colors.danger : colors.textPrimary, fontSize: 15, fontWeight: '800', fontVariant: ['tabular-nums'] }}>
-                  {formatCurrency(Number(valor))}
-                </Text>
-              </Card>
-            </TouchableOpacity>
-          ))}
-
-          {m && (
-            <Card padded radius={16}>
-              <Text style={{ color: colors.textSecondary, fontSize: 12 }}>
-                Referência {new Date(`${m.dataReferencia}T12:00:00`).toLocaleDateString('pt-BR')} · Comprometido até {new Date(`${m.horizonteComprometido}T12:00:00`).toLocaleDateString('pt-BR')}
-              </Text>
+      <View style={{ paddingHorizontal: screenPadding }}>
+        {metricasQuery.isLoading ? (
+          <View style={{ gap: spacing.sm }}>
+            {[1, 2, 3, 4, 5].map(i => <SkeletonBox key={i} width="100%" height={64} borderRadius={radius.lg} />)}
+          </View>
+        ) : metricasQuery.isError ? (
+          <EstadoVazio
+            emoji="📶"
+            titulo="Não deu para carregar as métricas"
+            texto="Verifique sua conexão e tente de novo."
+            acao={{ rotulo: 'Tentar de novo', onPress: () => metricasQuery.refetch() }}
+          />
+        ) : (
+          <>
+            {/* Linhas num card único, não nove cards soltos: o rótulo curado que
+                havia aqui apagava a descrição da métrica do leitor de tela. */}
+            <Card padded radius={radius.xl}>
+              {metricas.map(([id, label, valor], i, arr) => (
+                <ListRow
+                  key={id}
+                  title={label}
+                  subtitle={DESCRICOES[id]}
+                  value={formatCurrency(Number(valor))}
+                  valueTone={Number(valor) < 0 ? 'danger' : undefined}
+                  divider={i < arr.length - 1}
+                  onPress={() => setMetricaSelecionada(id)}
+                  dica="Abre a composição da métrica"
+                />
+              ))}
             </Card>
-          )}
-        </View>
-      )}
 
-      {projecaoQuery.data && projecaoQuery.data.meses && projecaoQuery.data.meses.length > 0 && (
-        <View style={{ marginTop: 24 }}>
-          <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700', marginBottom: 10 }}>Projeção de caixa</Text>
-          <Card padded radius={20}>
-            {projecaoQuery.data.meses.map((mes, i, arr) => (
-              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: i < arr.length - 1 ? 1 : 0, borderBottomColor: colors.border }}>
-                <Text style={{ color: i === 0 ? colors.brandFg : colors.textSecondary, fontSize: 13, fontWeight: '600', width: 44 }}>{mes.periodo}</Text>
+            {!!m && (
+              <Text style={{ ...typography.meta, color: colors.textSecondary, marginTop: spacing.md }}>
+                Referência {dataCurta(m.dataReferencia)} · Comprometido até {dataCurta(m.horizonteComprometido)}
+              </Text>
+            )}
+          </>
+        )}
+
+        <Text style={{ ...typography.cardTitle, color: colors.textPrimary, marginTop: spacing.xxl, marginBottom: spacing.md }}>
+          Projeção de caixa
+        </Text>
+        {projecaoQuery.isLoading ? (
+          <SkeletonBox width="100%" height={180} borderRadius={radius.xl} />
+        ) : projecaoQuery.isError ? (
+          // Antes a seção simplesmente sumia quando a projeção falhava: o usuário
+          // não distinguia "não há projeção" de "não carregou".
+          <EstadoVazio
+            compacto
+            emoji="📶"
+            titulo="Não deu para carregar a projeção"
+            texto="Verifique sua conexão e tente de novo."
+            acao={{ rotulo: 'Tentar de novo', onPress: () => projecaoQuery.refetch() }}
+          />
+        ) : projecao.length === 0 ? (
+          <EstadoVazio
+            compacto
+            emoji="🔮"
+            titulo="Sem projeção para os próximos meses"
+            texto="Cadastre recorrências e parcelas para o app projetar o caixa."
+          />
+        ) : (
+          <Card padded radius={radius.xl}>
+            {projecao.map((mes, i, arr) => (
+              <View
+                key={mes.periodo}
+                style={{
+                  flexDirection: 'row', alignItems: 'center',
+                  paddingVertical: spacing.md,
+                  borderBottomWidth: i < arr.length - 1 ? 1 : 0,
+                  borderBottomColor: colors.border,
+                }}
+              >
+                {/* O primeiro mês é o corrente: fica em cor de marca. */}
+                <Text style={{
+                  ...typography.meta, fontWeight: '600', width: 44,
+                  color: i === 0 ? colors.brandFg : colors.textSecondary,
+                }}>
+                  {mes.periodo}
+                </Text>
                 <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={{ color: colors.textSecondary, fontSize: 11 }}>Entradas</Text>
-                    <Text style={{ color: colors.success, fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{formatCurrency(mes.totalEntradas ?? 0)}</Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}>
-                    <Text style={{ color: colors.textSecondary, fontSize: 11 }}>Saídas</Text>
-                    <Text style={{ color: colors.danger, fontSize: 12, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{formatCurrency(mes.totalSaidas)}</Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}>
-                    <Text style={{ color: colors.textSecondary, fontSize: 11 }}>Saldo final</Text>
-                    <Text style={{ color: mes.saldoFinal >= 0 ? colors.success : colors.danger, fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{formatCurrency(mes.saldoFinal)}</Text>
-                  </View>
+                  <LinhaDaProjecao rotulo="Entradas" valor={mes.totalEntradas ?? 0} cor={colors.success} />
+                  <LinhaDaProjecao rotulo="Saídas" valor={mes.totalSaidas} cor={colors.danger} />
+                  <LinhaDaProjecao
+                    rotulo="Saldo final"
+                    valor={mes.saldoFinal}
+                    cor={mes.saldoFinal >= 0 ? colors.success : colors.danger}
+                    forte
+                  />
                 </View>
               </View>
             ))}
           </Card>
-        </View>
-      )}
+        )}
+      </View>
 
       <ComposicaoMetricaModal metrica={metricaSelecionada} onClose={() => setMetricaSelecionada(null)} />
     </ScrollView>
   );
 }
+
+const LinhaDaProjecao = ({ rotulo, valor, cor, forte = false }: {
+  rotulo: string;
+  valor: number;
+  cor: string;
+  forte?: boolean;
+}) => {
+  const colors = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm, marginTop: spacing.xxs }}>
+      <Text style={{ ...typography.meta, color: colors.textSecondary }}>{rotulo}</Text>
+      <Text style={{ ...typography.meta, ...numeric, fontWeight: forte ? '700' : '600', color: cor }}>
+        {formatCurrency(valor)}
+      </Text>
+    </View>
+  );
+};
