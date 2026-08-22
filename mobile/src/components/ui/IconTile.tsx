@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleProp, ViewStyle } from 'react-native';
-import { useTheme } from '../../theme';
+import { useTheme, radius } from '../../theme';
 
 export type TileTone = 'brand' | 'success' | 'danger' | 'warning' | 'info' | 'neutral';
 
@@ -30,7 +30,7 @@ export default function IconTile({ children, tone = 'brand', size = 40, style }:
         {
           width: size,
           height: size,
-          borderRadius: 12,
+          borderRadius: radius.md,
           backgroundColor: t.bg,
           alignItems: 'center',
           justifyContent: 'center',
@@ -40,6 +40,8 @@ export default function IconTile({ children, tone = 'brand', size = 40, style }:
       ]}
     >
       {typeof children === 'string' ? (
+        // O corpo do emoji é proporcional ao tile, não um token: o tile é
+        // parametrizável por `size` e a escala tem de acompanhar.
         <Text style={{ color: t.fg, fontSize: Math.round(size * 0.45), lineHeight: Math.round(size * 0.55) }}>
           {children}
         </Text>

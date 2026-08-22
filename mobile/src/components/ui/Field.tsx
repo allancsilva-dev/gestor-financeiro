@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TextInput, TextInputProps } from 'react-native';
-import { useTheme } from '../../theme';
+import { useTheme, radius, spacing, typography } from '../../theme';
 
 interface FieldProps extends TextInputProps {
   label: string;
@@ -13,12 +13,19 @@ interface FieldProps extends TextInputProps {
   ref?: React.Ref<TextInput>;
 }
 
-// Campo com label-eyebrow uppercase (assinatura visual "E-MAIL" / "VALOR") + erro
+/**
+ * Campo de formulário: rótulo, entrada e erro.
+ *
+ * O rótulo era um eyebrow em CAIXA ALTA de 10pt com `letterSpacing` — abaixo do
+ * piso de 12 da escala e com a mesma assinatura que `DESIGN.md` já rejeita nos
+ * botões. Agora é `typography.meta` em caixa normal: o campo mais repetido do
+ * app não é o lugar de gritar.
+ */
 export default function Field({ label, error, style, ref, ...rest }: FieldProps) {
   const colors = useTheme();
   return (
-    <View style={{ marginBottom: 16 }}>
-      <Text style={{ color: colors.textSecondary, fontSize: 10, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>
+    <View style={{ marginBottom: spacing.lg }}>
+      <Text style={{ ...typography.meta, color: colors.textSecondary, marginBottom: spacing.xs + 2 }}>
         {label}
       </Text>
       <TextInput
@@ -31,17 +38,21 @@ export default function Field({ label, error, style, ref, ...rest }: FieldProps)
             backgroundColor: colors.fieldBg,
             borderWidth: 1,
             borderColor: error ? colors.danger : colors.border,
-            borderRadius: 12,
-            padding: 12,
+            borderRadius: radius.md,
+            padding: spacing.md,
             color: colors.textPrimary,
-            fontSize: 15,
+            ...typography.input,
           },
           style,
         ]}
         {...rest}
       />
       {error ? (
-        <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={{ color: colors.danger, fontSize: 12, marginTop: 6 }}>
+        <Text
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          style={{ ...typography.meta, color: colors.danger, marginTop: spacing.xs + 2 }}
+        >
           {error}
         </Text>
       ) : null}

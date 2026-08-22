@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text, TouchableOpacity, StyleProp, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useTheme, useTabBarSpace } from '../../theme';
+import { useTheme, useTabBarSpace, fabSize, radius, shadow, spacing } from '../../theme';
 
 interface FabProps {
   onPress: () => void;
@@ -25,13 +25,10 @@ export default function Fab({ onPress, accessibilityLabel, style }: FabProps) {
       style={[
         {
           position: 'absolute',
-          right: 16,
+          right: spacing.lg,
           bottom: tabBarSpace,
           shadowColor: colors.fabGlow,
-          shadowOpacity: 0.5,
-          shadowRadius: 12,
-          shadowOffset: { width: 0, height: 6 },
-          elevation: 8,
+          ...shadow.glow,
         },
         style,
       ]}
@@ -40,9 +37,16 @@ export default function Fab({ onPress, accessibilityLabel, style }: FabProps) {
         colors={[colors.fabFrom, colors.fabTo]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={{ width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' }}
+        style={{
+          width: fabSize,
+          height: fabSize,
+          borderRadius: radius.pill,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
       >
-        <Text style={{ color: '#ffffff', fontSize: 28, lineHeight: 32, fontWeight: '400' }}>+</Text>
+        {/* O "+" é geometria do botão, não um papel da escala tipográfica */}
+        <Text style={{ color: colors.brandText, fontSize: 28, lineHeight: 32, fontWeight: '400' }}>+</Text>
       </LinearGradient>
     </TouchableOpacity>
   );

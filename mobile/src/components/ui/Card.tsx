@@ -1,14 +1,16 @@
 import React from 'react';
 import { View, ViewProps } from 'react-native';
-import { useEsquema, useTheme } from '../../theme';
+import { useEsquema, useTheme, cardRadius, shadow, spacing } from '../../theme';
 
 interface CardProps extends ViewProps {
   radius?: number;
   padded?: boolean;
 }
 
-// Card padrão: branco com sombra suave no claro, borda sutil no escuro (DESIGN.md)
-export default function Card({ radius = 18, padded = true, style, children, ...rest }: CardProps) {
+// Card padrão: branco com sombra suave no claro, borda sutil no escuro (DESIGN.md).
+// A sombra é `shadow.card` (geometria) + `colors.sombra` (cor do tema) — antes o
+// componente carregava um `shadowColor` próprio e o token de sombra ficava morto.
+export default function Card({ radius = cardRadius, padded = true, style, children, ...rest }: CardProps) {
   const colors = useTheme();
   const dark = useEsquema() === 'dark';
 
@@ -18,16 +20,10 @@ export default function Card({ radius = 18, padded = true, style, children, ...r
         {
           backgroundColor: colors.card,
           borderRadius: radius,
-          padding: padded ? 16 : 0,
+          padding: padded ? spacing.lg : 0,
           ...(dark
             ? { borderWidth: 1, borderColor: colors.border }
-            : {
-                shadowColor: '#1e1a3c',
-                shadowOpacity: 0.08,
-                shadowRadius: 12,
-                shadowOffset: { width: 0, height: 8 },
-                elevation: 3,
-              }),
+            : { shadowColor: colors.sombra, ...shadow.card }),
         },
         style,
       ]}

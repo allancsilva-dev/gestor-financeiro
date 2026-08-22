@@ -41,12 +41,13 @@ Entidades com cor própria não usam a marca: metas tingem o card com `paletaDaM
 | `navBg` | `#0c1526` | painel flutuante da tab bar |
 | `trilha` | `#21314f` | trilha de barra de progresso (travada em `tema.test.ts`) |
 | `overlay` | `rgba(255,255,255,0.08)` | superfície sutil sobre o fundo |
+| `sombra` | `#02060f` | cor da sombra projetada (geometria em `tokens.shadow`) |
 | `*Bg` | cor a 12% alpha | fundos de badge/tile semânticos |
 
 ### Light
 
 Mesmas chaves, reequilibradas: `bg #eef2f8`, `card #ffffff`, `textPrimary #0b1220`,
-`brand #0a86c9`, `success #0f7f45`, `danger #c32348`. A paridade de chaves e o contraste AA de
+`brand #0a86c9`, `success #0f7f45`, `danger #c32348`, `sombra #1e1a3c`. A paridade de chaves e o contraste AA de
 `textPrimary`, `textSecondary`, `danger`, `success` e `brandFg` sobre `bg` são travados por
 `mobile/src/__tests__/tema.test.ts` nos dois temas.
 
@@ -58,20 +59,24 @@ faz spread (`{ ...typography.value, ...numeric, color: colors.success }`), não 
 - `display` 34/800 — saldo do hero
 - `screenTitle` 26/800 — título de tela de topo
 - `greeting` 22/800 · `section` 20/700
-- `cardTitle` 15/700 · `label` 14/500 · `body` 14/500 · `meta` 12/500
+- `cardTitle` 15/700 · `rowTitle` 15/600 (linha de lista) · `input` 15/500 (campo)
+- `label` 14/500 · `body` 14/500 · `meta` 12/500 · `badge` 12/700
 - Valores monetários: sempre bold + `numeric` (tabular-nums), verde entra / vermelho sai
 
 ## Components
 
-- **Card**: `colors.card`, radius 16–20, sombra suave no claro e borda hairline no escuro. Nunca
-  card dentro de card.
+- **Card** (`ui/Card`): `colors.card`, `cardRadius` (18), sombra suave no claro e borda hairline
+  no escuro. Nunca card dentro de card. A sombra é `tokens.shadow.card` (geometria) +
+  `colors.sombra` (cor) — sombra é valor de tema, não constante de componente.
 - **Superfície com brilho** (`ui/SuperficieComBrilho`): base neutra + dois brilhos radiais (SVG),
   topo-direita e base-esquerda, centro neutro. É o fundo do card de meta e do bloco de conta em
   Ajustes. Não é gradiente linear — ver `MEDICOES-metas.md`.
 - **Tile de categoria** (`ui/IconTile`): quadradinho 40–44, radius 12, fundo pastel, emoji dentro.
   Emoji é o sistema de ícones; nada de biblioteca colorida.
-- **Lista** (`ui/ListRow`): linhas em card único com divisores, tile + título (600) + metadado,
-  valor ou chevron à direita.
+- **Lista** (`ui/ListRow`): linhas em card único com divisores, tile + título (`rowTitle`, 600) +
+  metadado, valor (`value` + `numeric`) ou chevron à direita. A linha **não** recebe
+  `accessibilityLabel`: é nó composto, e um rótulo curado apagaria subtítulo e valor da árvore.
+  O contexto vai na prop `dica` (`accessibilityHint`) e o tile é decorativo.
 - **Cabeçalho de tela** (`ui/CabecalhoDeTela`): título grande à esquerda, ação circular à direita,
   safe area somada aqui. Não há header nativo (`headerShown: false` em todos os layouts).
 - **Cabeçalho de seção** (`ui/CabecalhoSecao`): eyebrow curto + título + linha de orientação.
@@ -80,14 +85,23 @@ faz spread (`{ ...typography.value, ...numeric, color: colors.success }`), não 
   **+**, Metas, Ajustes. Ativo em ciano, com tile e barra indicadora.
 - **Chips/segmentos** (`ui/Chip`): pill radius 999, ativo com borda/fundo de marca, alvo ≥44.
 - **Badges de status** (`ui/Badge`): pill pequeno, fundo semântico a 12%, texto da cor plena.
-- **Barra de progresso**: trilha `colors.trilha`, altura 6, radius 3; preenchimento em gradiente
-  (sólido puro fica opaco demais).
+- **Barra de progresso** (`ui/ProgressBar`): a única do app. Trilha `colors.trilha`, altura 6,
+  `radius.pill`; preenchimento em gradiente (sólido puro fica opaco demais). Aceita `paleta` da
+  entidade dona — meta e cartão passam a sua, e a barra deixa de usar a marca. Antes existiam
+  três implementações, e a deste componente usava `colors.border` como trilha: fina demais,
+  sumia no claro. É o caso que `src/__tests__/tema.test.ts` trava.
 - **Botão** (`ui/Botao`): a única forma de botão do app — `primario` (fundo `brand`, texto
-  `brandText`), `secundario` (borda `border`), `perigo` (`danger`) e `texto` (só `brandFg`). Altura
-  52 (44 no `texto`), `radius.md`, `typography.button` em caixa normal — nunca `CAIXA ALTA` com
-  `letterSpacing`. Estados obrigatórios no próprio componente: normal, pressionado (`activeOpacity`
+  `brandText`), `secundario` (borda `border`), `perigo` (`danger`), `texto` (só `brandFg`) e
+  `invertido` (fundo `textPrimary`, texto `bg`). Dois tamanhos: `padrao` (altura 52, `radius.md`)
+  para formulário e rodapé de fluxo, e `pill` (altura 44, `radius.pill`) para ação dentro de card —
+  é o CTA "Depositar" do card de meta. `typography.button` em caixa normal, nunca `CAIXA ALTA`
+  com `letterSpacing`. Estados obrigatórios no próprio componente: normal, pressionado (`activeOpacity`
   0.85), desabilitado (opacidade 0.6) e carregando (spinner no lugar do rótulo, `busy` no
   `accessibilityState`).
+- **Campo** (`ui/Field`): rótulo em `typography.meta` **em caixa normal**, entrada em
+  `typography.input` sobre `colors.fieldBg`, erro em `meta`/`danger` com `accessibilityLiveRegion`.
+  O rótulo era um eyebrow de 10pt em CAIXA ALTA com `letterSpacing` — abaixo do piso de 12 da
+  escala, e a mesma assinatura que o botão já rejeita.
 - **Campo de senha** (`ui/CampoSenha`): envolve `ui/Field` e acrescenta o olho (alvo 44) e o medidor
   opcional de 4 segmentos (`colors.trilha` → `danger`/`warning`/`success`), cujo texto diz o que
   falta para a regra do backend — nunca uma nota abstrata de "força".
@@ -95,7 +109,8 @@ faz spread (`{ ...typography.value, ...numeric, color: colors.success }`), não 
   preenchidos em `brand`. É o indicador de fluxo multi-etapa; barra contínua com porcentagem não
   serve, o usuário quer saber quantas telas faltam.
 - **Estados**: `ui/SkeletonBox` com a forma do conteúdo real (nunca spinner no meio da tela),
-  `ui/EstadoVazio` para vazio e erro, retry sempre por `refetch()` do react-query.
+  `ui/EstadoVazio` para vazio e erro, retry sempre por `refetch()` do react-query. A ação do
+  estado vazio é um `ui/Botao` `pill` — o componente não fabrica botão próprio.
 
 ## Layout
 

@@ -7,6 +7,7 @@ import * as Sharing from 'expo-sharing';
 import { File, Paths } from 'expo-file-system';
 import * as DocumentPicker from 'expo-document-picker';
 import { useTheme, useTabBarSpace, spacing, radius, typography } from '../../src/theme';
+import { iconeDecorativo } from '../../src/utils/acessibilidade';
 import { misturar } from '../../src/theme/metaCores';
 import { useAuth } from '../../src/context/AuthContext';
 import { useTema } from '../../src/context/TemaContext';
@@ -218,7 +219,7 @@ export default function Ajustes() {
                   {usuario?.email ?? 'Dados pessoais e senha'}
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} {...iconeDecorativo} />
             </TouchableOpacity>
 
             <View style={{ height: 1, backgroundColor: colors.border, marginHorizontal: spacing.lg }} />
@@ -242,7 +243,7 @@ export default function Ajustes() {
                   </Text>
                 </View>
               )}
-              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} {...iconeDecorativo} />
             </TouchableOpacity>
           </SuperficieComBrilho>
         </Entrance>
@@ -344,7 +345,7 @@ export default function Ajustes() {
               title="Importar CSV"
               subtitle="Extrato do seu banco"
               onPress={importarCsv}
-              trailing={<Ionicons name="chevron-forward" size={18} color={colors.textMuted} />}
+              trailing={<Ionicons name="chevron-forward" size={18} color={colors.textMuted} {...iconeDecorativo} />}
             />
             <ListRow
               icon="📥"
@@ -352,7 +353,7 @@ export default function Ajustes() {
               title="Exportar dados"
               subtitle="Tudo em um CSV"
               onPress={exportarDados}
-              trailing={<Ionicons name="chevron-forward" size={18} color={colors.textMuted} />}
+              trailing={<Ionicons name="chevron-forward" size={18} color={colors.textMuted} {...iconeDecorativo} />}
             />
             <ListRow
               icon="🔒"
@@ -361,7 +362,7 @@ export default function Ajustes() {
               subtitle="O que guardamos e por quê"
               divider={false}
               onPress={() => router.push('/(auth)/privacidade')}
-              trailing={<Ionicons name="chevron-forward" size={18} color={colors.textMuted} />}
+              trailing={<Ionicons name="chevron-forward" size={18} color={colors.textMuted} {...iconeDecorativo} />}
             />
           </Card>
         </Entrance>

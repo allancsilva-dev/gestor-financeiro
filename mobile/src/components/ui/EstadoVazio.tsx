@@ -1,6 +1,7 @@
 import React from 'react';
-import { Text, TouchableOpacity, View } from 'react-native';
-import { useTheme, spacing, typography, radius } from '../../theme';
+import { Text, View } from 'react-native';
+import { useTheme, spacing, typography } from '../../theme';
+import Botao from './Botao';
 
 interface Props {
   emoji: string;
@@ -17,7 +18,8 @@ interface Props {
 export default function EstadoVazio({ emoji, titulo, texto, acao }: Props) {
   const colors = useTheme();
   return (
-    <View style={{ alignItems: 'center', paddingVertical: 56, paddingHorizontal: spacing.xxl }}>
+    <View style={{ alignItems: 'center', paddingVertical: spacing.xxxl + spacing.xxl, paddingHorizontal: spacing.xxl }}>
+      {/* O emoji é a ilustração do estado, não texto de leitura — corpo próprio */}
       <Text style={{ fontSize: 36 }}>{emoji}</Text>
       <Text style={{ ...typography.cardTitle, color: colors.textPrimary, marginTop: spacing.md, textAlign: 'center' }}>
         {titulo}
@@ -28,18 +30,12 @@ export default function EstadoVazio({ emoji, titulo, texto, acao }: Props) {
         </Text>
       )}
       {!!acao && (
-        <TouchableOpacity
+        <Botao
+          titulo={acao.rotulo}
           onPress={acao.onPress}
-          accessibilityRole="button"
-          accessibilityLabel={acao.rotulo}
-          style={{
-            marginTop: spacing.lg, paddingHorizontal: spacing.xl, height: 44,
-            borderRadius: radius.md, alignItems: 'center', justifyContent: 'center',
-            backgroundColor: colors.brand,
-          }}
-        >
-          <Text style={{ ...typography.button, color: colors.brandText }}>{acao.rotulo}</Text>
-        </TouchableOpacity>
+          tamanho="pill"
+          style={{ marginTop: spacing.lg, paddingHorizontal: spacing.xl }}
+        />
       )}
     </View>
   );

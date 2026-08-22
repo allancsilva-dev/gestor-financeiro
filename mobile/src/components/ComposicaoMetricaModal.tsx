@@ -83,9 +83,7 @@ export default function ComposicaoMetricaModal({ metrica, onClose }: ComposicaoM
                   title={origem.descricao}
                   subtitle={origem.tipo}
                   onPress={rota ? () => navegar(origem.navegacao!) : undefined}
-                  accessibilityLabel={rota
-                    ? `${origem.descricao}, ${formatCurrency(Number(origem.valor))}. Abrir detalhe`
-                    : undefined}
+                  dica={rota ? 'Abre o detalhe da origem' : undefined}
                   trailing={
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <Text style={{ color: colors.textPrimary, fontSize: 14, fontWeight: '700', fontVariant: ['tabular-nums'] }}>

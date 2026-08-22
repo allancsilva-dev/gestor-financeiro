@@ -231,7 +231,7 @@ export default function Transacoes() {
             value={`${t.tipo === 'ENTRADA' ? '+' : '−'} ${formatCurrency(Number(t.valorTotal ?? 0))}`}
             valueTone={t.tipo === 'ENTRADA' ? 'success' : 'danger'}
             onPress={() => setSelecionada(t)}
-            accessibilityLabel={`Editar transação ${t.descricao}`}
+            dica="Abre a edição da transação"
           />
         )}
       />

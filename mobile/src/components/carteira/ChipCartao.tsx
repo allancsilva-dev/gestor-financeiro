@@ -3,8 +3,8 @@ import { View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 /**
- * Chip EMV dourado. Desenhado em View porque o projeto não tem react-native-svg
- * e não vale puxar a dependência por um retângulo com quatro traços.
+ * Chip EMV dourado. Desenhado em View: é um retângulo com quatro traços, não
+ * vale o custo de um SVG.
  * Medida da referência: 50px ↔ 30dp de largura.
  */
 export default function ChipCartao({ largura = 30 }: { largura?: number }) {

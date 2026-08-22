@@ -312,7 +312,6 @@ export default function Home() {
                 iconTone="brand"
                 title={item.label}
                 onPress={item.onPress}
-                accessibilityLabel={item.label}
               />
             ))}
           </Card>

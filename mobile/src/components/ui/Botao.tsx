@@ -3,12 +3,19 @@ import { ActivityIndicator, Text, TouchableOpacity, ViewStyle } from 'react-nati
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme, radius, spacing, typography } from '../../theme';
 
-type Variante = 'primario' | 'secundario' | 'perigo' | 'texto';
+type Variante = 'primario' | 'secundario' | 'perigo' | 'texto' | 'invertido';
+/**
+ * `padrao` é o botão de formulário e rodapé de fluxo (altura 52).
+ * `pill` é a ação dentro de um card — mais curta e totalmente arredondada,
+ * como o CTA "Depositar" do card de meta. Nunca abaixo de 44: é alvo de toque.
+ */
+type Tamanho = 'padrao' | 'pill';
 
 interface BotaoProps {
   titulo: string;
   onPress: () => void;
   variante?: Variante;
+  tamanho?: Tamanho;
   carregando?: boolean;
   desabilitado?: boolean;
   icone?: React.ComponentProps<typeof Ionicons>['name'];
@@ -27,6 +34,7 @@ export default function Botao({
   titulo,
   onPress,
   variante = 'primario',
+  tamanho = 'padrao',
   carregando = false,
   desabilitado = false,
   icone,
@@ -42,6 +50,9 @@ export default function Botao({
     secundario: 'transparent',
     perigo: colors.danger,
     texto: 'transparent',
+    // Inverte o tema: o único elemento claro-sobre-escuro do card. É assim que o
+    // CTA lê como CTA sem gastar a cor da marca numa superfície que já é colorida.
+    invertido: colors.textPrimary,
   }[variante];
 
   const tinta = {
@@ -49,7 +60,10 @@ export default function Botao({
     secundario: colors.textPrimary,
     perigo: colors.brandText,
     texto: colors.brandFg,
+    invertido: colors.bg,
   }[variante];
+
+  const alturaMinima = tamanho === 'pill' ? 44 : variante === 'texto' ? 44 : 52;
 
   return (
     <TouchableOpacity
@@ -62,8 +76,8 @@ export default function Botao({
       accessibilityState={{ disabled: inativo, busy: carregando }}
       style={[
         {
-          minHeight: variante === 'texto' ? 44 : 52,
-          borderRadius: radius.md,
+          minHeight: alturaMinima,
+          borderRadius: tamanho === 'pill' ? radius.pill : radius.md,
           paddingHorizontal: spacing.lg,
           flexDirection: 'row',
           alignItems: 'center',

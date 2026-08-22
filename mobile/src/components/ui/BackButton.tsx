@@ -1,7 +1,9 @@
 import React from 'react';
 import { Text, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useTheme } from '../../theme';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { useTheme, spacing, typography } from '../../theme';
+import { iconeDecorativo } from '../../utils/acessibilidade';
 
 // Botão de voltar para as sub-telas de "Mais" (more/), onde o header nativo
 // fica oculto (headerShown:false). Colocar como primeiro filho do bloco de
@@ -16,10 +18,17 @@ export default function BackButton() {
       accessibilityRole="button"
       accessibilityLabel="Voltar"
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-      style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginBottom: 8, minHeight: 44 }}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
+        marginBottom: spacing.sm,
+        minHeight: 44,
+      }}
     >
-      <Text style={{ color: colors.textSecondary, fontSize: 22, lineHeight: 22, marginRight: 4 }}>‹</Text>
-      <Text style={{ color: colors.textSecondary, fontSize: 15, fontWeight: '600' }}>Voltar</Text>
+      {/* O glifo entrava na composição do rótulo (DESIGN.md:157) — fica escondido */}
+      <Ionicons name="chevron-back" size={20} color={colors.textSecondary} {...iconeDecorativo} />
+      <Text style={{ ...typography.value, color: colors.textSecondary }}>Voltar</Text>
     </TouchableOpacity>
   );
 }

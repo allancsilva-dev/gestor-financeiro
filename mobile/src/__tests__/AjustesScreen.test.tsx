@@ -137,7 +137,8 @@ describe('AjustesScreen', () => {
   it('dá acesso à política de privacidade a quem já tem conta', async () => {
     await renderizar();
     await waitFor(() => expect(screen.getByText('Política de privacidade')).toBeTruthy());
-    fireEvent.press(screen.getByLabelText('Política de privacidade'));
+    // O texto visível é o rótulo: a linha não carrega mais `accessibilityLabel`
+    fireEvent.press(screen.getByText('Política de privacidade'));
     expect(mockPush).toHaveBeenCalledWith('/(auth)/privacidade');
   });
 

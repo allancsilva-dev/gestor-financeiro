@@ -1,6 +1,6 @@
 import React from 'react';
 import { Text, TouchableOpacity } from 'react-native';
-import { useTheme } from '../../theme';
+import { useTheme, radius, spacing, typography } from '../../theme';
 
 interface ChipProps {
   label: string;
@@ -19,16 +19,16 @@ export default function Chip({ label, selected = false, onPress }: ChipProps) {
       accessibilityState={{ selected }}
       style={{
         minHeight: 44,
-        paddingHorizontal: 14,
-        paddingVertical: 6,
-        borderRadius: 999,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        borderRadius: radius.pill,
         borderWidth: 1,
         borderColor: selected ? colors.brand : colors.border,
         backgroundColor: selected ? colors.brandBg : colors.card,
         justifyContent: 'center',
       }}
     >
-      <Text style={{ color: selected ? colors.brandFg : colors.textSecondary, fontSize: 13, fontWeight: selected ? '600' : '400' }}>
+      <Text style={{ ...typography.chip, color: selected ? colors.brandFg : colors.textSecondary }}>
         {label}
       </Text>
     </TouchableOpacity>

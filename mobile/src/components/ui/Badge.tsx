@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text } from 'react-native';
-import { useTheme } from '../../theme';
+import { useTheme, radius, spacing, typography } from '../../theme';
 import { StatusPagamento } from '../../types';
 import { STATUS_LABEL } from '../../utils/format';
 
@@ -35,8 +35,16 @@ export default function Badge({ status, tone = 'info', children }: BadgeProps) {
   const label = children ?? (status ? STATUS_LABEL[status] ?? status : null);
 
   return (
-    <View style={{ backgroundColor: resolved.bg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, alignSelf: 'flex-start' }}>
-      <Text style={{ color: resolved.text, fontSize: 10, fontWeight: '700' }}>{label}</Text>
+    <View
+      style={{
+        backgroundColor: resolved.bg,
+        paddingHorizontal: spacing.sm,
+        paddingVertical: 2,
+        borderRadius: radius.pill,
+        alignSelf: 'flex-start',
+      }}
+    >
+      <Text style={{ ...typography.badge, color: resolved.text }}>{label}</Text>
     </View>
   );
 }

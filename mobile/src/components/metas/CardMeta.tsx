@@ -2,9 +2,9 @@ import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { iconeDecorativo } from '../../utils/acessibilidade';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Meta } from '../../types';
 import { useTheme, radius, numeric } from '../../theme';
+import ProgressBar from '../ui/ProgressBar';
 import { e } from '../../theme/escala';
 import { paletaDaMeta } from '../../theme/metaCores';
 import { acoesDaMeta } from '../../domain/metaPolicy';
@@ -105,15 +105,8 @@ export default function CardMeta({ meta, onAbrir, onDepositar, onEditar, onExclu
               </Text>
             </View>
 
-            <View
-              style={{ height: e(6), borderRadius: e(3), backgroundColor: paleta.trilha, marginTop: e(12), overflow: 'hidden' }}
-            >
-              <LinearGradient
-                colors={[paleta.fillDe, paleta.fillPara]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={{ width: `${progresso}%`, height: '100%', borderRadius: e(3) }}
-              />
+            <View style={{ marginTop: e(12) }}>
+              <ProgressBar value={progresso} height={e(6)} paleta={paleta} />
             </View>
           </View>
         </View>

@@ -1,6 +1,8 @@
 import React from 'react';
 import { Text, View } from 'react-native';
-import { useTheme, spacing, typography, numeric, radius } from '../../theme';
+import { useTheme, spacing, typography, numeric } from '../../theme';
+import { misturar } from '../../theme/metaCores';
+import ProgressBar from '../ui/ProgressBar';
 import { CarteiraCartao } from '../../types';
 import { formatCurrency } from '../../utils/format';
 import { dataCurta, dataLonga, prazoEmDias } from '../../domain/carteiraFormat';
@@ -90,21 +92,18 @@ export default function ResumoCartao({ cartao }: { cartao: CarteiraCartao }) {
       </Linha>
 
       {cartao.limiteTotal > 0 && (
-        <View
-          accessibilityRole="progressbar"
-          accessibilityLabel={`Limite usado: ${cartao.percentualUso} por cento`}
-          accessibilityValue={{ min: 0, max: 100, now: cartao.percentualUso }}
-          style={{
-            height: 6, borderRadius: radius.pill, backgroundColor: colors.trilha,
-            overflow: 'hidden', marginTop: spacing.md, marginHorizontal: spacing.md,
-          }}
-        >
+        <View style={{ marginTop: spacing.md, marginHorizontal: spacing.md }}>
           {/* Preenchimento na cor do emissor, não na marca do app: é o que a
               referência mostra (magenta no cartão roxo, não ciano). */}
-          <View style={{
-            width: `${Math.min(Math.max(cartao.percentualUso, 0), 100)}%`,
-            height: '100%', borderRadius: radius.pill, backgroundColor: identidade.from,
-          }} />
+          <ProgressBar
+            value={cartao.percentualUso}
+            accessibilityLabel={`Limite usado: ${cartao.percentualUso} por cento`}
+            paleta={{
+              trilha: colors.trilha,
+              fillDe: identidade.from,
+              fillPara: misturar(identidade.from, '#ffffff', 0.35),
+            }}
+          />
         </View>
       )}
 

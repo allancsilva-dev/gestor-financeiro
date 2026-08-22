@@ -46,6 +46,10 @@ export const DARK_COLORS = {
   trilha: '#21314f',
   skeletonBase: '#111b34',
   skeletonHighlight: '#1b2745',
+  // Cor de sombra projetada. Vive na paleta porque muda com o tema: no escuro é
+  // quase preta e quase invisível (o card usa hairline), no claro é o azul-tinta
+  // medido da referência. Geometria em `tokens.shadow`.
+  sombra: '#02060f',
   accent: '#a78bfa',
   accentBg: 'rgba(167,139,250,0.16)',
   chipBg: '#111b34',
@@ -91,6 +95,7 @@ export const LIGHT_COLORS: typeof DARK_COLORS = {
   trilha: '#bcc6d4',
   skeletonBase: '#e2e7f0',
   skeletonHighlight: '#f4f7fb',
+  sombra: '#1e1a3c',
   accent: '#6d28d9',
   accentBg: 'rgba(109,40,217,0.13)',
   chipBg: '#ffffff',
