@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, FlatList, Modal, ScrollView, ActivityIndicator, Switch, Alert } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, Text, FlatList, ScrollView, Switch, Alert } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { contaFixaService } from '../../../src/services/contaFixaService';
 import { categoriaService } from '../../../src/services/categoriaService';
@@ -11,17 +10,25 @@ import Chip from '../../../src/components/ui/Chip';
 import IconTile from '../../../src/components/ui/IconTile';
 import Field from '../../../src/components/ui/Field';
 import { ContaFixa, ContaFixaRequest } from '../../../src/types';
-import { useTheme, useTabBarSpace } from '../../../src/theme';
-import BackButton from '../../../src/components/ui/BackButton';
+import {
+  useTheme, useTabBarSpace, numeric, radius, screenPadding, spacing, typography,
+} from '../../../src/theme';
+import { competenciaAtual, competenciaIso } from '../../../src/domain/periodo';
+import { mensagemDeErro } from '../../../src/utils/erros';
 import { parseCurrencyBR, maskCurrencyInput, formatCurrency, formatNumber } from '../../../src/utils/format';
+import Botao from '../../../src/components/ui/Botao';
+import CabecalhoSubTela from '../../../src/components/ui/CabecalhoSubTela';
+import EstadoVazio from '../../../src/components/ui/EstadoVazio';
+import FolhaModal from '../../../src/components/ui/FolhaModal';
+import RotuloDeGrupo from '../../../src/components/ui/RotuloDeGrupo';
 import SkeletonBox from '../../../src/components/ui/SkeletonBox';
 import Fab from '../../../src/components/ui/Fab';
+import type { ContaFinanceira } from '../../../src/types';
 
 export default function ContasFixasScreen() {
   const colors = useTheme();
   const tabBarSpace = useTabBarSpace();
   const queryClient = useQueryClient();
-  const insets = useSafeAreaInsets();
   const [modalPagarVisible, setModalPagarVisible] = useState(false);
   const [modalCriarVisible, setModalCriarVisible] = useState(false);
   const [selecionada, setSelecionada] = useState<ContaFixa | null>(null);
@@ -59,7 +66,7 @@ export default function ContasFixasScreen() {
       setModalPagarVisible(false);
       setValorPago('');
     },
-    onError: (err: any) => setErroPagar(err?.userMessage ?? 'Erro ao registrar pagamento.'),
+    onError: (err: unknown) => setErroPagar(mensagemDeErro(err, 'Erro ao registrar pagamento.')),
   });
 
   const pularMes = (cf: ContaFixa) => {
@@ -72,7 +79,7 @@ export default function ContasFixasScreen() {
           setPulandoId(cf.id);
           contaFixaService.pularMes(cf.id)
             .then(() => refetch())
-            .catch((err: any) => Alert.alert('Não foi possível pular', err?.userMessage ?? 'Tente novamente.'))
+            .catch((err: unknown) => Alert.alert('Não foi possível pular', mensagemDeErro(err, 'Tente novamente.')))
             .finally(() => setPulandoId(null));
         },
       },
@@ -111,7 +118,7 @@ export default function ContasFixasScreen() {
       setModalCriarVisible(false);
       limparCriar();
     },
-    onError: (err: any) => setErroCriar(err?.userMessage ?? 'Erro ao criar conta fixa.'),
+    onError: (err: unknown) => setErroCriar(mensagemDeErro(err, 'Erro ao criar conta fixa.')),
   });
 
   const abrirEdicao = (cf: ContaFixa) => {
@@ -127,68 +134,80 @@ export default function ContasFixasScreen() {
     setModalCriarVisible(true);
   };
 
+  const { mes, ano } = competenciaAtual();
+  const competenciaDeHoje = competenciaIso(mes, ano);
+
   const renderItem = ({ item: cf }: { item: ContaFixa }) => {
     const pendente = cf.status === 'PENDENTE' || cf.status === 'ATRASADO';
-    const agora = new Date();
-    const mesAtual = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, '0')}`;
-    const realizavel = !cf.dataProximoVencimento || cf.dataProximoVencimento.slice(0, 7) <= mesAtual;
+    // Vencimento no futuro ainda não pode ser quitado: a competência é a régua.
+    const realizavel = !cf.dataProximoVencimento || cf.dataProximoVencimento.slice(0, 7) <= competenciaDeHoje;
+    const ocupado = pulandoId != null || pagarMutation.status === 'pending';
+    const acaoDeQuitar = cf.tipo === 'ENTRADA' ? 'Receber' : 'Pagar';
     return (
-      <Card radius={20} style={{ marginBottom: 12 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+      <Card radius={radius.xl} style={{ marginBottom: spacing.md }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
           <IconTile tone={cf.tipo === 'ENTRADA' ? 'success' : cf.status === 'ATRASADO' ? 'danger' : cf.status === 'PAGO' ? 'success' : 'brand'} size={44}>
             {cf.categoria?.icone || '📌'}
           </IconTile>
           <View style={{ flex: 1, minWidth: 0 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-              <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '700', flex: 1 }} numberOfLines={1}>{cf.nome}</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.sm }}>
+              <Text numberOfLines={1} style={{ ...typography.cardTitle, color: colors.textPrimary, flex: 1 }}>{cf.nome}</Text>
               <Badge status={cf.status} />
             </View>
-            <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }} numberOfLines={1}>
+            <Text numberOfLines={1} style={{ ...typography.meta, color: colors.textSecondary, marginTop: spacing.xxs }}>
               {cf.categoria?.nome ? `${cf.categoria.nome} · ` : ''}{cf.execucaoAutomatica ? 'Automática' : 'Manual'} · dia {cf.diaVencimento}
             </Text>
           </View>
         </View>
 
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
-          <Text style={{ color: cf.tipo === 'ENTRADA' ? colors.success : colors.danger, fontSize: 17, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
-            {cf.tipo === 'ENTRADA' ? '+' : '−'} {formatCurrency(Number(cf.valorPlanejado ?? 0))}
-          </Text>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <TouchableOpacity
-              onPress={() => abrirEdicao(cf)}
-              accessibilityRole="button"
-              accessibilityLabel={`Editar ${cf.nome}`}
-              style={{ minHeight: 44, paddingHorizontal: 10, justifyContent: 'center' }}
-            >
-              <Text style={{ color: colors.brandFg, fontSize: 12, fontWeight: '600' }}>Editar</Text>
-            </TouchableOpacity>
-          {pendente && (
-            <>
-              {cf.recorrente !== false && (
-                <TouchableOpacity
-                onPress={() => pularMes(cf)}
-                  disabled={pulandoId != null || pagarMutation.status === 'pending'}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Pular ${cf.nome} este mês`}
-                  style={{ minHeight: 44, paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1, borderColor: colors.border, justifyContent: 'center' }}
-                >
-                  {pulandoId === cf.id
-                    ? <ActivityIndicator size="small" color={colors.textSecondary} />
-                    : <Text style={{ color: colors.textSecondary, fontSize: 12, fontWeight: '600' }}>Pular</Text>}
-                </TouchableOpacity>
-              )}
-              {realizavel && <TouchableOpacity
-                disabled={pulandoId != null || pagarMutation.status === 'pending'}
-                onPress={() => { setSelecionada(cf); setValorPago(formatNumber(Number(cf.valorPlanejado ?? 0))); setErroPagar(null); setErroCarteira(null); setCarteiraPagamentoId(cf.carteira?.id ?? (carteiras.length === 1 ? carteiras[0].id : null)); setModalPagarVisible(true); }}
-                accessibilityRole="button"
-                accessibilityLabel={`${cf.tipo === 'ENTRADA' ? 'Receber' : 'Pagar'} ${cf.nome}`}
-                style={{ minHeight: 44, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 999, backgroundColor: colors.brand, justifyContent: 'center' }}
-              >
-                <Text style={{ color: colors.brandText, fontSize: 12, fontWeight: '700' }}>{cf.tipo === 'ENTRADA' ? 'Receber' : 'Pagar'}</Text>
-              </TouchableOpacity>}
-            </>
+        <Text style={{
+          ...typography.section, ...numeric, marginTop: spacing.md,
+          color: cf.tipo === 'ENTRADA' ? colors.success : colors.danger,
+        }}>
+          {cf.tipo === 'ENTRADA' ? '+' : '−'} {formatCurrency(Number(cf.valorPlanejado ?? 0))}
+        </Text>
+
+        {/* Os botões saem da linha do valor e ganham corpo de leitura: em caixa
+            estreita três pills de 44 ao lado do valor estouravam o card.
+            Rótulo é o texto visível; o nome da conta vai para a dica. */}
+        <View style={{
+          flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end',
+          gap: spacing.sm, marginTop: spacing.md,
+        }}>
+          <Botao
+            titulo="Editar"
+            variante="texto"
+            tamanho="pill"
+            onPress={() => abrirEdicao(cf)}
+            dica={`Edita ${cf.nome}`}
+          />
+          {pendente && cf.recorrente !== false && (
+            <Botao
+              titulo="Pular"
+              variante="secundario"
+              tamanho="pill"
+              onPress={() => pularMes(cf)}
+              desabilitado={ocupado}
+              carregando={pulandoId === cf.id}
+              dica={`Pula ${cf.nome} neste mês`}
+            />
           )}
-          </View>
+          {pendente && realizavel && (
+            <Botao
+              titulo={acaoDeQuitar}
+              tamanho="pill"
+              desabilitado={ocupado}
+              dica={`${acaoDeQuitar} ${cf.nome}`}
+              onPress={() => {
+                setSelecionada(cf);
+                setValorPago(formatNumber(Number(cf.valorPlanejado ?? 0)));
+                setErroPagar(null);
+                setErroCarteira(null);
+                setCarteiraPagamentoId(cf.carteira?.id ?? (carteiras.length === 1 ? carteiras[0].id : null));
+                setModalPagarVisible(true);
+              }}
+            />
+          )}
         </View>
       </Card>
     );
@@ -196,198 +215,220 @@ export default function ContasFixasScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <View style={{ paddingTop: insets.top + 16, paddingHorizontal: 16, paddingBottom: 12 }}>
-        <BackButton />
-        <Text style={{ color: colors.textPrimary, fontSize: 23, fontWeight: '800', letterSpacing: -0.4 }}>Recorrências</Text>
-        <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4 }}>
-          {emAberto.length > 0
-            ? `${formatCurrency(totalAReceber)} a receber · ${formatCurrency(totalAPagar)} a pagar`
-            : 'Entradas e saídas que se repetem'}
-        </Text>
-      </View>
+      <CabecalhoSubTela
+        titulo="Recorrências"
+        apoio={
+          <Text style={{ ...typography.body, ...numeric, color: colors.textSecondary }}>
+            {emAberto.length > 0
+              ? `${formatCurrency(totalAReceber)} a receber · ${formatCurrency(totalAPagar)} a pagar`
+              : 'Entradas e saídas que se repetem'}
+          </Text>
+        }
+      />
 
       {isLoading ? (
-        <View style={{ paddingHorizontal: 16, gap: 12 }}>
-          {[1, 2, 3].map(i => <SkeletonBox key={i} width="100%" height={110} borderRadius={20} />)}
+        <View style={{ paddingHorizontal: screenPadding, gap: spacing.md }}>
+          {[1, 2, 3].map(i => <SkeletonBox key={i} width="100%" height={110} borderRadius={radius.xl} />)}
         </View>
       ) : isError ? (
-        <View style={{ alignItems: 'center', padding: 48 }}>
-          <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600' }}>Erro ao carregar recorrências</Text>
-          <TouchableOpacity onPress={() => refetch()} style={{ marginTop: 8, minHeight: 44, justifyContent: 'center' }} accessibilityRole="button">
-            <Text style={{ color: colors.brandFg, fontWeight: '600' }}>Tentar novamente</Text>
-          </TouchableOpacity>
-        </View>
+        <EstadoVazio
+          emoji="📶"
+          titulo="Não deu para carregar suas recorrências"
+          texto="Verifique sua conexão e tente de novo."
+          acao={{ rotulo: 'Tentar de novo', onPress: () => refetch() }}
+        />
       ) : (
         <FlatList
           data={contas}
           keyExtractor={item => item.id.toString()}
-          contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: tabBarSpace }}
+          contentContainerStyle={{ paddingHorizontal: screenPadding, paddingBottom: tabBarSpace }}
           renderItem={renderItem}
           ListEmptyComponent={() => (
-            <View style={{ alignItems: 'center', paddingHorizontal: 32, paddingVertical: 48 }}>
-              <Text style={{ fontSize: 40, marginBottom: 12 }}>🧾</Text>
-              <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600', textAlign: 'center' }}>Nenhuma recorrência ainda</Text>
-              <Text style={{ color: colors.textSecondary, fontSize: 13, marginTop: 4, textAlign: 'center' }}>Cadastre salário, aluguel ou outros valores recorrentes.</Text>
-              <TouchableOpacity
-                onPress={() => { limparCriar(); setModalCriarVisible(true); }}
-                accessibilityRole="button"
-                accessibilityLabel="Cadastrar primeira recorrência"
-                style={{ marginTop: 12, minHeight: 44, paddingHorizontal: 20, borderRadius: 12, backgroundColor: colors.brandBg, alignItems: 'center', justifyContent: 'center' }}
-              >
-                <Text style={{ color: colors.brandFg, fontWeight: '700' }}>Cadastrar recorrência</Text>
-              </TouchableOpacity>
-            </View>
+            <EstadoVazio
+              emoji="🧾"
+              titulo="Nenhuma recorrência ainda"
+              texto="Cadastre salário, aluguel ou outros valores recorrentes."
+              acao={{ rotulo: 'Cadastrar recorrência', onPress: () => { limparCriar(); setModalCriarVisible(true); } }}
+            />
           )}
         />
       )}
 
       <Fab onPress={() => { limparCriar(); setModalCriarVisible(true); }} accessibilityLabel="Criar recorrência" />
 
-      <Modal visible={modalPagarVisible} animationType="slide" presentationStyle="pageSheet">
-        <View style={{ flex: 1, backgroundColor: colors.bg }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-            <TouchableOpacity onPress={() => { setModalPagarVisible(false); setValorPago(''); setErroPagar(null); }} accessibilityRole="button">
-              <Text style={{ color: colors.brandFg, fontSize: 15 }}>Cancelar</Text>
-            </TouchableOpacity>
-            <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600' }}>{selecionada?.tipo === 'ENTRADA' ? 'Receber' : 'Pagar'}</Text>
-            <TouchableOpacity
-              disabled={pagarMutation.status === 'pending'}
-              accessibilityRole="button"
-              onPress={() => {
-                if (pagarMutation.status === 'pending') return;
-                setErroPagar(null); setErroCarteira(null);
-                const v = parseCurrencyBR(valorPago);
-                if (isNaN(v) || v <= 0) { setErroPagar('Valor deve ser positivo.'); return; }
-                if (!carteiraPagamentoId) { setErroCarteira('Selecione de onde sai o pagamento.'); return; }
-                pagarMutation.mutate({ id: selecionada!.id, valor: v, carteiraId: carteiraPagamentoId });
-              }}
-            >
-              {pagarMutation.status === 'pending'
-                ? <ActivityIndicator color={colors.brand} size="small" />
-                : <Text style={{ color: colors.brandFg, fontSize: 15, fontWeight: '600' }}>Confirmar</Text>}
-            </TouchableOpacity>
-          </View>
-          <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
-            {selecionada && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-                <IconTile size={44}>{selecionada.categoria?.icone || '📌'}</IconTile>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '700' }} numberOfLines={1}>{selecionada.nome}</Text>
-                  <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>
-                    Planejado: {formatCurrency(Number(selecionada.valorPlanejado ?? 0))} · vence dia {selecionada.diaVencimento}
-                  </Text>
-                </View>
+      <FolhaModal
+        visible={modalPagarVisible}
+        titulo={selecionada?.tipo === 'ENTRADA' ? 'Receber' : 'Pagar'}
+        onFechar={() => { setModalPagarVisible(false); setValorPago(''); setErroPagar(null); }}
+        acao={{
+          rotulo: 'Confirmar',
+          carregando: pagarMutation.status === 'pending',
+          onPress: () => {
+            if (pagarMutation.status === 'pending') return;
+            setErroPagar(null); setErroCarteira(null);
+            const v = parseCurrencyBR(valorPago);
+            if (isNaN(v) || v <= 0) { setErroPagar('Valor deve ser positivo.'); return; }
+            if (!carteiraPagamentoId) { setErroCarteira('Selecione de onde sai o pagamento.'); return; }
+            pagarMutation.mutate({ id: selecionada!.id, valor: v, carteiraId: carteiraPagamentoId });
+          },
+        }}
+      >
+        <ScrollView contentContainerStyle={{ padding: screenPadding }} keyboardShouldPersistTaps="handled">
+          {selecionada && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg }}>
+              <IconTile size={44}>{selecionada.categoria?.icone || '📌'}</IconTile>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text numberOfLines={1} style={{ ...typography.cardTitle, color: colors.textPrimary }}>{selecionada.nome}</Text>
+                <Text style={{ ...typography.meta, ...numeric, color: colors.textSecondary, marginTop: spacing.xxs }}>
+                  Planejado: {formatCurrency(Number(selecionada.valorPlanejado ?? 0))} · vence dia {selecionada.diaVencimento}
+                </Text>
               </View>
-            )}
-            <Field label="Valor pago" value={valorPago} onChangeText={(t) => setValorPago(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" error={erroPagar} autoFocus />
+            </View>
+          )}
+          <Field label="Valor pago" value={valorPago} onChangeText={(t) => setValorPago(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" error={erroPagar} autoFocus />
 
-            <Text style={{ color: colors.textSecondary, fontSize: 10, letterSpacing: 0.8, marginTop: 8, marginBottom: 6, textTransform: 'uppercase' }}>{selecionada?.tipo === 'ENTRADA' ? 'Receber em' : 'Pagar com'}</Text>
-            {carteiras.length === 0 ? (
-              <Text style={{ color: colors.textSecondary, fontSize: 13 }}>Você ainda não tem contas. Crie uma em Mais → Contas para registrar o pagamento.</Text>
-            ) : (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} keyboardShouldPersistTaps="handled">
-                {carteiras.map(c => (
-                  <Chip
-                    key={c.id}
-                    label={`${c.nome} · ${formatCurrency(Number(c.saldo ?? 0))}`}
-                    selected={carteiraPagamentoId === c.id}
-                    onPress={() => { setCarteiraPagamentoId(c.id); setErroCarteira(null); }}
-                  />
-                ))}
-              </ScrollView>
-            )}
-            {erroCarteira && <Text style={{ color: colors.danger, fontSize: 12, marginTop: 8 }}>{erroCarteira}</Text>}
+          <RotuloDeGrupo>{selecionada?.tipo === 'ENTRADA' ? 'Receber em' : 'Pagar com'}</RotuloDeGrupo>
+          <FaixaDeContas
+            contas={carteiras}
+            selecionada={carteiraPagamentoId}
+            onSelecionar={id => { setCarteiraPagamentoId(id); setErroCarteira(null); }}
+            vazio="Você ainda não tem contas. Crie uma em Mais → Contas para registrar o pagamento."
+          />
+          {erroCarteira && (
+            <Text accessibilityRole="alert" style={{ ...typography.meta, color: colors.danger, marginTop: spacing.sm }}>{erroCarteira}</Text>
+          )}
+        </ScrollView>
+      </FolhaModal>
+
+      <FolhaModal
+        visible={modalCriarVisible}
+        titulo={editando ? 'Editar recorrência' : 'Nova recorrência'}
+        onFechar={() => { setModalCriarVisible(false); limparCriar(); }}
+        acao={{
+          rotulo: 'Salvar',
+          carregando: criarMutation.status === 'pending',
+          onPress: () => {
+            setDescricaoError(null); setValorError(null); setDiaError(null); setCategoriaError(null); setErroCriar(null);
+            let hasErr = false;
+            if (!descricaoCriar.trim()) { setDescricaoError('Descrição obrigatória.'); hasErr = true; }
+            const v = parseCurrencyBR(valorCriar);
+            if (isNaN(v) || v <= 0) { setValorError('Valor deve ser positivo.'); hasErr = true; }
+            const dia = Number(diaCriar);
+            if (!Number.isInteger(dia) || dia < 1 || dia > 31) { setDiaError('Dia deve ser um número entre 1 e 31.'); hasErr = true; }
+            if (!categoriaCriarId) { setCategoriaError('Selecione uma categoria.'); hasErr = true; }
+            if (automaticaCriar && !carteiraCriarId) { setErroCriar('Selecione a conta da execução automática.'); hasErr = true; }
+            if (hasErr) return;
+            criarMutation.mutate({
+              descricao: descricaoCriar.trim(),
+              valor: Number(v),
+              diaVencimento: dia,
+              categoriaId: categoriaCriarId!,
+              recorrente: recorrenteCriar,
+              tipo: tipoCriar,
+              execucaoAutomatica: automaticaCriar,
+              carteiraId: automaticaCriar ? carteiraCriarId! : undefined,
+            });
+          },
+        }}
+      >
+        <ScrollView contentContainerStyle={{ padding: screenPadding }} keyboardShouldPersistTaps="handled">
+          <RotuloDeGrupo primeiro>Tipo</RotuloDeGrupo>
+          <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg }}>
+            <Chip label="↑ Entrada" selected={tipoCriar === 'ENTRADA'} onPress={() => setTipoCriar('ENTRADA')} />
+            <Chip label="↓ Saída" selected={tipoCriar === 'SAIDA'} onPress={() => setTipoCriar('SAIDA')} />
+          </View>
+          <Field label="Descrição" value={descricaoCriar} onChangeText={setDescricaoCriar} placeholder="Ex: Aluguel" error={descricaoError} autoFocus />
+          <Field label="Valor" value={valorCriar} onChangeText={(t) => setValorCriar(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" error={valorError} />
+          <Field label="Dia de vencimento" value={diaCriar} onChangeText={setDiaCriar} keyboardType="number-pad" placeholder="Ex: 10" maxLength={2} error={diaError} />
+
+          <RotuloDeGrupo>Categoria</RotuloDeGrupo>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: spacing.sm }}
+            style={{ marginBottom: spacing.sm }}
+            keyboardShouldPersistTaps="handled"
+          >
+            {categorias.map(cat => (
+              <Chip key={cat.id} label={`${cat.icone ? cat.icone + ' ' : ''}${cat.nome}`} selected={categoriaCriarId === cat.id} onPress={() => setCategoriaCriarId(cat.id)} />
+            ))}
           </ScrollView>
-        </View>
-      </Modal>
+          {categoriaError && (
+            <Text accessibilityRole="alert" style={{ ...typography.meta, color: colors.danger, marginBottom: spacing.sm }}>{categoriaError}</Text>
+          )}
 
-      <Modal visible={modalCriarVisible} animationType="slide" presentationStyle="pageSheet">
-        <View style={{ flex: 1, backgroundColor: colors.bg }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-            <TouchableOpacity onPress={() => { setModalCriarVisible(false); limparCriar(); }} accessibilityRole="button">
-              <Text style={{ color: colors.brandFg, fontSize: 15 }}>Cancelar</Text>
-            </TouchableOpacity>
-            <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '600' }}>{editando ? 'Editar recorrência' : 'Nova recorrência'}</Text>
-            <TouchableOpacity
-              disabled={criarMutation.status === 'pending'}
-              accessibilityRole="button"
-              onPress={() => {
-                setDescricaoError(null); setValorError(null); setDiaError(null); setCategoriaError(null); setErroCriar(null);
-                let hasErr = false;
-                if (!descricaoCriar.trim()) { setDescricaoError('Descrição obrigatória.'); hasErr = true; }
-                const v = parseCurrencyBR(valorCriar);
-                if (isNaN(v) || v <= 0) { setValorError('Valor deve ser positivo.'); hasErr = true; }
-                const dia = Number(diaCriar);
-                if (!Number.isInteger(dia) || dia < 1 || dia > 31) { setDiaError('Dia deve ser um número entre 1 e 31.'); hasErr = true; }
-                if (!categoriaCriarId) { setCategoriaError('Selecione uma categoria.'); hasErr = true; }
-                if (automaticaCriar && !carteiraCriarId) { setErroCriar('Selecione a conta da execução automática.'); hasErr = true; }
-                if (hasErr) return;
-                criarMutation.mutate({
-                  descricao: descricaoCriar.trim(),
-                  valor: Number(v),
-                  diaVencimento: dia,
-                  categoriaId: categoriaCriarId!,
-                  recorrente: recorrenteCriar,
-                  tipo: tipoCriar,
-                  execucaoAutomatica: automaticaCriar,
-                  carteiraId: automaticaCriar ? carteiraCriarId! : undefined,
-                });
-              }}
-            >
-              {criarMutation.status === 'pending'
-                ? <ActivityIndicator color={colors.brand} size="small" />
-                : <Text style={{ color: colors.brandFg, fontSize: 15, fontWeight: '600' }}>Salvar</Text>}
-            </TouchableOpacity>
+          <RotuloDeGrupo>Execução</RotuloDeGrupo>
+          <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
+            <Chip label="Manual" selected={!automaticaCriar} onPress={() => setAutomaticaCriar(false)} />
+            <Chip label="Automática" selected={automaticaCriar} onPress={() => setAutomaticaCriar(true)} />
           </View>
-          <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
-            <Text style={{ color: colors.textSecondary, fontSize: 10, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Tipo</Text>
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
-              <Chip label="↑ Entrada" selected={tipoCriar === 'ENTRADA'} onPress={() => setTipoCriar('ENTRADA')} />
-              <Chip label="↓ Saída" selected={tipoCriar === 'SAIDA'} onPress={() => setTipoCriar('SAIDA')} />
-            </View>
-            <Field label="Descrição" value={descricaoCriar} onChangeText={setDescricaoCriar} placeholder="Ex: Aluguel" error={descricaoError} autoFocus />
-            <Field label="Valor" value={valorCriar} onChangeText={(t) => setValorCriar(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" error={valorError} />
-            <Field label="Dia de vencimento" value={diaCriar} onChangeText={setDiaCriar} keyboardType="number-pad" placeholder="Ex: 10" maxLength={2} error={diaError} />
-
-            <Text style={{ color: colors.textSecondary, fontSize: 10, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Categoria</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} style={{ marginBottom: 8 }} keyboardShouldPersistTaps="handled">
-              {categorias.map(cat => (
-                <Chip key={cat.id} label={`${cat.icone ? cat.icone + ' ' : ''}${cat.nome}`} selected={categoriaCriarId === cat.id} onPress={() => setCategoriaCriarId(cat.id)} />
-              ))}
-            </ScrollView>
-            {categoriaError && <Text style={{ color: colors.danger, fontSize: 12, marginBottom: 8 }}>{categoriaError}</Text>}
-
-            <Text style={{ color: colors.textSecondary, fontSize: 10, letterSpacing: 0.8, marginTop: 12, marginBottom: 6, textTransform: 'uppercase' }}>Execução</Text>
-            <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10 }}>
-              <Chip label="Manual" selected={!automaticaCriar} onPress={() => setAutomaticaCriar(false)} />
-              <Chip label="Automática" selected={automaticaCriar} onPress={() => setAutomaticaCriar(true)} />
-            </View>
-            {automaticaCriar && (
-              <>
-                <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 8 }}>Escolha a conta que receberá ou pagará no vencimento.</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                  {carteiras.map(c => <Chip key={c.id} label={`${c.nome} · ${formatCurrency(Number(c.saldo ?? 0))}`} selected={carteiraCriarId === c.id} onPress={() => setCarteiraCriarId(c.id)} />)}
-                </ScrollView>
-              </>
-            )}
-
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
-              <View style={{ flex: 1, marginRight: 12 }}>
-                <Text style={{ color: colors.textPrimary, fontSize: 15, fontWeight: '600' }}>Repete todo mês</Text>
-                <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 2 }}>Desative para contas de um mês só.</Text>
-              </View>
-              <Switch
-                value={recorrenteCriar}
-                onValueChange={setRecorrenteCriar}
-                trackColor={{ true: colors.brand }}
-                accessibilityLabel="Repete todo mês"
+          {automaticaCriar && (
+            <>
+              <Text style={{ ...typography.meta, color: colors.textSecondary, marginBottom: spacing.sm }}>
+                Escolha a conta que receberá ou pagará no vencimento.
+              </Text>
+              <FaixaDeContas
+                contas={carteiras}
+                selecionada={carteiraCriarId}
+                onSelecionar={setCarteiraCriarId}
+                vazio="Você ainda não tem contas. Crie uma em Mais → Contas."
               />
-            </View>
+            </>
+          )}
 
-            {erroCriar && <Text style={{ color: colors.danger, marginTop: 16 }}>{erroCriar}</Text>}
-          </ScrollView>
-        </View>
-      </Modal>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md, marginTop: spacing.md }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ ...typography.cardTitle, fontWeight: '600', color: colors.textPrimary }}>Repete todo mês</Text>
+              <Text style={{ ...typography.meta, color: colors.textSecondary, marginTop: spacing.xxs }}>Desative para contas de um mês só.</Text>
+            </View>
+            <Switch
+              value={recorrenteCriar}
+              onValueChange={setRecorrenteCriar}
+              trackColor={{ true: colors.brand }}
+              accessibilityLabel="Repete todo mês"
+            />
+          </View>
+
+          {erroCriar && (
+            <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={{ ...typography.meta, color: colors.danger, marginTop: spacing.lg }}>
+              {erroCriar}
+            </Text>
+          )}
+        </ScrollView>
+      </FolhaModal>
     </View>
   );
 }
+
+/**
+ * Faixa de contas de caixa. Aparece na folha de pagamento e na de execução
+ * automática — as duas pediam a mesma coisa, com o texto de vazio duplicado.
+ */
+const FaixaDeContas = ({ contas, selecionada, onSelecionar, vazio }: {
+  contas: ContaFinanceira[];
+  selecionada: number | null;
+  onSelecionar: (id: number) => void;
+  vazio: string;
+}) => {
+  const colors = useTheme();
+  if (contas.length === 0) {
+    return <Text style={{ ...typography.body, color: colors.textSecondary }}>{vazio}</Text>;
+  }
+  return (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ gap: spacing.sm }}
+      keyboardShouldPersistTaps="handled"
+    >
+      {contas.map(c => (
+        <Chip
+          key={c.id}
+          label={`${c.nome} · ${formatCurrency(Number(c.saldo ?? 0))}`}
+          selected={selecionada === c.id}
+          onPress={() => onSelecionar(c.id)}
+        />
+      ))}
+    </ScrollView>
+  );
+};
