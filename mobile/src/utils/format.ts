@@ -120,14 +120,35 @@ export const STATUS_LABEL: Record<StatusPagamento, string> = {
   CANCELADO: 'Cancelado',
 };
 
+/**
+ * Paleta de categoria. A **ordem importa**: `src/domain/categoriasIniciais.ts` e
+ * `NovaTransacaoModal` escolhem por índice.
+ */
 export const CATEGORY_COLORS = [
-  '#00c8ff', // ciano
-  '#2ed573', // verde
-  '#ff4757', // vermelho
-  '#ffa502', // amarelo
-  '#8b2fff', // roxo
-  '#ff6b81', // rosa
-  '#1e90ff', // azul royal
-  '#ff6348', // laranja
-  '#747d8c', // cinza neutro
+  '#00c8ff',
+  '#2ed573',
+  '#ff4757',
+  '#ffa502',
+  '#8b2fff',
+  '#ff6b81',
+  '#1e90ff',
+  '#ff6348',
+  '#747d8c',
 ];
+
+/**
+ * Nome de cada cor da paleta. O nome era um comentário ao lado do hex, então o
+ * seletor de cor só sabia dizer "Cor 1", "Cor 2" — posição não é cor, e quem usa
+ * leitor de tela não tinha como saber o que estava escolhendo.
+ */
+export const NOME_DA_COR: Record<string, string> = {
+  '#00c8ff': 'ciano',
+  '#2ed573': 'verde',
+  '#ff4757': 'vermelho',
+  '#ffa502': 'amarelo',
+  '#8b2fff': 'roxo',
+  '#ff6b81': 'rosa',
+  '#1e90ff': 'azul royal',
+  '#ff6348': 'laranja',
+  '#747d8c': 'cinza neutro',
+};
