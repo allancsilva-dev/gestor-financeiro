@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, AppStateStatus, KeyboardAvoidingView, Platform, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
-import api from '../services/api';
+import * as ScreenCapture from 'expo-screen-capture';
+import api, { refreshAccessToken } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../theme';
 
@@ -20,6 +21,20 @@ export default function AppLockGate({ children }: { children: React.ReactNode })
   const startupCheckPending = useRef(true);
   const autoAttempted = useRef(false);
   const visuallyLocked = locked || (isAuthenticated && !isLoading && startupCheckPending.current);
+
+  // Desbloqueio é o momento por onde o usuário sempre passa, então é onde a
+  // sessão é renovada — antes disso a digital só abria a UI sobre um token que
+  // podia estar morto havia dias, e o erro aparecia tela a tela.
+  // Falha de rede não prende ninguém do lado de fora: libera e o interceptor
+  // tenta de novo na próxima request. Se o servidor recusou o refresh, api.ts
+  // já encerrou a sessão e o portão troca a tela sozinho.
+  const renovarSessao = useCallback(async () => {
+    try {
+      await refreshAccessToken();
+    } catch {
+      // refreshAccessToken já trata; aqui só garantimos que o gate abra.
+    }
+  }, []);
 
   const unlockWithDevice = useCallback(async () => {
     if (authenticating) return;
@@ -40,6 +55,7 @@ export default function AppLockGate({ children }: { children: React.ReactNode })
         disableDeviceFallback: false,
       });
       if (result.success) {
+        await renovarSessao();
         setLocked(false);
         setShowPassword(false);
         setPassword('');
@@ -47,7 +63,7 @@ export default function AppLockGate({ children }: { children: React.ReactNode })
     } finally {
       setAuthenticating(false);
     }
-  }, [authenticating]);
+  }, [authenticating, renovarSessao]);
 
   useEffect(() => {
     if (isLoading) return;
@@ -73,6 +89,21 @@ export default function AppLockGate({ children }: { children: React.ReactNode })
     }
     if (!locked) autoAttempted.current = false;
   }, [locked, isAuthenticated, unlockWithDevice]);
+
+  // O overlay de privacidade abaixo limpa o app switcher do iOS, mas o Android
+  // tira o snapshot da Activity de qualquer jeito: só FLAG_SECURE tira os valores
+  // da miniatura de recentes e do print. Vale enquanto existe sessão — depois do
+  // logout não há o que proteger e o usuário volta a poder printar a própria tela.
+  useEffect(() => {
+    if (!isAuthenticated) {
+      ScreenCapture.allowScreenCaptureAsync().catch(() => undefined);
+      return;
+    }
+    ScreenCapture.preventScreenCaptureAsync().catch(() => undefined);
+    return () => {
+      ScreenCapture.allowScreenCaptureAsync().catch(() => undefined);
+    };
+  }, [isAuthenticated]);
 
   useEffect(() => {
     const onState = (next: AppStateStatus) => {
@@ -101,6 +132,7 @@ export default function AppLockGate({ children }: { children: React.ReactNode })
     setError(null);
     try {
       await api.post('/v1/usuarios/me/validar-senha', { senha: password });
+      await renovarSessao();
       setLocked(false);
       setPassword('');
       setShowPassword(false);
@@ -116,7 +148,7 @@ export default function AppLockGate({ children }: { children: React.ReactNode })
       {children}
       {(privacy || (visuallyLocked && isAuthenticated)) && (
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.select({ ios: 'padding', android: 'height' })}
           accessibilityViewIsModal
           style={{ position: 'absolute', inset: 0, zIndex: 100, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', padding: 28 }}
         >

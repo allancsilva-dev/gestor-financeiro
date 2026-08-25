@@ -3,7 +3,6 @@ import { Usuario } from '../types';
 import { authService } from '../services/authService';
 import {
   getAccessToken,
-  getRefreshToken,
   getUsuarioCache,
   clearAccessToken,
   clearRefreshToken,
@@ -11,7 +10,7 @@ import {
   clearUsuarioCache,
   setUsuarioCache,
 } from '../store/auth';
-import api from '../services/api';
+import api, { setOnSessionExpired } from '../services/api';
 
 interface AuthContextType {
   usuario: Usuario | null;
@@ -33,6 +32,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     restoreSession();
   }, []);
 
+  // api.ts avisa quando o refresh foi recusado pelo servidor. Sem isso o app
+  // ficava montado como autenticado sobre credenciais já descartadas, com toda
+  // tela em erro e nenhum caminho de volta ao login a não ser deslogar na mão.
+  useEffect(() => {
+    setOnSessionExpired(() => {
+      void clearUsuarioCache();
+      setUsuario(null);
+    });
+    return () => setOnSessionExpired(null);
+  }, []);
+
   const restoreSession = async () => {
     try {
       const token = await getAccessToken();
@@ -45,12 +55,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUsuario(data);
     } catch (err) {
       // Erro de rede/timeout mantém a sessão local (usuário do cache já foi
-      // aplicado acima). Só encerra a sessão quando o backend rejeitou a auth
-      // e o refresh token também foi invalidado — se o refresh falhou por rede,
-      // api.ts preserva o token e a próxima abertura tenta de novo.
+      // aplicado acima) e a próxima abertura tenta de novo.
+      // Quando o servidor respondeu negando a auth, a sessão acabou: o
+      // interceptor já tentou renovar antes de o erro chegar aqui.
       const status = (err as { response?: { status?: number } }).response?.status;
-      const refreshToken = await getRefreshToken();
-      if ((status === 401 || status === 403) && !refreshToken) {
+      if (status === 401 || status === 403) {
         await clearAccessToken();
         await clearRefreshToken();
         await clearCsrfToken();

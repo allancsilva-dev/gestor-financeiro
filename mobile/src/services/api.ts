@@ -27,11 +27,27 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
+// Aviso de sessão encerrada. Sem esse canal o app limpava as credenciais mas
+// continuava montado como se estivesse logado: toda tela caía em 401 e o
+// usuário precisava deslogar na mão.
+let onSessionExpired: (() => void) | null = null;
+
+export const setOnSessionExpired = (fn: (() => void) | null) => {
+  onSessionExpired = fn;
+};
+
+const encerrarSessao = async () => {
+  await clearAccessToken();
+  await clearRefreshToken();
+  await clearCsrfToken();
+  onSessionExpired?.();
+};
+
 // Renovação de access token: uma única chamada de refresh compartilhada
 // entre todas as requests que tomaram 401 ao mesmo tempo.
 let refreshPromise: Promise<string | null> | null = null;
 
-const refreshAccessToken = (): Promise<string | null> => {
+export const refreshAccessToken = (): Promise<string | null> => {
   if (!refreshPromise) {
     refreshPromise = (async () => {
       try {
@@ -54,13 +70,14 @@ const refreshAccessToken = (): Promise<string | null> => {
         if (data.csrfToken) await setCsrfToken(data.csrfToken);
         return token;
       } catch (err) {
-        // Só descarta tokens quando o backend rejeitou o refresh (401/403).
-        // Falha de rede/timeout preserva os tokens para tentar de novo depois.
-        const status = (err as AxiosError).response?.status;
-        if (status === 401 || status === 403) {
-          await clearAccessToken();
-          await clearRefreshToken();
-          await clearCsrfToken();
+        // Qualquer resposta do servidor no refresh significa sessão morta — não
+        // só 401/403. O backend também responde 404 (token some do banco) e já
+        // respondeu 422 (expirado); tratar só 401/403 deixava credenciais
+        // mortas no SecureStore e travava o app em loop de 401.
+        // Sem `response` é rede/timeout: preserva os tokens e tenta depois.
+        const respondeu = (err as AxiosError).response !== undefined;
+        if (respondeu) {
+          await encerrarSessao();
         }
         return null;
       } finally {
