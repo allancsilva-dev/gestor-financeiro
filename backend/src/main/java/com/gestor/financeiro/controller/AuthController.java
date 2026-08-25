@@ -4,6 +4,7 @@ import com.gestor.financeiro.config.JwtUtil;
 import com.gestor.financeiro.dto.*;
 import com.gestor.financeiro.exception.AccountLockedException;
 import com.gestor.financeiro.exception.BusinessException;
+import com.gestor.financeiro.exception.SessaoExpiradaException;
 import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.model.PasswordResetToken;
 import com.gestor.financeiro.model.RefreshToken;
@@ -57,7 +58,6 @@ public class AuthController {
     private static final String MOBILE_CLIENT_HEADER = "X-Client-Type";
     private static final String MOBILE_CLIENT_VALUE = "mobile";
 
-    private static final long REFRESH_COOKIE_MAX_AGE_SECONDS = 7L * 24 * 3600;
     private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
     private final UsuarioRepository usuarioRepository;
@@ -69,6 +69,11 @@ public class AuthController {
 
     @Value("${cookie.secure:false}")
     private boolean cookieSecure;
+
+    // Max-Age do cookie web acompanha a janela do refresh token; se ficasse
+    // fixo, o cookie morreria antes do token que ele carrega.
+    @Value("${jwt.refresh-expiration-days:30}")
+    private int refreshExpirationDays;
 
     @Value("${security.auth.max-failed-attempts:5}")
     private int maxFailedAttempts;
@@ -159,8 +164,8 @@ public class AuthController {
             }
 
             String csrfToken = createCsrfToken();
-            ResponseCookie refreshCookie = buildRefreshTokenCookie(refreshToken.valor(), REFRESH_COOKIE_MAX_AGE_SECONDS);
-            ResponseCookie csrfCookie = buildCsrfCookie(csrfToken, REFRESH_COOKIE_MAX_AGE_SECONDS);
+            ResponseCookie refreshCookie = buildRefreshTokenCookie(refreshToken.valor(), refreshCookieMaxAgeSeconds());
+            ResponseCookie csrfCookie = buildCsrfCookie(csrfToken, refreshCookieMaxAgeSeconds());
 
             return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, refreshCookie.toString(), csrfCookie.toString())
@@ -188,7 +193,7 @@ public class AuthController {
         String clientIp = extractClientIp(request);
 
         if (refreshTokenValue == null || refreshTokenValue.isEmpty()) {
-            throw new BusinessException("Refresh token não fornecido");
+            throw new SessaoExpiradaException("Refresh token não fornecido");
         }
 
         // Rotaciona token: revoga atual e emite um novo.
@@ -203,8 +208,8 @@ public class AuthController {
         }
 
         String csrfToken = createCsrfToken();
-        ResponseCookie refreshCookie = buildRefreshTokenCookie(refreshToken.valor(), REFRESH_COOKIE_MAX_AGE_SECONDS);
-        ResponseCookie csrfCookie = buildCsrfCookie(csrfToken, REFRESH_COOKIE_MAX_AGE_SECONDS);
+        ResponseCookie refreshCookie = buildRefreshTokenCookie(refreshToken.valor(), refreshCookieMaxAgeSeconds());
+        ResponseCookie csrfCookie = buildCsrfCookie(csrfToken, refreshCookieMaxAgeSeconds());
 
         return ResponseEntity.ok()
             .header(HttpHeaders.SET_COOKIE, refreshCookie.toString(), csrfCookie.toString())
@@ -410,6 +415,10 @@ public class AuthController {
         byte[] bytes = new byte[32];
         SECURE_RANDOM.nextBytes(bytes);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    private long refreshCookieMaxAgeSeconds() {
+        return (long) refreshExpirationDays * 24 * 3600;
     }
 
     private boolean isMobileClient(HttpServletRequest request) {

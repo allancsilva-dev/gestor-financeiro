@@ -860,4 +860,92 @@ class AuthControllerTest {
         String parChaveValor = setCookie.split(";", 2)[0];
         return parChaveValor.split("=", 2)[1];
     }
+
+    // Falha de refresh precisa chegar ao cliente como 401. Enquanto o backend
+    // respondia 422 (expirado) e 404 (desconhecido), o mobile — que só descarta
+    // credenciais em 401/403 — ficava preso com tokens mortos no SecureStore.
+    @Test
+    void refreshToken_deveResponder401QuandoTokenExpirado() throws Exception {
+        usuarioRepository.save(TestDataFactory.usuario("Alice", "alice.exp@teste.com", passwordEncoder.encode("123456")));
+
+        String tokenCru = loginMobileRetornandoRefreshToken("alice.exp@teste.com");
+
+        com.gestor.financeiro.model.RefreshToken persistido =
+                refreshTokenRepository.findByToken(TokenHasher.sha256Hex(tokenCru)).orElseThrow();
+        persistido.setDataExpiracao(LocalDateTime.now().minusMinutes(1));
+        refreshTokenRepository.save(persistido);
+
+        mockMvc.perform(post("/api/auth/refresh-token")
+                .header("X-Client-Type", "mobile")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("refreshToken", tokenCru))))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("SESSION_EXPIRED"));
+    }
+
+    @Test
+    void refreshToken_deveResponder401QuandoTokenDesconhecido() throws Exception {
+        mockMvc.perform(post("/api/auth/refresh-token")
+                .header("X-Client-Type", "mobile")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("refreshToken", "token-que-nunca-existiu"))))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("SESSION_EXPIRED"));
+    }
+
+    @Test
+    void refreshToken_deveResponder401QuandoTokenAusente() throws Exception {
+        mockMvc.perform(post("/api/auth/refresh-token")
+                .header("X-Client-Type", "mobile")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.code").value("SESSION_EXPIRED"));
+    }
+
+    // A janela desliza: o token emitido na rotação vale 30 dias contados de
+    // agora, então quem usa o app com regularidade nunca volta para o login.
+    @Test
+    void refreshToken_deveDeslizarJanelaDeExpiracaoNaRotacao() throws Exception {
+        usuarioRepository.save(TestDataFactory.usuario("Alice", "alice.desliza@teste.com", passwordEncoder.encode("123456")));
+
+        String tokenA = loginMobileRetornandoRefreshToken("alice.desliza@teste.com");
+
+        com.gestor.financeiro.model.RefreshToken original =
+                refreshTokenRepository.findByToken(TokenHasher.sha256Hex(tokenA)).orElseThrow();
+        original.setDataExpiracao(LocalDateTime.now().plusDays(2));
+        refreshTokenRepository.save(original);
+
+        Map<String, Object> renovado = objectMapper.readValue(mockMvc.perform(post("/api/auth/refresh-token")
+                .header("X-Client-Type", "mobile")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("refreshToken", tokenA))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(), Map.class);
+
+        String tokenB = (String) renovado.get("refreshToken");
+        com.gestor.financeiro.model.RefreshToken novo =
+                refreshTokenRepository.findByToken(TokenHasher.sha256Hex(tokenB)).orElseThrow();
+
+        assertThat(novo.getDataExpiracao()).isAfter(LocalDateTime.now().plusDays(29));
+        assertThat(refreshTokenRepository.findByToken(TokenHasher.sha256Hex(tokenA)).orElseThrow().getRevogado()).isTrue();
+    }
+
+    private String loginMobileRetornandoRefreshToken(String email) throws Exception {
+        Map<String, Object> login = objectMapper.readValue(mockMvc.perform(post("/api/auth/login")
+                .header("X-Client-Type", "mobile")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "email", email,
+                        "password", "123456"
+                ))))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(), Map.class);
+
+        return (String) login.get("refreshToken");
+    }
 }

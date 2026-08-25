@@ -106,6 +106,13 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(apiError);
     }
 
+    @ExceptionHandler(SessaoExpiradaException.class)
+    public ResponseEntity<ApiError> handleSessaoExpirada(SessaoExpiradaException ex, HttpServletRequest request) {
+        ApiError apiError = buildError("SESSION_EXPIRED", "Sessão expirada. Faça login novamente.", null, request);
+
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(apiError);
+    }
+
     @ExceptionHandler(TokenReuseDetectedException.class)
     public ResponseEntity<ApiError> handleTokenReuse(TokenReuseDetectedException ex, HttpServletRequest request) {
         ApiError apiError = buildError("TOKEN_REUSE_DETECTED", ex.getMessage(), null, request);

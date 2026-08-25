@@ -1,8 +1,7 @@
 package com.gestor.financeiro.service;
 
 import lombok.RequiredArgsConstructor;
-import com.gestor.financeiro.exception.BusinessException;
-import com.gestor.financeiro.exception.ResourceNotFoundException;
+import com.gestor.financeiro.exception.SessaoExpiradaException;
 import com.gestor.financeiro.exception.TokenReuseDetectedException;
 import com.gestor.financeiro.model.RefreshToken;
 import com.gestor.financeiro.model.Usuario;
@@ -10,6 +9,7 @@ import com.gestor.financeiro.repository.RefreshTokenRepository;
 import com.gestor.financeiro.security.TokenHasher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,8 +32,10 @@ public class RefreshTokenService {
     private static final Logger log = LoggerFactory.getLogger(RefreshTokenService.class);
     private final RefreshTokenRepository refreshTokenRepository;
 
-    // Tempo de expiração do refresh token (7 dias)
-    private static final int EXPIRATION_DAYS = 7;
+    // Janela do refresh token. Desliza: toda rotação regrava a expiração a
+    // partir de agora, então uso regular do app mantém a sessão viva.
+    @Value("${jwt.refresh-expiration-days:30}")
+    private int expirationDays;
 
     /**
      * Par emitido na criação/rotação: o valor cru vai ao cliente uma única vez;
@@ -52,8 +54,8 @@ public class RefreshTokenService {
         // 32 bytes de SecureRandom; no banco só o hash — vazamento do DB não rouba sessão
         String valor = gerarValorAleatorio();
 
-        // Data de expiração (7 dias a partir de agora)
-        LocalDateTime dataExpiracao = LocalDateTime.now().plusDays(EXPIRATION_DAYS);
+        // Expiração contada a partir de agora — é isso que faz a janela deslizar
+        LocalDateTime dataExpiracao = LocalDateTime.now().plusDays(expirationDays);
 
         RefreshToken refreshToken = new RefreshToken(usuario, hash(valor), dataExpiracao);
 
@@ -80,14 +82,14 @@ public class RefreshTokenService {
      */
     public RefreshToken validarRefreshToken(String token) {
         RefreshToken refreshToken = refreshTokenRepository.findByToken(hash(token))
-            .orElseThrow(() -> new ResourceNotFoundException("Refresh token não encontrado"));
+            .orElseThrow(() -> new SessaoExpiradaException("Refresh token não encontrado"));
 
         if (refreshToken.isExpirado()) {
-            throw new BusinessException("Refresh token expirado");
+            throw new SessaoExpiradaException("Refresh token expirado");
         }
 
         if (refreshToken.getRevogado()) {
-            throw new BusinessException("Refresh token revogado");
+            throw new SessaoExpiradaException("Refresh token revogado");
         }
 
         return refreshToken;
@@ -102,10 +104,10 @@ public class RefreshTokenService {
     @Transactional
     public TokenGerado rotacionarRefreshToken(String tokenAtual, String clientIp) {
         RefreshToken atual = refreshTokenRepository.findByToken(hash(tokenAtual))
-            .orElseThrow(() -> new ResourceNotFoundException("Refresh token não encontrado"));
+            .orElseThrow(() -> new SessaoExpiradaException("Refresh token não encontrado"));
 
         if (atual.isExpirado()) {
-            throw new BusinessException("Refresh token expirado");
+            throw new SessaoExpiradaException("Refresh token expirado");
         }
 
         if (atual.getRevogado()) {
