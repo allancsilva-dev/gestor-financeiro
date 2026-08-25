@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Keyboard, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTheme, useTabBarSpace, spacing, typography, numeric, radius } from '../../../src/theme';
@@ -88,6 +88,10 @@ export default function FaturaDetalheScreen() {
     try {
       const key = `${fatura.id}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
       await faturaService.pagarFatura(fatura.id, valor, carteiraPagamentoId, key);
+      // Pagamento concluído: o teclado não tem mais o que editar e, aberto, ele
+      // cobre os lançamentos e a barra de navegação. O campo ainda é recarregado
+      // com o restante pelo efeito acima, para quem quiser pagar o resto.
+      Keyboard.dismiss();
       queryClient.invalidateQueries({ queryKey: ['carteiras'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard-projecao'] });
       // prefixo ['cartoes'] cobre ['cartoes','carteira'] da tela Carteira
@@ -107,7 +111,18 @@ export default function FaturaDetalheScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ScrollView contentContainerStyle={{ paddingBottom: tabBarSpace }}>
+      {/*
+        O padrão do RN é `keyboardShouldPersistTaps="never"`: com o teclado
+        aberto, o primeiro toque fora do campo é consumido para fechá-lo e não
+        chega ao filho. Como "Pagar Fatura" fica logo abaixo do valor, quem
+        digitava um pagamento parcial e tocava no botão via o teclado sumir e
+        nada acontecer — só o segundo toque pagava. Todas as outras telas com
+        campo dentro de ScrollView já usam "handled".
+      */}
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: tabBarSpace }}
+        keyboardShouldPersistTaps="handled"
+      >
         <CabecalhoSubTela
           titulo={params.nome ?? fatura?.cartaoNome ?? 'Fatura'}
           apoio={
