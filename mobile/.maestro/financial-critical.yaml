@@ -105,7 +105,13 @@ tags:
 - inputText: "500000"
 - pressKey: Enter
 - pressKey: Enter
-- inputText: "5"
+# Fechamento no fim do mês, não no dia 5: a competência de uma compra é o mês
+# seguinte quando o dia da compra passa do fechamento (FaturaDatas.competencia).
+# Com fechamento 5, a compra de hoje só caía na "fatura atual" quando o flow
+# rodava até o dia 5 — nos outros dias a fatura vinha zerada e a asserção de
+# 75,00 falhava. 31 é clampado ao último dia do mês, então nenhuma compra do
+# mês corrente escapa da competência atual, em qualquer data de execução.
+- inputText: "31"
 - pressKey: Enter
 - inputText: "12"
 - tapOn:
@@ -253,7 +259,10 @@ tags:
 - extendedWaitUntil:
     visible: ".*Restante:.*50,00"
     timeout: 15000
-- assertVisible: ".*Pago:.*25,00"
+# Pago e restante moram no MESMO nó ("Pago: R$ 25,00 · Restante: R$ 50,00") e o
+# Maestro casa regex por igualdade total: sem o `.*` final a expressão exigiria
+# que o texto terminasse em 25,00, e ele termina em 50,00.
+- assertVisible: ".*Pago:.*25,00.*"
 - takeScreenshot: "03-fatura-parcial"
 
 # Reserva de R$ 50 na meta e verificacao do cofre
@@ -275,7 +284,10 @@ tags:
 - extendedWaitUntil:
     visible: ".*50,00.*de.*1.000,00"
     timeout: 15000
-- assertVisible: "5,0%"
+# O card arredonda o progresso para inteiro (`formatPercent(progresso, 0)`):
+# mostra "5%", nunca "5,0%". E o bloco de informação é um nó só, então a regex
+# precisa cobrir o texto inteiro.
+- assertVisible: ".*Meta Smoke, 5%.*"
 - takeScreenshot: "04-meta-reservada"
 - tapOn:
     point: "89%,92%"
@@ -284,7 +296,10 @@ tags:
 - extendedWaitUntil:
     visible: ".*Cofre: Meta Smoke.*"
     timeout: 15000
-- assertVisible: ".*50,00"
+# O saldo mora no mesmo nó do cofre, que termina em "Somente leitura ·
+# gerenciada no módulo de origem" — `.*50,00` exigiria que o texto acabasse no
+# valor. Amarrar o valor ao cofre também evita casar com outro card qualquer.
+- assertVisible: ".*Cofre: Meta Smoke.*50,00.*"
 
 # Extrato confiavel da conta principal
 # O card da conta é composto: o rótulo do nó funde nome, subtipo, saldo e banco,
@@ -299,8 +314,12 @@ tags:
 - tapOn: "Fechar"
 
 # Relatorios atualizados com as duas despesas (100 + 75)
-- tapOn: "Voltar"
-- tapOn: "Relatórios"
+# "Voltar" aqui não leva ao hub de Ajustes: a pilha do `more` ainda tem a fatura
+# embaixo de Contas, então o pop volta para a fatura e o tile "Relatórios" não
+# está em tela. A aba Análises abre a mesma tela direto — e, como os rótulos da
+# tab bar nativa não entram na árvore de acessibilidade, o toque é por coordenada.
+- tapOn:
+    point: "30%,92%"
 - extendedWaitUntil:
     visible: "Relatórios"
     timeout: 15000
