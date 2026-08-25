@@ -32,6 +32,19 @@ import IconTile from '../../src/components/ui/IconTile';
 import ListRow from '../../src/components/ui/ListRow';
 import Entrance from '../../src/components/ui/Entrance';
 
+// O SAF do Android filtra pelo MIME que o provedor do arquivo declara, e CSV
+// vindo de Downloads, Drive ou WhatsApp quase sempre chega como octet-stream ou
+// text/plain: com o filtro estrito o arquivo aparece cinza e não dá pra tocar.
+// Abre-se o filtro e revalida-se pela extensão — mesmo padrão do anexo em
+// EditarTransacaoModal. O backend não valida content-type, só lê o stream.
+const TIPOS_CSV = [
+  'text/csv',
+  'text/comma-separated-values',
+  'application/vnd.ms-excel',
+  'text/plain',
+  'application/octet-stream',
+];
+
 // Ferramentas do app. Os rótulos "Categorias", "Carteira", "Contas" e "Relatórios"
 // são tocados por texto em .maestro/financial-critical.yaml — não renomear.
 const FERRAMENTAS: Array<{
@@ -105,13 +118,17 @@ export default function Ajustes() {
   const importarCsv = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ['text/csv', 'text/comma-separated-values', 'application/vnd.ms-excel'],
+        type: TIPOS_CSV,
         multiple: false,
         copyToCacheDirectory: true,
       });
 
       if (result.canceled || !result.assets?.[0]) return;
       const asset = result.assets[0];
+      if ((asset.name?.split('.').pop() ?? '').toLowerCase() !== 'csv') {
+        Alert.alert('Importar CSV', 'Selecione um arquivo .csv.');
+        return;
+      }
       const data = await importService.csv({
         uri: asset.uri,
         name: asset.name || 'extrato.csv',
