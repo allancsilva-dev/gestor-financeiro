@@ -46,13 +46,15 @@ export default function CardMeta({ meta, onAbrir, onDepositar, onEditar, onExclu
   const corDoRitmo = ritmo?.tom === 'atencao' ? colors.warning : colors.brandFg;
 
   return (
-    <TouchableOpacity
-      activeOpacity={0.9}
-      accessibilityRole="button"
-      accessibilityHint="Abre os detalhes da meta"
-      onPress={() => onAbrir(meta)}
-      style={{ marginHorizontal: e(18), marginBottom: e(33) }}
-    >
+    /*
+      O card não é UM botão só: enquanto a raiz inteira era `TouchableOpacity`,
+      o iOS fundia tudo num único nó de acessibilidade
+      ("Meta Smoke, 0%, ..., Excluir a meta, Editar a meta, Depositar") e os
+      três botões da linha de ações deixavam de ser elementos próprios — o
+      VoiceOver lia "Depositar" como texto e não tinha como acioná-lo. Agora só
+      o bloco de informação abre os detalhes; as ações são irmãs dele.
+    */
+    <View style={{ marginHorizontal: e(18), marginBottom: e(33) }}>
       <SuperficieComBrilho
         id={meta.id}
         tintaTopo={paleta.tintaTopo}
@@ -60,7 +62,13 @@ export default function CardMeta({ meta, onAbrir, onDepositar, onEditar, onExclu
         borderRadius={e(20)}
         style={{ paddingHorizontal: e(16), paddingVertical: e(10) }}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <TouchableOpacity
+          activeOpacity={0.9}
+          accessibilityRole="button"
+          accessibilityHint="Abre os detalhes da meta"
+          onPress={() => onAbrir(meta)}
+          style={{ flexDirection: 'row', alignItems: 'center' }}
+        >
           <View
             style={{
               width: TILE, height: TILE, borderRadius: e(18),
@@ -109,7 +117,7 @@ export default function CardMeta({ meta, onAbrir, onDepositar, onEditar, onExclu
               <ProgressBar value={progresso} height={e(6)} paleta={paleta} />
             </View>
           </View>
-        </View>
+        </TouchableOpacity>
 
         <View style={{ height: 1, backgroundColor: colors.border, marginTop: e(10) }} />
 
@@ -159,6 +167,6 @@ export default function CardMeta({ meta, onAbrir, onDepositar, onEditar, onExclu
           )}
         </View>
       </SuperficieComBrilho>
-    </TouchableOpacity>
+    </View>
   );
 }
