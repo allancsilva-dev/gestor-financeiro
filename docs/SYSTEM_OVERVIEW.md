@@ -2,13 +2,22 @@
 
 Documentacao de alto nivel sobre como o sistema funciona. Mantido pelo `docs-reporter`.
 
-**Ultima atualizacao:** 2026-08-22 (branch `design/pr13-perfil`, commits `9c1335be`..`ad5fc022`,
+**Ultima atualizacao:** 2026-08-22 (working tree sobre a branch `design/pr13-perfil`: correcao da
+sessao mobile que travava em erro apos desbloqueio por digital — refresh token com falha 422/404
+nao era tratado como fim de sessao pelo mobile, e o desbloqueio por biometria nao renovava nada
+contra o servidor; janela do refresh token elevada de 7 para 30 dias, novo code `SESSION_EXPIRED`
+(401) para as tres causas de falha de refresh, novo `RefreshTokenScheduler` — ver item 29 da lista
+de decisoes tecnicas, PROB-0085, BUG-0096/BUG-0097, BACKLOG-0103/0104/0105)
+
+**Atualizacao anterior:** 2026-08-22 (branch `design/pr13-perfil`, commits `9c1335be`..`ad5fc022`,
 mergeada em `main` no intervalo `12571a4..HEAD`: serie de 13 PRs que unificou o padrao visual do
 app mobile — kit `ui/` normalizado, tres telas de referencia (Home/Carteira/Metas) fechadas num so
 padrao, trinco `padraoVisual.test.ts` e migracao das 10 telas restantes de `app/**` para o padrao
-novo — ver item 27 da lista de decisoes tecnicas, BUG-0083 a BUG-0091, BACKLOG-0098/0099/0100/0101)
+novo — ver item 27 da lista de decisoes tecnicas, BUG-0083 a BUG-0091, BACKLOG-0098/0099/0100/0101;
+rodada de verificacao runtime com os quatro flows Maestro verdes tambem faz parte desta janela — ver
+item 28, BUG-0092 a BUG-0095, `docs/REVIEW_REPORTS/2026-08-22_mobile_verification_maestro-runtime-padrao-visual.md`)
 
-**Atualizacao anterior:** 2026-08-21 (working tree nao commitado sobre `main` em `12cc447`: redesign de
+**Duas atualizacoes atras:** 2026-08-21 (working tree nao commitado sobre `main` em `12cc447`: redesign de
 `mobile/app/(app)/ajustes.tsx` para o padrao visual de Home/Carteira/Metas, escolha de tema
 claro/escuro/sistema pelo usuario (antes so seguia o SO), exclusao de conta LGPD consumida pela
 primeira vez no mobile via `DELETE /v1/usuarios/me`, e `DESIGN.md` reescrito para refletir a marca
@@ -124,10 +133,14 @@ Page (renderizacao, eventos)
 1. **Registro:** `POST /api/auth/register` → cria Usuario com senha BCrypt.
 2. **Login:** `POST /api/auth/login` → valida credenciais, retorna `{ accessToken, usuario }` + cookie HttpOnly `refreshToken`.
    - Access token: JWT HS256, 15 min, Bearer header, subject = email.
-   - Refresh token: UUID v4, 7 dias, cookie HttpOnly (`Path=/api/auth`, `SameSite=Lax`, `Secure` em prod).
-3. **Refresh:** `POST /api/auth/refresh-token` → rotaciona refresh token com deteccao de reuse (revoca todos os tokens do usuario se detectar reuso). Resposta inclui `accessToken` e `csrfToken` (desde 2026-07-09, ver BUG-0013) — o cookie `refreshToken` (HttpOnly) segue sendo a fonte de verdade, o `csrfToken` tambem vai no corpo porque clientes nativos (React Native) nao leem cookies para o padrao double-submit.
+   - Refresh token: UUID v4, **30 dias** (elevado de 7 para 30 em 2026-08-22, PROB-0085/BUG-0096 —
+     decisão do dono do produto), configurável via `jwt.refresh-expiration-days` em
+     `application.properties` e nos profiles `dev`/`prod`/`vps`; cookie HttpOnly (`Path=/api/auth`,
+     `SameSite=Lax`, `Secure` em prod, Max-Age acompanha a mesma property). Rotação deslizante: cada
+     renovação regrava a expiração a partir de "agora".
+3. **Refresh:** `POST /api/auth/refresh-token` → rotaciona refresh token com deteccao de reuse (revoca todos os tokens do usuario se detectar reuso). Resposta inclui `accessToken` e `csrfToken` (desde 2026-07-09, ver BUG-0013) — o cookie `refreshToken` (HttpOnly) segue sendo a fonte de verdade, o `csrfToken` tambem vai no corpo porque clientes nativos (React Native) nao leem cookies para o padrao double-submit (o mobile grava mas nunca le esse `csrfToken` — codigo morto, ver BACKLOG-0103). **Falha de refresh (desde 2026-08-22, PROB-0085/BUG-0096):** as tres causas de falha — token expirado, revogado ou nao encontrado — respondem HTTP 401 com `code: SESSION_EXPIRED` (`SessaoExpiradaException`, mapeada em `GlobalExceptionHandler`), assim como "Refresh token nao fornecido"; reuso detectado continua 401 com `code: TOKEN_REUSE_DETECTED`. Antes disso, expirado/revogado/nao-encontrado respondiam 422/404, o que o mobile nao tratava como fim de sessao (ver item 20 abaixo). Novo `RefreshTokenScheduler` limpa tokens expirados diariamente as 03:15 `America/Sao_Paulo` (`app.refresh-token.cleanup.cron`/`.enabled`), chamando `RefreshTokenService.limparTokensExpirados()`, que existia sem caller.
 4. **Interceptor Axios (web):** detecta 401, tenta refresh automatico, enfileira requisicoes concorrentes durante refresh.
-5. **Interceptor Axios (mobile):** desde 2026-07-11 (BUG-0051/PROB-0056), mobile usa contrato body-only: `withCredentials:false`, `X-Client-Type: mobile`, refresh token lido do `SecureStore` e enviado no body para `/auth/refresh-token`; cookie/CSRF ficam exclusivos do contrato web. O interceptor detecta 401 fora de rotas `/auth/`, usa uma promise deduplicada entre requests concorrentes e repete a request original com o novo Bearer token.
+5. **Interceptor Axios (mobile):** desde 2026-07-11 (BUG-0051/PROB-0056), mobile usa contrato body-only: `withCredentials:false`, `X-Client-Type: mobile`, refresh token lido do `SecureStore` e enviado no body para `/auth/refresh-token`; cookie/CSRF ficam exclusivos do contrato web. O interceptor detecta 401 fora de rotas `/auth/`, usa uma promise deduplicada entre requests concorrentes e repete a request original com o novo Bearer token. **Encerramento de sessão (desde 2026-08-22, PROB-0085/BUG-0097):** quando o refresh falha com qualquer resposta do servidor (não só 401/403 — cobre também o `SESSION_EXPIRED` 401 e os antigos 422/404 do backend), `mobile/src/services/api.ts` limpa o `SecureStore` e aciona um canal (`setOnSessionExpired`) que o `AuthContext` usa para derrubar `usuario`/`isAuthenticated` e levar a UI de volta ao login; a ausência de `response` (falha de rede/timeout) preserva os tokens — tolerância offline. `refreshAccessToken` é exportada e também é chamada pelo `AppLockGate` no desbloqueio (ver item 20 de "Principais decisões técnicas").
 6. **Logout:** `POST /api/auth/logout` → revoga refresh token, limpa cookie (Max-Age=0).
 7. **Forgot password:** `POST /api/auth/forgot-password` → envia token por email. `POST /api/auth/reset-password` → redefine senha.
 
@@ -203,7 +216,7 @@ O sistema e **single-tenant** — nao ha multi-tenancy corporativa. Cada usuario
 17. **Mobile ganhou edicao/exclusao de transacao (`EditarTransacaoModal`):** desde 2026-07-09 (PROB-0045/BUG-0027), tocar numa linha de `mobile/app/(app)/transacoes.tsx` abre um sheet que edita apenas os campos que o backend de fato aplica em `PUT /api/v1/transacoes/{id}` (valor, descricao, data, observacoes); tipo/categoria/forma de pagamento sao exibidos como contexto fixo, nao editavel, pois o backend os ignora. Compra de cartao exibe aviso de que a edicao/exclusao ressincroniza faturas via `FaturaService.ressincronizarCompraCartao`/`cancelarCompraCartao` (PROB-0044).
 18. **Badge de status/tipo de lancamento na fatura em mobile e web:** desde 2026-07-11 (BUG-0052), `mobile/app/(app)/more/faturas.tsx` e `frontend/src/pages/Faturas.tsx` exibem chip de tipo para `ESTORNO`/`AJUSTE` e removem o prefixo textual `"Ajuste: "`/`"Estorno: "` da descricao exibida.
 19. **Recorrências são ocorrências mensais idempotentes:** desde 2026-07-14 (BUG-0066), `ContaFixa` representa entrada ou saída e pode ser manual ou automática. `execucoes_recorrencia` registra vencimento/status/tentativa/falha/transação com unicidade `(conta_fixa_id, data_vencimento)`; a carteira e a recorrência são bloqueadas antes do lançamento e o ledger recebe a chave `RECORRENCIA:{id}:{data}`. O scheduler roda às 00:05 em `America/Sao_Paulo` e também no `ApplicationReadyEvent` para recuperar ocorrências perdidas. Saída sem saldo permanece `FALHA_SALDO`, não cria transação e não permite saldo negativo.
-20. **Dados mobile protegidos sem apagar a sessão:** tokens e usuário continuam no SecureStore, enquanto `AppLockGate` bloqueia cold start e retornos após 60 segundos em segundo plano. O desbloqueio aceita biometria/credencial do aparelho ou validação online da senha; a senha nunca é persistida. O estado `inactive/background` cobre imediatamente a interface para impedir captura dos valores pelo seletor de apps.
+20. **Dados mobile protegidos sem apagar a sessão:** tokens e usuário continuam no SecureStore, enquanto `AppLockGate` bloqueia cold start e retornos após 60 segundos em segundo plano. O desbloqueio aceita biometria/credencial do aparelho ou validação online da senha; a senha nunca é persistida. O estado `inactive/background` cobre imediatamente a interface para impedir captura dos valores pelo seletor de apps. **Desde 2026-08-22 (PROB-0085/BUG-0097):** tanto o desbloqueio por biometria quanto por senha chamam `refreshAccessToken()` contra o servidor antes de liberar a UI — antes, o desbloqueio era puramente local (só validava a biometria/senha e abria o cadeado), então uma sessão morta havia dias no servidor ficava "desbloqueada" sem que o app percebesse. Falha de rede ainda libera a UI normalmente (tolerância offline mantida); sessão recusada pelo servidor aciona o encerramento de sessão (ver item na seção "Fluxo de autenticacao"). Biometria continua sem proteger o token em repouso no `SecureStore` (`requireAuthentication` não usado) — risco residual registrado em BACKLOG-0104.
 19. **Rollover de credito/saldo devedor de fatura e lazy na leitura, sem endpoint de fechamento nem scheduler:** desde 2026-07-11 (BUG-0053), decisao do dono do produto foi nao criar um passo explicito de "fechar fatura" — o status `FECHADA` continua derivado (BUG-0020) e o rollover (`FaturaService.liquidarFaturaAnterior`) e disparado ao materializar a proxima fatura de competencia (`buscarAtual`/`buscarPorMes`/`criarOuBuscarFatura`), liquidando recursivamente faturas anteriores ja fechadas. Ver secao "Regra de produto: credito de fatura e saldo devedor rolado".
 20. **Resolucao de IP do cliente via `forward-headers-strategy=native` (Tomcat `RemoteIpValve`), nao `framework`:** desde 2026-07-14 (PROB-0066/BUG-0059), o Spring deixou de confiar diretamente em todo o `X-Forwarded-For` recebido — o Tomcat resolve o IP real a partir de uma lista fechada de proxies internos confiaveis (`internal-proxies`, loopback + faixas privadas Docker). A env var `SERVER_FORWARD_HEADERS_STRATEGY` nos `docker-compose.*.yml` sobrepoe o valor do profile — os dois precisam estar alinhados. Decisao acoplada a uma premissa de infraestrutura: o proxy mais externo (nginx standalone ou Nginx Proxy Manager) precisa sempre normalizar/anexar o `X-Forwarded-For` com o IP real de conexao, nunca repassar cegamente o header do cliente.
 21. **SPA ganhou headers de seguranca no nginx, nao no Spring:** desde 2026-07-14 (PROB-0070/BUG-0063), como `SecurityConfig` so intercepta `/api/**`, HSTS/`X-Frame-Options`/`X-Content-Type-Options`/`Referrer-Policy`/CSP foram adicionados diretamente nos dois configs de nginx (`nginx.conf.template`, `nginx.npm.conf`), nao no backend — decisao de manter a responsabilidade de servir o SPA com seus headers de seguranca na camada que efetivamente entrega esses arquivos ao navegador.
@@ -336,6 +349,89 @@ O sistema e **single-tenant** — nao ha multi-tenancy corporativa. Cada usuario
       BACKLOG-0101 (aritmetica monetaria em `float` repetida sem util central em `analises.tsx`,
       `more/investimentos.tsx`, `more/orcamentos.tsx` — divida conhecida, sem erro observado).
 
+28. **Rodada de verificacao em runtime da serie de padronizacao visual, com os quatro flows Maestro
+    executados e verdes (2026-08-22, commits `9c1335be`..`ba199be`, verificacao feita sobre working
+    tree apos `ba199be`, ainda nao commitada):** decorre diretamente do item 27. Ambiente: simulador
+    iPhone 17 Pro (iOS 26.5), Postgres efemero em container, backend Spring na porta 8081, banco
+    descartavel `gf_verify`, app iOS Debug com bundle embutido apontando para
+    `http://127.0.0.1:8081/api`, `APP_ENV=local-e2e`.
+    - **Resultado dos quatro flows:** `financial-critical.yaml` verde ponta a ponta (0 falhas, 6
+      screenshots, todos os guard-rails de erro passaram) apos 5 correcoes no flow e 3 correcoes de
+      bug de app; `smoke-auth.yaml` (17s), `privacy-consent.yaml` (34s) e `recovery-navigation.yaml`
+      (9s) passaram sem alteracao. Suites ao final: mobile `npx tsc --noEmit` limpo, `npm run lint`
+      limpo, 244 testes/29 suites PASS; backend 292 testes PASS, `BUILD SUCCESS`.
+    - **Quatro bugs de app corrigidos (ver `docs/BUGFIX_LOG.md` BUG-0092 a BUG-0095):** (1)
+      `more/fatura.tsx` sem `keyboardShouldPersistTaps="handled"` no `ScrollView` — primeiro toque
+      em "Pagar Fatura" engolido pelo fechamento do teclado, unica tela em `app/**` com esse defeito
+      (pre-existente, nao introduzido pela serie); (2) mesma tela, teclado ficava aberto cobrindo a
+      lista apos pagamento — `Keyboard.dismiss()` adicionado; (3) `CardMeta.tsx` com
+      `TouchableOpacity` na raiz envolvendo tanto o bloco de informacao quanto a linha de acoes —
+      iOS fundia tudo num so no de acessibilidade e "Depositar"/"Editar"/"Excluir" ficavam
+      inacessiveis ao VoiceOver e ao proprio Maestro (confirmado por dump de arvore antes/depois);
+      unico caso de touchable aninhado no app; (4) `RelatorioService.gastosPorCategoria`
+      (`String.valueOf(row[4])` transformava icone `NULL` na string literal `"null"`, exibida na
+      tela em vez do fallback 🏷️) — helper `asTexto(Object)` corrige.
+    - **Cinco correcoes de manutencao no proprio flow `financial-critical.yaml`** (nao sao bug de
+      app): cartao de teste passou a usar `diaFechamento = 31` em vez de `5` (com fechamento 5 a
+      compra do dia so caia na competencia atual em ~5 dos ~31 dias do mes, por causa de
+      `FaturaDatas.competencia`); tres asserts de regex corrigidos para casar o no de texto inteiro
+      em vez de exigir que o valor esperado fique no fim da string (pago/restante da fatura,
+      percentual arredondado da meta, saldo do cofre); navegacao para Relatorios trocada de
+      `tapOn: "Voltar"` + `tapOn: "Relatórios"` (nao funcionava — pilha do `more` mantinha a fatura
+      embaixo de Contas) para toque por coordenada na aba Analises.
+    - **Verificacoes manuais adicionais em runtime, todas com screenshot:** `orcamentos.tsx`
+      (BUG-0083) confirmado nos dois caminhos reais (404 de mes sem orcamento → estado vazio com
+      "Criar orcamento"; backend fora do ar → "Nao deu para carregar" sem oferecer criacao); FAB de
+      investimentos (BUG-0085) acima da barra flutuante, sem colisao; folha dentro de folha
+      (`MovimentoModal` sobre `DetalheAtivoModal`, encadeamento de `metas.tsx`) sem travar; CTA
+      "Depositar" do card de meta nao corta texto, alvo de toque efetivo ~49pt; `CabecalhoDeTela`
+      sem padding dobrado/zerado em Metas/Carteira/Analises; `ui/ProgressBar` verificada a 0%/100%/
+      cor de entidade nos dois temas, trilha visivel no tema claro (regressao que o componente foi
+      criado para evitar, confirmada corrigida); Aparencia (Ajustes) com os tres modos aplicando
+      corretamente; `perfil.tsx` com olho/medidor de forca nos campos de senha, caminho de "senha
+      atual incorreta" verificado por API + leitura de codigo (nao pela UI); reconciliacao
+      financeira do extrato fechando exata (R$ 825,00, "Diferenca: R$ 0,00").
+    - **Nao verificado nesta rodada (pendencias honestas, registradas em `docs/BACKLOG.md`):**
+      tela estreita ~320dp para o card de contas fixas (BACKLOG-0102, novo); VoiceOver/TalkBack
+      realmente ligado no dispositivo (a acessibilidade foi verificada por dump de arvore do
+      Maestro, mesma fonte que o leitor de tela consome, mas nao o leitor em si — nota adicionada em
+      BACKLOG-0078); Reduce Motion (idem); Android (sem `adb` disponivel nesta maquina, tudo acima e
+      iOS).
+    - **Pendencias de decisao do dono mantidas sem alteracao de escopo:** BACKLOG-0100 (divergencia
+      "Analises"/"Relatorios", reconfirmada visualmente nesta rodada) e BACKLOG-0099 (tres
+      `pageSheet` a mao fora do trinco — `NovaTransacaoModal` foi exercitado em runtime e renderiza
+      corretamente, mas segue fora do alcance do trinco).
+    - **BACKLOG-0098 fechado** com esta rodada como evidencia de conclusao do criterio de aceite.
+      Ver `docs/REVIEW_REPORTS/2026-08-22_mobile_verification_maestro-runtime-padrao-visual.md` para
+      o relatorio completo.
+
+29. **Sessão mobile deixa de travar em erro silencioso após desbloqueio por digital; refresh token
+    passa a 30 dias configuráveis (2026-08-22, PROB-0085, BUG-0096/BUG-0097):** dono do produto
+    reportou que, usando o app com desbloqueio por digital, "deu falha e simplesmente não
+    carregava", log acusando token expirado — só se recuperava deslogando e logando manualmente. Dois
+    defeitos somados: (1) o backend respondia à falha de refresh com três status diferentes
+    (422/404/401) e o mobile só tratava 401/403 como fim de sessão, deixando tokens mortos no
+    `SecureStore` e a UI presa, montada como autenticada, sem aviso ao `AuthContext`; (2) o
+    desbloqueio por biometria (`AppLockGate.unlockWithDevice`) validava só localmente e nunca
+    chamava o servidor, então uma sessão morta havia dias ficava "desbloqueada" sem que o app
+    percebesse. **Decisões do dono cravadas nesta rodada:** sessão com renovação deslizante, janela
+    elevada de 7 para 30 dias; desbloqueio por digital renova o token contra o servidor, com
+    tolerância offline (falha de rede não prende o usuário fora do app). Backend: nova
+    `SessaoExpiradaException` (401, `code: SESSION_EXPIRED`) substitui os status 422/404 nas três
+    causas de falha de refresh; janela configurável via `jwt.refresh-expiration-days`; novo
+    `RefreshTokenScheduler` liga a limpeza diária de tokens expirados que já existia sem caller.
+    Mobile: `api.ts` encerra a sessão em qualquer resposta do servidor na falha de refresh (não só
+    401/403), preservando tokens só na ausência de resposta (offline); `AuthContext` reage via novo
+    canal `setOnSessionExpired`; `AppLockGate` passa a chamar `refreshAccessToken()` no desbloqueio
+    (biometria e senha), com dedup de promise para não confundir refresh paralelo com reuso de
+    token. Verificação: backend 296 testes PASS (4 novos), mobile 30 suítes/254 testes PASS (7 casos
+    novos em `sessaoExpirada.test.ts`, +3 em `AppLockGate.test.tsx`), runtime na stack local
+    confirmando os três códigos de falha de refresh como 401 `SESSION_EXPIRED`, reuso como 401
+    `TOKEN_REUSE_DETECTED`, deslizamento de expiração e scheduler de limpeza. Riscos residuais
+    registrados: `csrfToken` do mobile é código morto (BACKLOG-0103), biometria não protege o token
+    em repouso no `SecureStore` (BACKLOG-0104, P2). Ver `docs/PROBLEM_LEDGER.md` PROB-0085 e
+    `docs/BUGFIX_LOG.md` BUG-0096/BUG-0097 para o detalhamento completo.
+
 ## Regra de produto: credito de fatura e saldo devedor rolado (IMPLEMENTADO, 2026-07-11)
 
 > Spec de produto para PROB-0050 / BACKLOG-0059 / BACKLOG-0054. Decisao de produto travada em 2026-07-11 e **implementada no mesmo dia** (BUG-0053). Pagamento parcial *dentro* da fatura aberta ja existia (BUG-0052); este bloco cobre o comportamento no **fechamento** e nos casos de **credito**, agora em producao no codigo.
@@ -421,7 +517,7 @@ Tudo que sobra (credito) ou falta (divida) numa fatura ao fechar **fica no propr
 26. **[RESOLVIDO 2026-08-21] Idempotencia de investimentos:** `POST /api/v1/investimentos/{ativoId}/movimentacoes` passa a aceitar header `Idempotency-Key` (mesmo padrao de `FaturaController`), com exists-check por `findByUsuarioIdAndIdempotencyKey` antes de qualquer efeito colateral e persistencia da chave em `movimentacoes_ativo.idempotency_key` (migration `V44__movimentacao_ativo_idempotency.sql`, indice unico parcial `ux_movimentacoes_ativo_usuario_idempotency`). A "protecao" anterior via `mov.getId()` era falsa (chave gerada apos persistir, nunca colidia entre dois cliques). Ver BACKLOG-0081 (FECHADO) e BUG-0076.
 27. **[RESOLVIDO 2026-08-21] Listagem de investimentos com paginacao — muda contrato de API:** `GET /api/v1/investimentos` e `GET /api/v1/investimentos/{ativoId}/movimentacoes` passam a devolver `Page` com `@PageableDefault(size = 20)` e `PaginationUtils.enforceMaxSize(pageable, 100)`, como `TransacaoController`. Clientes mobile/web atualizados para consumir `.content` com `size=100`; **breaking change** para qualquer cliente externo nao atualizado. `backend/API.md` (nao `docs/API.md`) nao documenta os endpoints de investimentos nem antes nem depois desta mudanca (pendencia registrada em BACKLOG-0097). Ver BACKLOG-0082 (FECHADO) e BUG-0077.
 28. **Correcao de rate limit/nginx/redes do hardening pre-producao ainda nao validada em ambiente real:** desde 2026-07-14 (PROB-0066/BUG-0059, PROB-0070/BUG-0063), a troca de `forward-headers-strategy` (framework→native), a nova rede Docker interna `web<->API` e os headers de seguranca do SPA foram implementados e testados apenas no nivel de unidade/build — `nginx -t`, recriacao de redes e smoke em staging (X-Forwarded-For forjado, cookie Secure, CSP do SPA carregado de fato) ficam pendentes (BACKLOG-0080).
-29. **Padrao visual do mobile unificado, mas nao verificado em Maestro real (2026-08-21/22):** a serie de 13 PRs que padronizou o visual do app (item 27 em "Principais decisoes tecnicas") foi validada por `npm run typecheck`/`npm run lint`/`npm test` (244 testes/29 suites PASS) e leitura de diff, mas nenhum dos quatro flows Maestro (`financial-critical.yaml`, `smoke-auth.yaml`, `privacy-consent.yaml`, `recovery-navigation.yaml`) foi executado em simulador/dispositivo nesta rodada, apesar de `financial-critical.yaml` ter sido editado 5 vezes para acompanhar rotulos e textos de erro que mudaram (BACKLOG-0098).
+29. **[RESOLVIDO 2026-08-22] Padrao visual do mobile unificado e verificado em Maestro real:** a serie de 13 PRs que padronizou o visual do app (item 27 em "Principais decisoes tecnicas") foi validada por `npm run typecheck`/`npm run lint`/`npm test` (244 testes/29 suites PASS) e leitura de diff, mas os quatro flows Maestro so foram executados numa rodada posterior, em 2026-08-22, em simulador iPhone 17 Pro (iOS 26.5) contra stack local (Postgres efemero em container, backend porta 8081, banco `gf_verify`). `financial-critical.yaml` ficou verde ponta a ponta apos 5 correcoes no proprio flow e 3 correcoes de bug de app (BUG-0092 a BUG-0094); `smoke-auth.yaml`, `privacy-consent.yaml` e `recovery-navigation.yaml` passaram sem alteracao. Um quarto bug de app foi encontrado por verificacao manual/API na mesma rodada (BUG-0095, backend). Ver item 28 em "Principais decisoes tecnicas", BACKLOG-0098 (fechado) e `docs/REVIEW_REPORTS/2026-08-22_mobile_verification_maestro-runtime-padrao-visual.md`. Pendencias que essa rodada nao cobriu: Android (sem `adb` na maquina), VoiceOver/TalkBack realmente ligado e Reduce Motion (ver BACKLOG-0078) e tela estreita ~320dp para o card de contas fixas (BACKLOG-0102, novo).
 30. **Trinco visual (`padraoVisual.test.ts`) cobre `app/**` mas nao `src/components/**`:** tres modais de alto trafego — `ComposicaoMetricaModal`, `EditarTransacaoModal`, `NovaTransacaoModal` (todos em `mobile/src/components/`) — continuam com `pageSheet` desenhado a mao e podem regredir sem que o build quebre (BACKLOG-0099).
 
 ## Pontos frageis atuais

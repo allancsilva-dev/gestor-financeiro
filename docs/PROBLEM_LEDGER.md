@@ -1834,3 +1834,90 @@ esta evidência histórica não fecha o problema;
   percebido como bug — só foi notado aqui porque a tela nova validou o fluxo ponta a ponta contra o
   backend real.
 - **Proximo passo:** Ver BACKLOG-0094 (correção do interceptor + varredura das telas dependentes).
+
+---
+
+## PROB-0085 — Sessão mobile trava em "token expirado" após desbloqueio por digital; exigia deslogar e logar manualmente
+
+- **ID:** PROB-0085
+- **Titulo:** Usando o app com desbloqueio por biometria, a sessão morria silenciosamente e a UI
+  ficava presa em erro/loading sem voltar ao login sozinha — usuário precisava deslogar e logar de
+  novo na mão
+- **Data:** 2026-08-22
+- **Origem:** bug report (dono do produto)
+- **Severidade:** HIGH
+- **Status:** FECHADO (2026-08-22) — corrigido e verificado nesta sessão; ver BUG-0096 (backend) e
+  BUG-0097 (mobile)
+- **Area:** backend, mobile, seguranca
+- **Sintoma:** Usando o app com desbloqueio por digital, o app "deu falha e simplesmente não
+  carregava"; log acusou token expirado. Toda a UI ficava presa em estado de erro/loading, sem
+  redirecionamento automático para a tela de login — só saía do estado preso deslogando e logando
+  manualmente.
+- **Causa raiz:** Confirmada — dois defeitos somados:
+  1. **Falha de refresh não-401 deixava a sessão travada no cliente.** O backend respondia à falha
+     de refresh do token com três status diferentes: 422 (`BusinessException` "Refresh token
+     expirado"), 404 (`ResourceNotFoundException` "não encontrado") e 401
+     (`TokenReuseDetectedException`, reuso detectado). O mobile (`mobile/src/services/api.ts`) só
+     descartava as credenciais salvas em 401/403. Em 422/404 os tokens mortos permaneciam no
+     `SecureStore`, `refreshAccessToken()` devolvia `null`, a request original original falhava com
+     401 e nada avisava o `AuthContext` — `isAuthenticated` é apenas `usuario !== null` e
+     `restoreSession` já tinha rodado no boot, então a UI seguia montada como autenticada, com toda
+     tela em erro/loading. O guarda de boot tinha o mesmo furo: a condição `(401||403) &&
+     !refreshToken` nunca fechava, porque o refresh token continuava gravado no armazenamento.
+  2. **O desbloqueio por digital não renovava nada com o servidor.**
+     `AppLockGate.unlockWithDevice` validava a biometria localmente e só fazia `setLocked(false)` —
+     nenhuma chamada ao backend acontecia no desbloqueio, então o cadeado visual podia estar sobre
+     uma sessão morta havia dias sem que o app percebesse.
+- **Impacto tecnico:** Usuário via o app "travado" sem explicação, precisando descobrir sozinho que
+  precisava deslogar manualmente para recuperar o acesso — sintoma percebido como bug grave de
+  estabilidade, não como expiração normal de sessão. Qualquer falha de refresh que não fosse 401/403
+  (token expirado, revogado ou não encontrado) caía nesse buraco.
+- **Arquivos ou modulos relacionados:**
+  `backend/src/main/java/com/gestor/financeiro/service/RefreshTokenService.java`,
+  `backend/src/main/java/com/gestor/financeiro/controller/AuthController.java`,
+  `backend/src/main/java/com/gestor/financeiro/exception/GlobalExceptionHandler.java`,
+  `backend/src/main/java/com/gestor/financeiro/exception/SessaoExpiradaException.java` (novo),
+  `backend/src/main/java/com/gestor/financeiro/service/RefreshTokenScheduler.java` (novo),
+  `mobile/src/services/api.ts`, `mobile/src/context/AuthContext.tsx`,
+  `mobile/src/components/AppLockGate.tsx`.
+- **Solucao proposta:** Ver "Solucao aplicada" — já implementada nesta sessão.
+- **Solucao aplicada:** Backend: as três saídas de falha do refresh (expirado, revogado, não
+  encontrado) passaram a lançar `SessaoExpiradaException`, mapeada em `GlobalExceptionHandler` para
+  HTTP 401 com `code: SESSION_EXPIRED`; `AuthController` idem para "Refresh token não fornecido";
+  `TokenReuseDetectedException` permanece 401 com code próprio. Janela do refresh token elevada de 7
+  para 30 dias (decisão do dono do produto), configurável via `jwt.refresh-expiration-days` nos
+  quatro profiles; rotação continua deslizante (renova a expiração a cada refresh); Max-Age do
+  cookie web passou a acompanhar a mesma property (antes o cookie morria antes do token). Novo
+  `RefreshTokenScheduler` liga a limpeza diária de tokens expirados (03:15
+  `America/Sao_Paulo`, `app.refresh-token.cleanup.cron`/`.enabled`, guarda de sobreposição com
+  `AtomicBoolean`) — o método `limparTokensExpirados()` já existia mas nunca tinha caller. Mobile:
+  `api.ts` passou a encerrar a sessão em **qualquer resposta do servidor** na falha de refresh (não
+  só 401/403), preservando os tokens quando não há `response` (rede/timeout — tolerância offline
+  mantida); novo canal `setOnSessionExpired(fn)`/`encerrarSessao()`; `refreshAccessToken` passou a
+  ser exportada. `AuthContext` registra o handler no mount (limpa cache e `usuario`, derrubando
+  `isAuthenticated` e levando ao login) e `restoreSession` encerra a sessão sempre que o servidor
+  negou a autenticação (401/403), sem depender da ausência local do refresh token.
+  `AppLockGate.unlockWithDevice` e `unlockWithPassword` agora chamam `refreshAccessToken()` antes de
+  liberar a UI (falha de rede libera assim mesmo; sessão recusada pelo servidor cai no canal de
+  sessão encerrada); dedup por `refreshPromise` compartilhado evita que duas chamadas paralelas de
+  refresh pareçam reuso e revoguem todas as sessões do usuário.
+- **Evidencias ou comandos usados:** Ver "Testes/validacoes executadas" de BUG-0096 e BUG-0097 em
+  `docs/BUGFIX_LOG.md` — suíte backend 296 testes PASS (4 novos em `AuthControllerTest`), suíte
+  mobile 30 suítes/254 testes PASS (novo `mobile/src/__tests__/sessaoExpirada.test.ts`, 7 casos;
+  `AppLockGate.test.tsx` +3 casos); verificação em runtime na stack local (backend 8081, banco
+  descartável `gf_sessao`) exercitando login, rotação, expirado→401 `SESSION_EXPIRED`,
+  desconhecido→401 `SESSION_EXPIRED`, ausente→401 `SESSION_EXPIRED`, reuso→401
+  `TOKEN_REUSE_DETECTED`, deslizamento da expiração de 2 dias envelhecidos de volta a ~30 dias após
+  renovação, rota protegida com token podre→401, e o scheduler de limpeza com cron acelerado
+  (`refresh_token_cleanup_concluido removidos=2`, batendo com os 2 tokens expirados existentes).
+- **Riscos residuais:** (1) Biometria não protege o token em repouso — `SecureStore.setItemAsync`
+  não usa `requireAuthentication` (ver BACKLOG-0104); endurecer isso tem risco de perda de sessão em
+  troca de aparelho, decisão de produto pendente. (2) `csrfToken` continua gravado no mobile e nunca
+  lido — código morto, sem risco funcional, mas ruído (ver BACKLOG-0103). (3) Janela de sessão mais
+  longa (30 dias) aumenta a superfície de tempo em que um refresh token roubado permanece válido até
+  ser usado (mitigado pela detecção de reuso, que revoga todas as sessões do usuário ao primeiro uso
+  duplicado). (4) Verificação de runtime foi feita só em iOS/simulador — não há confirmação em
+  Android nesta rodada.
+- **Proximo passo:** Observar em uso real (dono do produto) se o sintoma original (app travado após
+  digital) volta a ocorrer. Nenhuma ação pendente de código para fechar este problema — os riscos
+  residuais acima já estão rastreados como itens de backlog separados.

@@ -1936,5 +1936,236 @@ Registro de bugs corrigidos. Mantido pelo `docs-reporter`.
 
 ---
 
+## BUG-0092 — `more/fatura.tsx`: primeiro toque em "Pagar Fatura" engolido pelo teclado
+
+- **Problema relacionado:** N/A
+- **Data:** 2026-08-22
+- **Area:** mobile
+- **Sintoma:** Com o campo de valor focado (teclado aberto), o primeiro toque em "Pagar Fatura"
+  não pagava nada; só o segundo toque, com o teclado já fechado, gravava o pagamento. Reproduzido
+  em runtime pelo flow `mobile/.maestro/financial-critical.yaml`: o passo do Maestro reportava o
+  toque como `COMPLETED`, mas `faturas_cartao.valor_pago` continuava `0.00` no banco logo depois;
+  um segundo toque manual na mesma tela já assentada gravava `25.00`.
+- **Causa raiz:** Confirmada — o `ScrollView` da tela não definia `keyboardShouldPersistTaps`. O
+  padrão do React Native é `"never"`: com o teclado aberto, o primeiro toque fora do campo é
+  consumido para fechar o teclado e não chega ao filho. Como "Pagar Fatura" fica logo abaixo do
+  campo de valor, digitar um pagamento parcial e tocar no botão em seguida via apenas o teclado
+  sumir. Varredura em `mobile/app/**` confirmou que esta era a **única** tela com `TextInput`
+  dentro de `ScrollView` sem esse prop — as outras 9 telas equivalentes já usavam `"handled"`.
+- **Correcao aplicada:** `keyboardShouldPersistTaps="handled"` no `ScrollView` de
+  `mobile/app/(app)/more/fatura.tsx`.
+- **Arquivos alterados:** `mobile/app/(app)/more/fatura.tsx`
+- **Testes/validacoes executadas:** Reproduzido e confirmado corrigido em runtime (simulador iPhone
+  17 Pro, iOS 26.5, stack local porta 8081, banco `gf_verify`) via
+  `mobile/.maestro/financial-critical.yaml` — o passo de pagamento parcial passou a gravar
+  `valor_pago = 25.00` no primeiro toque. `npx tsc --noEmit`, `npm run lint` e `npm test` (244
+  testes / 29 suítes) limpos ao final da rodada.
+- **Resultado:** PASS
+- **Ressalvas:** Bug pré-existente à série de padronização visual (a raiz do `ScrollView` é
+  idêntica antes e depois do commit `9c1335be`) — não foi introduzido por ela, apenas encontrado
+  durante a verificação em runtime desta rodada (2026-08-22).
+- **Commit:** pendente
+
+---
+
+## BUG-0093 — `more/fatura.tsx`: teclado permanecia aberto após pagamento concluído
+
+- **Problema relacionado:** BUG-0092 (consequência direta da correção)
+- **Data:** 2026-08-22
+- **Area:** mobile
+- **Sintoma:** Com o toque de "Pagar Fatura" deixando de ser engolido (BUG-0092), o teclado
+  passou a ficar aberto depois de um pagamento concluído com sucesso, cobrindo a lista de
+  "Lançamentos" e a barra de navegação inferior.
+- **Causa raiz:** Confirmada — nada fechava o teclado explicitamente após `pagarFatura` resolver
+  com sucesso; sem o toque engolido, o foco no campo de valor permanecia.
+- **Correcao aplicada:** `Keyboard.dismiss()` chamado imediatamente após o sucesso de
+  `pagarFatura`, antes das invalidações de query. O campo continua sendo recarregado com o saldo
+  restante pelo efeito já existente, para quem quiser pagar o resto em seguida.
+- **Arquivos alterados:** `mobile/app/(app)/more/fatura.tsx`
+- **Testes/validacoes executadas:** Confirmado em runtime no mesmo simulador/stack de BUG-0092 —
+  teclado fecha e a lista de lançamentos fica visível logo após o pagamento.
+- **Resultado:** PASS
+- **Ressalvas:** Nenhuma.
+- **Commit:** pendente
+
+---
+
+## BUG-0094 — `CardMeta.tsx`: ações do card de meta inacessíveis ao leitor de tela (touchable aninhado)
+
+- **Problema relacionado:** N/A (mesma classe de defeito de BUG-0084/BACKLOG-0096, mas caso
+  estruturalmente diferente: aqui é aninhamento de `TouchableOpacity`, não `accessibilityLabel`
+  curado)
+- **Data:** 2026-08-22
+- **Area:** mobile, acessibilidade
+- **Sintoma:** A raiz do card era um `TouchableOpacity` com `accessibilityRole="button"`, e o iOS
+  funde todos os descendentes num único nó de acessibilidade. Dump real da árvore (Maestro
+  `hierarchy`) ANTES da correção:
+  `Meta Smoke, 0%, R$ 0,00, de R$ 1.000,00, Excluir a meta Meta Smoke, Editar a meta Meta Smoke, Depositar`.
+  "Depositar", "Editar" e "Excluir" eram anunciados como texto, não como elementos próprios — o
+  VoiceOver não tinha como acioná-los, e o Maestro também não achava o botão (`Element not found:
+  Text matching regex: Depositar`).
+- **Causa raiz:** Confirmada — `TouchableOpacity` na raiz do card envolvia tanto o bloco de
+  informação (que deveria abrir os detalhes) quanto a linha de ações (`Depositar`/editar/excluir,
+  que já eram `TouchableOpacity`/`Botao` próprios), criando touchable dentro de touchable. Uma
+  varredura em `mobile/app/**` e `mobile/src/components/**` confirmou que `CardMeta` era o único
+  caso desse padrão no app.
+- **Correcao aplicada:** A raiz do card virou `View`; apenas o bloco de informação (ícone, nome,
+  progresso, valores) passou a ser o `TouchableOpacity` que abre os detalhes; a linha de ações
+  ficou irmã dele, fora do touchable. Dump da árvore DEPOIS da correção, agora com quatro nós
+  próprios: `🏷️, Meta Folha, 0%, R$ 0,00, de R$ 1.000,00` / `Depositar` / `Editar a meta Meta
+  Folha` / `Excluir a meta Meta Folha`. Sem mudança visual (screenshot comparado antes/depois).
+- **Arquivos alterados:** `mobile/src/components/metas/CardMeta.tsx`
+- **Testes/validacoes executadas:** Dumps de árvore de acessibilidade via `maestro hierarchy`
+  antes e depois da correção (mesma fonte que VoiceOver consome); screenshot visual comparado sem
+  diferença; `npm test` (244/29) e `npx tsc --noEmit` limpos.
+- **Resultado:** PASS
+- **Ressalvas:** Verificação feita pela árvore de acessibilidade do Maestro, não com VoiceOver
+  realmente ligado no dispositivo — ver `docs/BACKLOG.md` BACKLOG-0078 (pendência de validação
+  assistiva em device físico, já existente, atualizada nesta rodada).
+- **Commit:** pendente
+
+---
+
+## BUG-0095 — `backend/RelatorioService.java`: relatório de categorias mostrava o texto "null" no lugar do ícone
+
+- **Problema relacionado:** N/A
+- **Data:** 2026-08-22
+- **Area:** backend
+- **Sintoma:** Na tela "Gastos por categoria" (`analises.tsx`), categorias sem ícone cadastrado
+  mostravam literalmente o texto `null` dentro do tile do ícone, em vez do emoji de fallback
+  (capturado em screenshot).
+- **Causa raiz:** Confirmada — em `RelatorioService.gastosPorCategoria`, o ícone era construído
+  com `String.valueOf(row[4])`; quando a coluna SQL é `NULL`, `String.valueOf(null)` devolve a
+  string `"null"` (não um `null` de verdade), que viajava intacta no JSON até o app. O fallback do
+  app (`{c.icone || '🏷️'}` em `analises.tsx`) só cobre `null`/string vazia, não a string não vazia
+  `"null"`. As linhas vizinhas do mesmo método (`Maiores despesas`) já faziam a guarda correta —
+  foi um caso esquecido nesta função.
+- **Correcao aplicada:** Novo helper privado `asTexto(Object)` que devolve `null` de verdade
+  quando o valor é `null` (em vez de `String.valueOf`); aplicado ao campo de ícone. O campo `cor`
+  ganhou fallback explícito `"#6B7280"` quando `null`, mesma convenção já usada duas linhas abaixo
+  no mesmo arquivo.
+- **Arquivos alterados:**
+  `backend/src/main/java/com/gestor/financeiro/service/RelatorioService.java`
+- **Testes/validacoes executadas:** Confirmado pela API (`"icone": null` no JSON, em vez de
+  `"icone": "null"`) e visualmente no app (tile agora mostra 🏷️). Suite backend completa: 292
+  testes PASS, `mvn` `BUILD SUCCESS`.
+- **Resultado:** PASS
+- **Ressalvas:** Nenhuma.
+- **Commit:** pendente
+
+---
+
+## BUG-0096 — Backend: falhas de refresh token (expirado/revogado/não encontrado) respondiam 422/404 em vez de 401, deixando o cliente sem sinal de sessão morta
+
+- **Problema relacionado:** PROB-0085
+- **Data:** 2026-08-22
+- **Area:** backend, seguranca
+- **Sintoma:** `RefreshTokenService` respondia à falha de renovação de token com três status HTTP
+  diferentes conforme a causa: 422 (`BusinessException` "Refresh token expirado"), 404
+  (`ResourceNotFoundException` "não encontrado") e 401 (`TokenReuseDetectedException`, reuso
+  detectado). Só o 401 tinha tratamento especial nos clientes — 422/404 pareciam erros de negócio
+  comuns, não fim de sessão, e o cliente mobile não os interpretava como motivo para deslogar (ver
+  BUG-0097). Além disso a janela do refresh token (7 dias) era curta e fixa no código, e
+  `RefreshTokenService.limparTokensExpirados()` existia sem nenhum caller — a tabela
+  `refresh_tokens` crescia sem limite, agravado pela rotação (cada renovação grava uma linha nova).
+- **Causa raiz:** Confirmada — as três saídas de falha de `RefreshTokenService` usavam exceções
+  mapeadas para 422/404 no `GlobalExceptionHandler`, em vez de uma exceção dedicada de sessão
+  mapeada para 401; `AuthController` tinha o mesmo problema para "Refresh token não fornecido"; e
+  `RefreshTokenScheduler` simplesmente não existia.
+- **Correcao aplicada:** Nova `exception/SessaoExpiradaException.java`, mapeada em
+  `GlobalExceptionHandler` para HTTP 401 com `code: SESSION_EXPIRED` e mensagem "Sessão expirada.
+  Faça login novamente.". As três saídas de falha do `RefreshTokenService` (expirado, revogado, não
+  encontrado) e o caso "Refresh token não fornecido" do `AuthController` passaram a lançar
+  `SessaoExpiradaException`; `TokenReuseDetectedException` continua 401 com code próprio
+  (`TOKEN_REUSE_DETECTED`), sem alteração. Janela do refresh token elevada de 7 para 30 dias
+  (decisão do dono do produto), agora configurável via `jwt.refresh-expiration-days=30` em
+  `application.properties` e nos profiles `dev`/`prod`/`vps`; `RefreshTokenService` passou a ler o
+  valor via `@Value` em vez de constante fixa. A rotação já era deslizante (cada renovação regrava a
+  expiração a partir de agora) — o que faltava era o refresh de fato acontecer no cliente (ver
+  BUG-0097). O Max-Age do cookie web do refresh token em `AuthController` deixou de ser 7 dias fixos
+  e passou a acompanhar a mesma property (antes o cookie expirava antes do token que ele carrega).
+  Novo `service/RefreshTokenScheduler.java`: cron diário `0 15 3 * * *` (03:15
+  `America/Sao_Paulo`, configurável via `app.refresh-token.cleanup.cron`), habilitado por padrão via
+  `@ConditionalOnProperty(app.refresh-token.cleanup.enabled, matchIfMissing=true)`, com guarda de
+  sobreposição via `AtomicBoolean` (mesmo padrão de `ReconciliacaoScheduler`) chamando o método que
+  já existia sem caller.
+- **Arquivos alterados:**
+  `backend/src/main/java/com/gestor/financeiro/exception/SessaoExpiradaException.java` (novo),
+  `backend/src/main/java/com/gestor/financeiro/exception/GlobalExceptionHandler.java`,
+  `backend/src/main/java/com/gestor/financeiro/service/RefreshTokenService.java`,
+  `backend/src/main/java/com/gestor/financeiro/controller/AuthController.java`,
+  `backend/src/main/java/com/gestor/financeiro/service/RefreshTokenScheduler.java` (novo),
+  `backend/src/main/resources/application.properties`,
+  `backend/src/main/resources/application-dev.properties`,
+  `backend/src/main/resources/application-prod.properties`,
+  `backend/src/main/resources/application-vps.properties`,
+  `backend/src/test/java/com/gestor/financeiro/AuthControllerTest.java`.
+- **Testes/validacoes executadas:** Suíte backend completa: 296 testes, 0 falhas (`BUILD SUCCESS`).
+  4 testes novos em `AuthControllerTest`: refresh expirado → 401 `SESSION_EXPIRED`; refresh
+  desconhecido → 401 `SESSION_EXPIRED`; refresh ausente → 401 `SESSION_EXPIRED`; rotação desliza a
+  expiração para ~30 dias e revoga o token anterior. Verificação em runtime na stack local (backend
+  porta 8081, banco descartável `gf_sessao`): login emite token com 30 dias de janela; rotação
+  revoga o anterior e emite novo; token envelhecido para 2 dias volta a ~30 após renovar
+  (deslizamento comprovado); refresh expirado → 401 `SESSION_EXPIRED`; refresh desconhecido → 401
+  `SESSION_EXPIRED`; refresh ausente → 401 `SESSION_EXPIRED`; reuso → 401
+  `TOKEN_REUSE_DETECTED`; rota protegida com token podre → 401. Scheduler exercitado com cron
+  acelerado: log `refresh_token_cleanup_concluido removidos=2`, batendo exatamente com os 2 tokens
+  expirados existentes na base de verificação.
+- **Resultado:** PASS
+- **Ressalvas:** Nenhuma.
+- **Commit:** pendente
+
+---
+
+## BUG-0097 — Mobile: desbloqueio por biometria/senha não renovava a sessão, e falha de refresh não-401 não desconectava o usuário
+
+- **Problema relacionado:** PROB-0085
+- **Data:** 2026-08-22
+- **Area:** mobile, seguranca
+- **Sintoma:** Após desbloquear o app com digital, a UI podia ficar presa em erro/loading com log
+  acusando token expirado, sem redirecionamento automático ao login — só se recuperava deslogando e
+  logando manualmente. Reportado pelo dono do produto em uso real (2026-08-22).
+- **Causa raiz:** Confirmada — dois defeitos combinados. (1)
+  `mobile/src/services/api.ts` só descartava as credenciais salvas quando a falha de refresh vinha
+  com status 401/403; nos casos 422/404 (ver BUG-0096) os tokens mortos continuavam no
+  `SecureStore`, `refreshAccessToken()` devolvia `null`, a request original falhava com 401 e nada
+  avisava o `AuthContext` — `isAuthenticated` é só `usuario !== null` e `restoreSession` já tinha
+  rodado no boot, então a UI seguia montada como autenticada. O guarda de boot tinha o mesmo furo: a
+  condição `(401||403) && !refreshToken` nunca fechava, porque o refresh token continuava gravado.
+  (2) `AppLockGate.unlockWithDevice` validava a biometria localmente e só fazia
+  `setLocked(false)` — nenhuma chamada ao servidor acontecia no desbloqueio, então o cadeado visual
+  podia estar sobre uma sessão morta havia dias sem que o app percebesse.
+- **Correcao aplicada:** `api.ts`: qualquer **resposta** do servidor na falha de refresh agora
+  encerra a sessão (não só 401/403); a ausência de `response` (falha de rede/timeout) preserva os
+  tokens — tolerância offline mantida. Novo canal `setOnSessionExpired(fn)` + `encerrarSessao()`
+  (limpa `SecureStore`); `refreshAccessToken` passou a ser exportada para ser chamada fora do
+  interceptor. `context/AuthContext.tsx` registra o handler de sessão encerrada no mount (limpa
+  cache de queries e `setUsuario(null)`, derrubando `isAuthenticated` e levando ao login);
+  `restoreSession` passou a encerrar a sessão sempre que o servidor negou a autenticação (401/403),
+  sem depender da ausência local do refresh token. `components/AppLockGate.tsx`: tanto
+  `unlockWithDevice` (biometria) quanto `unlockWithPassword` agora chamam `refreshAccessToken()`
+  antes de liberar a UI — falha de rede libera a UI assim mesmo (tolerância offline: o usuário não
+  fica preso fora do app por falta de conexão); sessão recusada pelo servidor cai no canal de sessão
+  encerrada acima. A dedup por `refreshPromise` compartilhado (já existente em `api.ts`) evita
+  corrida com um 401 simultâneo de tela — importante porque, com rotação, duas chamadas de refresh
+  em paralelo fariam a segunda parecer reuso de token e revogar todas as sessões do usuário.
+- **Arquivos alterados:** `mobile/src/services/api.ts`, `mobile/src/context/AuthContext.tsx`,
+  `mobile/src/components/AppLockGate.tsx`, `mobile/src/__tests__/sessaoExpirada.test.ts` (novo),
+  `mobile/src/__tests__/AppLockGate.test.tsx`.
+- **Testes/validacoes executadas:** Suíte mobile completa: 30 suítes / 254 testes, 0 falhas. Novo
+  `src/__tests__/sessaoExpirada.test.ts` com 7 casos (401/403/404/422 encerram a sessão e avisam o
+  handler; falha de rede preserva os tokens; par de tokens rotacionado é gravado corretamente;
+  chamada de refresh única compartilhada entre requests concorrentes). `AppLockGate.test.tsx` ganhou
+  3 casos novos: desbloqueio por digital chama `refreshAccessToken`; cancelamento da biometria não
+  chama refresh; refresh falhando por erro de rede ainda libera a UI (tolerância offline). `npx tsc
+  --noEmit` e `npm run lint` limpos.
+- **Resultado:** PASS
+- **Ressalvas:** Verificação de runtime feita só em iOS/simulador nesta rodada; não há confirmação
+  em Android. Biometria continua sem proteger o token em repouso no `SecureStore` (risco residual
+  registrado em BACKLOG-0104, fora do escopo desta correção).
+- **Commit:** pendente
+
+---
+
 > Este arquivo e mantido pelo `docs-reporter`. Bugs corrigidos devem ser registrados com o proximo ID
 > sequencial (BUG-0002, BUG-0003, ...). Para historico de versoes, consulte `docs/CHANGELOG.md`.

@@ -1039,6 +1039,14 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Atualizacao mobile 2026-07-13:** corrigidos controles interativos abaixo de 44pt, labels de inputs diretos, checkbox de consentimento, estados/erros anunciados e dashboard com hierarquia mais sóbria, sem hero promocional. Adicionado ESLint a11y bloqueante com `--max-warnings=0`; CI preserva gate TypeScript separado. Typecheck, lint e 11 testes PASS.
 - **Pendente:** auditoria manual VoiceOver/TalkBack, fonte ampliada e contraste renderizado em hardware Android/iOS. Web fora do escopo.
 - **Status:** PARCIAL — correções estáticas e gates mobile concluídos; validação assistiva em devices físicos pendente.
+- **Atualização 2026-08-22:** Durante a rodada de verificação Maestro pós-padronização visual
+  (simulador iPhone 17 Pro, iOS 26.5), a acessibilidade foi verificada por dumps da árvore de
+  acessibilidade (`maestro hierarchy`) — a mesma fonte que VoiceOver consome — e foi assim que
+  BUG-0094 (`CardMeta`, touchable aninhado escondendo as ações "Depositar"/"Editar"/"Excluir") foi
+  encontrado e confirmado corrigido. Isso não substitui a pendência original: nenhum passe com
+  VoiceOver/TalkBack de fato ligado no dispositivo foi feito nesta rodada, e Reduce Motion também
+  não foi exercitado. Pendência permanece igual, agora com evidência adicional de que o método de
+  dump por si só já encontra defeitos reais.
 
 ---
 
@@ -1698,7 +1706,30 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Risco se ficar pendente:** Regressão de automação silenciosa — um ajuste de rótulo mal calibrado
   (regex parcial errada, texto de guard-rail que não bate com a tela real) só seria descoberto na
   próxima tentativa manual de rodar Maestro, potencialmente muito depois da mudança que o causou.
-- **Status:** ABERTO
+- **Status:** FECHADO
+- **Atualização 2026-08-22:** Os quatro flows executados em simulador iPhone 17 Pro (iOS 26.5)
+  contra a stack local (Postgres efêmero em container, backend Spring porta 8081, banco
+  `gf_verify`, app iOS Debug com `APP_ENV=local-e2e`). `financial-critical.yaml` ficou verde
+  ponta a ponta (0 falhas, 6 screenshots, todos os guard-rails de erro passaram), mas só depois de
+  5 correções no próprio flow (regex/rótulos que não batiam com a tela real; dependência de data
+  na criação do cartão — ver nota abaixo) e 3 correções de bug de app (BUG-0092, BUG-0093,
+  BUG-0094). `smoke-auth.yaml` (17s), `privacy-consent.yaml` (34s) e `recovery-navigation.yaml`
+  (9s) passaram sem alteração adicional. Critério de aceite cumprido: os quatro flows rodaram
+  contra o app com o padrão visual novo e toda regressão encontrada foi registrada (BUG-0092 a
+  BUG-0095 em `docs/BUGFIX_LOG.md`). Correções de manutenção do próprio flow (não são bug de app):
+  cartão de teste passou a usar `diaFechamento = 31` (clampado ao último dia do mês) em vez de `5`
+  — com fechamento 5 o flow só passava em 5 dos ~31 dias do mês, porque a compra do dia caía na
+  competência seguinte (`FaturaDatas.competencia`) fora dessa janela; três asserções de regex
+  corrigidas para casar o nó de texto completo (Maestro exige igualdade total, não apenas
+  substring) — pago/restante, percentual da meta (arredondado para inteiro, "5%" nunca "5,0%") e
+  saldo do cofre; navegação para Relatórios trocada de `tapOn: "Voltar"` + `tapOn: "Relatórios"`
+  (não funcionava — a pilha do `more` mantinha a fatura embaixo de Contas) para toque por
+  coordenada na aba Análises. Detalhe completo em
+  `docs/REVIEW_REPORTS/2026-08-22_mobile_verification_maestro-runtime-padrao-visual.md`. Pendência
+  não coberta nesta rodada: Android (sem `adb` disponível na máquina), VoiceOver/TalkBack
+  realmente ligado (verificação foi por dump de árvore de acessibilidade do Maestro — mesma fonte
+  que o leitor de tela consome, mas não o leitor em si) e Reduce Motion (ver atualização em
+  BACKLOG-0078).
 
 ---
 
@@ -1725,6 +1756,10 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   rápido, edição de transação, composição de métrica) e podem divergir do padrão visual sem que
   nenhum teste automatizado detecte.
 - **Status:** ABERTO
+- **Atualização 2026-08-22:** `NovaTransacaoModal` foi exercitado em runtime durante a rodada de
+  verificação com os quatro flows Maestro (simulador iPhone 17 Pro, iOS 26.5) e renderiza
+  corretamente, sem defeito visual observado — mas o modal continua fora do alcance do trinco
+  `padraoVisual.test.ts`, que só varre `app/**`. Não muda o critério de aceite nem a prioridade.
 
 ---
 
@@ -1746,6 +1781,10 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   coisa, tela abre dizendo outra); risco baixo de confusão, mas cresce se a tela ganhar mais pontos
   de entrada com nomes próprios.
 - **Status:** ABERTO
+- **Atualização 2026-08-22:** Divergência reconfirmada visualmente em runtime (simulador iPhone 17
+  Pro) durante a rodada de verificação Maestro — o hub de Ajustes mostra o tile "Relatórios" e a
+  aba da tab bar diz "Análises" para o mesmo destino. Continua dependendo de decisão de produto;
+  nenhuma alteração de escopo feita.
 
 ---
 
@@ -1769,4 +1808,108 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Risco se ficar pendente:** Nenhum erro observado até o momento, mas o padrão de cálculo
   duplicado e sem teste de precisão dedicado é terreno fértil para divergência de centavos entre
   telas diferentes mostrando o mesmo valor agregado.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0102 — Confirmar layout do card de contas fixas em tela estreita (iPhone SE / ~320dp)
+
+- **Titulo:** Os três botões de ação do card em `mobile/app/(app)/more/contas-fixas.tsx`
+  (Editar/Pular/Pagar-Receber) só foram vistos numa tela de 402dp (iPhone 17 Pro); comportamento em
+  aparelho estreito de verdade não foi testado
+- **Prioridade:** P3
+- **Área:** mobile
+- **Motivo:** Durante a rodada de verificação Maestro pós-padronização visual (2026-08-22,
+  simulador iPhone 17 Pro, iOS 26.5), a linha de ação do card de conta fixa (migrado nesta série
+  em `0e65a78c`, com `flexWrap` para os três botões) foi confirmada visualmente apenas na
+  geometria de 402dp, onde se comporta bem. Nenhum simulador ou dispositivo estreito (ex.: iPhone
+  SE, ~320dp) estava disponível nesta rodada para confirmar se os três botões continuam legíveis e
+  tocáveis sem quebra de linha inesperada ou corte de texto.
+- **Dependências:** Simulador ou device com largura de tela ~320dp disponível (iPhone SE 2ª/3ª
+  geração ou equivalente Android estreito).
+- **Critério de aceite:** Card de conta fixa com os três botões de ação verificado visualmente (ou
+  por screenshot) numa tela de ~320dp de largura, nos temas claro e escuro, sem corte de texto,
+  sobreposição ou alvo de toque abaixo de 44pt.
+- **Risco se ficar pendente:** Regressão visual silenciosa em aparelhos mais antigos/estreitos —
+  usuários com esses aparelhos podem ver botões cortados ou empilhados de forma inesperada sem que
+  isso apareça em nenhum teste automatizado ou verificação manual feita até agora.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0103 — `csrfToken` gravado no mobile e nunca lido (código morto)
+
+- **Titulo:** `mobile/src/services/authService.ts` e `mobile/src/services/api.ts` continuam
+  persistindo `csrfToken` recebido do backend, mas nenhum código do mobile volta a ler esse valor
+- **Prioridade:** P3
+- **Área:** mobile
+- **Motivo:** Achado durante a correção da sessão travada por digital (PROB-0085, 2026-08-22). O
+  contrato de refresh do mobile é body-only desde 2026-07-11 (BUG-0051/PROB-0056) — cookie/CSRF
+  double-submit é exclusivo do contrato web (ver item 5 de "Fluxo de autenticacao" em
+  `docs/SYSTEM_OVERVIEW.md`). O `csrfToken` que o backend continua devolvendo no corpo da resposta
+  de login/refresh é salvo no `SecureStore` do mobile mas não tem nenhum consumidor — não é enviado
+  em nenhum header nem usado em nenhuma verificação local.
+- **Dependências:** Nenhuma técnica. Confirmar por varredura (`rg csrfToken mobile/`) que de fato
+  não há nenhum uso antes de remover.
+- **Critério de aceite:** `csrfToken` deixa de ser persistido no mobile (ou, alternativamente,
+  passa a ser efetivamente usado se alguma decisão de produto exigir double-submit também no
+  mobile no futuro); nenhuma mudança de comportamento observável para o usuário.
+- **Risco se ficar pendente:** Nenhum risco funcional — é ruído de código morto que pode confundir
+  quem ler o fluxo de autenticação do mobile pensando que o CSRF token é usado no cliente nativo.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0104 — Biometria do mobile não protege o token em repouso no `SecureStore`
+
+- **Titulo:** `SecureStore.setItemAsync` em `mobile/src/store/auth.ts` não usa a opção
+  `requireAuthentication` — o `AppLockGate` bloqueia a tela, mas o token gravado em disco não exige
+  biometria/PIN do sistema para ser lido
+- **Prioridade:** P2
+- **Área:** mobile, seguranca
+- **Motivo:** Achado durante a correção da sessão travada por digital (PROB-0085, 2026-08-22),
+  registrado como risco residual da correção (não como parte dela). Hoje a proteção por biometria é
+  inteiramente de UI (`AppLockGate` cobre a tela) — o token em si, uma vez no `SecureStore`, pode
+  ser lido por qualquer código do próprio app sem novo desafio biométrico do SO.
+- **Dependências:** Decisão do dono do produto — endurecer com `requireAuthentication` tem risco de
+  perda de sessão em troca de aparelho (restauração de backup/novo device pode não conseguir
+  decifrar o valor protegido pela chave biométrica antiga), o que pode conflitar com a decisão já
+  cravada nesta mesma sessão de que "desbloqueio por digital renova o token contra o servidor, com
+  tolerância offline" (ver PROB-0085) — precisa de análise conjunta antes de implementar.
+  Levantamento de como o Expo SecureStore/Keychain/Keystore se comporta com `requireAuthentication`
+  em troca de aparelho, restauração de backup e biometria recadastrada.
+- **Critério de aceite:** Decisão de produto registrada (endurecer ou aceitar o risco
+  conscientemente) e, se endurecer, implementação com teste cobrindo o caminho de falha
+  (biometria recadastrada/aparelho trocado) sem deixar o usuário irrecuperavelmente fora da conta.
+- **Risco se ficar pendente:** Um app comprometido no mesmo aparelho (ou acesso físico com o
+  aparelho desbloqueado por outro meio) pode ler o token diretamente do armazenamento sem passar
+  pelo desafio biométrico da tela de bloqueio do app.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0105 — Nota operacional: timezone do Postgres do container (UTC) vs. app (`America/Sao_Paulo`) exige margem em verificação manual por SQL
+
+- **Titulo:** Manipular `data_expiracao` de `refresh_tokens` (ou qualquer coluna de data/hora) via
+  SQL manual direto no container, para fins de verificação/teste, precisa de margem de ~3h para não
+  enganar o resultado
+- **Prioridade:** P3
+- **Área:** documentacao, infra
+- **Motivo:** Observado durante a verificação em runtime de PROB-0085 (2026-08-22). O Postgres do
+  container de stack local está em UTC e o app/backend operam em `America/Sao_Paulo`. A coluna
+  `data_expiracao` (e equivalentes) é `LocalDateTime`, sempre escrita e lida pelo processo Java — é
+  consistente ponta a ponta em uso normal da aplicação. O ponto de atenção é só para quem for
+  manipular essas colunas por SQL manual fora do Java (ex.: forçar um token "quase expirado" para
+  testar o scheduler de limpeza): um `UPDATE` ingênuo usando `now()` do Postgres (UTC) contra uma
+  coluna que o Java trata como hora local de São Paulo introduz um desvio de fuso (~3h) que pode
+  fazer um token parecer expirado quando não está, ou vice-versa.
+- **Dependências:** Nenhuma técnica — é uma nota de procedimento para verificações futuras, não um
+  defeito de código.
+- **Critério de aceite:** Nota incorporada a algum guia de verificação/runbook de stack local (se e
+  quando um for criado), lembrando de somar/subtrair a margem de fuso ao manipular datas por SQL
+  manual, ou de preferir sempre passar pelo fluxo real da aplicação (login/refresh) em vez de UPDATE
+  direto.
+- **Risco se ficar pendente:** Baixo — risco é de uma futura verificação manual chegar a conclusão
+  errada por causa do desvio de fuso, não de comportamento incorreto em produção (que sempre passa
+  pelo Java).
 - **Status:** ABERTO
