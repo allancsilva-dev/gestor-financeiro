@@ -1,4 +1,4 @@
-import { useColorScheme } from 'react-native';
+import { Platform, useColorScheme } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { spacing, tabBar } from './tokens';
 import { DARK_COLORS, LIGHT_COLORS, AppColors } from './colors';
@@ -25,6 +25,21 @@ export const useTheme = (): AppColors => (useEsquema() === 'dark' ? DARK_COLORS 
 export const useTabBarSpace = (): number => {
   const insets = useSafeAreaInsets();
   return insets.bottom + tabBar.altura + spacing.lg;
+};
+
+/**
+ * Respiro no topo do cabeçalho de um modal.
+ *
+ * `presentationStyle="pageSheet"` só existe no iOS, onde a folha já nasce abaixo
+ * da barra de status. No Android a prop é ignorada e o modal ocupa a tela
+ * inteira — com `statusBarTranslucent` o conteúdo começa em y=0 e o botão de
+ * fechar fica atrás do relógio. Todo modal do app usa este valor junto com
+ * `statusBarTranslucent`: a dupla vale para API 33 a 36, sem depender de qual
+ * versão do Android decidiu desenhar de ponta a ponta.
+ */
+export const useModalTopInset = (): number => {
+  const insets = useSafeAreaInsets();
+  return Platform.OS === 'android' ? insets.top : 0;
 };
 
 export { DARK_COLORS, LIGHT_COLORS };

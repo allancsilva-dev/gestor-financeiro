@@ -7,7 +7,7 @@ import { transacaoService } from '../services/transacaoService';
 import { categoriaService } from '../services/categoriaService';
 import parcelaService from '../services/parcelaService';
 import anexoService, { UploadFile } from '../services/anexoService';
-import { useTheme } from '../theme';
+import { useModalTopInset, useTheme } from '../theme';
 import { parseDateBR, isValidDateBR, parseCurrencyBR, maskCurrencyInput, maskDateInput } from '../utils/format';
 import { Transacao, TransacaoRequest } from '../types';
 import Field from './ui/Field';
@@ -35,6 +35,7 @@ const bytesLabel = (bytes: number) => {
 // Tipo e forma de pagamento ficam fixos; categoria pode mudar sem recriar lançamento.
 export default function EditarTransacaoModal({ visible, transacao, onClose }: EditarTransacaoModalProps) {
   const colors = useTheme();
+  const topo = useModalTopInset();
   const invalidarCacheDeTransacao = useInvalidarAposTransacao();
 
   const [salvando, setSalvando] = useState(false);
@@ -254,8 +255,8 @@ export default function EditarTransacaoModal({ visible, transacao, onClose }: Ed
     : transacao?.tipo === 'ENTRADA' ? 'Entrada' : 'Saída';
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" statusBarTranslucent onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: topo }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
           <TouchableOpacity onPress={onClose} accessibilityRole="button">
             <Text style={{ color: colors.brandFg, fontSize: 15 }}>Cancelar</Text>

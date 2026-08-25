@@ -3,7 +3,7 @@ import { View, Text, Modal, TouchableOpacity, ActivityIndicator, ScrollView } fr
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import metricasService from '../services/metricasService';
-import { useTheme } from '../theme';
+import { useModalTopInset, useTheme, spacing } from '../theme';
 import { formatCurrency } from '../utils/format';
 import { MetricaId, NavegacaoOrigem } from '../types';
 import ListRow from './ui/ListRow';
@@ -40,6 +40,7 @@ export function rotaDaNavegacao(nav: NavegacaoOrigem): string | null {
 // para ser usado também na tela Visão financeira.
 export default function ComposicaoMetricaModal({ metrica, onClose }: ComposicaoMetricaModalProps) {
   const colors = useTheme();
+  const topo = useModalTopInset();
   const router = useRouter();
 
   const navegar = (nav: NavegacaoOrigem) => {
@@ -56,8 +57,8 @@ export default function ComposicaoMetricaModal({ metrica, onClose }: ComposicaoM
   });
 
   return (
-    <Modal visible={metrica != null} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: 18 }}>
+    <Modal visible={metrica != null} animationType="slide" presentationStyle="pageSheet" statusBarTranslucent onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: topo + spacing.lg }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
           <Text style={{ color: colors.textPrimary, fontSize: 17, fontWeight: '700' }}>Composição da métrica</Text>
           <TouchableOpacity onPress={onClose} accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }}>

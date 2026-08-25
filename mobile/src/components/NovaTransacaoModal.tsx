@@ -5,7 +5,7 @@ import { transacaoService } from '../services/transacaoService';
 import { categoriaService } from '../services/categoriaService';
 import contaFinanceiraService from '../services/contaFinanceiraService';
 import cartaoService from '../services/cartaoService';
-import { useTheme } from '../theme';
+import { useModalTopInset, useTheme } from '../theme';
 import { parseDateBR, isValidDateBR, parseCurrencyBR, maskCurrencyInput, maskDateInput, todayBR } from '../utils/format';
 import { TransacaoRequest, TipoTransacao, SugestaoCategoria } from '../types';
 import { getLancamentoPrefs, setLancamentoPrefs } from '../store/lancamentoPrefs';
@@ -46,6 +46,7 @@ const DEBOUNCE_SUGESTAO_MS = 600;
 // confirmar; data default hoje; observações/parcelamento em "Mais detalhes".
 export default function NovaTransacaoModal({ visible, onClose, onSaved, initialTipo = 'SAIDA', initialData = null, cartaoIdInicial = null }: NovaTransacaoModalProps) {
   const colors = useTheme();
+  const topo = useModalTopInset();
   const queryClient = useQueryClient();
   const invalidarCacheDeTransacao = useInvalidarAposTransacao();
 
@@ -318,8 +319,8 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
   const tituloModal = initialData ? 'Repetir lançamento' : 'Nova Transação';
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
-      <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" statusBarTranslucent onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: colors.bg, paddingTop: topo }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
           <TouchableOpacity onPress={() => { resetForm(); onClose(); }} accessibilityRole="button">
             <Text style={{ color: colors.brandFg, fontSize: 15 }}>Cancelar</Text>

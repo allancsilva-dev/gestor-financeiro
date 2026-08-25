@@ -1,6 +1,6 @@
 import React from 'react';
 import { ActivityIndicator, Modal, Text, TouchableOpacity, View } from 'react-native';
-import { useTheme, spacing, typography } from '../../theme';
+import { useModalTopInset, useTheme, spacing, typography } from '../../theme';
 
 interface AcaoFolha {
   rotulo: string;
@@ -37,6 +37,7 @@ export default function FolhaModal({
   children,
 }: Props) {
   const colors = useTheme();
+  const topo = useModalTopInset();
   const inativo = acao?.desabilitado || acao?.carregando;
 
   return (
@@ -44,6 +45,7 @@ export default function FolhaModal({
       visible={visible}
       animationType="slide"
       presentationStyle="pageSheet"
+      statusBarTranslucent
       onRequestClose={onFechar}
     >
       <View style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -54,6 +56,7 @@ export default function FolhaModal({
             alignItems: 'center',
             gap: spacing.md,
             padding: spacing.lg,
+            paddingTop: topo + spacing.lg,
             borderBottomWidth: 1,
             borderBottomColor: colors.border,
           }}
