@@ -45,7 +45,9 @@ public class RelatorioService {
             int pct = BigDecimal.ZERO.compareTo(totalGastos) == 0 ? 0
                     : valor.multiply(BigDecimal.valueOf(100)).divide(totalGastos, 0, RoundingMode.HALF_UP).intValue();
             gastosPorCategoria.add(new RelatorioCategoriaDto(
-                    asLong(row[3]), String.valueOf(row[0]), String.valueOf(row[2]), String.valueOf(row[4]), valor, BigDecimal.valueOf(pct)));
+                    asLong(row[3]), String.valueOf(row[0]),
+                    row[2] != null ? String.valueOf(row[2]) : "#6B7280",
+                    asTexto(row[4]), valor, BigDecimal.valueOf(pct)));
         }
 
         List<Object[]> despesasRaw = transacaoRepository.findMaioresDespesas(
@@ -81,6 +83,16 @@ public class RelatorioService {
                     "Cartão de Crédito", valor, BigDecimal.valueOf(pct)));
         }
         return gastosPorConta;
+    }
+
+    /**
+     * Texto de coluna que pode vir NULL. `String.valueOf(null)` devolve a string
+     * "null", que viajava no JSON e chegava à tela: o app mostrava o texto
+     * "null" no lugar do ícone da categoria, porque `icone || '🏷️'` não trata
+     * string não vazia. Categoria sem ícone tem de chegar como null de verdade.
+     */
+    private static String asTexto(Object value) {
+        return value == null ? null : String.valueOf(value);
     }
 
     private static Long asLong(Object value) {
