@@ -38,13 +38,14 @@ public final class CanonicalImportOrchestrator {
     }
 
     public ImportBatch stage(Long usuarioId, ImportSource source, String idempotencyKey) throws IOException {
-        String expectedHash = source.sha256();
-        String initialHash = expectedHash == null ? sha256(source) : expectedHash;
+        String declaredHash = source.sha256();
+        String initialHash = declaredHash == null ? sha256(source) : declaredHash;
         ImportBatch created = batches.create(usuarioId, ImportFormat.UNKNOWN, null, initialHash, idempotencyKey);
         if (created.getStatus() != ImportBatchStatus.RECEIVED || created.getFormat() != ImportFormat.UNKNOWN) return created;
         try {
-            String actualHash = sha256(source);
-            if (!actualHash.equals(initialHash))
+            // Só relê o arquivo quando o hash veio declarado pelo chamador: sem declaração o
+            // valor acima já é a leitura íntegra do arquivo e um segundo passe não prova nada.
+            if (declaredHash != null && !sha256(source).equals(declaredHash))
                 throw new ImportParsingException(ImportFailureCode.HASH_MISMATCH, "Hash do arquivo não confere");
             ImportConnectorRegistry.DetectedConnector detected = connectors.detect(source);
             batches.setDetected(usuarioId, created.getId(), detected.detection().format(), detected.detection().institutionCode());
@@ -87,7 +88,9 @@ public final class CanonicalImportOrchestrator {
         batch = batchRepository.findByIdAndUsuarioId(batchId, usuarioId).orElseThrow();
         batch.setTotalRecords(counts[0] + counts[1] + counts[2]); batch.setValidRecords(counts[0]);
         batch.setInvalidRecords(counts[1]); batch.setPendingReviewRecords(counts[2]);
-        batch.setStatus(ImportBatchStatus.PARSED); batchRepository.save(batch);
+        batchRepository.save(batch);
+        // Transição sempre pelo serviço: valida o grafo de estados e emite a métrica.
+        batches.transition(usuarioId, batchId, ImportBatchStatus.PARSED, null);
     }
 
     private String sha256(ImportSource source) throws IOException {

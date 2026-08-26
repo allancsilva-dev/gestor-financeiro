@@ -120,7 +120,7 @@ public final class CsvImportConnector implements FinancialDataConnector {
         for (String value : Set.of("descricao", "description", "memo", "historico")) map.put(value, "description");
         for (String value : Set.of("valor", "amount")) map.put(value, "amount");
         for (String value : Set.of("moeda", "currency")) map.put(value, "currency");
-        for (String value : Set.of("direcao", "type")) map.put(value, "direction");
+        for (String value : Set.of("direcao", "tipo", "type", "trntype")) map.put(value, "direction");
         for (String value : Set.of("external id", "external_id", "fitid")) map.put(value, "externalId");
         return Map.copyOf(map);
     }

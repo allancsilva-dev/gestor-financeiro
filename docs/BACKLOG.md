@@ -1945,4 +1945,6 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   trilha auditável.
 - **Risco se ficar pendente:** Importação produtiva permanece indisponível; endpoint legado não é
   arquitetura válida para produção.
-- **Status:** ABERTO — fundação PR-F4-01 concluída; parser ainda ausente.
+- **Status:** ABERTO — fundação PR-F4-01 e parsers CSV/OFX (PR-F4-01b) concluídos e cobertos por
+  teste. Faltam adapter `ImportSource` de produção, endpoints do pipeline, preview, mapeamento
+  configurável, dedupe, commit no ledger, reversão, conciliação e worker de fila.

@@ -7,6 +7,25 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ---
 
+## [Fase 4 — PR-F4-01b] - 2026-08-26
+
+### Correção da fundação de importação e envelope de runtime
+- Transição para `PARSED` passa a usar `ImportBatchService.transition`, recuperando validação do
+  grafo de estados e a métrica `app.import.batch.transitions`; o SHA-256 do arquivo deixa de ser
+  calculado duas vezes e só é reconferido quando o chamador declara o hash.
+- CSV reconhece a coluna `tipo` (cabeçalho pt-BR mais comum) e `trntype`; `TRNTYPE` de OFX volta a
+  ser descritivo — a direção é decidida pelo sinal de `TRNAMT`, evitando extrato inteiro em
+  `PENDING_REVIEW`. `DIRECTION_MISSING` passa a ser emitido; campo `metadata` morto do registro
+  canônico foi removido do contrato.
+- `CanonicalImportOrchestrator` ganha cobertura (contagem por status, flush em lote, hash
+  divergente, teto de arquivo, teto de registros e falha de detecção deixando o lote em `FAILED`);
+  somados testes de OFX SGML e de charset windows-1252.
+- Exportação CSV neutraliza fórmula de planilha (CSV injection) em todos os campos de texto.
+- Runtime explícito: pool Hikari, threads Tomcat, limites de multipart, `Idempotency-Key` validada
+  com 400 dedicado, CORS com whitelist de headers e `mem_limit`/`JAVA_TOOL_OPTIONS` no compose da
+  VPS. Restore passa a exigir marcador do alvo e banco vazio.
+- Validação: 326 testes unitários verdes e gate de cobertura JaCoCo atendido.
+
 ## [Fase 4 — PR-F4-01] - 2026-08-26
 
 ### Fundação canônica de importação

@@ -6,7 +6,6 @@ import com.gestor.financeiro.model.enums.ImportRecordStatus;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.Map;
 
 /** Registro normalizado, independente de CSV, OFX ou futuro conector. */
 public record CanonicalImportRecord(
@@ -19,10 +18,6 @@ public record CanonicalImportRecord(
         String currency,
         TipoTransacao direction,
         ImportRecordStatus status,
-        ImportRecordReasonCode reasonCode,
-        Map<String, String> metadata
+        ImportRecordReasonCode reasonCode
 ) {
-    public CanonicalImportRecord {
-        metadata = metadata == null ? Map.of() : Map.copyOf(metadata);
-    }
 }

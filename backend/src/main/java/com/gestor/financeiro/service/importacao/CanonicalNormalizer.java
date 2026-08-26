@@ -48,7 +48,7 @@ public final class CanonicalNormalizer {
         String fingerprint = fingerprint(institution, cleanExternalId, occurredOn, magnitude,
                 isoCurrency, parsedDirection, cleanDescription);
         return new CanonicalImportRecord(line, cleanExternalId, fingerprint, occurredOn, cleanDescription,
-                magnitude, isoCurrency, parsedDirection, status, reason, java.util.Map.of());
+                magnitude, isoCurrency, parsedDirection, status, reason);
     }
 
     private LocalDate parseDate(String raw, List<ImportRecordReasonCode> issues) {
@@ -113,16 +113,27 @@ public final class CanonicalNormalizer {
     }
 
     private TipoTransacao parseDirection(String raw, int sign, List<ImportRecordReasonCode> issues) {
-        if (raw == null || raw.isBlank()) return null;
+        if (raw == null || raw.isBlank()) {
+            // Sem direção e sem sinal não há como decidir; com sinal o chamador infere.
+            if (sign == 0) issues.add(ImportRecordReasonCode.DIRECTION_MISSING);
+            return null;
+        }
         String value = text(raw, 20, false);
-        TipoTransacao result = switch (value == null ? "" : value.toUpperCase(Locale.ROOT)) {
+        TipoTransacao explicito = switch (value == null ? "" : value.toUpperCase(Locale.ROOT)) {
             case "ENTRADA", "CREDIT", "CREDITO", "CRÉDITO" -> TipoTransacao.ENTRADA;
             case "SAIDA", "SAÍDA", "DEBIT", "DEBITO", "DÉBITO" -> TipoTransacao.SAIDA;
             default -> null;
         };
-        if (result == null) issues.add(ImportRecordReasonCode.DIRECTION_INVALID);
-        else if (sign != 0 && (sign > 0) != (result == TipoTransacao.ENTRADA)) issues.add(ImportRecordReasonCode.DIRECTION_CONFLICT);
-        return result;
+        if (explicito == null) {
+            // TRNTYPE de OFX (POS, ATM, XFER, PAYMENT, DEP, FEE, INT...) é descritivo: quem
+            // decide a direção é o sinal de TRNAMT. Sem sinal, o valor é inaproveitável.
+            if (sign == 0) issues.add(ImportRecordReasonCode.DIRECTION_INVALID);
+            return null;
+        }
+        if (sign != 0 && (sign > 0) != (explicito == TipoTransacao.ENTRADA)) {
+            issues.add(ImportRecordReasonCode.DIRECTION_CONFLICT);
+        }
+        return explicito;
     }
 
     private String text(String raw, int max, boolean condense) {

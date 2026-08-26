@@ -31,7 +31,7 @@ class SecureImportParsingTest {
         assertEquals("AbC-1", records.get(0).externalId());
         assertEquals(TipoTransacao.SAIDA, records.get(0).direction());
         assertEquals(ImportRecordStatus.VALID, records.get(0).status());
-        assertTrue(records.get(0).metadata().isEmpty());
+        assertNull(records.get(0).reasonCode());
     }
 
     @Test void doesNotAcceptIncoherentDelimiterAndHeader() throws Exception {
@@ -76,8 +76,63 @@ class SecureImportParsingTest {
         assertNotEquals(first.fingerprint(), differentCase.fingerprint());
     }
 
-    private ImportSource source(String value, String contentType) {
-        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+    @Test void parsesOfxSgmlWithUnclosedTags() throws Exception {
+        String ofx = String.join("\n",
+                "OFXHEADER:100", "DATA:OFXSGML", "VERSION:102", "",
+                "<OFX>", "<BANKMSGSRSV1>", "<STMTRS>", "<CURDEF>BRL",
+                "<BANKACCTFROM>", "<BANKID>0341", "</BANKACCTFROM>",
+                "<BANKTRANLIST>", "<STMTTRN>", "<TRNTYPE>POS", "<DTPOSTED>20260820",
+                "<TRNAMT>-12.34", "<FITID>ABC-1", "<NAME>Mercado Centro", "</STMTTRN>",
+                "</BANKTRANLIST>", "</STMTRS>", "</BANKMSGSRSV1>", "</OFX>") + "\n";
+        OfxImportConnector connector = new OfxImportConnector(limits, normalizer);
+        List<CanonicalImportRecord> records = new ArrayList<>();
+        connector.parse(source(ofx, "application/x-ofx"), records::add);
+        assertEquals(1, records.size());
+        assertEquals("Mercado Centro", records.get(0).description());
+        assertEquals("ABC-1", records.get(0).externalId());
+        assertEquals("BRL", records.get(0).currency());
+        assertEquals(TipoTransacao.SAIDA, records.get(0).direction());
+        assertEquals(ImportRecordStatus.VALID, records.get(0).status());
+    }
+
+    @Test void decodesWindows1252WhenHintDeclaresIt() throws Exception {
+        byte[] csv = "data,descricao,valor,moeda,tipo\n2026-08-20,Caf\u00e9 da esquina,-9.90,BRL,SAIDA\n"
+                .getBytes(java.nio.charset.Charset.forName("windows-1252"));
+        CsvImportConnector connector = new CsvImportConnector(limits, normalizer);
+        List<CanonicalImportRecord> records = new ArrayList<>();
+        connector.parse(source(csv, "text/csv; charset=windows-1252"), records::add);
+        assertEquals(1, records.size());
+        assertEquals("Caf\u00e9 da esquina", records.get(0).description());
+    }
+
+    @Test void trnTypeDescritivoNaoInvalidaDirecaoQuandoOSinalDecide() {
+        CanonicalImportRecord saida = normalizer.normalize(2, "0341", "F1", "2026-08-20", "Posto", "-50.00", "BRL", "POS");
+        CanonicalImportRecord entrada = normalizer.normalize(3, "0341", "F2", "2026-08-20", "Deposito", "80.00", "BRL", "DIRECTDEP");
+        assertEquals(TipoTransacao.SAIDA, saida.direction());
+        assertEquals(ImportRecordStatus.VALID, saida.status());
+        assertEquals(TipoTransacao.ENTRADA, entrada.direction());
+        assertEquals(ImportRecordStatus.VALID, entrada.status());
+    }
+
+    @Test void csvLeColunaTipoEmPortuguesEAcusaConflitoComOSinal() throws Exception {
+        String csv = "data,descricao,valor,moeda,tipo\n2026-08-20,Mercado,12.34,BRL,SAIDA\n";
+        CsvImportConnector connector = new CsvImportConnector(limits, normalizer);
+        List<CanonicalImportRecord> records = new ArrayList<>();
+        connector.parse(source(csv, "text/csv"), records::add);
+        assertEquals(1, records.size());
+        assertEquals(TipoTransacao.SAIDA, records.get(0).direction());
+        assertEquals(ImportRecordStatus.PENDING_REVIEW, records.get(0).status());
+        assertEquals(ImportRecordReasonCode.DIRECTION_CONFLICT, records.get(0).reasonCode());
+    }
+
+    @Test void direcaoAusenteSemSinalEhSinalizada() {
+        CanonicalImportRecord record = normalizer.normalize(2, null, null, "2026-08-20", "Sem valor", null, "BRL", null);
+        assertEquals(ImportRecordStatus.INVALID, record.status());
+        assertEquals(ImportRecordReasonCode.MULTIPLE_ISSUES, record.reasonCode());
+        assertNull(record.direction());
+    }
+
+    private ImportSource source(byte[] bytes, String contentType) {
         return new ImportSource() {
             public InputStream openStream() { return new ByteArrayInputStream(bytes); }
             public long size() { return bytes.length; }
@@ -88,5 +143,9 @@ class SecureImportParsingTest {
                 catch (Exception e) { throw new IllegalStateException(e); }
             }
         };
+    }
+
+    private ImportSource source(String value, String contentType) {
+        return source(value.getBytes(StandardCharsets.UTF_8), contentType);
     }
 }
