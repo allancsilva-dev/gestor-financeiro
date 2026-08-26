@@ -7,6 +7,18 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ---
 
+## [Fase 4 — PR-F4-04] - 2026-08-26
+
+### Prévia da importação
+- `GET /api/v1/importacoes/{id}/registros` devolve as linhas já normalizadas, com filtro por status
+  e paginação **por cursor de `sourceLine`** — `OFFSET` faria o banco varrer o lote inteiro a cada
+  página, e um lote vai a dezenas de milhares de linhas.
+- `ImportRecordRepository`, que era uma interface vazia, ganha a consulta paginada e a contagem por
+  status; o lote é resolvido pelo titular antes da leitura, então lote alheio responde `404` e nunca
+  lista vazia.
+- Status inválido no filtro responde `422` em vez de lista silenciosamente vazia.
+- Validação: 340 testes unitários e gate de cobertura verdes.
+
 ## [Fase 4 — PR-F4-03] - 2026-08-26
 
 ### Worker da fila durável

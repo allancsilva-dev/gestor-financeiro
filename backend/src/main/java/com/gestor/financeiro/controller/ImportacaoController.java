@@ -2,6 +2,8 @@ package com.gestor.financeiro.controller;
 
 import com.gestor.financeiro.config.IdempotencyFilter;
 import com.gestor.financeiro.dto.ImportBatchResponse;
+import com.gestor.financeiro.dto.ImportRecordPageResponse;
+import com.gestor.financeiro.dto.ImportRecordResponse;
 import com.gestor.financeiro.model.ImportBatch;
 import com.gestor.financeiro.model.enums.ImportBatchStatus;
 import com.gestor.financeiro.model.enums.ImportFailureCode;
@@ -9,6 +11,7 @@ import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.importacao.CanonicalImportOrchestrator;
 import com.gestor.financeiro.service.importacao.ImportAdmissionService;
 import com.gestor.financeiro.service.importacao.ImportBatchService;
+import com.gestor.financeiro.service.importacao.ImportPreviewService;
 import com.gestor.financeiro.service.importacao.ImportParsingException;
 import com.gestor.financeiro.service.importacao.TempFileImportSource;
 import io.swagger.v3.oas.annotations.Operation;
@@ -44,6 +47,7 @@ public class ImportacaoController {
     private final CanonicalImportOrchestrator orchestrator;
     private final ImportBatchService batches;
     private final ImportAdmissionService admission;
+    private final ImportPreviewService preview;
     private final AuthenticatedUserService authenticatedUserService;
 
     @Value("${spring.servlet.multipart.location:${java.io.tmpdir}}")
@@ -75,5 +79,16 @@ public class ImportacaoController {
     public ResponseEntity<ImportBatchResponse> consultar(@PathVariable Long id) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         return ResponseEntity.ok(ImportBatchResponse.de(batches.get(usuarioId, id)));
+    }
+
+    @GetMapping("/{id}/registros")
+    @Operation(summary = "Revisar as linhas normalizadas do arquivo antes de confirmar")
+    public ResponseEntity<ImportRecordPageResponse> registros(
+            @PathVariable Long id,
+            @RequestParam(value = "status", required = false) String status,
+            @RequestParam(value = "aposLinha", defaultValue = "0") int aposLinha,
+            @RequestParam(value = "tamanho", defaultValue = "50") int tamanho) {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        return ResponseEntity.ok(preview.pagina(usuarioId, id, status, aposLinha, tamanho));
     }
 }

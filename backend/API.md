@@ -333,6 +333,11 @@ em `status` retorna HTTP 400 (`INVALID_PARAMETER`).
   `Idempotency-Key`. Devolve `201` com o lote (`status`, `format`, contadores). O arquivo é
   detectado, normalizado e persistido como lote auditável; **nada é lançado no ledger neste passo**.
 - `GET /api/v1/importacoes/{id}` — situação do lote do titular; `404` para lote de outro titular.
+- `GET /api/v1/importacoes/{id}/registros` — prévia das linhas normalizadas. Parâmetros:
+  `status` (`VALID`, `INVALID`, `PENDING_REVIEW`, `DUPLICATE`, `APPROVED`, `COMMITTED`, `REVERSED`),
+  `aposLinha` (cursor por `sourceLine`, começa em `0`) e `tamanho` (default `50`, teto `200`).
+  A resposta traz `registros` e `proximaLinha` — `null` quando acabou. Paginação é por cursor, não
+  por `OFFSET`: um lote chega a dezenas de milhares de linhas.
 
 Respostas de erro do envio:
 

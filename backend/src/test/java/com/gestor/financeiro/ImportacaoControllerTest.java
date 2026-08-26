@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -47,6 +48,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ImportacaoControllerTest {
 
     private static final String EMAIL = "importacao@test.local";
+    private static final String OUTRO_EMAIL = "outro-importador@test.local";
     private static final Path TEMP_DIR = Path.of("target/multipart-test");
 
     private static final String CSV = "data,descricao,valor,moeda,tipo\n"
@@ -75,6 +77,7 @@ class ImportacaoControllerTest {
         limparImportacoes();
         rateLimitBucketRepository.deleteAll();
         usuarioRepository.deleteById(usuario.getId());
+        usuarioRepository.findByEmail(OUTRO_EMAIL).ifPresent(usuarioRepository::delete);
     }
 
     private void limparImportacoes() {
@@ -161,6 +164,52 @@ class ImportacaoControllerTest {
                     .andExpect(jsonPath("$.details.failureCode").value("DETECTION_FAILED"));
         }
         assertEquals(1, batchRepository.count(), "replay não pode criar um segundo lote");
+    }
+
+    @Test
+    @WithMockUser(username = EMAIL)
+    void previaPaginaPorCursorEFiltraPorStatus() throws Exception {
+        StringBuilder csv = new StringBuilder("data,descricao,valor,moeda,tipo\n");
+        for (int i = 1; i <= 5; i++) {
+            csv.append("2026-08-0").append(i).append(",Compra ").append(i).append(",-10.00,BRL,SAIDA\n");
+        }
+        csv.append("2026-08-06,Sem moeda,-10.00,,SAIDA\n");
+
+        String envio = mockMvc.perform(multipart("/api/v1/importacoes").file(arquivo(csv.toString())))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long batchId = idDe(envio);
+
+        mockMvc.perform(get("/api/v1/importacoes/" + batchId + "/registros?tamanho=2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.registros.length()").value(2))
+                .andExpect(jsonPath("$.registros[0].sourceLine").value(2))
+                .andExpect(jsonPath("$.proximaLinha").value(3));
+
+        mockMvc.perform(get("/api/v1/importacoes/" + batchId + "/registros?tamanho=2&aposLinha=3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.registros[0].sourceLine").value(4));
+
+        mockMvc.perform(get("/api/v1/importacoes/" + batchId + "/registros?status=PENDING_REVIEW"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.registros.length()").value(1))
+                .andExpect(jsonPath("$.registros[0].reasonCode").value("CURRENCY_MISSING"))
+                .andExpect(jsonPath("$.proximaLinha").doesNotExist());
+
+        mockMvc.perform(get("/api/v1/importacoes/" + batchId + "/registros?status=INEXISTENTE"))
+                .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    @WithMockUser(username = OUTRO_EMAIL)
+    void previaDeLoteDeOutroTitularResponde404() throws Exception {
+        ImportBatch alheio = batchRepository.save(loteRecebido("c".repeat(64)));
+        usuarioRepository.save(TestDataFactory.usuario("Outro", OUTRO_EMAIL, "hash"));
+
+        mockMvc.perform(get("/api/v1/importacoes/" + alheio.getId() + "/registros"))
+                .andExpect(status().isNotFound());
+        mockMvc.perform(get("/api/v1/importacoes/" + alheio.getId()))
+                .andExpect(status().isNotFound());
     }
 
     @Test
