@@ -21,6 +21,8 @@ services:
       dockerfile: Dockerfile
     container_name: gf-api
     restart: unless-stopped
+    mem_limit: 768m
+    cpus: 1.0
     depends_on:
       postgres:
         condition: service_healthy
@@ -44,6 +46,10 @@ services:
       SERVER_FORWARD_HEADERS_STRATEGY: native
       APP_UPLOAD_DIR: /app/uploads
       APP_BUSINESS_TIMEZONE: ${APP_BUSINESS_TIMEZONE:-America/Sao_Paulo}
+      JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--XX:MaxRAMPercentage=70.0 -XX:+ExitOnOutOfMemoryError}
+      DB_POOL_MAX_SIZE: ${DB_POOL_MAX_SIZE:-10}
+      DB_POOL_MIN_IDLE: ${DB_POOL_MIN_IDLE:-2}
+      SERVER_TOMCAT_THREADS_MAX: ${SERVER_TOMCAT_THREADS_MAX:-50}
     # Anexos sobrevivem a recreate do container (ADR-0005 / PROB-0080)
     volumes:
       - backend_uploads:/app/uploads

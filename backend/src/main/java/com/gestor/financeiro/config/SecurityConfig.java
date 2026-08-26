@@ -58,8 +58,16 @@ public class SecurityConfig {
             .collect(Collectors.toList());
 
         configuration.setAllowedOrigins(allowedOrigins);
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList(
+            "Authorization",
+            "Content-Type",
+            IdempotencyFilter.HEADER,
+            RefreshTokenCsrfFilter.CSRF_HEADER_NAME,
+            "X-Client-Type",
+            "X-Request-Id"
+        ));
+        configuration.setExposedHeaders(List.of("X-Request-Id"));
         // Necessário para envio de cookies HttpOnly do refresh token (fase 3).
         configuration.setAllowCredentials(true);
 
