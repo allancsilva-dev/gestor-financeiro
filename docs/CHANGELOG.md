@@ -7,6 +7,26 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ---
 
+## [Fase 4 — PR-F4-01d] - 2026-08-26
+
+### Envelope de runtime alinhado para receber upload
+- `docker-compose.production.yml` recebe o mesmo envelope do compose da VPS (`mem_limit`, `cpus`,
+  `JAVA_TOOL_OPTIONS` com `MaxRAMPercentage`/`ExitOnOutOfMemoryError`, `DB_POOL_*`,
+  `SERVER_TOMCAT_THREADS_MAX`), que antes divergiam.
+- Temporário de multipart passa a viver em tmpfs dedicado com teto de 64 MB nos dois composes:
+  upload não enche mais a camada de escrita do container.
+- nginx aceita 12 MB de corpo (acima do teto de 11 MB do Spring), com timeouts próprios do path de
+  importação — o 413 passa a vir da aplicação, com corpo de erro, em vez do proxy.
+- Tomcat ganha `max-swallow-size` (413 no meio do upload drena o corpo em vez de abortar a conexão),
+  `keep-alive-timeout` e teto de form post; Hibernate ganha `jdbc.batch_size` e `order_inserts`.
+- Erros de upload deixam de virar 500: `MaxUploadSizeExceededException` → 413 `UPLOAD_TOO_LARGE`,
+  `MultipartException` → 400 `INVALID_MULTIPART`, parte ausente → 400 `MISSING_REQUEST_PART`,
+  `ImportParsingException` → 422 `IMPORT_PARSING_FAILED` com `failureCode` em `details`.
+- `requestId` passa a aparecer no log dos perfis em uso (estava só no MDC); `Retry-After` entra em
+  `exposedHeaders` do CORS; exposição do actuator vira parametrizável por `ACTUATOR_EXPOSURE`,
+  mantendo o default mínimo enquanto BACKLOG-0074 estiver aberto.
+- Validação: 330 testes unitários e gate de cobertura verdes.
+
 ## [Fase 4 — PR-F4-01c] - 2026-08-26
 
 ### Testes de integração passam a rodar no CI

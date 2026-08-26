@@ -24,7 +24,10 @@ server {
   include             /etc/letsencrypt/options-ssl-nginx.conf;
   ssl_dhparam         /etc/letsencrypt/ssl-dhparams.pem;
 
-  client_max_body_size 10m;
+  # Acima do teto do Spring (11MB de request): o 413 tem que vir da aplicação, com
+  # corpo de erro, e não do proxy. Arquivo em si continua limitado em 10MB no backend.
+  client_max_body_size 12m;
+  client_body_timeout 60s;
 
   proxy_http_version 1.1;
   proxy_set_header Host $host;
@@ -37,6 +40,10 @@ server {
 
   location /api/ {
     proxy_pass http://api:8080/api/;
+    # Importação de arquivo grande demora mais que o default de 60s.
+    proxy_read_timeout 120s;
+    proxy_send_timeout 120s;
+    proxy_request_buffering on;
   }
 
   location /actuator/health {

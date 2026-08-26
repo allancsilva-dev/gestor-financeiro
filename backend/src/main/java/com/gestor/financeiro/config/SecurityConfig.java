@@ -67,7 +67,9 @@ public class SecurityConfig {
             "X-Client-Type",
             "X-Request-Id"
         ));
-        configuration.setExposedHeaders(List.of("X-Request-Id"));
+        // Retry-After acompanha 429 de limite de importação; sem expor, o cliente não
+        // consegue ler o tempo de espera e fica tentando de novo às cegas.
+        configuration.setExposedHeaders(List.of("X-Request-Id", "Retry-After"));
         // Necessário para envio de cookies HttpOnly do refresh token (fase 3).
         configuration.setAllowCredentials(true);
 

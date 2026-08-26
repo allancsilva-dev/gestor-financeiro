@@ -5,7 +5,9 @@
     <springProfile name="default,dev,test,vps">
         <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
             <encoder>
-                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
+                <!-- requestId vem do RequestIdFilter (MDC): sem ele, log de produção não
+                     liga erro do cliente a linha de log. -->
+                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] [req=%X{requestId:--}] %logger{36} - %msg%n</pattern>
             </encoder>
         </appender>
 

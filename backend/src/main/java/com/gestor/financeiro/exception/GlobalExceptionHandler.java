@@ -15,6 +15,11 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import com.gestor.financeiro.service.importacao.ImportParsingException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -83,6 +88,35 @@ public class GlobalExceptionHandler {
             LegacyImportDisabledException ex, HttpServletRequest request) {
         ApiError apiError = buildError("LEGACY_IMPORT_DISABLED", ex.getMessage(), null, request);
         return ResponseEntity.status(HttpStatus.GONE).body(apiError);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiError> handleUploadTooLarge(MaxUploadSizeExceededException ex,
+                                                         HttpServletRequest request) {
+        ApiError apiError = buildError("UPLOAD_TOO_LARGE", "Arquivo excede o limite permitido", null, request);
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(apiError);
+    }
+
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<ApiError> handleMultipart(MultipartException ex, HttpServletRequest request) {
+        // Corpo multipart malformado ou interrompido: erro do cliente, não do servidor.
+        ApiError apiError = buildError("INVALID_MULTIPART", "Envio de arquivo inválido", null, request);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(apiError);
+    }
+
+    @ExceptionHandler({MissingServletRequestPartException.class, MissingServletRequestParameterException.class})
+    public ResponseEntity<ApiError> handleMissingPart(Exception ex, HttpServletRequest request) {
+        ApiError apiError = buildError("MISSING_REQUEST_PART", "Parte obrigatória da requisição ausente",
+                null, request);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(apiError);
+    }
+
+    @ExceptionHandler(ImportParsingException.class)
+    public ResponseEntity<ApiError> handleImportParsing(ImportParsingException ex, HttpServletRequest request) {
+        // Mensagem já nasce segura (sem conteúdo do arquivo); o código de falha é enum fechado.
+        Map<String, String> details = Map.of("failureCode", ex.code().name());
+        ApiError apiError = buildError("IMPORT_PARSING_FAILED", ex.getMessage(), details, request);
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(apiError);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
