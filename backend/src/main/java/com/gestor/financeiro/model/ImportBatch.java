@@ -25,6 +25,11 @@ public class ImportBatch {
     @Column(nullable = false, length = 12)
     private ImportFormat format;
 
+    /** Conta financeira de destino; obrigatória a partir de COMMITTING (CHECK na V49). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "carteira_id")
+    private Carteira carteira;
+
     @Column(name = "institution_code", length = 80)
     private String institutionCode;
 

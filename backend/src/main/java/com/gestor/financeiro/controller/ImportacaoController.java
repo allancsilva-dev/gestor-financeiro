@@ -1,9 +1,11 @@
 package com.gestor.financeiro.controller;
 
 import com.gestor.financeiro.config.IdempotencyFilter;
+import com.gestor.financeiro.dto.AprovarRegistroImportacaoRequest;
 import com.gestor.financeiro.dto.ImportBatchResponse;
 import com.gestor.financeiro.dto.ImportRecordPageResponse;
 import com.gestor.financeiro.dto.ImportRecordResponse;
+import com.gestor.financeiro.dto.PrepararImportacaoRequest;
 import com.gestor.financeiro.model.ImportBatch;
 import com.gestor.financeiro.model.enums.ImportBatchStatus;
 import com.gestor.financeiro.model.enums.ImportFailureCode;
@@ -11,12 +13,14 @@ import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.importacao.CanonicalImportOrchestrator;
 import com.gestor.financeiro.service.importacao.ImportAdmissionService;
 import com.gestor.financeiro.service.importacao.ImportBatchService;
+import com.gestor.financeiro.service.importacao.ImportCommitService;
 import com.gestor.financeiro.service.importacao.ImportPreviewService;
 import com.gestor.financeiro.service.importacao.ImportParsingException;
 import com.gestor.financeiro.service.importacao.TempFileImportSource;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -26,6 +30,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -48,6 +53,7 @@ public class ImportacaoController {
     private final ImportBatchService batches;
     private final ImportAdmissionService admission;
     private final ImportPreviewService preview;
+    private final ImportCommitService commitService;
     private final AuthenticatedUserService authenticatedUserService;
 
     @Value("${spring.servlet.multipart.location:${java.io.tmpdir}}")
@@ -79,6 +85,36 @@ public class ImportacaoController {
     public ResponseEntity<ImportBatchResponse> consultar(@PathVariable Long id) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         return ResponseEntity.ok(ImportBatchResponse.de(batches.get(usuarioId, id)));
+    }
+
+    @PostMapping("/{id}/preparar")
+    @Operation(summary = "Definir a conta de destino e liberar o lote para lançamento")
+    public ResponseEntity<ImportBatchResponse> preparar(@PathVariable Long id,
+                                                        @Valid @RequestBody PrepararImportacaoRequest request) {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        return ResponseEntity.ok(ImportBatchResponse.de(
+                commitService.preparar(usuarioId, id, request.contaFinanceiraId())));
+    }
+
+    @PostMapping("/{id}/registros/{registroId}/aprovar")
+    @Operation(summary = "Aprovar uma linha da prévia, opcionalmente escolhendo a categoria")
+    public ResponseEntity<ImportRecordResponse> aprovar(
+            @PathVariable Long id,
+            @PathVariable Long registroId,
+            @RequestBody(required = false) AprovarRegistroImportacaoRequest request) {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        Long categoriaId = request == null ? null : request.categoriaId();
+        return ResponseEntity.ok(ImportRecordResponse.de(
+                commitService.aprovar(usuarioId, id, registroId, categoriaId)));
+    }
+
+    @PostMapping("/{id}/commit")
+    @Operation(summary = "Lançar o lote revisado no ledger")
+    public ResponseEntity<ImportBatchResponse> commit(@PathVariable Long id) {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        // Trabalho longo vai para a fila; o cliente acompanha por GET.
+        return ResponseEntity.accepted().body(ImportBatchResponse.de(
+                commitService.solicitarCommit(usuarioId, id)));
     }
 
     @GetMapping("/{id}/registros")

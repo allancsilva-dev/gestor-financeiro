@@ -7,6 +7,27 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ---
 
+## [Fase 4 — PR-F4-06] - 2026-08-26
+
+### Lançamento do lote no ledger
+- `POST /api/v1/importacoes/{id}/preparar`, `.../registros/{id}/aprovar` e `.../commit`. O commit
+  responde `202` e o trabalho vai para a fila durável; a requisição HTTP deixa de ser onde milhares
+  de lançamentos são gravados.
+- Cada linha vira transação por `TransacaoService.criar(..., ledgerIdempotencyKey)` — o mesmo caminho
+  do lançamento manual, com saldo, categoria e ledger. Nenhuma regra financeira foi reimplementada
+  no pacote de importação.
+- Idempotência real: a chave `IMPORT:{batchId}:{registroId}` chega ao ledger e o índice único de
+  idempotência do movimento é o backstop. Reexecutar o commit (retentativa de job, lease vencido)
+  não duplica saldo — provado em teste contra PostgreSQL, com saldo e soma do ledger conferidos a
+  centavo.
+- Uma transação por linha (`REQUIRES_NEW`), nunca uma cobrindo o lote: o pool tem 10 conexões e o
+  lote vai a dezenas de milhares de linhas. Linha que falha vira `INVALID` com motivo e o lote
+  continua; commit parcial é resultado válido e visível.
+- V49 (expand): destino do lote (`carteira_id`), categoria do registro, motivos `COMMIT_FAILED` e
+  `CURRENCY_UNSUPPORTED`, e guard de banco recusando lote em commit sem conta de destino.
+- Conta de cartão é recusada na preparação: compra de cartão nasce na fatura (ADR-0009).
+- Validação: 354 testes unitários e 44 de integração verdes; cobertura atendida.
+
 ## [Fase 4 — PR-F4-05] - 2026-08-26
 
 ### Deduplicação de importação

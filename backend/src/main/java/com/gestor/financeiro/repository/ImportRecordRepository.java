@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface ImportRecordRepository extends JpaRepository<ImportRecord, Long> {
 
@@ -29,6 +30,21 @@ public interface ImportRecordRepository extends JpaRepository<ImportRecord, Long
                               Limit limite);
 
     long countByBatchIdAndStatus(Long batchId, ImportRecordStatus status);
+
+    Optional<ImportRecord> findByIdAndBatchId(Long id, Long batchId);
+
+    /** Fila de lançamento: anda por cursor de linha, para lote grande não virar OFFSET. */
+    @Query("""
+            select r from ImportRecord r
+             where r.batch.id = :batchId
+               and r.sourceLine > :aposLinha
+               and r.status in :status
+             order by r.sourceLine asc
+            """)
+    List<ImportRecord> paginaParaLancamento(@Param("batchId") Long batchId,
+                                            @Param("aposLinha") int aposLinha,
+                                            @Param("status") List<ImportRecordStatus> status,
+                                            Limit limite);
 
     /**
      * Identidade forte: mesma instituição e mesmo id externo já lançado pelo titular. Instituição

@@ -333,6 +333,16 @@ em `status` retorna HTTP 400 (`INVALID_PARAMETER`).
   `Idempotency-Key`. Devolve `201` com o lote (`status`, `format`, contadores). O arquivo é
   detectado, normalizado e persistido como lote auditável; **nada é lançado no ledger neste passo**.
 - `GET /api/v1/importacoes/{id}` — situação do lote do titular; `404` para lote de outro titular.
+- `POST /api/v1/importacoes/{id}/preparar` — corpo `{ "contaFinanceiraId": 1 }`. Define a conta de
+  destino e leva o lote a `READY_TO_COMMIT`. Conta de cartão é recusada (`422`): compra de cartão
+  nasce na fatura, não como movimento de caixa.
+- `POST /api/v1/importacoes/{id}/registros/{registroId}/aprovar` — corpo opcional
+  `{ "categoriaId": 3 }`. Traz para o lançamento uma linha em revisão ou marcada como duplicada.
+- `POST /api/v1/importacoes/{id}/commit` — `202`; o lançamento vai para a fila durável e o cliente
+  acompanha por `GET /api/v1/importacoes/{id}`. Só entram linhas `VALID` e `APPROVED`; linha que
+  falha vira `INVALID` com motivo e o lote continua. Reexecutar o lançamento não duplica saldo: a
+  chave `IMPORT:{batchId}:{registroId}` chega ao ledger e o índice único de idempotência é o
+  backstop.
 - `GET /api/v1/importacoes/{id}/registros` — prévia das linhas normalizadas. Parâmetros:
   `status` (`VALID`, `INVALID`, `PENDING_REVIEW`, `DUPLICATE`, `APPROVED`, `COMMITTED`, `REVERSED`),
   `aposLinha` (cursor por `sourceLine`, começa em `0`) e `tamanho` (default `50`, teto `200`).

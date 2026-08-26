@@ -54,6 +54,11 @@ public class ImportRecord {
     @Column(name = "reason_code", length = 80)
     private String reasonCode;
 
+    /** Categoria escolhida na revisão; validada por titular no commit. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "categoria_id")
+    private Categoria categoria;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "transacao_id")
     private Transacao transacao;
