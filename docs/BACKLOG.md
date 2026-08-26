@@ -1948,3 +1948,21 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Status:** ABERTO — fundação PR-F4-01 e parsers CSV/OFX (PR-F4-01b) concluídos e cobertos por
   teste. Faltam adapter `ImportSource` de produção, endpoints do pipeline, preview, mapeamento
   configurável, dedupe, commit no ledger, reversão, conciliação e worker de fila.
+
+## BACKLOG-0107 — Reabrir a decisão de parse assíncrono quando houver segunda instância ou object storage
+
+- **Título:** Mover o parse de importação para a fila quando o staging do arquivo deixar de ser disco local
+- **Prioridade:** P2
+- **Área:** backend, importação, infraestrutura
+- **Motivo:** o parse continua síncrono por decisão registrada em `docs/adr/ADR-0016`. Tornar o parse
+  assíncrono exige o arquivo sobreviver à requisição; hoje isso significaria disco local, e a API roda
+  em uma única instância (`container_name` impede `--scale`). Com duas instâncias, o job poderia ser
+  reivindicado por quem não tem o arquivo.
+- **Dependências:** segunda instância da API **ou** staging em object storage (ADR-0005 já prevê o
+  caminho para anexos).
+- **Critério de aceite:** upload responde `202` com lote em `RECEIVED`, job `IMPORT_PARSE` enfileirado
+  com `job_key` determinística, arquivo em armazenamento acessível a qualquer instância, faxineiro de
+  órfãos e cliente acompanhando por consulta.
+- **Risco se ficar pendente:** baixo enquanto houver uma instância; alto no dia em que houver duas sem
+  revisar esta decisão.
+- **Status:** ABERTO — gatilho explícito, não trabalho pendente.

@@ -29,3 +29,4 @@ Regras:
 | [ADR-0013](ADR-0013-metricas-oficiais.md) | Metricas oficiais do produto (9) | Accepted |
 | [ADR-0014](ADR-0014-competencia-de-orcamento.md) | Competencia de orcamento | Accepted |
 | [ADR-0015](ADR-0015-reconciliacao-e-migracao.md) | Padrao obrigatorio de reconciliacao e migracao | Accepted |
+| [ADR-0016](ADR-0016-fila-duravel-e-limites-do-worker.md) | Fila duravel, worker e o que fica sincrono | Accepted |

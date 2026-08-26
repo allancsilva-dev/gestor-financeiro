@@ -158,6 +158,19 @@ public class BackgroundJobService {
                 """, retryDelay.toSeconds(), errorCode, jobId, workerId) == 1;
     }
 
+    /**
+     * Cancela job que ainda não começou. Job em execução não é cancelado à força: o worker perde o
+     * lease e o trabalho fica sem dono, o que quebraria a invariante de lease da V45.
+     */
+    @Transactional
+    public boolean cancel(long jobId) {
+        return jdbcTemplate.update("""
+                update background_jobs
+                   set status = 'CANCELLED', finished_at = current_timestamp, updated_at = current_timestamp
+                 where id = ? and status in ('PENDING', 'RETRY')
+                """, jobId) == 1;
+    }
+
     private void validatePayload(String payload) {
         if (payload == null || payload.getBytes(StandardCharsets.UTF_8).length > MAX_PAYLOAD_BYTES) {
             throw new IllegalArgumentException("Payload de job ausente ou maior que 64 KiB");

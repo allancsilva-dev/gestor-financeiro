@@ -7,6 +7,24 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ---
 
+## [Fase 4 — PR-F4-03] - 2026-08-26
+
+### Worker da fila durável
+- `BackgroundJobWorker` passa a consumir `background_jobs`, que existia desde o PR-F4-01 sem nenhum
+  produtor ou consumidor em produção. Executor próprio (o `TaskScheduler` do Spring tem pool 1 e já
+  hospeda recorrências, reconciliação e limpeza de rate limit), concorrência default 2 para não
+  esgotar o pool de 10 conexões disputado por 50 threads HTTP.
+- `claim` acontece fora da transação de trabalho, lease é renovado em segundo plano enquanto o
+  handler executa, falha vira retentativa com backoff e depois dead letter, e tipo sem handler vai
+  direto para dead letter em vez de girar na fila.
+- Contrato do `JobHandler`: idempotente, sem `SecurityContext` (é `ThreadLocal` e não cruza thread),
+  com código de erro estável e sem PII. Métrica `app.jobs.processed{type,result}`.
+- `BackgroundJobService.cancel` fecha a lacuna do estado `CANCELLED`, que existia no CHECK da V45 sem
+  método correspondente.
+- `docs/adr/ADR-0016` registra a decisão de manter o parse de importação síncrono enquanto o staging
+  for disco local e a API tiver instância única; BACKLOG-0107 guarda o gatilho para reabrir.
+- Validação: 338 testes unitários e 40 de integração verdes.
+
 ## [Fase 4 — PR-F4-02] - 2026-08-26
 
 ### Endpoint de importação com admissão controlada
