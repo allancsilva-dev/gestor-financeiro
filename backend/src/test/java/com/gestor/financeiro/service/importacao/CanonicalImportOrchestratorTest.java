@@ -36,6 +36,7 @@ class CanonicalImportOrchestratorTest {
 
     @Autowired ImportBatchService batches;
     @Autowired CanonicalNormalizer normalizer;
+    @Autowired ImportDeduplicationService deduplicacao;
     @Autowired ImportRecordRepository records;
     @Autowired ImportBatchRepository batchRepository;
     @Autowired UsuarioRepository usuarioRepository;
@@ -67,7 +68,7 @@ class CanonicalImportOrchestratorTest {
         // Registry proprio: os conectores precisam enxergar os mesmos limites do orquestrador.
         ImportConnectorRegistry registry = new ImportConnectorRegistry(List.of(
                 new CsvImportConnector(limits, normalizer), new OfxImportConnector(limits, normalizer)));
-        return new CanonicalImportOrchestrator(batches, registry, records, batchRepository, limits,
+        return new CanonicalImportOrchestrator(batches, registry, deduplicacao, records, batchRepository, limits,
                 entityManager, transactionManager);
     }
 

@@ -7,6 +7,24 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ---
 
+## [Fase 4 — PR-F4-05] - 2026-08-26
+
+### Deduplicação de importação
+- Reenviar o mesmo arquivo deixa de ser risco de ledger duplicado: ao fim do parse, o lote marca
+  `DUPLICATE` comparando com registros **já lançados** (`COMMITTED`) do próprio titular.
+- Duas identidades com pesos diferentes: **forte** (mesma instituição + mesmo `external_id`/FITID —
+  vale mesmo com valor diferente) e **heurística** (impressão digital de data, valor, moeda, direção
+  e descrição). A heurística **nunca** vira constraint: dois lançamentos idênticos no mesmo dia podem
+  ser dois fatos reais, então o registro é apenas marcado e quem decide é o usuário na prévia.
+- Registro em revisão não é marcado pela heurística, id externo de outra instituição não é o mesmo
+  fato, lote de outro titular não contamina, e registro ainda não lançado não bloqueia novo envio —
+  cada uma dessas fronteiras tem teste.
+- Migration V48 cria índices parciais sobre os registros já lançados, que é o único recorte que a
+  deduplicação consulta.
+- Ordem de execução ajustada em relação ao plano: deduplicação, commit e reversão vêm antes do
+  mapeamento configurável de colunas — a brecha aberta é o ledger, não o cabeçalho exótico.
+- Validação: 346 testes unitários e 40 de integração verdes.
+
 ## [Fase 4 — PR-F4-04] - 2026-08-26
 
 ### Prévia da importação
