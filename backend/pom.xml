@@ -235,9 +235,21 @@
 			</build>
 		</profile>
 		<profile>
+			<!-- Perfil de integração: só *IT.java, com PostgreSQL real via Testcontainers.
+			     Unitários e gate de cobertura ficam no build padrão para não duplicar execução. -->
 			<id>integration-test</id>
+			<properties>
+				<jacoco.skip>true</jacoco.skip>
+			</properties>
 			<build>
 				<plugins>
+					<plugin>
+						<groupId>org.apache.maven.plugins</groupId>
+						<artifactId>maven-surefire-plugin</artifactId>
+						<configuration>
+							<skipTests>true</skipTests>
+						</configuration>
+					</plugin>
 					<plugin>
 						<groupId>org.apache.maven.plugins</groupId>
 						<artifactId>maven-failsafe-plugin</artifactId>

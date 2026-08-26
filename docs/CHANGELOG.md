@@ -7,6 +7,19 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ---
 
+## [Fase 4 — PR-F4-01c] - 2026-08-26
+
+### Testes de integração passam a rodar no CI
+- O perfil `integration-test` nunca era ativado e o Surefire não casa `*IT.java`: os testes de
+  concorrência, lease de fila, idempotência e migration existiam sem nunca executar em CI. Novo job
+  `backend-it` roda `mvn verify -Pintegration-test` com PostgreSQL real via Testcontainers.
+- Perfil de integração passou a executar só `*IT.java` (Surefire desligado, cobertura desligada),
+  para não duplicar o build padrão.
+- `BackgroundJobIT` ganhou disputa real de `claim` com 4 threads (o `FOR UPDATE SKIP LOCKED` só é
+  exercitado com concorrência de verdade) e retomada de job com lease vencido. Os testes deixaram
+  de comparar o relógio do host com o do banco, que era fonte de intermitência.
+- Validação: 35 testes de integração verdes contra PostgreSQL 16/17.
+
 ## [Fase 4 — PR-F4-01b] - 2026-08-26
 
 ### Correção da fundação de importação e envelope de runtime

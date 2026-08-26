@@ -16,9 +16,20 @@ import org.testcontainers.containers.PostgreSQLContainer;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -27,6 +38,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class BackgroundJobIT {
 
     private static PostgreSQLContainer<?> postgres;
+
+    /**
+     * O claim compara available_at com o relógio do banco; o teste enfileira com folga para não
+     * depender de o relógio do host estar alinhado ao do container.
+     */
+    private static Instant disponivelAgora() { return Instant.now().minusSeconds(5); }
 
     @Autowired BackgroundJobService service;
     @Autowired JdbcTemplate jdbcTemplate;
@@ -74,8 +91,8 @@ class BackgroundJobIT {
 
     @Test
     void workersRecebemJobsDistintosELeaseProtegeConclusao() {
-        service.enqueue("it:claim:1", "IMPORT_PARSE", "{}", (short) 1, 0, Instant.now(), 3);
-        service.enqueue("it:claim:2", "IMPORT_PARSE", "{}", (short) 1, 0, Instant.now(), 3);
+        service.enqueue("it:claim:1", "IMPORT_PARSE", "{}", (short) 1, 0, disponivelAgora(), 3);
+        service.enqueue("it:claim:2", "IMPORT_PARSE", "{}", (short) 1, 0, disponivelAgora(), 3);
 
         List<BackgroundJob> first = service.claim("worker-a", 1, Duration.ofMinutes(1));
         List<BackgroundJob> second = service.claim("worker-b", 1, Duration.ofMinutes(1));
@@ -89,7 +106,7 @@ class BackgroundJobIT {
 
     @Test
     void ultimaFalhaVaiParaDeadLetter() {
-        service.enqueue("it:dead", "IMPORT_PARSE", "{}", (short) 1, 0, Instant.now(), 1);
+        service.enqueue("it:dead", "IMPORT_PARSE", "{}", (short) 1, 0, disponivelAgora(), 1);
         BackgroundJob job = service.claim("worker-dead", 1, Duration.ofMinutes(1)).get(0);
 
         assertTrue(service.fail(job.id(), "worker-dead", "IMPORT_PARSE_FAILED", Duration.ZERO));
@@ -98,6 +115,57 @@ class BackgroundJobIT {
         assertEquals(1, jdbcTemplate.queryForObject(
                 "select count(*) from background_jobs where id = ? and lease_owner is null and finished_at is not null",
                 Integer.class, job.id()));
+    }
+
+    @Test
+    void claimConcorrenteNaoEntregaOMesmoJobDuasVezes() throws Exception {
+        int jobs = 8, workers = 4;
+        for (int i = 0; i < jobs; i++) {
+            service.enqueue("it:race:" + i, "IMPORT_PARSE", "{}", (short) 1, 0, disponivelAgora(), 3);
+        }
+
+        ExecutorService pool = Executors.newFixedThreadPool(workers);
+        CountDownLatch largada = new CountDownLatch(1);
+        ConcurrentLinkedQueue<Long> reivindicados = new ConcurrentLinkedQueue<>();
+        List<Future<Integer>> resultados = new ArrayList<>();
+        try {
+            for (int w = 0; w < workers; w++) {
+                String worker = "worker-race-" + w;
+                Callable<Integer> tarefa = () -> {
+                    largada.await();
+                    List<BackgroundJob> lote = service.claim(worker, 2, Duration.ofMinutes(1));
+                    lote.forEach(job -> reivindicados.add(job.id()));
+                    return lote.size();
+                };
+                resultados.add(pool.submit(tarefa));
+            }
+            largada.countDown();
+            pool.shutdown();
+            assertTrue(pool.awaitTermination(60, TimeUnit.SECONDS), "possível deadlock no claim concorrente");
+            for (Future<Integer> resultado : resultados) resultado.get();
+        } finally {
+            pool.shutdownNow();
+        }
+
+        List<Long> todos = new ArrayList<>(reivindicados);
+        Set<Long> distintos = new HashSet<>(todos);
+        assertEquals(todos.size(), distintos.size(), "mesmo job entregue a dois workers");
+        assertEquals(jobs, distintos.size(), "todos os jobs disponíveis deveriam ser reivindicados");
+    }
+
+    @Test
+    void leaseExpiradoPermiteReivindicacaoPorOutroWorker() {
+        service.enqueue("it:lease", "IMPORT_PARSE", "{}", (short) 1, 0, disponivelAgora(), 3);
+
+        // Lease abaixo de um segundo nasce vencido: é o cenário de worker morto sem renovar.
+        BackgroundJob primeiro = service.claim("worker-morto", 1, Duration.ofMillis(500)).get(0);
+        List<BackgroundJob> retomada = service.claim("worker-vivo", 1, Duration.ofMinutes(1));
+
+        assertEquals(1, retomada.size());
+        assertEquals(primeiro.id(), retomada.get(0).id());
+        assertEquals(2, retomada.get(0).attempts());
+        assertFalse(service.complete(primeiro.id(), "worker-morto"), "worker sem lease não pode concluir");
+        assertTrue(service.complete(primeiro.id(), "worker-vivo"));
     }
 
     private static String getenvOrDefault(String key, String defaultValue) {
