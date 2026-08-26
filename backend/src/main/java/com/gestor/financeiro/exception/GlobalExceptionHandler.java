@@ -78,6 +78,13 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.GONE).body(apiError);
     }
 
+    @ExceptionHandler(LegacyImportDisabledException.class)
+    public ResponseEntity<ApiError> handleLegacyImportDisabled(
+            LegacyImportDisabledException ex, HttpServletRequest request) {
+        ApiError apiError = buildError("LEGACY_IMPORT_DISABLED", ex.getMessage(), null, request);
+        return ResponseEntity.status(HttpStatus.GONE).body(apiError);
+    }
+
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiError> handleNotReadable(HttpMessageNotReadableException ex, HttpServletRequest request) {
         ApiError apiError = buildError("INVALID_REQUEST", "JSON inválido ou malformado", null, request);
