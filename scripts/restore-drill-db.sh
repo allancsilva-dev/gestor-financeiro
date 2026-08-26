@@ -16,6 +16,7 @@ fi
 BACKUP_FILE="$1"
 DRILL_DB_URL="${2:-${RESTORE_DRILL_DATABASE_URL:-}}"
 CONTAINER=""
+DRILL_MARKER="${RESTORE_TARGET_MARKER:-}"
 UPLOADS_TMP="$(mktemp -d /tmp/gf_drill_uploads_XXXXXX)"
 
 cleanup() {
@@ -38,16 +39,19 @@ if [ -z "$DRILL_DB_URL" ]; then
   done
   PORT="$(docker port "$CONTAINER" 5432/tcp | sed 's/.*://')"
   DRILL_DB_URL="postgresql://postgres:postgres@127.0.0.1:${PORT}/gf_drill"
+  DRILL_MARKER="drill-$(date +%s)-$$"
+  psql "$DRILL_DB_URL" -v ON_ERROR_STOP=1 -v marker="$DRILL_MARKER" -c \
+    "alter database gf_drill set nexos.restore_target to :'marker'" >/dev/null
   echo "PostgreSQL efêmero: $DRILL_DB_URL"
 fi
 
-if [[ "$DRILL_DB_URL" =~ prod|production|gestor_financeiro$ ]]; then
-  echo "Erro: URL parece ambiente real. Use banco descartavel para restore drill." >&2
+if [ -z "$DRILL_MARKER" ]; then
+  echo "Erro: alvo externo exige RESTORE_TARGET_MARKER previamente configurado no banco." >&2
   exit 1
 fi
 
 echo "Restore drill iniciado: $(date)"
-RESTORE_ASSUME_YES=true RESTORE_UPLOADS_DIR="$UPLOADS_TMP" \
+RESTORE_ASSUME_YES=true RESTORE_TARGET_MARKER="$DRILL_MARKER" RESTORE_UPLOADS_DIR="$UPLOADS_TMP" \
   "$(dirname "$0")/restore-db.sh" "$BACKUP_FILE" "$DRILL_DB_URL"
 
 # ── Validações ──
