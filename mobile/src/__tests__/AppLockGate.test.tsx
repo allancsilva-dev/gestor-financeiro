@@ -3,6 +3,7 @@ import { AppState } from 'react-native';
 import { act, render, screen, waitFor } from '@testing-library/react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as ScreenCapture from 'expo-screen-capture';
+import Constants from 'expo-constants';
 import AppLockGate from '../components/AppLockGate';
 import { refreshAccessToken } from '../services/api';
 
@@ -47,6 +48,11 @@ jest.mock('expo-screen-capture', () => ({
   allowScreenCaptureAsync: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock('expo-constants', () => ({
+  __esModule: true,
+  default: { expoConfig: { extra: { appEnv: 'test' } } },
+}));
+
 describe('AppLockGate', () => {
   beforeEach(() => {
     authState.isAuthenticated = false;
@@ -82,6 +88,21 @@ describe('AppLockGate', () => {
     view.rerender(<AppLockGate><>Conteúdo privado</></AppLockGate>);
 
     await waitFor(() => expect(ScreenCapture.allowScreenCaptureAsync).toHaveBeenCalled());
+  });
+
+  it('libera captura somente no ambiente local-e2e', async () => {
+    const extra = Constants.expoConfig!.extra as { appEnv: string };
+    extra.appEnv = 'local-e2e';
+
+    authState.isAuthenticated = true;
+    authState.isLoading = false;
+    const view = render(<AppLockGate><>Conteúdo privado</></AppLockGate>);
+
+    await waitFor(() => expect(ScreenCapture.allowScreenCaptureAsync).toHaveBeenCalled());
+    expect(ScreenCapture.preventScreenCaptureAsync).not.toHaveBeenCalled();
+
+    view.unmount();
+    extra.appEnv = 'test';
   });
 
   it('não bloqueia primeira autenticação iniciada após checagem da sessão', () => {

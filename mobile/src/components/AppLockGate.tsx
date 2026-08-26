@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, AppStateStatus, KeyboardAvoidingView, Platform, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as ScreenCapture from 'expo-screen-capture';
+import Constants from 'expo-constants';
 import api, { refreshAccessToken } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../theme';
@@ -95,6 +96,13 @@ export default function AppLockGate({ children }: { children: React.ReactNode })
   // da miniatura de recentes e do print. Vale enquanto existe sessão — depois do
   // logout não há o que proteger e o usuário volta a poder printar a própria tela.
   useEffect(() => {
+    // XCTest/Maestro captura a tela continuamente para localizar elementos. No
+    // ambiente descartavel de E2E isso ativaria a protecao e deixaria a arvore
+    // inteira preta; producao e desenvolvimento continuam protegidos.
+    if (Constants.expoConfig?.extra?.appEnv === 'local-e2e') {
+      ScreenCapture.allowScreenCaptureAsync().catch(() => undefined);
+      return;
+    }
     if (!isAuthenticated) {
       ScreenCapture.allowScreenCaptureAsync().catch(() => undefined);
       return;
