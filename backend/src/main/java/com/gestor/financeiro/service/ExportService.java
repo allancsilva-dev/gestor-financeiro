@@ -59,8 +59,8 @@ public class ExportService {
         for (Categoria c : categorias) {
             csv.append(c.getId()).append(",");
             csv.append(escapeCsv(c.getNome())).append(",");
-            csv.append(c.getCor() != null ? c.getCor() : "").append(",");
-            csv.append(c.getIcone() != null ? c.getIcone() : "").append(",");
+            csv.append(escapeCsv(c.getCor())).append(",");
+            csv.append(escapeCsv(c.getIcone())).append(",");
             csv.append(c.getValorEsperado() != null ? c.getValorEsperado() : "0").append(",");
             csv.append(c.getValorGasto() != null ? c.getValorGasto() : "0").append(",");
             csv.append(Boolean.TRUE.equals(c.getAtivo()) ? "Sim" : "Não").append("\n");
@@ -178,10 +178,25 @@ public class ExportService {
         return csv.toString();
     }
 
-    private String escapeCsv(String value) {
+    static String escapeCsv(String value) {
         if (value == null) return "";
-        if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
-            return "\"" + value.replace("\"", "\"\"") + "\"";
+        String safe = neutralizeSpreadsheetFormula(value);
+        if (safe.contains(",") || safe.contains("\"") || safe.contains("\n") || safe.contains("\r")) {
+            return "\"" + safe.replace("\"", "\"\"") + "\"";
+        }
+        return safe;
+    }
+
+    private static String neutralizeSpreadsheetFormula(String value) {
+        int index = 0;
+        while (index < value.length() && value.charAt(index) == ' ') {
+            index++;
+        }
+        if (index >= value.length()) return value;
+        char first = value.charAt(index);
+        if (first == '=' || first == '+' || first == '-' || first == '@'
+                || first == '\t' || first == '\r' || first == '\n') {
+            return "'" + value;
         }
         return value;
     }
