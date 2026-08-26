@@ -2,7 +2,11 @@
 
 Registro de diagramas do sistema. Mantido pelo `docs-reporter`.
 
-**Ultima atualizacao:** 2026-07-14 (hardening pre-producao: item 7 de "Proximos passos opcionais" registra a pendencia de diagrama de topologia de rede/proxy e fronteira de confianca do X-Forwarded-For, PROB-0066)
+**Ultima revisao documental:** 2026-08-25
+
+> O `.drawio` continua sendo baseline visual anterior às migrations V32–V44. A arquitetura textual
+> corrente está em `SYSTEM_OVERVIEW.md`; atualizar ERD/topologia permanece trabalho próprio. As
+> anotações abaixo identificam diferenças conhecidas em vez de representar schema integral atual.
 
 ---
 
@@ -39,7 +43,7 @@ Referencia textual:
 ┌─────────▼───────────────────────▼────────────────┐
 │                   API Layer                       │
 │  ┌──────────────────────────────────────────────┐│
-│  │         Spring Boot 3.5.7 (Java 17)           ││
+│  │         Spring Boot 3.5.16 (Java 17)          ││
 │  │  ┌──────────┐  ┌──────────┐  ┌────────────┐  ││
 │  │  │Security  │  │Controllers│  │ Exception   │  ││
 │  │  │(JWT+BCrypt│  │(REST)    │  │ Handler     │  ││

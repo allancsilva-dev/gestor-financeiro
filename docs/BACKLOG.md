@@ -3,6 +3,10 @@
 Registro de proximos passos e itens nao tratados agora, descobertos em revisoes, auditorias e
 implementacoes. Mantido pelo `docs-reporter`. Complementa `docs/PROXIMOS_PASSOS.md`.
 
+**Revisão de estado:** 25/08/2026 (`main` em `e885ed7`). `PROXIMOS_PASSOS.md` é legado; direção
+atual está em `15 07 2026 - MetaDoNexosFinancas.md`. Entradas fechadas preservam diagnóstico e
+evidência histórica; trabalho executável atual é formado pelos itens `ABERTO`/`PARCIAL` restantes.
+
 ## Padrao obrigatorio de implementacao
 
 Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquitetura, contrato explicito, migracao segura quando aplicavel, testes proporcionais ao risco e observabilidade. Nao aceitar como conclusao: `--force` sem analise, bypass de seguranca, suppressions para esconder erro, pin arbitrario de dependencia, duplicacao de regra financeira, estado inconsistente temporario ou ajuste exclusivo para fazer teste/build passar. Excecao tecnica exige decisao registrada, risco residual, mitigacao, prazo e responsavel.
@@ -661,7 +665,9 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Dependencias:** Levantamento de quem consome `Parcela` hoje (endpoints, telas mobile/frontend, relatórios) antes de qualquer remoção; migration de dados se decidido migrar histórico existente.
 - **Criterio de aceite:** Decisão documentada — manter as duas tabelas (com justificativa) ou depreciar `Parcela` para compras de cartão em favor exclusivo de `FaturaLancamento`, com plano de migração se aplicável. Para promover a V27: backup e restore drill aprovados, maintenance job `card-schedule` com zero `sem_lancamento_canonico`, relatório versionado e validação pós-migration no PostgreSQL da VPS.
 - **Risco se ficar pendente:** Bugs que afetam o cálculo de parcelas (como arredondamento) precisam ser corrigidos em dois lugares distintos; risco de corrigir um e esquecer o outro em manutenções futuras.
-- **Status:** PARCIAL (Release A concluida; V27 staged para Release B apos auditoria VPS, 2026-07-13)
+- **Status:** FECHADO (2026-07-16; confirmado em 25/08/2026) — V36 promoveu o contract
+  anteriormente staged e removeu parcela redundante de compra de cartão. `FaturaLancamento` é o
+  cronograma canônico; `Parcela` permanece somente para fluxo não-cartão.
 
 ---
 
@@ -982,7 +988,8 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Criterio de aceite:** E2E de cadastro/onboarding, transação/saldo, fatura, conta fixa, meta, sessão/refresh/logout/reset, importação/exportação e anexo; smoke Android/iOS; execução bloqueante no CI e contra staging.
 - **Atualizacao mobile 2026-07-13:** workflow protegido `mobile-maestro.yml` executa Android e iOS contra staging no SHA informado. Flows nativos cobrem login, navegação para recuperação e política/consentimento antes do cadastro. CLI Maestro fixada com checksum do instalador; resultados JUnit e diagnosticos são artifacts.
 - **Pendente:** executar o workflow com staging/secrets reais e ampliar cobertura para onboarding, transação/saldo, fatura, conta fixa, meta, sessão/logout, importação/exportação e anexo. Web fora do escopo desta rodada.
-- **Status:** PARCIAL — infraestrutura e smokes mobile implementados; jornadas financeiras e execução remota pendentes.
+- **Status:** PARCIAL — quatro flows mobile, incluindo `financial-critical`, passaram localmente
+  em simulador em 22/08/2026. Jornadas web, execução remota e matriz Android continuam pendentes.
 
 ---
 
@@ -1087,7 +1094,7 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Dependencias:** nenhuma tecnica; decisao de produto sobre se o padrao `Idempotency-Key` ja usado em fatura deve se estender a investimentos.
 - **Criterio de aceite:** `adicionarMovimentacao` aceita e persiste `Idempotency-Key` por requisicao; reenvio da mesma key retorna o resultado original sem duplicar a movimentacao; teste automatizado cobrindo reenvio.
 - **Risco se ficar pendente:** duplo clique ou retry de rede no lancamento de uma movimentacao de investimento pode duplicar compra/venda/dividendo, distorcendo posicao e preco medio do ativo (mesma classe de risco ja corrigida em PROB-0067/BUG-0060 para parcelas).
-- **Status:** FECHADO (2026-08-21, working tree ainda nao commitado na `main`) — `POST
+- **Status:** FECHADO (2026-08-21; confirmado em `main` em 25/08/2026) — `POST
   /api/v1/investimentos/{ativoId}/movimentacoes` aceita o header `Idempotency-Key`
   (`InvestimentoController`, mesmo padrao de `FaturaController`). `InvestimentoService.adicionarMovimentacao`
   ganhou sobrecarga com a chave, faz exists-check por `findByUsuarioIdAndIdempotencyKey` antes de
@@ -1116,7 +1123,7 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Dependencias:** nenhuma tecnica; ajuste de contrato de API (`API.md`, fora da responsabilidade deste agente de documentacao) e dos clientes (web/mobile) que consomem a listagem.
 - **Criterio de aceite:** endpoint de listagem de investimentos aceita `page`/`size` (ou equivalente ja usado em outras listagens do sistema); resposta inclui metadados de paginacao; clientes web/mobile atualizados para consumir paginado.
 - **Risco se ficar pendente:** degradacao de performance e payload crescente para usuarios com muitas movimentacoes de investimento acumuladas.
-- **Status:** FECHADO (2026-08-21, working tree ainda nao commitado na `main`) — muda contrato de
+- **Status:** FECHADO (2026-08-21; confirmado em `main` em 25/08/2026) — muda contrato de
   API (breaking change). `GET /api/v1/investimentos` e `GET
   /api/v1/investimentos/{ativoId}/movimentacoes` passam a devolver `Page` com
   `@PageableDefault(size = 20)` e `PaginationUtils.enforceMaxSize(pageable, 100)`, como
@@ -1148,7 +1155,7 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   errada — a entidade **ja tinha** `toString()` customizado (`model/RefreshToken.java`), e era
   exatamente esse metodo o vazamento: imprimia 20 chars do hash SHA-256 do token e
   `usuario.getEmail()` (PII), alem de disparar lazy-load e poder estourar NPE no `substring`.
-- **Status:** FECHADO (2026-08-21, working tree ainda nao commitado na `main`) — `toString()` agora
+- **Status:** FECHADO (2026-08-21; confirmado em `main` em 25/08/2026) — `toString()` agora
   expoe so `id`, `usuarioId` (via `usuario.getId()`, que nao forca o lazy load) e
   `dataExpiracao`/`revogado`. Evidencia: `RefreshTokenToStringTest` (2, novo) dentro de `./mvnw
   test` 292/0 falhas. Ver BUG-0078.
@@ -1166,7 +1173,7 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Lista fechada (2026-08-21):** `grep mappedBy backend/src/main/java/com/gestor/financeiro/model/*.java`
   confirma exatamente 2 ciclos bidirecionais no modelo: `Ativo` ↔ `MovimentacaoAtivo`
   (`model/Ativo.java:66`) e `Transacao` ↔ `Parcela` (`model/Transacao.java:80`).
-- **Status:** FECHADO (2026-08-21, working tree ainda nao commitado na `main`) — os dois pares
+- **Status:** FECHADO (2026-08-21; confirmado em `main` em 25/08/2026) — os dois pares
   ganharam `@ToString.Exclude` + `@EqualsAndHashCode.Exclude` nos dois lados; o par de
   investimentos (`Ativo`/`MovimentacaoAtivo`) ganhou tambem `@JsonIgnoreProperties`, que nao tinha
   nenhuma protecao antes (nem no JSON) — `Transacao`↔`Parcela` ja tinha. Evidencia:
@@ -1183,7 +1190,7 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Dependencias:** BACKLOG-0011 (relacionado, ja fechado — este item e um follow-up mais amplo, nao uma reabertura).
 - **Criterio de aceite:** revisao linha a linha do `application.properties` base classificando cada default como (a) seguro para dev local, (b) exige override obrigatorio em prod (documentado), ou (c) deve ser removido; nenhum default sensivel de producao herdado silenciosamente do perfil base.
 - **Risco se ficar pendente:** configuracao insegura de producao por omissao, caso um profile futuro (`-vps`/`-prod`) deixe de sobrescrever algum default sensivel do perfil base sem que isso seja percebido.
-- **Status:** FECHADO (2026-08-21, working tree ainda nao commitado na `main`) — defaults do perfil
+- **Status:** FECHADO (2026-08-21; confirmado em `main` em 25/08/2026) — defaults do perfil
   base (`backend/src/main/resources/application.properties`) invertidos para o lado seguro:
   `spring.jpa.show-sql=false`, `app.docs.public=false`, `management.endpoint.health.show-details=never`,
   `logging.level.com.gestor.financeiro=INFO`, `logging.level.org.springframework.security=WARN`,
@@ -1213,7 +1220,7 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Status:** CONCLUIDO (2026-07-15) — ADR-0008..0015 aceitos pelo responsavel do produto via
   plano da Fase 2 rev. 3 (3 rodadas de review, veredito PASS); glossario atualizado (9 metricas);
   mapeamento e plano de migracao em `docs/adr/ANEXO-fase-0b-mapeamento-dados.md`. **Codigo da
-  Fase 2 permanece bloqueado por BACKLOG-0087 (PROB-0081: drill off-host real pendente).**
+  Fase 2 foi implementado; promoção operacional permanece bloqueada por BACKLOG-0088/PROB-0081.**
 
 ---
 
@@ -1224,7 +1231,10 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Area:** processo
 - **Motivo:** Regra da auditoria `docs/15 07 2026 - MetaDoNexosFinancas.md`; foco total em integridade (PR-0..PR-4 do plano Fase 1).
 - **Criterio de aceite:** Congelamento termina somente apos PR-4 mergeado, suites globais verdes (backend, web, mobile, E2E) e evidencias registradas no PROBLEM_LEDGER
-- **Status:** ATIVO
+- **Status:** FECHADO (2026-08-25) — PR-0..PR-4 e as Fases 1–3 foram mergeados com evidências
+  automatizadas e runtime registradas. O congelamento amplo cumpriu sua função. Open Finance,
+  WhatsApp e IA continuam fora da prioridade, agora por ordem de roadmap; deploy e promoção do
+  PR-F2-20 seguem bloqueados especificamente por BACKLOG-0088/PROB-0081.
 
 ---
 
@@ -1232,7 +1242,7 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 
 - **Prioridade:** P0 operacional
 - **Área:** backend, banco, operação
-- **Motivo:** a reconciliação global está implementada localmente, mas não autoriza deploy antes
+- **Motivo:** a reconciliação global está implementada em `main`, mas não autoriza deploy antes
   da prova em dados restaurados de produção.
 - **Critério de aceite:** backup off-host e restore drill de `PROB-0081` aprovados; V41 aplicada no
   clone; postflight PR-F2-19 verde; maintenance `global-reconciliation` com checksum válido, zero
@@ -1403,7 +1413,9 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Risco se ficar pendente:** histórico de versões e checklist de execução ficam temporariamente
   incompletos para quem consulta apenas esses dois arquivos; a rastreabilidade completa dos onze
   PRs já existe em `SYSTEM_OVERVIEW.md` e nos respectivos relatórios de revisão.
-- **Status:** ABERTO.
+- **Status:** FECHADO (2026-08-25) — `CHANGELOG.md` recebeu consolidação das Fases 3 e série
+  visual; `CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md` recebeu estado consolidado e referências
+  dos PR-F3-01..13. Relatórios individuais permanecem como evidência detalhada.
 
 ---
 
@@ -1458,8 +1470,9 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   para clareza; nenhuma citação ativa trata o caminho do protótipo como referência válida sem nota.
 - **Risco se ficar pendente:** Baixo — confusão eventual de quem consulta o histórico sem saber que o
   redesign visual foi descartado por completo em 2026-08-19.
-- **Status:** ABERTO (parcialmente endereçado nesta rodada — ver anotações cravadas em
-  BACKLOG-0048 e SYSTEM_OVERVIEW.md).
+- **Status:** FECHADO (2026-08-25) — referências ativas apontam `DESIGN.md` e tokens atuais;
+  menções ao standalone em BACKLOG/SYSTEM_OVERVIEW estão marcadas como caminho morto e os
+  relatórios históricos permanecem deliberadamente datados.
 
 ---
 
@@ -1573,10 +1586,9 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   passos seguintes (fatura, pagamento parcial, reserva na meta) exercitados pelo menos uma vez.
 - **Risco se ficar pendente:** o trecho financeiro mais sensível (fatura e pagamento parcial)
   continua sem cobertura E2E executada, embora coberto por testes de backend.
-- **Status:** ABERTO — a causa raiz foi corrigida e validada por `npx tsc --noEmit` limpo e Jest
-  200/200 no mobile (3 testes novos), mas o critério de aceite é `financial-critical` verde ponta
-  a ponta no simulador, e o flow **não foi executado nesta rodada** (sem simulador disponível).
-  Fica pendente só a execução. Ver BUG-0082.
+- **Status:** FECHADO (2026-08-22) — execução posterior registrada em BACKLOG-0098 deixou
+  `financial-critical` verde ponta a ponta no simulador, incluindo fatura, pagamento parcial,
+  meta e guard-rails. Ver relatório de verificação mobile de 22/08/2026.
 
 ---
 
@@ -1594,7 +1606,7 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   o texto, o conteúdo textual some da árvore.
 - **Critério de aceite:** convenção registrada no DESIGN.md sobre quando usar `accessibilityLabel`
   no container e quando deixar o texto acessível; telas revisadas conforme a convenção.
-- **Status:** FECHADO (2026-08-21, working tree ainda nao commitado na `main`) — convenção nova
+- **Status:** FECHADO (2026-08-21; confirmado em `main` em 25/08/2026) — convenção nova
   registrada em `DESIGN.md` (seção "Acessibilidade"): controle com texto visível não leva
   `accessibilityLabel` (o RN deriva o rótulo dos filhos); `accessibilityLabel` só para controles
   icon-only; contexto extra vai em `accessibilityHint`; `accessibilityRole`/`accessibilityState`
@@ -1673,7 +1685,8 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Risco se ficar pendente:** clientes externos (fora de mobile/web, que já foram atualizados)
   integrando contra o contrato antigo (lista simples, sem idempotência) quebram sem aviso
   documentado; consumidores futuros da API não sabem que o header existe.
-- **Status:** ABERTO
+- **Status:** FECHADO (2026-08-25) — `backend/API.md` documenta paginação (`Page`, `size<=100`),
+  `Idempotency-Key` e semântica de reenvio das movimentações de investimento.
 
 ---
 
@@ -1913,3 +1926,23 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   errada por causa do desvio de fuso, não de comportamento incorreto em produção (que sempre passa
   pelo Java).
 - **Status:** ABERTO
+
+---
+
+## BACKLOG-0106 — Completar pipeline canônico de importação após fundação PR-F4-01
+
+- **Título:** Implementar parsers CSV/OFX seguros, normalização, preview, deduplicação, commit,
+  conciliação e reversão sobre `import_batches`/`import_records`
+- **Prioridade:** P0
+- **Área:** backend, banco, integridade financeira
+- **Motivo:** PR-F4-01 de 2026-08-26 entregou contrato streaming, lifecycle persistido, ownership,
+  idempotência, observabilidade e V46. Importador CSV antigo continua separado e não oferece
+  revisão nem reversão por batch.
+- **Dependências:** Implementar em PRs pequenos na ordem: parser/detecção/normalização;
+  preview/mapeamento; dedupe; commit transacional; conciliação; reversão.
+- **Critério de aceite:** CSV e OFX passam pelo mesmo pipeline, arquivos grandes são processados
+  com limites, reenvio não duplica ledger, usuário revisa antes do commit e pode reverter batch com
+  trilha auditável.
+- **Risco se ficar pendente:** Importação produtiva permanece indisponível; endpoint legado não é
+  arquitetura válida para produção.
+- **Status:** ABERTO — fundação PR-F4-01 concluída; parser ainda ausente.

@@ -47,13 +47,19 @@ containers. Falha no backup ou na recuperação saudável da API faz a execuçã
 ## Restore
 
 ```bash
-# produção (exige chave privada importada no keyring local)
-./scripts/restore-db.sh backups/postgres/gf_backup_20260715_033000.tar.gpg "$DATABASE_URL"
-RESTORE_UPLOADS_DIR=/caminho/uploads ./scripts/restore-db.sh <bundle> "$DATABASE_URL"
+# Em sessão administrativa separada, marque explicitamente o banco-alvo e reconecte.
+psql "$DATABASE_URL" -c "ALTER DATABASE nome_do_banco SET nexos.restore_target='incidente-123'"
+
+# Restore exige chave privada importada, marcador idêntico e banco vazio por padrão.
+RESTORE_TARGET_MARKER=incidente-123 \
+  ./scripts/restore-db.sh backups/postgres/gf_backup_20260715_033000.tar.gpg "$DATABASE_URL"
+RESTORE_TARGET_MARKER=incidente-123 RESTORE_UPLOADS_DIR=/caminho/uploads \
+  ./scripts/restore-db.sh <bundle> "$DATABASE_URL"
 ```
 
 Valida checksums do manifesto antes do `pg_restore --clean --if-exists`. Bundles legados
-(`*.sql.gz[.gpg]`) continuam aceitos.
+(`*.sql.gz[.gpg]`) continuam aceitos. Recuperação aprovada sobre banco não vazio também exige
+`RESTORE_ALLOW_NONEMPTY=true`; nome ou URL do banco nunca liberam restore.
 
 ## Restore drill (obrigatório antes de fechar release)
 
@@ -67,3 +73,5 @@ de arquivos de anexo extraídos cobre os registros do banco e valida cada caminh
 Depois do drill, suba a API
 apontando para o banco restaurado e faça o download real de um anexo (evidência no
 PROBLEM_LEDGER). Nenhum release declara PROB-0081 fechado sem drill registrado.
+Com URL externa, o operador deve configurar `nexos.restore_target` no banco e fornecer o mesmo
+valor em `RESTORE_TARGET_MARKER`; o script só cria marcador automaticamente no container efêmero.

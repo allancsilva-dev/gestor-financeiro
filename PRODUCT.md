@@ -24,10 +24,10 @@ Leve, amigável, confiável. Finanças sem cara de banco: tom acolhedor ("Olá, 
 
 1. **Saldo em 3 segundos** — cada tela responde primeiro à pergunta principal (quanto tenho? quanto gastei?) com número grande; detalhe vem depois.
 2. **Lançar gasto sem fricção** — o "+" central é a ação primária do app inteiro; formulários curtos, teclado certo, valor primeiro.
-3. **Verde entra, vermelho sai** — semântica de cor de dinheiro é sagrada e consistente em todas as telas; violeta é marca/navegação, nunca valor.
+3. **Verde entra, vermelho sai** — semântica de cor de dinheiro é sagrada e consistente em todas as telas; ciano é marca/navegação, violeta é apoio, nunca valor financeiro.
 4. **Emoji é o sistema de ícones de categoria** — pastel tile + emoji, não biblioteca de ícones colorida.
 5. **Estados nunca ficam mudos** — loading (skeleton), vazio (convite à ação) e erro (retry) desenhados em toda lista/tela.
 
 ## Accessibility & Inclusion
 
-WCAG AA: contraste de texto ≥4.5:1 (atenção ao muted `#aab0bd`, que falha sobre branco — usar só em texto decorativo grande ou escurecer), alvos de toque ≥44pt, labels de acessibilidade em ícones e botões, suporte a `prefers-reduced-motion`/`Reduce Motion` do iOS, dark mode como cidadão de primeira classe (toggle claro/escuro).
+WCAG AA: contraste de texto normal ≥4.5:1, alvos de toque ≥44pt, labels de acessibilidade em ícones e botões, suporte a `prefers-reduced-motion`/`Reduce Motion` do iOS e tema sistema/claro/escuro como cidadão de primeira classe. Tokens e contrastes automatizados ficam em `DESIGN.md` e `mobile/src/__tests__/tema.test.ts`; VoiceOver/TalkBack em hardware físico permanece gate de release.

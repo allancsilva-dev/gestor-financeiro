@@ -4,6 +4,24 @@
 **Finalidade:** acompanhar a execução dos PRs da Fase 0 e das fases futuras, registrando status, evidências, bloqueios, testes, pendências e conclusão real de cada entrega.
 **Regra central:** nenhum PR deve ser marcado como concluído sem evidência objetiva de implementação, validação e registro documental.
 
+> **Consolidação 25/08/2026 (`main` em `e885ed7`).** Fase 0/Foundation, Ledger, Fase 1,
+> contratos financeiros da Fase 2 e experiência simples da Fase 3 estão implementados. Entradas
+> abaixo preservam status e evidência do momento de cada PR; não interpretar ressalva histórica
+> como falha atual sem conferir `BACKLOG.md` e `PROBLEM_LEDGER.md`.
+
+### Fase 3 de produto — PR-F3-01 a PR-F3-13
+
+**Status consolidado:** `PASS_COM_RESSALVA_OPERACIONAL`
+
+- PR-F3-01..04: compromissos, sugestão de categoria, onboarding mínimo e drill-down backend.
+- PR-F3-05..11: lançamento rápido, visão financeira, Home reduzida, setup progressivo e metas.
+- PR-F3-12: web mínimo com métricas e drill-down.
+- PR-F3-13: remoção de consumo legado e alinhamento de linguagem; fase encerrada.
+- Evidência: commits `3db4979`..`90bc02d`, relatórios em `docs/REVIEW_REPORTS/` e quatro flows
+  Maestro verdes em 22/08/2026 após a padronização visual.
+- Ressalvas atuais: deploy/backup off-host, hardware assistivo e itens abertos do backlog; nenhuma
+  delas reabre a implementação funcional da Fase 3.
+
 ---
 
 ## 1. Como usar este arquivo
@@ -113,7 +131,7 @@ Remover a dependência de `spring.jpa.hibernate.ddl-auto=update` e estabelecer v
 
 | Pergunta | Resposta |
 |---|---|---|
-| Stack do backend | Java 17, Spring Boot 3.5.7, Spring Data JPA, Spring Security |
+| Stack do backend | Java 17, Spring Boot 3.5.16, Spring Data JPA, Spring Security |
 | Versão do Spring Boot | 3.5.7 |
 | Build tool | Maven |
 | Banco principal | PostgreSQL 17+ |

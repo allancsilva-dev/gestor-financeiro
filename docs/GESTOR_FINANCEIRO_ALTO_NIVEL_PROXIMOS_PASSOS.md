@@ -4,6 +4,12 @@
 **Data:** 2026-07-07
 **Objetivo:** definir o que caracteriza um gestor financeiro pessoal de alto nível e qual deve ser a sequência correta de evolução do projeto, considerando robustez, segurança, integridade financeira, performance, UX e capacidade de crescimento.
 
+> **Atualização 25/08/2026:** este plano orientou a fundação executada entre julho e agosto.
+> Fundação, Ledger, Fase 1, contratos financeiros da Fase 2 e experiência simples da Fase 3 estão
+> implementados em `main`. Para estado corrente e próximas prioridades, usar também
+> `15 07 2026 - MetaDoNexosFinancas.md`, `BACKLOG.md` e `SYSTEM_OVERVIEW.md`. O texto histórico
+> abaixo explica a motivação das decisões, não uma lista atual de trabalho não feito.
+
 ---
 
 ## 1. Veredito executivo
@@ -117,7 +123,7 @@ Para isso, as decisões atuais devem evitar acoplamentos frágeis, regras duplic
 
 ### 4.1 Base implementada
 
-O projeto possui backend Java 17 com Spring Boot 3.5.7, PostgreSQL, Spring Data JPA, Spring Security, JWT, refresh token, frontend React/Vite/TypeScript, mobile Expo/React Native e documentação técnica. O domínio atual cobre usuário, categoria, carteira, conta, conta fixa, meta, transação, parcela, refresh token e password reset.
+O projeto possui backend Java 17 com Spring Boot 3.5.16, PostgreSQL, Spring Data JPA, Spring Security, JWT, refresh token, frontend React/Vite/TypeScript, mobile Expo/React Native e documentação técnica. O domínio atual cobre usuário, categoria, conta financeira, cartão, fatura, recorrência, meta, transação, operação financeira, ledger, orçamento, importação, anexo, investimento, refresh token e password reset.
 
 O fluxo principal já existe: cadastro, login, dashboard, categorias, contas, carteiras, transações, parcelamento, contas fixas e metas.
 
@@ -630,6 +636,10 @@ Uma entrega só deve ser aceita quando cumprir todos os pontos aplicáveis:
 
 ## 14. Ordem recomendada dos próximos passos
 
+> **Situação atual:** os blocos “Agora”, “Depois” e “Depois disso” abaixo foram executados. CI,
+> deploy e backup foram implementados, mas promoção pública continua bloqueada pela prova off-host
+> de `PROB-0081`, reconciliação em clone restaurado e gates externos de release.
+
 ### Agora
 
 Fechar pendências pós-Fase 0:
@@ -691,6 +701,7 @@ A fundação backend foi executada, PR-LEDGER-01 adicionou validação PostgreSQ
 
 Depois que essa base estiver fechada, a análise deve ser refeita. Somente então vale decidir os próximos incrementos de produto, como orçamento, faturas, projeções, relatórios, exportação e deploy público.
 
-**Status recomendado atual:** `NAO_APTO_PARA_DEPLOY`
-**Status recomendado para desenvolvimento:** `FASE_LEDGER_EM_ANDAMENTO`
-**Prioridade real:** fechar ressalvas restantes de UX frontend/mobile, manter validação Testcontainers no CI/dev com Docker e commitar o codigo.
+**Status atual:** `NAO_APTO_PARA_DEPLOY_PUBLICO`
+**Status para desenvolvimento:** `FASES_0_A_3_IMPLEMENTADAS`
+**Prioridade real:** fechar backup/restore off-host (`PROB-0081`), promover PR-F2-20 com
+reconciliação limpa, executar gates externos de release e resolver pendências P1 do backlog.

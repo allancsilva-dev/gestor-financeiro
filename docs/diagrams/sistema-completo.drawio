@@ -19,7 +19,7 @@
                 <mxCell id="api-zone" value="API backend" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0F7EA;strokeColor=#82B366;fontSize=16;fontStyle=1;align=left;verticalAlign=top;spacingLeft=14;spacingTop=8;" parent="1" vertex="1">
                     <mxGeometry x="620" y="90" width="520" height="520" as="geometry"/>
                 </mxCell>
-                <mxCell id="spring" value="Spring Boot 3.5.7 / Java 17&lt;br&gt;Porta dev: 8081 | prod: ${PORT:8080}&lt;br&gt;API publica: /api/auth/*&lt;br&gt;API versionada: /api/v1/*&lt;br&gt;Swagger: /swagger-ui.html&lt;br&gt;Actuator: /actuator/health, /actuator/info" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#5A9E3F;fontSize=13;align=left;verticalAlign=top;spacing=10;" parent="1" vertex="1">
+                <mxCell id="spring" value="Spring Boot 3.5.16 / Java 17&lt;br&gt;Porta dev: 8081 | prod: ${PORT:8080}&lt;br&gt;API publica: /api/auth/*&lt;br&gt;API versionada: /api/v1/*&lt;br&gt;Swagger: /swagger-ui.html&lt;br&gt;Actuator: /actuator/health, /actuator/info" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#5A9E3F;fontSize=13;align=left;verticalAlign=top;spacing=10;" parent="1" vertex="1">
                     <mxGeometry x="650" y="135" width="460" height="110" as="geometry"/>
                 </mxCell>
                 <mxCell id="security" value="Security layer&lt;br&gt;Spring Security&lt;br&gt;JwtAuthenticationFilter&lt;br&gt;BCryptPasswordEncoder&lt;br&gt;LoginRateLimitFilter&lt;br&gt;CORS por env/fallback" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF2CC;strokeColor=#D6B656;fontSize=12;align=left;verticalAlign=top;spacing=8;" parent="1" vertex="1">

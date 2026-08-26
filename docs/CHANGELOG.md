@@ -7,6 +7,54 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ---
 
+## [Fase 4 — PR-F4-01] - 2026-08-26
+
+### Fundação canônica de importação
+- Adicionados contrato streaming independente de formato, batches e registros canônicos com
+  lifecycle fechado, ownership, optimistic lock, idempotência por titular e métricas de baixa
+  cardinalidade. Nenhum parser novo ou write no ledger foi habilitado.
+- Migration V46 cria staging auditável com constraints e índices; arquivo bruto não é persistido.
+  Exclusão LGPD passou a remover batches e registros importados.
+- Validação: 330 testes unitários e 33 testes de integração PostgreSQL, sem falhas.
+- Próximo PR: parser CSV/OFX seguro e normalização streaming; endpoint CSV legado continua fora do
+  pipeline novo.
+
+## [Estado consolidado] - 2026-08-25
+
+### Experiência mobile e confiabilidade
+- Padrão visual mobile unificado em Home, Carteira, Metas e demais telas, com tema
+  sistema/claro/escuro, componentes canônicos e trinco de arquitetura visual.
+- Cadastro/onboarding, Ajustes, privacidade, exclusão LGPD e recuperação de sessão foram
+  redesenhados e verificados contra o backend real.
+- Falhas de refresh expirado/revogado retornam `SESSION_EXPIRED` (401); cliente remove sessão
+  morta e volta ao login sem ficar preso em loading/erro.
+- Quatro flows Maestro passaram em simulador iOS em 22/08: `financial-critical`, `smoke-auth`,
+  `privacy-consent` e `recovery-navigation`.
+- Correções runtime cobrem invalidação da Home após transação, pagamento de fatura no primeiro
+  toque, ações acessíveis em metas, MIME CSV Android, insets e ícone nulo de categoria.
+
+### Fase 3 — experiência simples
+- Compromissos próximos, sugestão determinística de categoria, contrato de onboarding mínimo e
+  drill-down foram entregues no backend.
+- Mobile ganhou lançamento rápido, visão das métricas oficiais, Home reduzida, setup progressivo,
+  modalidade/histórico de metas e navegação até a origem dos valores.
+- Web passou a consumir métricas e drill-down mínimos; `/dashboard/resumo` ficou deprecado.
+- Linguagem financeira foi alinhada ao glossário. Fase 3 encerrada no PR-F3-13.
+
+### Contratos e segurança posteriores
+- Investimentos agora usam paginação e `Idempotency-Key`; migration V44 protege duplicação por
+  titular.
+- Defaults do perfil base foram endurecidos; entidades JPA bidirecionais e `RefreshToken.toString()`
+  deixaram de expor dados/recursão.
+- Spring Boot atualizado para 3.5.16 e dependências runtime sem vulnerabilidade high/critical
+  conhecida na última auditoria registrada.
+
+### Gates ainda abertos
+- Deploy público continua bloqueado por backup/restore off-host real (`PROB-0081`), promoção do
+  PR-F2-20 em clone restaurado e gates externos de release.
+- VoiceOver/TalkBack em hardware físico, pendências web/mobile do backlog e operação externa
+  continuam fora deste fechamento.
+
 ## [Fase 2 — PR-F2-20] - 2026-07-16
 
 ### Reconciliação global automatizada

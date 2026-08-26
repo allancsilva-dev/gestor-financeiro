@@ -1,6 +1,9 @@
 ﻿#  API Reference  Gestor Financeiro
 
-Documentação da API REST atualizada para o estado pós-fases 1-5.
+Documentação da API REST conferida em 25/08/2026 contra `main` (`e885ed7`).
+
+> Rotas `/carteiras`, `/contas` e `/dashboard/resumo` permanecem por compatibilidade. Novos
+> clientes devem usar contas financeiras, cartões, métricas e compromissos.
 
 **Base URL:** `http://localhost:8081`  
 **Swagger UI:** `/swagger-ui.html`  
@@ -149,6 +152,8 @@ Retorna usuário autenticado.
 ---
 
 ##  Dashboard (`/api/v1/dashboard`)
+Endpoint legado. `GET /resumo` está deprecado; use `/api/v1/metricas` e
+`/api/v1/compromissos`. Rotas de gráficos continuam disponíveis:
 - `GET /api/v1/dashboard/resumo`
 - `GET /api/v1/dashboard/gastos-por-categoria`
 - `GET /api/v1/dashboard/evolucao-mensal`
@@ -205,7 +210,9 @@ Formato de resposta paginada:
 ##  Transações (`/api/v1/transacoes`)
 - `GET /api/v1/transacoes/minhas` (paginado)
 - `GET /api/v1/transacoes/periodo?inicio=YYYY-MM-DD&fim=YYYY-MM-DD&page=0&size=20&sort=data,desc` (paginado)
+- `GET /api/v1/transacoes/sugestao-categoria?descricao=...`
 - `GET /api/v1/transacoes/{id}`
+- `GET /api/v1/transacoes/{id}/cronograma`
 - `POST /api/v1/transacoes`
 - `PUT /api/v1/transacoes/{id}`
 - `DELETE /api/v1/transacoes/{id}`
@@ -217,7 +224,46 @@ Formato de resposta paginada:
 - `PUT /api/v1/categorias/{id}`
 - `DELETE /api/v1/categorias/{id}`
 
-##  Carteiras (`/api/v1/carteiras`)
+## Contas financeiras (`/api/v1/contas-financeiras`)
+- `GET /api/v1/contas-financeiras/minhas` (paginado)
+- `GET /api/v1/contas-financeiras/{id}`
+- `POST /api/v1/contas-financeiras`
+- `PUT /api/v1/contas-financeiras/{id}`
+- `DELETE /api/v1/contas-financeiras/{id}`
+- `POST /api/v1/contas-financeiras/{id}/ajustes`
+- `GET /api/v1/contas-financeiras/{id}/movimentos` (paginado)
+- `GET /api/v1/contas-financeiras/minhas/reconciliacao`
+- `GET /api/v1/contas-financeiras/{id}/reconciliacao`
+
+Criação pública aceita contas de caixa `ATIVO`. Contas `PASSIVO/CARTAO`, `COFRE` e `CUSTODIA`
+são criadas pelos casos de uso correspondentes. Saldo é materializado pelo ledger.
+
+## Cartões (`/api/v1/cartoes`)
+- `GET /api/v1/cartoes` (alias `/meus`)
+- `GET /api/v1/cartoes/carteira`
+- `GET /api/v1/cartoes/{id}`
+- `POST /api/v1/cartoes`
+- `PUT /api/v1/cartoes/{id}`
+- `DELETE /api/v1/cartoes/{id}`
+
+## Faturas (`/api/v1/faturas`)
+- `GET /api/v1/faturas/cartao/{cartaoId}/atual`
+- `GET /api/v1/faturas/cartao/{cartaoId}`
+- `POST /api/v1/faturas/cartao/{cartaoId}`
+- `PUT /api/v1/faturas/{id}/pagar` — aceita `Idempotency-Key`
+
+## Métricas e compromissos
+- `GET /api/v1/metricas`
+- `GET /api/v1/metricas/{metrica}/origens`
+- `GET /api/v1/compromissos?ate=YYYY-MM-DD`
+
+## Onboarding (`/api/v1/onboarding`)
+- `GET /api/v1/onboarding/status`
+- `POST /api/v1/onboarding/completar`
+- `POST /api/v1/onboarding/finalizar` — transacional e idempotente; usado por web/mobile
+
+## Carteiras legadas (`/api/v1/carteiras`)
+Compatibilidade. Novos clientes devem usar `/contas-financeiras`.
 - `GET /api/v1/carteiras/minhas` (paginado)
 - `GET /api/v1/carteiras/{id}`
 - `POST /api/v1/carteiras`
@@ -227,7 +273,8 @@ Formato de resposta paginada:
 - `GET /api/v1/carteiras/minhas/saldo-total`
 - `DELETE /api/v1/carteiras/{id}`
 
-##  Contas (`/api/v1/contas`)
+## Contas/cartões legados (`/api/v1/contas`)
+Compatibilidade de configuração de cartão. Novos clientes devem usar `/cartoes`.
 - `GET /api/v1/contas/minhas` (paginado)
 - `GET /api/v1/contas/{id}`
 - `POST /api/v1/contas`
@@ -240,6 +287,10 @@ Formato de resposta paginada:
 - `POST /api/v1/contas-fixas`
 - `PUT /api/v1/contas-fixas/{id}`
 - `PUT /api/v1/contas-fixas/{id}/pagar`
+- `PUT /api/v1/contas-fixas/{id}/realizar`
+- `PUT /api/v1/contas-fixas/{id}/pular`
+- `PUT /api/v1/contas-fixas/{id}/reativar`
+- `GET /api/v1/contas-fixas/falhas-pendentes`
 - `DELETE /api/v1/contas-fixas/{id}`
 
 ##  Metas (`/api/v1/metas`)
@@ -262,6 +313,36 @@ em `status` retorna HTTP 400 (`INVALID_PARAMETER`).
 - `GET /api/v1/parcelas/{id}`
 - `PUT /api/v1/parcelas/{id}/pagar`
 - `PUT /api/v1/parcelas/{id}/despagar`
+
+## Orçamentos (`/api/v1/orcamentos`)
+- `GET /api/v1/orcamentos/atual`
+- `GET /api/v1/orcamentos`
+- `POST /api/v1/orcamentos`
+
+## Relatórios e exportação
+- `GET /api/v1/relatorios`
+- `GET /api/v1/exportar/transacoes`
+- `GET /api/v1/exportar/categorias`
+- `GET /api/v1/exportar/contas`
+- `GET /api/v1/exportar/completo`
+
+## Importação e anexos
+- `POST /api/v1/importar/csv`
+- `POST /api/v1/anexos/{transacaoId}`
+- `GET /api/v1/anexos/{transacaoId}`
+- `GET /api/v1/anexos/{id}/download`
+- `DELETE /api/v1/anexos/{id}`
+
+## Investimentos (`/api/v1/investimentos`)
+- `POST /api/v1/investimentos`
+- `GET /api/v1/investimentos` — `Page`, `size<=100`
+- `PUT /api/v1/investimentos/{id}`
+- `DELETE /api/v1/investimentos/{id}`
+- `POST /api/v1/investimentos/{ativoId}/movimentacoes` — aceita `Idempotency-Key`
+- `GET /api/v1/investimentos/{ativoId}/movimentacoes` — `Page`, `size<=100`
+
+Reenvio da mesma chave para o mesmo titular devolve a movimentação existente sem duplicar posição,
+caixa ou ledger.
 
 ---
 

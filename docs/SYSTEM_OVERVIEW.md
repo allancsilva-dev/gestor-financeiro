@@ -2,12 +2,17 @@
 
 Documentacao de alto nivel sobre como o sistema funciona. Mantido pelo `docs-reporter`.
 
-**Ultima atualizacao:** 2026-08-22 (working tree sobre a branch `design/pr13-perfil`: correcao da
-sessao mobile que travava em erro apos desbloqueio por digital — refresh token com falha 422/404
-nao era tratado como fim de sessao pelo mobile, e o desbloqueio por biometria nao renovava nada
-contra o servidor; janela do refresh token elevada de 7 para 30 dias, novo code `SESSION_EXPIRED`
-(401) para as tres causas de falha de refresh, novo `RefreshTokenScheduler` — ver item 29 da lista
-de decisoes tecnicas, PROB-0085, BUG-0096/BUG-0097, BACKLOG-0103/0104/0105)
+**Ultima atualizacao:** 2026-08-26 (`main` em `e885ed7`, working tree nao consolidado):
+PR-F4-01 adiciona fundacao canonica de importacao no backend. `FinancialDataConnector` recebe
+somente fonte streaming, sem `Path`, URL ou colecao em memoria. V46 cria `import_batches` e
+`import_records` com ownership, lifecycle, optimistic lock, idempotencia, constraints, indices e
+exclusao LGPD. Nenhum parser, endpoint novo ou commit no ledger foi habilitado. Testes: 330
+unitarios e 33 de integracao PostgreSQL, sem falhas.
+
+**Atualizacao anterior:** 2026-08-25 (`main` em `e885ed7`, working tree limpo): correcoes de sessao
+mobile, padronizacao visual e verificacao Maestro descritas abaixo estao commitadas em `main`.
+Refresh expirado/revogado retorna `SESSION_EXPIRED` (401), o mobile encerra a sessao morta e o
+desbloqueio local valida a sessao no servidor. Ver item 29, PROB-0085 e BUG-0096/BUG-0097.
 
 **Atualizacao anterior:** 2026-08-22 (branch `design/pr13-perfil`, commits `9c1335be`..`ad5fc022`,
 mergeada em `main` no intervalo `12571a4..HEAD`: serie de 13 PRs que unificou o padrao visual do
@@ -33,13 +38,13 @@ ciano atual — ver item 26 da lista de decisoes tecnicas, PROB-0083, BACKLOG-00
 
 | Camada | Tecnologia | Versao |
 |---|---|---|
-| Backend runtime | Java + Spring Boot | Java 17, Spring Boot 3.5.7 |
+| Backend runtime | Java + Spring Boot | Java 17, Spring Boot 3.5.16 |
 | Build backend | Maven Wrapper | `./mvnw` |
 | Banco de dados | PostgreSQL (prod), H2 (testes) | PostgreSQL 17+ |
 | ORM | Spring Data JPA / Hibernate | — |
 | Seguranca | Spring Security + JWT (jjwt) | jjwt 0.11.5 |
 | Password hash | BCrypt | — |
-| Frontend web | React + TypeScript + Vite + Tailwind CSS | React 19.2.0, TS ~5.9.3 |
+| Frontend web | React + TypeScript + Vite + Tailwind CSS | React 19.2.0, TS ~5.9.3, Vite 7.3.5 |
 | Graficos web | Recharts | 3.4.1 |
 | HTTP client web | Axios | 1.13.2 |
 | Roteamento web | React Router DOM | 7.9.6 |

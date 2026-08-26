@@ -5,7 +5,11 @@ Roadmap e planejamento de funcionalidades futuras do Gestor Financeiro.
 **Última atualização:** 30/11/2025
 **Versão atual:** 1.4.0
 
-> **Documento legado.** Este roadmap foi escrito antes da auditoria e da Fase 0 concluída em 2026-07-07. Para prioridade atual, usar `GESTOR_FINANCEIRO_ALTO_NIVEL_PROXIMOS_PASSOS.md`, `BACKLOG.md`, `PROBLEM_LEDGER.md` e `CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md`. Deploy não é prioridade imediata enquanto PostgreSQL real, mobile P0/P1, frontend CSRF/logs/404 e CI/CD estiverem pendentes.
+> **Documento legado — não usar para status ou prioridade.** Este roadmap retrata 30/11/2025.
+> Vários itens abaixo já foram implementados e seus marcadores foram preservados somente como
+> histórico. Fonte atual: `15 07 2026 - MetaDoNexosFinancas.md` para direção, `BACKLOG.md` para
+> trabalho aberto, `SYSTEM_OVERVIEW.md` para estado técnico e
+> `CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md` para evidências.
 
 ---
 

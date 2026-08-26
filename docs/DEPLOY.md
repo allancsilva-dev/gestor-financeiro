@@ -2,8 +2,12 @@
 
 Guia completo para deploy em produção do sistema Gestor Financeiro.
 
-**Versão:** 1.5.0
-**Última atualização:** 2026-07-08
+**Estado documental:** revisado em 25/08/2026
+**Última atualização técnica:** 2026-07-16
+
+> Deploy público continua bloqueado até fechamento de `PROB-0081`, promoção do PR-F2-20 em clone
+> restaurado e execução dos gates de BACKLOG-0080. Este guia descreve procedimento; não declara
+> ambiente de produção aprovado.
 
 ---
 
@@ -440,6 +444,7 @@ Backups salvos em `backups/` como `.sql.gz.gpg`. Mantidos ultimos 7. Backup sem 
 
 ```bash
 BACKUP_ENCRYPTION_PASSPHRASE='senha-forte-fora-do-repo' \
+  RESTORE_TARGET_MARKER=incidente-123 \
   ./scripts/restore-db.sh backups/gestor_financeiro_20260101.sql.gz.gpg postgresql://user:pass@host:5432/db
 ```
 
@@ -447,8 +452,14 @@ Restore drill em banco descartável:
 
 ```bash
 BACKUP_ENCRYPTION_PASSPHRASE='senha-forte-fora-do-repo' \
+  RESTORE_TARGET_MARKER=drill-123 \
   ./scripts/restore-drill-db.sh backups/gestor_financeiro_20260101.sql.gz.gpg postgresql://user:pass@host:5432/db_descartavel
 ```
+
+Antes dos comandos acima, um administrador deve configurar no banco alvo o mesmo valor:
+`ALTER DATABASE nome_do_banco SET nexos.restore_target='...'` e reconectar. Restore sobre banco
+não vazio exige ainda `RESTORE_ALLOW_NONEMPTY=true`. O drill sem URL cria e marca sozinho um
+PostgreSQL efêmero.
 
 Apos restore, validar schema com Flyway:
 ```bash
@@ -618,5 +629,5 @@ protegida; nunca versionar keystore ou senha no repositório.
 
 ---
 
-**Última atualização:** 30/11/2025  
+**Revisão documental:** 25/08/2026
 **Mantido por:** Zero (Allan Carvalho)

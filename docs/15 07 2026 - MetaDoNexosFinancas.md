@@ -1,5 +1,64 @@
 # Meta do Nexos Finanças — 15/07/2026
 
+> **Atualização de estado — 25/08/2026 (`main` em `e885ed7`).** Este arquivo nasceu como auditoria
+> em 15/07/2026. O diagnóstico original permanece abaixo como baseline histórica, mas não descreve
+> sozinho o sistema atual. Estados “feito” nesta atualização foram conferidos no código, migrations,
+> testes existentes e histórico Git; nenhuma suíte foi reexecutada nesta revisão documental.
+
+## Estado atual em 25/08/2026
+
+O sistema avançou de “gestor manual com verdades paralelas” para um núcleo financeiro com conta
+financeira canônica, ledger, operações agrupadas, conciliação, métricas oficiais e clientes
+alinhados. As Fases 0–3 do plano de julho foram implementadas. O principal bloqueio restante não é
+uma feature ausente: é a promoção operacional segura do PR-F2-20 em dados restaurados, dependente do
+backup/restore off-host real de `PROB-0081`.
+
+**Veredito atual:** `APTO_PARA_DESENVOLVIMENTO` e `NAO_APTO_PARA_DEPLOY_PUBLICO` enquanto os gates
+operacionais permanecerem abertos.
+
+### Achados bloqueantes da auditoria original
+
+| Achado | Estado atual | Evidência principal |
+|---|---|---|
+| P0-1 — renda do onboarding como saída | **RESOLVIDO** | `OnboardingService` cria `ENTRADA` com categoria Renda; `OnboardingServiceTest` cobre sinal, categoria e reenvio |
+| P0-2 — exclusão LGPD sem execuções | **RESOLVIDO** | manifesto transacional remove recorrências; `UsuarioExclusaoLgpdIT` cobre realizada, pulada, falha, arquivos e isolamento |
+| P0-3 — meta concluída/excluída oculta reserva | **RESOLVIDO** | status `ATIVA/CONCLUIDA/ARQUIVADA`, histórico, resgate e modalidades `COFRE_REAL/RESERVA_VIRTUAL`; migrations V30–V38 e testes de lifecycle |
+| P0-4 — onboarding web não atômico | **RESOLVIDO** | web e mobile usam `POST /v1/onboarding/finalizar`; serviço transacional e idempotente coberto por `OnboardingAtomicidadeTest` |
+
+### Problemas estruturais da auditoria original
+
+| Achado | Estado atual | Observação |
+|---|---|---|
+| P1-1 — `Conta` e `Carteira` sobrepostas | **RESOLVIDO NO CONTRATO CANÔNICO** | `Carteira` evoluiu para conta financeira; `Conta` ficou como configuração compatível de cartão, com passivo no ledger. V32/V35/V41 |
+| P1-2 — transação sem caixa conta como conciliada | **RESOLVIDO** | conta financeira obrigatória para operação real; importado incompleto usa `PENDENTE_CONCILIACAO`; V34 possui guard |
+| P1-3 — parcelamento com múltiplas verdades | **RESOLVIDO PARA CARTÃO / PARCIAL NO LEGADO** | `FaturaLancamento` é cronograma canônico de cartão e V36 remove redundância; `Parcela` continua para fluxo não-cartão |
+| P1-4 — conceitos de saldo pouco claros | **RESOLVIDO NO NÚCLEO** | nove métricas oficiais, composição e drill-down; mobile expõe visão financeira e web possui consumo mínimo |
+| P1-5 — timezone inconsistente | **PARCIAL** | backend usa política/clock de negócio e mobile corrige `LocalDate`; web ainda tem pontos abertos em `BACKLOG-0092` |
+| P1-6 — anexos efêmeros | **PARCIAL** | volume persistente, validação de arquivo, backup e exclusão existem; storage externo produtivo e drill completo seguem operacionais |
+| P1-7 — backups divergentes | **PARCIAL/BLOQUEANTE** | política canônica, criptografia e drill local existem; remote off-host real continua em `PROB-0081` |
+
+### Produto e experiência
+
+- Home mobile foi reduzida e reconstruída em torno de saldo disponível, compromissos, últimas
+  movimentações e setup progressivo.
+- Lançamento rápido usa valor primeiro, data atual, preferência de conta e sugestão determinística
+  de categoria; criação contextual cobre ausência de categoria/cartão.
+- Metas possuem modalidade imutável, histórico, cofre real, reserva virtual e extrato de origem.
+- Nove métricas oficiais distinguem disponível, reservado, comprometido, investido, dívidas,
+  resultado e patrimônio, com drill-down.
+- Padrão visual mobile foi unificado e protegido por teste de arquitetura visual; quatro flows
+  Maestro foram registrados verdes em 22/08/2026. Validação assistiva em hardware físico continua
+  pendente.
+- Importação CSV, anexos, investimentos e insights determinísticos existem. OFX completo, pipeline
+  avançado de revisão, WhatsApp, áudio, IA e Open Finance continuam futuros.
+
+### Evidência de qualidade disponível
+
+O repositório possui atualmente 74 arquivos de teste backend, 12 arquivos de teste web, 31 arquivos
+de teste mobile e 4 flows Maestro. Esses números são inventário estático, não contagem de casos.
+Resultados executados devem sempre citar data e commit; a evidência mais recente está no
+`SYSTEM_OVERVIEW.md`, `BUGFIX_LOG.md` e relatório de verificação mobile de 22/08/2026.
+
 ## Objetivo
 
 Transformar o Gestor Financeiro em um produto de finanças pessoais simples, confiável e progressivamente automatizado, usando Oinc, Piere e Pró Assessor como referências de experiência e capacidade.
@@ -12,13 +71,13 @@ O produto deve permitir que uma pessoa sem conhecimento financeiro:
 - receba orientação útil baseada nos próprios dados;
 - automatize tarefas repetitivas sem perder controle.
 
-## Veredito da auditoria
+## Veredito da auditoria original (baseline de 15/07/2026)
 
 O sistema atual é um gestor financeiro manual avançado. Possui boa base técnica, muitos módulos e regras relevantes, mas ainda não entrega experiência comparável às referências.
 
 Problema principal não é falta de telas. É falta de uma verdade financeira única e de um modelo de produto simples.
 
-### Avaliação aproximada
+### Avaliação aproximada em 15/07/2026
 
 - Base técnica: 7/10
 - Coerência financeira: 5/10
@@ -88,7 +147,7 @@ Toda movimentação deve explicar claramente:
 
 Dashboard, extrato, fatura, orçamento, meta, projeção e relatório devem derivar dessa mesma verdade.
 
-## Achados bloqueantes
+## Achados bloqueantes em 15/07/2026
 
 ### P0-1 — Onboarding cadastra renda como saída
 
@@ -167,7 +226,7 @@ Critério de aceite futuro:
 - teste cobre falha em cada etapa sem deixar dados parciais;
 - contrato de onboarding não é reproduzido nos clientes.
 
-## Problemas estruturais
+## Problemas estruturais em 15/07/2026
 
 ### P1-1 — `Conta` e `Carteira` representam conceitos sobrepostos
 
@@ -294,7 +353,7 @@ Direção recomendada:
 - restore drill automatizado;
 - evidência vinculada ao release.
 
-## UX mobile
+## UX mobile auditada em 15/07/2026
 
 ### Lançamento rápido não cumpre meta declarada
 
@@ -375,7 +434,7 @@ Direção recomendada em fases:
 4. regras personalizáveis;
 5. IA somente com dados consistentes, rastreabilidade e limites claros.
 
-## Testes e release
+## Testes e release na auditoria de 15/07/2026
 
 ### Cobertura encontrada
 
@@ -819,6 +878,18 @@ Antes de migration ou código:
 
 ## Roadmap recomendado
 
+### Progresso consolidado em 25/08/2026
+
+| Fase | Estado | Resultado |
+|---|---|---|
+| 0 — decisões e congelamento | **CONCLUÍDA** | glossário, ADR-0008..0015, invariantes e plano de migration aprovados |
+| 1 — integridade imediata | **CONCLUÍDA** | P0-1..P0-4 corrigidos, regressões e migrations adicionadas |
+| 2 — verdade financeira | **IMPLEMENTADA COM GATE OPERACIONAL** | conta financeira, operações, ledger, cartão, metas, investimentos, métricas e reconciliação; promoção do PR-F2-20 depende de `PROB-0081` |
+| 3 — experiência simples | **CONCLUÍDA** | compromissos, sugestão de categoria, lançamento rápido, home reduzida, drill-down, onboarding mínimo e clientes alinhados |
+| 4 — importação e automação | **PARCIAL** | CSV, recorrências e insights determinísticos existem; OFX/pipeline avançado/rollover de orçamento seguem futuros |
+| 5 — assistente conversacional | **NÃO INICIADA** | texto, áudio, WhatsApp e IA continuam fora do núcleo atual |
+| 6 — conectores regulados | **NÃO INICIADA** | Open Finance e expansão familiar permanecem futuras |
+
 ### Fase 0 — Congelamento e decisões
 
 - não iniciar Open Finance, WhatsApp ou módulo novo enquanto P0 estiver aberto;
@@ -936,8 +1007,16 @@ Produto estará alinhado à meta quando usuário conseguir:
 
 ## Estado desta decisão
 
-Este documento consolida diagnóstico, decisões candidatas e direção para discussão detalhada. Não autoriza
-sozinho alterações de código, banco, infraestrutura ou produto.
+Em 15/07/2026 este documento consolidava diagnóstico e decisões candidatas. Desde então, decisões de
+domínio foram formalizadas nas ADRs, Fases 1–3 foram implementadas e o modelo financeiro alvo passou
+a existir no núcleo do sistema.
 
-Próximo trabalho deve começar somente após discussão, definição explícita de escopo, aprovação das decisões de
-domínio e prioridade pelo responsável do produto.
+Prioridade atual:
+
+1. fechar `PROB-0081` com remote off-host e restore drill real;
+2. promover e comprovar PR-F2-20 em clone restaurado, com zero divergências;
+3. fechar gates de deploy, acessibilidade física e pendências P1 atuais do backlog;
+4. somente depois ampliar automação, captura conversacional ou conectores regulados.
+
+Este documento continua sendo direção de produto. Mudanças de código, banco, infraestrutura ou
+produto exigem escopo próprio e validação proporcional ao risco.

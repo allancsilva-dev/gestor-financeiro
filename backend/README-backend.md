@@ -3,7 +3,7 @@
 API REST do sistema de gestão financeira pessoal, construída com Spring Boot e PostgreSQL.
 
 ![Java](https://img.shields.io/badge/Java-17-orange.svg)
-![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.4.1-green.svg)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.16-green.svg)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-blue.svg)
 
 ---
@@ -22,11 +22,11 @@ API REST do sistema de gestão financeira pessoal, construída com Spring Boot e
 ### Gestão Financeira
 - [x] CRUD de transações (com suporte a parcelamento)
 - [x] CRUD de categorias (com soft delete)
-- [x] CRUD de carteiras
-- [x] CRUD de contas
-- [x] CRUD de contas fixas (com marcação de pagamento)
-- [x] CRUD de metas financeiras (com controle de progresso)
-- [x] Gerenciamento de parcelas
+- [x] Contas financeiras com ledger, ajustes e reconciliação
+- [x] Cartões, faturas, recorrências e parcelas
+- [x] Metas com cofre real/reserva virtual e histórico
+- [x] Orçamentos, importação CSV, anexos e investimentos
+- [x] Métricas oficiais, compromissos e drill-down
 
 ### Dashboard e Análises
 - [x] Resumo financeiro (saldo, entradas, saídas do mês)
@@ -39,7 +39,7 @@ API REST do sistema de gestão financeira pessoal, construída com Spring Boot e
 ## 🛠️ Tecnologias
 
 - Java 17
-- Spring Boot 3.4.1
+- Spring Boot 3.5.16
 - Spring Security + JWT
 - Spring Data JPA / Hibernate
 - PostgreSQL 17
@@ -139,28 +139,29 @@ A API estará disponível em: **http://localhost:8081**
 
 ## 📡 Endpoints
 
-Documentação completa em [API.md](../docs/API.md)
+Documentação completa em [API.md](API.md)
 
 ### Resumo
 | Grupo | Base Path |
 |-------|-----------|
 | Autenticação | `/api/auth` |
-| Usuário | `/api/usuarios` |
-| Dashboard | `/api/dashboard` |
-| Transações | `/api/transacoes` |
-| Categorias | `/api/categorias` |
-| Carteiras | `/api/carteiras` |
-| Contas | `/api/contas` |
-| Contas Fixas | `/api/contas-fixas` |
-| Metas | `/api/metas` |
-| Parcelas | `/api/parcelas` |
+| Usuário | `/api/v1/usuarios` |
+| Métricas | `/api/v1/metricas` |
+| Compromissos | `/api/v1/compromissos` |
+| Transações | `/api/v1/transacoes` |
+| Categorias | `/api/v1/categorias` |
+| Contas financeiras | `/api/v1/contas-financeiras` |
+| Cartões e faturas | `/api/v1/cartoes`, `/api/v1/faturas` |
+| Recorrências | `/api/v1/contas-fixas` |
+| Metas | `/api/v1/metas` |
+| Investimentos | `/api/v1/investimentos` |
 
 ---
 
 ## 🔐 Segurança
 
 - Access token JWT expira em **15 minutos**
-- Refresh token expira em **7 dias**
+- Refresh token expira em **30 dias** por padrão configurável
 - Senhas criptografadas com **BCrypt**
 - Secrets protegidos via **variáveis de ambiente**
 - CORS configurado
@@ -170,7 +171,8 @@ Documentação completa em [API.md](../docs/API.md)
 
 ## 📊 Versão
 
-**1.4.0** — Ver [CHANGELOG.md](../docs/CHANGELOG.md)
+Estado atual documentado em [CHANGELOG.md](../docs/CHANGELOG.md) e
+[SYSTEM_OVERVIEW.md](../docs/SYSTEM_OVERVIEW.md).
 
 ---
 
