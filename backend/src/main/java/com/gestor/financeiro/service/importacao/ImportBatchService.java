@@ -46,7 +46,12 @@ public class ImportBatchService {
             var existing = repository.findByUsuarioIdAndIdempotencyKey(usuarioId, idempotencyKey);
             if (existing.isPresent()) {
                 ImportBatch batch = existing.get();
-                if (batch.getFormat() == format && batch.getFileSha256().equals(fileSha256)) return batch;
+                // Identidade do reenvio é o conteúdo: o formato do lote existente já foi detectado,
+                // enquanto o reenvio chega como UNKNOWN. Exigir igualdade de formato transformaria
+                // replay legítimo em 409.
+                boolean mesmoConteudo = batch.getFileSha256().equals(fileSha256);
+                boolean formatoCompativel = format == ImportFormat.UNKNOWN || batch.getFormat() == format;
+                if (mesmoConteudo && formatoCompativel) return batch;
                 throw new FinancialConflictException("Idempotency-Key já usada para outra importação");
             }
         }

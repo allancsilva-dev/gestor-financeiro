@@ -50,6 +50,17 @@ class ImportBatchServiceTest {
     }
 
     @Test
+    void replayAposDeteccaoDevolveOMesmoLote() {
+        ImportBatch first = service.create(usuario.getId(), ImportFormat.UNKNOWN, null, HASH_A, "import:replay");
+        service.setDetected(usuario.getId(), first.getId(), ImportFormat.CSV, "NUBANK");
+
+        ImportBatch replay = service.create(usuario.getId(), ImportFormat.UNKNOWN, null, HASH_A, "import:replay");
+
+        assertEquals(first.getId(), replay.getId());
+        assertEquals(ImportFormat.CSV, replay.getFormat());
+    }
+
+    @Test
     void reusedIdempotencyKeyWithDifferentContentConflicts() {
         service.create(usuario.getId(), ImportFormat.CSV, null, HASH_A, "import:2");
         assertThrows(FinancialConflictException.class,

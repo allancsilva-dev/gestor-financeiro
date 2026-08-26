@@ -90,6 +90,15 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.GONE).body(apiError);
     }
 
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ApiError> handleRateLimited(RateLimitExceededException ex,
+                                                       HttpServletRequest request) {
+        ApiError apiError = buildError("RATE_LIMITED", ex.getMessage(), null, request);
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("Retry-After", String.valueOf(ex.getRetryAfterSeconds()))
+                .body(apiError);
+    }
+
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ApiError> handleUploadTooLarge(MaxUploadSizeExceededException ex,
                                                          HttpServletRequest request) {

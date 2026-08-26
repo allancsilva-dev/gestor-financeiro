@@ -7,6 +7,22 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ---
 
+## [Fase 4 — PR-F4-02] - 2026-08-26
+
+### Endpoint de importação com admissão controlada
+- `POST /api/v1/importacoes` (multipart, `Idempotency-Key`) e `GET /api/v1/importacoes/{id}`. O
+  arquivo vira lote auditável; nenhuma escrita no ledger acontece neste passo.
+- `TempFileImportSource`: o upload é copiado para arquivo temporário próprio, com permissão de dono,
+  stream reabrível (o orquestrador lê o conteúdo mais de uma vez) e remoção garantida em qualquer
+  saída, inclusive erro — coberto por teste.
+- Admissão em três travas: rate limit por titular, lotes em voo por titular (com janela, para lote
+  órfão não bloquear o usuário para sempre) e teto de parses simultâneos por instância — esta última
+  é o que impede uploads concorrentes de estourarem o heap e matarem o processo.
+- Replay de `Idempotency-Key` com o mesmo arquivo devolve o mesmo lote (antes o formato detectado
+  fazia o reenvio legítimo virar `409`); replay de chave cujo lote falhou repete o mesmo erro.
+- `backend/API.md` passa a documentar o pipeline e a tabela de erros do envio.
+- Validação: 338 testes unitários e gate de cobertura verdes.
+
 ## [Fase 4 — PR-F4-01d] - 2026-08-26
 
 ### Envelope de runtime alinhado para receber upload

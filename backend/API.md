@@ -327,7 +327,28 @@ em `status` retorna HTTP 400 (`INVALID_PARAMETER`).
 - `GET /api/v1/exportar/completo`
 
 ## Importação e anexos
-- `POST /api/v1/importar/csv`
+
+### Pipeline canônico (`/api/v1/importacoes`)
+- `POST /api/v1/importacoes` — `multipart/form-data`, parte `file` (CSV ou OFX). Aceita
+  `Idempotency-Key`. Devolve `201` com o lote (`status`, `format`, contadores). O arquivo é
+  detectado, normalizado e persistido como lote auditável; **nada é lançado no ledger neste passo**.
+- `GET /api/v1/importacoes/{id}` — situação do lote do titular; `404` para lote de outro titular.
+
+Respostas de erro do envio:
+
+| Situação | Status | `code` |
+|---|---|---|
+| Reenvio da mesma `Idempotency-Key` com o mesmo arquivo | `201` | — (mesmo lote) |
+| Mesma `Idempotency-Key` com arquivo diferente | `409` | `FINANCIAL_CONFLICT` |
+| Arquivo acima do limite | `413` | `UPLOAD_TOO_LARGE` |
+| Parte `file` ausente | `400` | `MISSING_REQUEST_PART` |
+| Corpo multipart malformado | `400` | `INVALID_MULTIPART` |
+| Formato irreconhecível, limite estrutural, hash divergente | `422` | `IMPORT_PARSING_FAILED` (+ `details.failureCode`) |
+| Muitos envios ou importação anterior em processamento | `429` | `RATE_LIMITED` (+ header `Retry-After`) |
+
+### Legado e anexos
+- `POST /api/v1/importar/csv` — **desativado por padrão** (`410 LEGACY_IMPORT_DISABLED`); grava
+  direto no ledger, sem prévia nem reversão.
 - `POST /api/v1/anexos/{transacaoId}`
 - `GET /api/v1/anexos/{transacaoId}`
 - `GET /api/v1/anexos/{id}/download`
