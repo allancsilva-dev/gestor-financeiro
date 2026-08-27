@@ -22,7 +22,11 @@ public record MetaResponseDto(
     String descricao,
     com.gestor.financeiro.model.enums.ModalidadeMeta modalidade,
     Long cofreId,
-    Long carteiraAlocadaId
+    Long carteiraAlocadaId,
+    /** Aporte automático: opt-in explícito, com dia e conta de origem. */
+    Boolean aporteAutomatico,
+    Short aporteDia,
+    Long aporteCarteiraId
 ) {
     public static MetaResponseDto fromEntity(Meta meta) {
         return new MetaResponseDto(
@@ -41,7 +45,10 @@ public record MetaResponseDto(
             meta.getDescricao(),
             meta.getModalidade(),
             meta.getCofre() == null ? null : meta.getCofre().getId(),
-            meta.getCarteiraAlocada() == null ? null : meta.getCarteiraAlocada().getId()
+            meta.getCarteiraAlocada() == null ? null : meta.getCarteiraAlocada().getId(),
+            meta.getAporteAutomatico(),
+            meta.getAporteDia(),
+            meta.getAporteCarteira() == null ? null : meta.getAporteCarteira().getId()
         );
     }
 }

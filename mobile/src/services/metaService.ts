@@ -23,6 +23,15 @@ export const metaService = {
   removerValor: (id: number, valor: number, carteiraId: number) =>
     api.put<Meta>(`/v1/metas/${id}/remover`, { valor, carteiraId }).then(r => r.data),
 
+  /**
+   * Liga ou desliga o aporte mensal automático. `ativo: false` desliga e limpa o resto — parar de
+   * mover dinheiro não pode depender de o cliente lembrar de limpar campo.
+   */
+  configurarAporteAutomatico: (
+    id: number,
+    dados: { ativo: boolean; dia?: number; carteiraId?: number; valorMensal?: number },
+  ) => api.put<Meta>(`/v1/metas/${id}/aporte-automatico`, dados).then(r => r.data),
+
   deletar: (id: number) =>
     api.delete(`/v1/metas/${id}`),
 };

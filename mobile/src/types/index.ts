@@ -398,6 +398,10 @@ export interface Meta {
   icone?: string;
   descricao?: string;
   modalidade: ModalidadeMeta;
+  /** Aporte automático: opt-in explícito, com dia e conta de origem. */
+  aporteAutomatico?: boolean;
+  aporteDia?: number | null;
+  aporteCarteiraId?: number | null;
   cofreId?: number | null;
   carteiraAlocadaId?: number | null;
 }

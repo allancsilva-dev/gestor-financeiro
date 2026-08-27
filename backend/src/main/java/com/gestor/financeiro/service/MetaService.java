@@ -66,6 +66,16 @@ public class MetaService {
     // Adiciona valor à meta (quando o usuário guarda dinheiro)
     @Transactional
     public Meta adicionarValor(Long metaId, BigDecimal valor, Long carteiraId, Long usuarioId) {
+        return adicionarValor(metaId, valor, carteiraId, usuarioId, null);
+    }
+
+    /**
+     * Reserva com chave de idempotencia. O aporte automatico repete todo mes e pode ser reexecutado
+     * pela fila: sem chave, uma retentativa reservaria duas vezes o mesmo valor.
+     */
+    @Transactional
+    public Meta adicionarValor(Long metaId, BigDecimal valor, Long carteiraId, Long usuarioId,
+                               String idempotencyKey) {
         Meta meta = buscarPorIdDoUsuario(metaId, usuarioId);
         exigirNaoArquivada(meta);
 
@@ -83,18 +93,20 @@ public class MetaService {
         Carteira cofre = cofreDe(meta, usuarioId);
         OperacaoFinanceira operacao = operacaoService.criar(new CriarOperacaoCommand(
                 usuarioId, TipoOperacaoFinanceira.RESERVA_META, PoliticaOperacao.CAIXA,
-                OrigemOperacaoFinanceira.MANUAL, LocalDateTime.now(clock), null,
+                OrigemOperacaoFinanceira.MANUAL, LocalDateTime.now(clock), idempotencyKey,
                 "reserva-meta|meta=" + meta.getId() + "|valor=" + valor.toPlainString(),
                 "Reserva para meta: " + meta.getNome(), null));
 
         registrarMovimentoCarteira(meta, carteiraId, usuarioId, valor,
                 TipoMovimentoCarteira.RESERVA_META,
                 RegistrarMovimentoCommand.Direcao.SAIDA,
-                "Reserva para meta: " + meta.getNome(), operacao, false);
+                "Reserva para meta: " + meta.getNome(), operacao, false,
+                chaveDaPerna(idempotencyKey, "saida"));
         registrarMovimentoCarteira(meta, cofre.getId(), usuarioId, valor,
                 TipoMovimentoCarteira.RESERVA_META,
                 RegistrarMovimentoCommand.Direcao.ENTRADA,
-                "Reserva recebida: " + meta.getNome(), operacao, false);
+                "Reserva recebida: " + meta.getNome(), operacao, false,
+                chaveDaPerna(idempotencyKey, "entrada"));
 
         BigDecimal valorAnterior = meta.getValorReservado();
         meta.setValorReservado(valorAnterior.add(valor));
@@ -244,6 +256,15 @@ public class MetaService {
                                             BigDecimal valor, TipoMovimentoCarteira tipo,
                                             RegistrarMovimentoCommand.Direcao direcao, String descricao,
                                             OperacaoFinanceira operacao, boolean permitirSaldoNegativo) {
+        registrarMovimentoCarteira(meta, carteiraId, usuarioId, valor, tipo, direcao, descricao,
+                operacao, permitirSaldoNegativo, null);
+    }
+
+    private void registrarMovimentoCarteira(Meta meta, Long carteiraId, Long usuarioId,
+                                            BigDecimal valor, TipoMovimentoCarteira tipo,
+                                            RegistrarMovimentoCommand.Direcao direcao, String descricao,
+                                            OperacaoFinanceira operacao, boolean permitirSaldoNegativo,
+                                            String idempotencyKey) {
         ledgerService.registrarMovimento(new RegistrarMovimentoCommand(
                 usuarioId,
                 carteiraId,
@@ -254,10 +275,15 @@ public class MetaService {
                 "META",
                 meta.getId(),
                 descricao,
-                null,
+                idempotencyKey,
                 LocalDateTime.now(clock),
                 permitirSaldoNegativo
         ), operacao);
+    }
+
+    /** Cada perna do par precisa de chave propria: o indice unico do ledger e por movimento. */
+    private String chaveDaPerna(String idempotencyKey, String perna) {
+        return idempotencyKey == null ? null : idempotencyKey + ":" + perna;
     }
 
     /**

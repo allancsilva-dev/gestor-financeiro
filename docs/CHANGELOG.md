@@ -7,6 +7,26 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ---
 
+## [Fase 4 — PR-F4-15] - 2026-08-27
+
+### Aporte automático de metas
+- `Meta.valorMensal` deixou de ser decorativo: V54 acrescenta `aporte_automatico`, dia e conta de
+  origem, com CHECK que recusa aporte ligado sem os três — job sem instrução não é estado válido.
+- **Opt-in explícito.** Preencher valor mensal é planejamento; autorizar o app a mover dinheiro
+  todo mês é outra coisa. Sem ligar, nada acontece.
+- A reserva passa por `MetaService.adicionarValor`, preservando o invariante
+  `valorReservado == saldo do cofre` (V37). `adicionarValor` ganhou sobrecarga com chave de
+  idempotência, que também corrigiu o estorno em lote de reservas.
+- **Idempotência por competência na própria meta.** A chave do ledger só protege meta com cofre
+  real; reserva virtual não gera lançamento e teria sido aportada duas vezes — o teste pegou isso.
+- **Saldo insuficiente não vira saldo negativo**: o mês fica sem reserva e o titular recebe aviso na
+  caixa in-app. O app não empurra a conta para o vermelho para cumprir meta.
+- Dia limitado a 28 para existir em todo mês; conta de origem precisa ser de caixa (cofre, cartão e
+  custódia recusados).
+- Mobile: a folha de detalhe da meta ganha "Guardar sozinho", com a conta de origem e o que
+  acontece se faltar saldo.
+- Validação: 401 testes unitários e 49 de integração no backend; 418 no mobile.
+
 ## [Fase 4 — PR-F4-14] - 2026-08-27
 
 ### Detecção de recorrências e assinaturas

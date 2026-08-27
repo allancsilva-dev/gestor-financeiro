@@ -58,6 +58,9 @@ export default function Metas() {
   const [editandoMeta, setEditandoMeta] = useState<Meta | null>(null);
   const [metaSelecionada, setMetaSelecionada] = useState<Meta | null>(null);
   const [erroCriar, setErroCriar] = useState<string | null>(null);
+  const [erroAporte, setErroAporte] = useState<string | null>(null);
+  const [carteiraOrigemAporte, setCarteiraOrigemAporte] = useState<number | null>(null);
+  const [diaDoAporte] = useState<number>(5);
   const [valorAdicionar, setValorAdicionar] = useState('');
   const [valorRemover, setValorRemover] = useState('');
   const [erroAdicionar, setErroAdicionar] = useState<string | null>(null);
@@ -152,6 +155,39 @@ export default function Metas() {
     setErroCriar(null);
     setModalDetalheVisible(false);
     setModalCriarVisible(true);
+  };
+
+  // Aporte automático: ligar move dinheiro todo mês, então é opt-in explícito por meta.
+  const aporteMutation = useMutation({
+    mutationFn: ({ id, dados }: {
+      id: number;
+      dados: { ativo: boolean; dia?: number; carteiraId?: number };
+    }) => metaService.configurarAporteAutomatico(id, dados),
+    onSuccess: (meta) => {
+      setMetaSelecionada(meta);
+      setErroAporte(null);
+      queryClient.invalidateQueries({ queryKey: ['metas'] });
+    },
+    onError: (err) => setErroAporte(mensagemDeErro(err)),
+  });
+
+  const alternarAporte = (meta: Meta) => {
+    if (meta.aporteAutomatico) {
+      aporteMutation.mutate({ id: meta.id, dados: { ativo: false } });
+      return;
+    }
+    if (!meta.valorMensal) {
+      setErroAporte('Defina quanto guardar por mês antes de automatizar.');
+      return;
+    }
+    if (!carteiraOrigemAporte) {
+      setErroAporte('Escolha de qual conta o valor sai.');
+      return;
+    }
+    aporteMutation.mutate({
+      id: meta.id,
+      dados: { ativo: true, dia: diaDoAporte, carteiraId: carteiraOrigemAporte },
+    });
   };
 
   const abrirAdicionarValor = (meta: Meta, origemDetalhe = false) => {
@@ -426,6 +462,45 @@ export default function Metas() {
                 <Text style={{ ...typography.body, color: colors.textSecondary, marginTop: spacing.md }}>{metaSelecionada.descricao}</Text>
               ) : null}
             </Card>
+
+            {acoesDaMeta(metaSelecionada).adicionar && (
+              <Card radius={radius.xl} style={{ marginTop: spacing.lg }}>
+                <Text style={{ ...typography.cardTitle, color: colors.textPrimary }}>Guardar sozinho</Text>
+                <Text style={{ ...typography.meta, color: colors.textSecondary, marginTop: spacing.xxs }}>
+                  {metaSelecionada.aporteAutomatico
+                    ? `Todo dia ${metaSelecionada.aporteDia}, ${formatCurrency(Number(metaSelecionada.valorMensal ?? 0))} saem da conta escolhida para esta meta.`
+                    : 'O app pode separar o valor mensal todo mês. Se faltar saldo, ele avisa em vez de deixar a conta negativa.'}
+                </Text>
+
+                {!metaSelecionada.aporteAutomatico && (
+                  <>
+                    <RotuloDeGrupo>Sai da conta</RotuloDeGrupo>
+                    <SeletorDeConta
+                      contas={carteiras}
+                      selecionada={carteiraOrigemAporte}
+                      onSelecionar={id => { setCarteiraOrigemAporte(id); setErroAporte(null); }}
+                      vazio="Você ainda não tem contas. Crie uma em Mais → Contas."
+                    />
+                  </>
+                )}
+
+                {erroAporte && (
+                  <Text accessibilityRole="alert" style={{ ...typography.meta, color: colors.danger, marginTop: spacing.sm }}>
+                    {erroAporte}
+                  </Text>
+                )}
+
+                <View style={{ marginTop: spacing.md }}>
+                  <Botao
+                    titulo={metaSelecionada.aporteAutomatico ? 'Desligar' : 'Guardar todo mês'}
+                    variante={metaSelecionada.aporteAutomatico ? 'secundario' : 'primario'}
+                    onPress={() => alternarAporte(metaSelecionada)}
+                    carregando={aporteMutation.status === 'pending'}
+                    testID="meta-aporte-automatico"
+                  />
+                </View>
+              </Card>
+            )}
 
             {acoesDaMeta(metaSelecionada).editar && (
               <View style={{ gap: spacing.md, marginTop: spacing.lg }}>

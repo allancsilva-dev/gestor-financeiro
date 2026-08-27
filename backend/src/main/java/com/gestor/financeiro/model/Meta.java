@@ -53,6 +53,25 @@ public class Meta {
     
     @Column(precision = 10, scale = 2)
     private BigDecimal valorMensal;
+
+    /**
+     * Aporte automatico e opt-in: preencher valor mensal e planejamento, autorizar o app a mover
+     * dinheiro todo mes e outra coisa.
+     */
+    @Column(name = "aporte_automatico", nullable = false)
+    private Boolean aporteAutomatico = false;
+
+    /** Dia do mes do aporte; ate 28 para existir em todo mes. */
+    @Column(name = "aporte_dia")
+    private Short aporteDia;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "aporte_carteira_id")
+    private Carteira aporteCarteira;
+
+    /** Ultima competencia ja aportada (yyyy-MM); trava o aporte nas duas modalidades. */
+    @Column(name = "aporte_ultima_competencia", length = 7)
+    private String aporteUltimaCompetencia;
     
     @Column
     private LocalDate dataInicio;

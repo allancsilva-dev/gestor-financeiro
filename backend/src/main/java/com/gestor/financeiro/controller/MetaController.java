@@ -9,7 +9,10 @@ import com.gestor.financeiro.model.Meta;
 import com.gestor.financeiro.model.enums.StatusMeta;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.MetaService;
+import com.gestor.financeiro.service.meta.AporteAutomaticoService;
+import com.gestor.financeiro.dto.ConfigurarAporteRequest;
 import com.gestor.financeiro.util.PaginationUtils;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -28,6 +31,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class MetaController {
     private final MetaService metaService;
+    private final AporteAutomaticoService aporteAutomaticoService;
     private final AuthenticatedUserService authenticatedUserService;
     
     // GET /api/metas/minhas?status=ATIVA|CONCLUIDA|ARQUIVADA - ausência de filtro equivale a ATIVA
@@ -132,5 +136,16 @@ public class MetaController {
             meta.setModalidade(request.getModalidade());
         }
         return meta;
+    }
+
+    @PutMapping("/{id}/aporte-automatico")
+    @Operation(summary = "Ligar ou desligar o aporte mensal automático da meta")
+    public ResponseEntity<MetaResponseDto> configurarAporte(
+            @PathVariable Long id,
+            @Valid @RequestBody ConfigurarAporteRequest request) {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        return ResponseEntity.ok(MetaResponseDto.fromEntity(aporteAutomaticoService.configurar(
+                usuarioId, id, Boolean.TRUE.equals(request.ativo()), request.dia(),
+                request.carteiraId(), request.valorMensal())));
     }
 }

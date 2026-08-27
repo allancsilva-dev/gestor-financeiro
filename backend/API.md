@@ -384,6 +384,20 @@ Respostas de erro do envio:
 - `GET /api/v1/anexos/{id}/download`
 - `DELETE /api/v1/anexos/{id}`
 
+## Metas — aporte automático
+- `PUT /api/v1/metas/{id}/aporte-automatico` — corpo
+  `{ "ativo": true, "dia": 5, "carteiraId": 9, "valorMensal": 200.00 }`. `ativo: false` desliga e
+  limpa dia e conta. Ligar exige valor mensal, dia entre **1 e 28** (para existir em todo mês) e uma
+  conta de caixa — cofre, cartão e custódia são recusados como origem.
+- A resposta de meta passa a trazer `aporteAutomatico`, `aporteDia` e `aporteCarteiraId`.
+
+O aporte roda na fila (`META_APORTE`, um job por titular por dia) e é **idempotente por
+competência**: a meta guarda a última competência aportada, o que protege as duas modalidades — a
+reserva virtual não gera lançamento e por isso não seria coberta pela chave de idempotência do
+ledger. A reserva passa por `MetaService.adicionarValor`, mantendo o invariante
+`valorReservado == saldo do cofre`. **Saldo insuficiente não vira saldo negativo**: o mês fica sem
+reserva e o titular recebe aviso.
+
 ## Recorrências detectadas (`/api/v1/recorrencias/sugestoes`)
 - `GET /api/v1/recorrencias/sugestoes` — padrões encontrados no histórico que ainda aguardam decisão.
 - `POST /api/v1/recorrencias/sugestoes/{id}/confirmar` — cria a recorrência a partir do padrão,
