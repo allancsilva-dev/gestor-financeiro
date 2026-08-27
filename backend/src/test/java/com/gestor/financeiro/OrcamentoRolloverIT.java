@@ -103,13 +103,27 @@ class OrcamentoRolloverIT {
     }
 
     /**
-     * Drena até a fila esvaziar: outro teste da suíte pode ter deixado titulares no banco, e uma
-     * rodada só pegaria o job de outro usuário.
+     * Drena até o fechamento aparecer.
+     *
+     * <p>Duas razões para não parar na primeira rodada vazia: outro teste da suíte pode ter deixado
+     * titulares no banco, e o `available_at` do job é gravado com o relógio da aplicação enquanto o
+     * claim compara com o relógio do banco — alguns milissegundos de diferença fazem a primeira
+     * rodada voltar vazia sem que haja nada errado.</p>
      */
     private void drenarFila() {
         BackgroundJobWorker worker = new BackgroundJobWorker(jobs, meterRegistry, handlers, true, 1, 1, 30, 60);
-        for (int rodada = 0; rodada < 50 && worker.executarUmaRodada("worker-orcamento-it"); rodada++) {
-            // segue drenando
+        long limite = System.currentTimeMillis() + 15_000;
+        while (System.currentTimeMillis() < limite) {
+            worker.executarUmaRodada("worker-orcamento-it");
+            Integer fechados = jdbcTemplate.queryForObject(
+                    "select count(*) from orcamento_fechamentos where usuario_id = ?", Integer.class, usuario.getId());
+            if (fechados != null && fechados > 0) return;
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException interrompido) {
+                Thread.currentThread().interrupt();
+                return;
+            }
         }
     }
 

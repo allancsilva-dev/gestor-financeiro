@@ -103,6 +103,25 @@ export default function ContasFixasScreen() {
 
   const { data: categorias = [] } = useQuery({ queryKey: ['categorias'], queryFn: () => categoriaService.listar() });
 
+  // Padrões detectados no histórico. São sugestões: viram recorrência só quando o dono confirma.
+  const { data: sugestoes = [] } = useQuery({
+    queryKey: ['recorrencia-sugestoes'],
+    queryFn: () => contaFixaService.listarSugestoes(),
+  });
+
+  const confirmarSugestao = useMutation({
+    mutationFn: (id: number) => contaFixaService.confirmarSugestao(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['recorrencia-sugestoes'] });
+      queryClient.invalidateQueries({ queryKey: ['contas-fixas'] });
+    },
+  });
+
+  const descartarSugestao = useMutation({
+    mutationFn: (id: number) => contaFixaService.descartarSugestao(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['recorrencia-sugestoes'] }),
+  });
+
   const limparCriar = () => {
     setDescricaoCriar(''); setValorCriar(''); setDiaCriar(''); setCategoriaCriarId(null); setRecorrenteCriar(true);
     setTipoCriar('SAIDA'); setAutomaticaCriar(false); setCarteiraCriarId(null); setEditando(null);
@@ -243,6 +262,55 @@ export default function ContasFixasScreen() {
           keyExtractor={item => item.id.toString()}
           contentContainerStyle={{ paddingHorizontal: screenPadding, paddingBottom: tabBarSpace }}
           renderItem={renderItem}
+          ListHeaderComponent={sugestoes.length === 0 ? null : (
+            <Card radius={radius.xl} style={{ marginBottom: spacing.md }}>
+              <Text style={{ ...typography.cardTitle, color: colors.textPrimary }}>
+                Isto se repete todo mês
+              </Text>
+              <Text style={{ ...typography.meta, color: colors.textSecondary, marginTop: spacing.xxs }}>
+                Encontramos no seu histórico. Vira recorrência só se você quiser — e continua sem
+                lançar sozinho.
+              </Text>
+              {sugestoes.map(sugestao => (
+                <View
+                  key={sugestao.id}
+                  style={{
+                    paddingTop: spacing.md, marginTop: spacing.md,
+                    borderTopWidth: 1, borderTopColor: colors.border, gap: spacing.xs,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+                    <Text numberOfLines={1} style={{ ...typography.rowTitle, color: colors.textPrimary, flex: 1 }}>
+                      {sugestao.descricao}
+                    </Text>
+                    <Text style={{ ...typography.value, ...numeric, color: colors.textPrimary }}>
+                      {formatCurrency(sugestao.valorMedio)}
+                    </Text>
+                  </View>
+                  <Text style={{ ...typography.meta, color: colors.textSecondary }}>
+                    {sugestao.ocorrencias} vezes · todo dia {sugestao.diaTipico}
+                    {sugestao.categoriaNome ? ` · ${sugestao.categoriaNome}` : ''}
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                    <Botao
+                      titulo="É recorrente"
+                      tamanho="pill"
+                      onPress={() => confirmarSugestao.mutate(sugestao.id)}
+                      carregando={confirmarSugestao.isPending}
+                      accessibilityLabel={`Transformar ${sugestao.descricao} em recorrência`}
+                    />
+                    <Botao
+                      titulo="Não é"
+                      variante="texto"
+                      tamanho="pill"
+                      onPress={() => descartarSugestao.mutate(sugestao.id)}
+                      accessibilityLabel={`Descartar sugestão de ${sugestao.descricao}`}
+                    />
+                  </View>
+                </View>
+              ))}
+            </Card>
+          )}
           ListEmptyComponent={() => (
             <EstadoVazio
               emoji="🧾"

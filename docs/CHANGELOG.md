@@ -7,6 +7,28 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ---
 
+## [Fase 4 — PR-F4-14] - 2026-08-27
+
+### Detecção de recorrências e assinaturas
+- V53 cria `recorrencia_candidatas`: padrões encontrados no histórico, com o que sustenta a
+  sugestão (ocorrências, período, valor típico, dia típico) e a decisão do titular.
+- **O app sugere; quem assume compromisso é a pessoa.** Confirmar cria a recorrência com execução
+  automática **desligada** — detectar que algo aconteceu três vezes não é autorização para lançar
+  sozinho daqui em diante. Descartado não volta a ser sugerido.
+- Critério: mesma descrição normalizada e mesmo tipo, em pelo menos **três meses distintos** (duas
+  ocorrências podem ser coincidência, e três compras no mesmo mês são parcelamento, não assinatura),
+  com valor estável. O dia sugerido é a **mediana** — média empurraria o vencimento para o meio do
+  mês quando uma cobrança atrasa. Conta de luz que triplica não vira assinatura.
+- Lançamento que já nasceu de recorrência é ignorado, e a varredura tem janela e teto de linhas.
+  Roda semanalmente na fila: o padrão leva meses para mudar, varrer todo dia gastaria banco pelo
+  mesmo resultado.
+- Mobile: a tela de Recorrências abre com "Isto se repete todo mês", mostrando o que sustenta cada
+  sugestão e os dois caminhos — "É recorrente" e "Não é".
+- Validação: 393 testes unitários e 49 de integração no backend; 416 no mobile.
+- Ajuste de teste: o IT de rollover passou a esperar o trabalho da fila em vez de uma rodada só —
+  o `available_at` é gravado com o relógio da aplicação e comparado com o do banco, e a diferença
+  de milissegundos deixava a primeira rodada vazia sem nada de errado acontecer.
+
 ## [Fase 4 — PR-F4-13] - 2026-08-27
 
 ### Regras de categorização do titular

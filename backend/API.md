@@ -384,6 +384,20 @@ Respostas de erro do envio:
 - `GET /api/v1/anexos/{id}/download`
 - `DELETE /api/v1/anexos/{id}`
 
+## Recorrências detectadas (`/api/v1/recorrencias/sugestoes`)
+- `GET /api/v1/recorrencias/sugestoes` — padrões encontrados no histórico que ainda aguardam decisão.
+- `POST /api/v1/recorrencias/sugestoes/{id}/confirmar` — cria a recorrência a partir do padrão,
+  **com execução automática desligada**: detectar repetição não é autorização para o app lançar
+  sozinho. Ligar continua sendo escolha à parte.
+- `POST /api/v1/recorrencias/sugestoes/{id}/descartar` — o padrão não volta a ser sugerido.
+
+Critério da detecção: mesma descrição normalizada e mesmo tipo, em **pelo menos três meses
+distintos** (duas ocorrências podem ser coincidência; três compras no mesmo mês são parcelamento,
+não assinatura), com valor estável dentro de `app.recorrencia.variacao-maxima`. O dia sugerido é a
+**mediana**, não a média — uma cobrança atrasada não deve empurrar o vencimento para o meio do mês.
+Lançamento que já nasceu de recorrência é ignorado. A varredura roda semanalmente na fila
+(`RECURRENCE_SCAN`).
+
 ## Categorização (`/api/v1/regras-categoria`)
 - `GET /api/v1/regras-categoria` — regras ativas do titular, na ordem em que decidem
   (prioridade e, no empate, id).

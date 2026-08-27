@@ -422,6 +422,19 @@ export interface MetaProgresso {
 }
 
 // ── Orçamento ─────────────────────────────────────────────────────
+export interface RecorrenciaSugestao {
+  id: number;
+  descricao: string;
+  tipo: 'ENTRADA' | 'SAIDA';
+  valorMedio: number;
+  diaTipico: number;
+  ocorrencias: number;
+  primeiraData: string;
+  ultimaData: string;
+  categoriaId: number | null;
+  categoriaNome: string | null;
+}
+
 export type TipoCasamentoRegra = 'IGUAL' | 'COMECA_COM' | 'CONTEM';
 
 export interface RegraCategoria {

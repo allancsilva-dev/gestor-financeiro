@@ -1,5 +1,5 @@
 import api from './api';
-import { ContaFixa, ContaFixaRequest, FalhaRecorrencia, PagedResponse } from '../types';
+import { ContaFixa, ContaFixaRequest, FalhaRecorrencia, PagedResponse, RecorrenciaSugestao } from '../types';
 
 export const contaFixaService = {
   listar: () =>
@@ -28,4 +28,14 @@ export const contaFixaService = {
 
   deletar: (id: number) =>
     api.delete(`/v1/contas-fixas/${id}`),
+
+  /** Padrões de repetição detectados no histórico, aguardando decisão do titular. */
+  listarSugestoes: () =>
+    api.get<RecorrenciaSugestao[]>('/v1/recorrencias/sugestoes').then(r => r.data),
+
+  confirmarSugestao: (id: number) =>
+    api.post<ContaFixa>(`/v1/recorrencias/sugestoes/${id}/confirmar`).then(r => r.data),
+
+  descartarSugestao: (id: number) =>
+    api.post<void>(`/v1/recorrencias/sugestoes/${id}/descartar`).then(() => undefined),
 };
