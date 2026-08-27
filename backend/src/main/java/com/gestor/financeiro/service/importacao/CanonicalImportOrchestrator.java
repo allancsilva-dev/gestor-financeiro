@@ -23,6 +23,7 @@ public final class CanonicalImportOrchestrator {
     private final ImportBatchService batches;
     private final ImportConnectorRegistry connectors;
     private final ImportDeduplicationService deduplicacao;
+    private final ImportCategorizacaoService categorizacao;
     private final ImportRecordRepository records;
     private final ImportBatchRepository batchRepository;
     private final ImportLimits limits;
@@ -31,10 +32,11 @@ public final class CanonicalImportOrchestrator {
 
     public CanonicalImportOrchestrator(ImportBatchService batches, ImportConnectorRegistry connectors,
                                        ImportDeduplicationService deduplicacao,
+                                       ImportCategorizacaoService categorizacao,
                                        ImportRecordRepository records, ImportBatchRepository batchRepository,
                                        ImportLimits limits, EntityManager entityManager,
                                        PlatformTransactionManager transactionManager) {
-        this.batches = batches; this.connectors = connectors; this.deduplicacao = deduplicacao; this.records = records;
+        this.batches = batches; this.connectors = connectors; this.deduplicacao = deduplicacao; this.categorizacao = categorizacao; this.records = records;
         this.batchRepository = batchRepository; this.limits = limits; this.entityManager = entityManager;
         this.transactions = new TransactionTemplate(transactionManager);
     }
@@ -91,8 +93,10 @@ public final class CanonicalImportOrchestrator {
         batch.setTotalRecords(counts[0] + counts[1] + counts[2]); batch.setValidRecords(counts[0]);
         batch.setInvalidRecords(counts[1]); batch.setPendingReviewRecords(counts[2]);
         batchRepository.saveAndFlush(batch);
-        // Dedupe antes de encerrar o parse: quem revisa a prévia já vê o que é reenvio.
+        // Dedupe e categorização antes de encerrar o parse: quem revisa a prévia já vê o que é
+        // reenvio e em qual categoria cada linha vai cair.
         deduplicacao.marcarDuplicados(usuarioId, batchId);
+        categorizacao.categorizar(usuarioId, batchId);
         // Transição sempre pelo serviço: valida o grafo de estados e emite a métrica.
         batches.transition(usuarioId, batchId, ImportBatchStatus.PARSED, null);
     }

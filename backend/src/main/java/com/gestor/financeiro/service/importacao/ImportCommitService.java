@@ -17,6 +17,8 @@ import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.CategoriaRepository;
 import com.gestor.financeiro.repository.ImportBatchRepository;
 import com.gestor.financeiro.repository.ImportRecordRepository;
+import com.gestor.financeiro.service.RegraCategoriaService;
+import com.gestor.financeiro.service.SugestaoCategoriaService;
 import com.gestor.financeiro.service.TransacaoService;
 import com.gestor.financeiro.service.job.BackgroundJobService;
 import org.slf4j.Logger;
@@ -64,6 +66,7 @@ public class ImportCommitService {
     private final CarteiraRepository carteiras;
     private final CategoriaRepository categorias;
     private final TransacaoService transacaoService;
+    private final RegraCategoriaService regras;
     private final BackgroundJobService jobs;
     private final TransactionTemplate porRegistro;
     private final int tamanhoDoBloco;
@@ -71,6 +74,7 @@ public class ImportCommitService {
     public ImportCommitService(ImportBatchService batches, ImportBatchRepository batchRepository,
                                ImportRecordRepository records, CarteiraRepository carteiras,
                                CategoriaRepository categorias, TransacaoService transacaoService,
+                               RegraCategoriaService regras,
                                BackgroundJobService jobs, PlatformTransactionManager transactionManager,
                                @Value("${app.import.commit.chunk-size:200}") int tamanhoDoBloco) {
         this.batches = batches;
@@ -79,6 +83,7 @@ public class ImportCommitService {
         this.carteiras = carteiras;
         this.categorias = categorias;
         this.transacaoService = transacaoService;
+        this.regras = regras;
         this.jobs = jobs;
         this.porRegistro = new TransactionTemplate(transactionManager);
         this.porRegistro.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -107,6 +112,16 @@ public class ImportCommitService {
     /** Aprova uma linha que a revisão decidiu trazer, opcionalmente com categoria. */
     @Transactional
     public ImportRecord aprovar(Long usuarioId, Long batchId, Long registroId, Long categoriaId) {
+        return aprovar(usuarioId, batchId, registroId, categoriaId, false);
+    }
+
+    /**
+     * Aprova a linha e, quando o titular pede, guarda a escolha como regra para as próximas
+     * importações — a partir da descrição desta linha, casamento exato.
+     */
+    @Transactional
+    public ImportRecord aprovar(Long usuarioId, Long batchId, Long registroId, Long categoriaId,
+                                boolean criarRegra) {
         ImportBatch batch = batches.get(usuarioId, batchId);
         if (batch.getStatus() == ImportBatchStatus.COMMITTING
                 || batch.getStatus() == ImportBatchStatus.COMMITTED
@@ -128,7 +143,14 @@ public class ImportCommitService {
             record.setCategoria(categoria);
         }
         record.setStatus(ImportRecordStatus.APPROVED);
-        return records.save(record);
+        ImportRecord salvo = records.save(record);
+
+        if (criarRegra && categoriaId != null && record.getNormalizedDescription() != null) {
+            regras.criar(usuarioId, SugestaoCategoriaService.normalizar(record.getNormalizedDescription()),
+                    com.gestor.financeiro.model.enums.TipoCasamentoRegra.IGUAL, record.getDirection(),
+                    categoriaId, 50);
+        }
+        return salvo;
     }
 
     /** Enfileira o lançamento: trabalho longo não roda na thread do request. */

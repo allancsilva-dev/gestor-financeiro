@@ -422,6 +422,19 @@ export interface MetaProgresso {
 }
 
 // ── Orçamento ─────────────────────────────────────────────────────
+export type TipoCasamentoRegra = 'IGUAL' | 'COMECA_COM' | 'CONTEM';
+
+export interface RegraCategoria {
+  id: number;
+  padrao: string;
+  tipoCasamento: TipoCasamentoRegra;
+  tipoTransacao: 'ENTRADA' | 'SAIDA' | null;
+  categoriaId: number;
+  categoriaNome: string;
+  categoriaIcone: string | null;
+  prioridade: number;
+}
+
 export type PoliticaRollover = 'NONE' | 'SURPLUS_ONLY' | 'DEFICIT_ONLY' | 'BOTH';
 
 export interface OrcamentoCategoriaItem {
@@ -617,6 +630,8 @@ export interface ImportRecord {
   status: ImportRecordStatus;
   reasonCode?: string | null;
   transacaoId?: number | null;
+  categoriaId?: number | null;
+  categoriaNome?: string | null;
 }
 
 export interface ImportRecordPage {

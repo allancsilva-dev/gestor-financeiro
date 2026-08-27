@@ -459,6 +459,11 @@ function LinhaDoExtrato({
         <Text style={{ ...typography.meta, color: colors.textMuted }}>
           {registro.occurredOn ? formatDateOnlyBR(registro.occurredOn) : 'sem data'}
         </Text>
+        {registro.categoriaNome ? (
+          <Text style={{ ...typography.meta, color: colors.textSecondary }}>
+            {registro.categoriaNome}
+          </Text>
+        ) : null}
         {registro.status === 'DUPLICATE' && <Badge tone="warning">Já importado antes</Badge>}
         {registro.reasonCode && (
           <Text style={{ ...typography.meta, color: colors.warning }}>

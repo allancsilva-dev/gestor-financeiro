@@ -9,7 +9,11 @@ import com.gestor.financeiro.model.enums.ImportFormat;
 import com.gestor.financeiro.model.enums.ImportRecordStatus;
 import com.gestor.financeiro.repository.ImportBatchRepository;
 import com.gestor.financeiro.repository.ImportRecordRepository;
+import com.gestor.financeiro.model.Categoria;
+import com.gestor.financeiro.model.enums.TipoCasamentoRegra;
+import com.gestor.financeiro.repository.CategoriaRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
+import com.gestor.financeiro.service.RegraCategoriaService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,6 +41,9 @@ class CanonicalImportOrchestratorTest {
     @Autowired ImportBatchService batches;
     @Autowired CanonicalNormalizer normalizer;
     @Autowired ImportDeduplicationService deduplicacao;
+    @Autowired ImportCategorizacaoService categorizacao;
+    @Autowired RegraCategoriaService regras;
+    @Autowired CategoriaRepository categorias;
     @Autowired ImportRecordRepository records;
     @Autowired ImportBatchRepository batchRepository;
     @Autowired UsuarioRepository usuarioRepository;
@@ -59,6 +66,9 @@ class CanonicalImportOrchestratorTest {
         // travar o delete de usuários de outros testes por integridade referencial.
         records.deleteAll();
         batchRepository.deleteAll();
+        // Regra e categoria referenciam o titular: saem antes dele, na ordem das FKs.
+        regras.listar(usuario.getId()).forEach(regra -> regras.remover(usuario.getId(), regra.getId()));
+        categorias.deleteAll(categorias.findByUsuarioId(usuario.getId()));
         usuarioRepository.deleteById(usuario.getId());
     }
 
@@ -68,7 +78,7 @@ class CanonicalImportOrchestratorTest {
         // Registry proprio: os conectores precisam enxergar os mesmos limites do orquestrador.
         ImportConnectorRegistry registry = new ImportConnectorRegistry(List.of(
                 new CsvImportConnector(limits, normalizer), new OfxImportConnector(limits, normalizer)));
-        return new CanonicalImportOrchestrator(batches, registry, deduplicacao, records, batchRepository, limits,
+        return new CanonicalImportOrchestrator(batches, registry, deduplicacao, categorizacao, records, batchRepository, limits,
                 entityManager, transactionManager);
     }
 
@@ -175,6 +185,25 @@ class CanonicalImportOrchestratorTest {
         ImportBatch batch = batchDoUsuario();
         assertEquals(ImportBatchStatus.FAILED, batch.getStatus());
         assertEquals(ImportFailureCode.DETECTION_FAILED.name(), batch.getFailureCode());
+    }
+
+    @Test
+    void regraDoTitularJaCategorizaAsLinhasNaPrevia() throws Exception {
+        Categoria mercado = categorias.save(TestDataFactory.categoria(usuario, "Mercado"));
+        regras.criar(usuario.getId(), "mercado", TipoCasamentoRegra.CONTEM, null, mercado.getId(), null);
+
+        String csv = String.join("\n",
+                "data,descricao,valor,moeda,tipo",
+                "2026-08-20,Mercado Centro,-12.34,BRL,SAIDA",
+                "2026-08-21,Farmacia,-40.00,BRL,SAIDA") + "\n";
+
+        ImportBatch batch = orchestrator(1000, 250, 10_485_760L)
+                .stage(usuario.getId(), MemorySource.of(csv), "orq:regra");
+
+        var registros = recordsOf(batch.getId());
+        var comCategoria = registros.stream().filter(r -> r.getCategoria() != null).toList();
+        assertEquals(1, comCategoria.size(), "só a linha que casa com a regra é categorizada");
+        assertEquals(mercado.getId(), comCategoria.get(0).getCategoria().getId());
     }
 
     /** Fonte reabrivel em memoria: o orquestrador le o conteudo mais de uma vez. */

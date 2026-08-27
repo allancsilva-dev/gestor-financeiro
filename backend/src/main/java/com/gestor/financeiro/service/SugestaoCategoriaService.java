@@ -17,7 +17,8 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Sugestao deterministica de categoria (PR-F3-02). Prioridade: ultima
+ * Sugestao deterministica de categoria (PR-F3-02, ampliada na Fase 4). Prioridade: regra do
+ * titular; depois ultima
  * transacao do mesmo tipo com descricao normalizada igual; depois categoria
  * mais usada nos ultimos 90 dias para o mesmo tipo, empate por menor ID.
  * Read-only: nao cria categoria nem altera lancamento.
@@ -33,19 +34,23 @@ public class SugestaoCategoriaService {
     static final int JANELA_DESCRICAO = 300;
     static final int DIAS_FREQUENCIA = 90;
 
+    public static final String CRITERIO_REGRA_DO_TITULAR = "REGRA_DO_TITULAR";
     public static final String CRITERIO_DESCRICAO_IGUAL = "DESCRICAO_IGUAL";
     public static final String CRITERIO_MAIS_USADA_90_DIAS = "MAIS_USADA_90_DIAS";
     public static final String CRITERIO_NENHUMA = "NENHUMA";
 
     private final TransacaoRepository transacaoRepository;
     private final CategoriaRepository categoriaRepository;
+    private final RegraCategoriaService regras;
     private final Clock clock;
 
     public SugestaoCategoriaService(TransacaoRepository transacaoRepository,
                                     CategoriaRepository categoriaRepository,
+                                    RegraCategoriaService regras,
                                     Clock clock) {
         this.transacaoRepository = transacaoRepository;
         this.categoriaRepository = categoriaRepository;
+        this.regras = regras;
         this.clock = clock;
     }
 
@@ -56,6 +61,13 @@ public class SugestaoCategoriaService {
         }
         if (tipo == null) {
             throw new BusinessException("Tipo é obrigatório");
+        }
+
+        // Regra escrita pelo titular ganha da heuristica: ele ja disse o que quer.
+        var porRegra = regras.aplicar(usuarioId, descricao, tipo);
+        if (porRegra.isPresent()) {
+            return new SugestaoCategoriaResponse(CRITERIO_REGRA_DO_TITULAR,
+                    CategoriaResumoDto.fromEntity(porRegra.get()));
         }
 
         String alvo = normalizar(descricao);

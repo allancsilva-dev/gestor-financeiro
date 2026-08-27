@@ -7,6 +7,31 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ---
 
+## [Fase 4 — PR-F4-13] - 2026-08-27
+
+### Regras de categorização do titular
+- V52 cria `regras_categoria`: padrão normalizado, tipo de casamento (`IGUAL`, `COMECA_COM`,
+  `CONTEM`), escopo opcional por tipo de transação, prioridade e categoria de destino.
+- **Sem expressão regular, por decisão de segurança.** Regex escrita pelo titular rodaria no request
+  e no worker, Java não tem engine com garantia de tempo linear, e uma regra infeliz viraria negação
+  de serviço com um lançamento comum. Há teto de regras por titular e padrão mínimo de dois
+  caracteres — padrão de um caractere casaria com quase tudo.
+- A regra decide **antes** das heurísticas de sugestão (critério `REGRA_DO_TITULAR`): quem já disse
+  que "mercado da esquina" é Alimentação não repete a cada lançamento.
+- A importação deixou de ignorar categoria: as regras são aplicadas às linhas do lote **na prévia**,
+  então o usuário vê onde cada linha vai cair antes de confirmar. Linha que nenhuma regra alcança
+  segue sem categoria — o pipeline não chuta. As regras são carregadas uma vez por lote, não por
+  linha.
+- Aprender é explícito: `aprovar` aceita `criarRegra`. Transformar toda correção em regra
+  automaticamente encheria a lista de regras que o usuário não pediu e mudaria a categorização
+  futura sem ele saber.
+- Mobile ganha a tela "Categorizar sozinho", que explica cada regra em português ("Quando a descrição
+  tiver 'mercado da esquina'") e avisa, ao apagar, que o que já foi lançado não muda.
+- O guardião de LGPD apontou `regras_categoria` fora do manifesto de exclusão; entrou antes de
+  categorias, que ela referencia.
+- Validação: 383 testes unitários e 49 de integração no backend; 412 no mobile, lint e typecheck
+  limpos.
+
 ## [Fase 4 — PR-F4-12] - 2026-08-27
 
 ### Rollover de orçamento

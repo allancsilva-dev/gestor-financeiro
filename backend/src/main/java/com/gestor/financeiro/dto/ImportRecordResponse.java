@@ -17,7 +17,10 @@ public record ImportRecordResponse(
         String direction,
         String status,
         String reasonCode,
-        Long transacaoId
+        Long transacaoId,
+        /** Categoria aplicada por regra do titular ou escolhida na revisão. */
+        Long categoriaId,
+        String categoriaNome
 ) {
     public static ImportRecordResponse de(ImportRecord record) {
         return new ImportRecordResponse(
@@ -31,6 +34,8 @@ public record ImportRecordResponse(
                 record.getDirection() == null ? null : record.getDirection().name(),
                 record.getStatus().name(),
                 record.getReasonCode(),
-                record.getTransacao() == null ? null : record.getTransacao().getId());
+                record.getTransacao() == null ? null : record.getTransacao().getId(),
+                record.getCategoria() == null ? null : record.getCategoria().getId(),
+                record.getCategoria() == null ? null : record.getCategoria().getNome());
     }
 }

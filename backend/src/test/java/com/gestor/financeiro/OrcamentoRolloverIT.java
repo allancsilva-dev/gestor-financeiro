@@ -92,6 +92,27 @@ class OrcamentoRolloverIT {
         categoria = categorias.save(TestDataFactory.categoria(usuario, "Mercado"));
     }
 
+    /** O agendador enfileira para todo titular do banco; aqui só interessa o meu. */
+    private String chaveDoTitular() {
+        return "BUDGET_CLOSE:" + usuario.getId() + ":" + competenciaAnterior();
+    }
+
+    private int jobsDoTitular() {
+        return jdbcTemplate.queryForObject("select count(*) from background_jobs where job_key = ?",
+                Integer.class, chaveDoTitular());
+    }
+
+    /**
+     * Drena até a fila esvaziar: outro teste da suíte pode ter deixado titulares no banco, e uma
+     * rodada só pegaria o job de outro usuário.
+     */
+    private void drenarFila() {
+        BackgroundJobWorker worker = new BackgroundJobWorker(jobs, meterRegistry, handlers, true, 1, 1, 30, 60);
+        for (int rodada = 0; rodada < 50 && worker.executarUmaRodada("worker-orcamento-it"); rodada++) {
+            // segue drenando
+        }
+    }
+
     private YearMonth competenciaAnterior() {
         return YearMonth.from(LocalDate.now()).minusMonths(1);
     }
@@ -114,17 +135,15 @@ class OrcamentoRolloverIT {
         YearMonth anterior = competenciaAnterior();
         limite(anterior, "800.00", "SURPLUS_ONLY");
 
-        assertEquals(1, scheduler.enfileirarCompetenciaAnterior());
-        // Cron roda todo dia: enfileirar de novo não pode fechar duas vezes.
-        assertEquals(1, scheduler.enfileirarCompetenciaAnterior());
-        assertEquals(1, (int) jdbcTemplate.queryForObject(
-                "select count(*) from background_jobs where job_type = 'BUDGET_CLOSE'", Integer.class));
+        scheduler.enfileirarCompetenciaAnterior();
+        // Cron roda todo dia: enfileirar de novo não pode gerar um segundo job da mesma competência.
+        scheduler.enfileirarCompetenciaAnterior();
+        assertEquals(1, jobsDoTitular(), "job_key determinística por titular e competência");
 
-        BackgroundJobWorker worker = new BackgroundJobWorker(jobs, meterRegistry, handlers, true, 1, 1, 30, 60);
-        assertTrue(worker.executarUmaRodada("worker-orcamento-it"));
+        drenarFila();
 
         assertEquals("COMPLETED", jdbcTemplate.queryForObject(
-                "select status from background_jobs where job_type = 'BUDGET_CLOSE'", String.class));
+                "select status from background_jobs where job_key = ?", String.class, chaveDoTitular()));
         assertEquals(1, (int) jdbcTemplate.queryForObject(
                 "select count(*) from orcamento_fechamentos where usuario_id = ?", Integer.class, usuario.getId()));
         assertEquals(0, new BigDecimal("800.00").compareTo(jdbcTemplate.queryForObject(
@@ -137,8 +156,9 @@ class OrcamentoRolloverIT {
         YearMonth anterior = competenciaAnterior();
         limite(anterior, "800.00", "BOTH");
         scheduler.enfileirarCompetenciaAnterior();
-        new BackgroundJobWorker(jobs, meterRegistry, handlers, true, 1, 1, 30, 60)
-                .executarUmaRodada("worker-orcamento-it");
+        drenarFila();
+        assertEquals(1, (int) jdbcTemplate.queryForObject(
+                "select count(*) from orcamento_fechamentos where usuario_id = ?", Integer.class, usuario.getId()));
 
         // resultado precisa ser base + carry_in - gasto; qualquer outro número é conta errada.
         assertThrows(DataIntegrityViolationException.class, () -> jdbcTemplate.update(

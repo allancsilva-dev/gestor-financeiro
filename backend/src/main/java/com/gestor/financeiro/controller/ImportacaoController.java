@@ -122,8 +122,9 @@ public class ImportacaoController {
             @RequestBody(required = false) AprovarRegistroImportacaoRequest request) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Long categoriaId = request == null ? null : request.categoriaId();
+        boolean criarRegra = request != null && Boolean.TRUE.equals(request.criarRegra());
         return ResponseEntity.ok(ImportRecordResponse.de(
-                commitService.aprovar(usuarioId, id, registroId, categoriaId)));
+                commitService.aprovar(usuarioId, id, registroId, categoriaId, criarRegra)));
     }
 
     @PostMapping("/{id}/commit")

@@ -42,6 +42,7 @@ const FERRAMENTAS: Array<{
   { label: 'Carteira', sub: 'Cartões e faturas', rota: '/more/faturas', icone: '💳' },
   { label: 'Relatórios', sub: 'Gráficos', rota: '/analises', icone: '📈' },
   { label: 'Categorias', sub: 'Organizar', rota: '/more/categorias', icone: '🏷' },
+  { label: 'Categorizar sozinho', sub: 'Regras suas', rota: '/more/regras-categoria', icone: '🪄' },
   { label: 'Investimentos', sub: 'Posições', rota: '/more/investimentos', icone: '📦' },
   { label: 'Entrada por IA', sub: 'Lançar conversando', rota: null, icone: '🤖', desabilitado: true },
 ];

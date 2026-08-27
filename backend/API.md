@@ -384,6 +384,25 @@ Respostas de erro do envio:
 - `GET /api/v1/anexos/{id}/download`
 - `DELETE /api/v1/anexos/{id}`
 
+## Categorização (`/api/v1/regras-categoria`)
+- `GET /api/v1/regras-categoria` — regras ativas do titular, na ordem em que decidem
+  (prioridade e, no empate, id).
+- `POST /api/v1/regras-categoria` — corpo `{ "padrao": "mercado", "tipoCasamento": "CONTEM",
+  "tipoTransacao": "SAIDA", "categoriaId": 3, "prioridade": 100 }`. `tipoCasamento` aceita `IGUAL`,
+  `COMECA_COM` e `CONTEM`; ausente vale `CONTEM`. `tipoTransacao` ausente vale para entrada e saída.
+  Mesmo padrão no mesmo escopo **atualiza** o destino em vez de duplicar.
+- `DELETE /api/v1/regras-categoria/{id}`.
+
+**Não existe casamento por expressão regular** — decisão de segurança: regex vinda do titular roda
+no request e no worker, Java não tem engine com garantia de tempo linear, e uma regra infeliz viraria
+negação de serviço. Há teto de regras por titular (`app.categorizacao.max-regras`) e padrão mínimo
+de dois caracteres.
+
+A regra do titular decide **antes** das heurísticas de `GET /api/v1/transacoes/sugestao-categoria`
+(critério `REGRA_DO_TITULAR`) e é aplicada às linhas do lote de importação ainda na prévia — o
+usuário vê a categoria antes de confirmar. `POST /api/v1/importacoes/{id}/registros/{id}/aprovar`
+aceita `{"criarRegra": true}` para transformar aquela escolha em regra.
+
 ## Notificações (`/api/v1/notificacoes`)
 - `GET /api/v1/notificacoes` — caixa do titular (`Page`, `size<=50`), não lidas primeiro.
 - `GET /api/v1/notificacoes/nao-lidas/contagem` — alimenta o badge do sino.

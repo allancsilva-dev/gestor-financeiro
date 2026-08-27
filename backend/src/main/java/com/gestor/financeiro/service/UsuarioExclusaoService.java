@@ -71,6 +71,9 @@ public class UsuarioExclusaoService {
         new DeleteTitular("contas_fixas",
             "DELETE FROM ContaFixa cf WHERE cf.usuario.id = :id"),
         // Antes dos orcamentos e das categorias: o fechamento referencia as duas pontas.
+        // Regra referencia categoria e titular: sai antes das duas.
+        new DeleteTitular("regras_categoria",
+            "DELETE FROM RegraCategoria rc WHERE rc.usuario.id = :id"),
         new DeleteTitular("orcamento_fechamentos",
             "DELETE FROM OrcamentoFechamento of WHERE of.usuario.id = :id"),
         new DeleteTitular("orcamentos_categorias",
