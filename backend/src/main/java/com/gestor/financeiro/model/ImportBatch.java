@@ -30,6 +30,11 @@ public class ImportBatch {
     @JoinColumn(name = "carteira_id")
     private Carteira carteira;
 
+    /** Cartão de destino quando o lote é uma fatura. Exclusivo com {@link #carteira} (V55). */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "conta_id")
+    private Conta conta;
+
     @Column(name = "institution_code", length = 80)
     private String institutionCode;
 

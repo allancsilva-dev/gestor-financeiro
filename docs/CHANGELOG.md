@@ -7,6 +7,24 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ---
 
+## [Fase 4 — PR-F4-16] - 2026-08-27
+
+### Importação de fatura de cartão
+- O lote passa a aceitar **cartão** como destino, além de conta de caixa: `preparar` recebe
+  `contaFinanceiraId` **ou** `cartaoId`, nunca os dois. V55 acrescenta `conta_id` e o CHECK que
+  garante destino único — extrato e fatura são histórias diferentes, e misturá-las duplicaria o
+  lançamento.
+- Nenhuma regra de fatura foi reimplementada: com cartão no destino, a linha entra por
+  `TransacaoService` no caminho de compra no cartão, que registra o lançamento de fatura e espelha o
+  passivo. Compra no cartão **não sai do caixa** — o dinheiro só sai no pagamento da fatura, e o
+  teste fixa isso.
+- Linha de **entrada** em lote de fatura é recusada com motivo: estorno nasce do cancelamento da
+  compra original, não de uma linha solta do arquivo.
+- A reversão de lote continua valendo: cancelar a transação já aciona o cancelamento da compra no
+  cartão, removendo lançamento de fatura aberta ou compensando fatura paga.
+- Mobile: o destino da importação virou "Onde isto entra?", com contas e cartões lado a lado.
+- Validação: 404 testes unitários e 49 de integração no backend; 419 no mobile.
+
 ## [Fase 4 — PR-F4-15] - 2026-08-27
 
 ### Aporte automático de metas

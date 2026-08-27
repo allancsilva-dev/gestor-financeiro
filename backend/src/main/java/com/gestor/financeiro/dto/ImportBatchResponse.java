@@ -17,6 +17,9 @@ public record ImportBatchResponse(
         int pendingReviewRecords,
         int duplicateRecords,
         String failureCode,
+        /** Destino escolhido: conta de caixa (extrato) ou cartão (fatura). */
+        Long contaFinanceiraId,
+        Long cartaoId,
         Instant createdAt,
         Instant updatedAt
 ) {
@@ -33,6 +36,8 @@ public record ImportBatchResponse(
                 batch.getPendingReviewRecords(),
                 batch.getDuplicateRecords(),
                 batch.getFailureCode(),
+                batch.getCarteira() == null ? null : batch.getCarteira().getId(),
+                batch.getConta() == null ? null : batch.getConta().getId(),
                 batch.getCreatedAt(),
                 batch.getUpdatedAt());
     }

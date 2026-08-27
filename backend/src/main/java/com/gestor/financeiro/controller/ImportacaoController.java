@@ -22,7 +22,6 @@ import com.gestor.financeiro.service.importacao.TempFileImportSource;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
@@ -108,10 +107,10 @@ public class ImportacaoController {
     @PostMapping("/{id}/preparar")
     @Operation(summary = "Definir a conta de destino e liberar o lote para lançamento")
     public ResponseEntity<ImportBatchResponse> preparar(@PathVariable Long id,
-                                                        @Valid @RequestBody PrepararImportacaoRequest request) {
+                                                        @RequestBody PrepararImportacaoRequest request) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         return ResponseEntity.ok(ImportBatchResponse.de(
-                commitService.preparar(usuarioId, id, request.contaFinanceiraId())));
+                commitService.preparar(usuarioId, id, request.contaFinanceiraId(), request.cartaoId())));
     }
 
     @PostMapping("/{id}/registros/{registroId}/aprovar")

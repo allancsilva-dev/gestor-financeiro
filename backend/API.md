@@ -344,9 +344,12 @@ mês fechado guarda a política e a versão da regra que valiam na hora e não �
 - `GET /api/v1/importacoes` — histórico do titular (`Page`, `size<=100`), do mais recente para o
   mais antigo.
 - `GET /api/v1/importacoes/{id}` — situação do lote do titular; `404` para lote de outro titular.
-- `POST /api/v1/importacoes/{id}/preparar` — corpo `{ "contaFinanceiraId": 1 }`. Define a conta de
-  destino e leva o lote a `READY_TO_COMMIT`. Conta de cartão é recusada (`422`): compra de cartão
-  nasce na fatura, não como movimento de caixa.
+- `POST /api/v1/importacoes/{id}/preparar` — corpo `{ "contaFinanceiraId": 1 }` **ou**
+  `{ "cartaoId": 4 }`, nunca os dois. Conta de caixa importa extrato (movimento no ledger); cartão
+  importa fatura (cada linha vira lançamento de fatura, e o dinheiro só sai do caixa no pagamento).
+  A conta passiva do cartão é recusada: para fatura, escolha o cartão. Em lote de fatura, linha de
+  **entrada** é recusada (`INVALID`) — estorno nasce do cancelamento da compra, não de uma linha
+  solta do arquivo.
 - `POST /api/v1/importacoes/{id}/registros/{registroId}/aprovar` — corpo opcional
   `{ "categoriaId": 3 }`. Traz para o lançamento uma linha em revisão ou marcada como duplicada.
 - `POST /api/v1/importacoes/{id}/commit` — `202`; o lançamento vai para a fila durável e o cliente

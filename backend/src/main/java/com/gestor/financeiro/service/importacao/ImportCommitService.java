@@ -3,6 +3,7 @@ package com.gestor.financeiro.service.importacao;
 import com.gestor.financeiro.exception.BusinessException;
 import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.model.Carteira;
+import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.model.ImportBatch;
 import com.gestor.financeiro.model.ImportRecord;
@@ -12,8 +13,10 @@ import com.gestor.financeiro.model.enums.ImportFailureCode;
 import com.gestor.financeiro.model.enums.ImportRecordReasonCode;
 import com.gestor.financeiro.model.enums.ImportRecordStatus;
 import com.gestor.financeiro.model.enums.StatusPagamento;
+import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.model.enums.SubtipoContaFinanceira;
 import com.gestor.financeiro.repository.CarteiraRepository;
+import com.gestor.financeiro.repository.ContaRepository;
 import com.gestor.financeiro.repository.CategoriaRepository;
 import com.gestor.financeiro.repository.ImportBatchRepository;
 import com.gestor.financeiro.repository.ImportRecordRepository;
@@ -64,6 +67,7 @@ public class ImportCommitService {
     private final ImportBatchRepository batchRepository;
     private final ImportRecordRepository records;
     private final CarteiraRepository carteiras;
+    private final ContaRepository cartoes;
     private final CategoriaRepository categorias;
     private final TransacaoService transacaoService;
     private final RegraCategoriaService regras;
@@ -73,6 +77,7 @@ public class ImportCommitService {
 
     public ImportCommitService(ImportBatchService batches, ImportBatchRepository batchRepository,
                                ImportRecordRepository records, CarteiraRepository carteiras,
+                               ContaRepository cartoes,
                                CategoriaRepository categorias, TransacaoService transacaoService,
                                RegraCategoriaService regras,
                                BackgroundJobService jobs, PlatformTransactionManager transactionManager,
@@ -81,6 +86,7 @@ public class ImportCommitService {
         this.batchRepository = batchRepository;
         this.records = records;
         this.carteiras = carteiras;
+        this.cartoes = cartoes;
         this.categorias = categorias;
         this.transacaoService = transacaoService;
         this.regras = regras;
@@ -93,14 +99,36 @@ public class ImportCommitService {
     /** Define a conta de destino e libera o lote para lançamento. */
     @Transactional
     public ImportBatch preparar(Long usuarioId, Long batchId, Long contaFinanceiraId) {
+        return preparar(usuarioId, batchId, contaFinanceiraId, null);
+    }
+
+    /**
+     * Define o destino do lote: conta de caixa (extrato) ou cartão (fatura). Um ou outro, nunca os
+     * dois — compra de cartão nasce na fatura e movimento de caixa nasce no ledger (ADR-0009), e o
+     * arquivo pertence a uma dessas duas histórias.
+     */
+    @Transactional
+    public ImportBatch preparar(Long usuarioId, Long batchId, Long contaFinanceiraId, Long cartaoId) {
         ImportBatch batch = batches.get(usuarioId, batchId);
-        Carteira conta = carteiras.findByIdAndUsuarioId(contaFinanceiraId, usuarioId)
-                .orElseThrow(() -> new ResourceNotFoundException("Conta financeira não encontrada"));
-        if (conta.getSubtipo() == SubtipoContaFinanceira.CARTAO) {
-            // Compra de cartão nasce na fatura, não como movimento de caixa (ADR-0009).
-            throw new BusinessException("Importação para conta de cartão ainda não é suportada");
+        if ((contaFinanceiraId == null) == (cartaoId == null)) {
+            throw new BusinessException("Escolha uma conta de caixa ou um cartão como destino");
         }
-        batch.setCarteira(conta);
+
+        if (cartaoId != null) {
+            Conta cartao = cartoes.findByIdAndUsuarioId(cartaoId, usuarioId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Cartão não encontrado"));
+            batch.setConta(cartao);
+            batch.setCarteira(null);
+        } else {
+            Carteira conta = carteiras.findByIdAndUsuarioId(contaFinanceiraId, usuarioId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Conta financeira não encontrada"));
+            if (conta.getSubtipo() == SubtipoContaFinanceira.CARTAO) {
+                // A conta passiva do cartão é espelho contábil; a fatura entra pelo cartão.
+                throw new BusinessException("Para importar fatura, escolha o cartão, não a conta passiva");
+            }
+            batch.setCarteira(conta);
+            batch.setConta(null);
+        }
         batchRepository.save(batch);
         if (batch.getStatus() == ImportBatchStatus.PARSED
                 || batch.getStatus() == ImportBatchStatus.PENDING_REVIEW) {
@@ -157,8 +185,8 @@ public class ImportCommitService {
     @Transactional
     public ImportBatch solicitarCommit(Long usuarioId, Long batchId) {
         ImportBatch batch = batches.get(usuarioId, batchId);
-        if (batch.getCarteira() == null) {
-            throw new BusinessException("Defina a conta de destino antes de lançar");
+        if (batch.getCarteira() == null && batch.getConta() == null) {
+            throw new BusinessException("Defina o destino antes de lançar");
         }
         if (batch.getStatus() == ImportBatchStatus.COMMITTING) {
             return batch; // Pedido repetido: o job já está na fila.
@@ -181,9 +209,10 @@ public class ImportCommitService {
             throw new BusinessException("Lote não está em lançamento");
         }
         Long carteiraId = batch.getCarteira() == null ? null : batch.getCarteira().getId();
-        if (carteiraId == null) {
+        Long cartaoId = batch.getConta() == null ? null : batch.getConta().getId();
+        if (carteiraId == null && cartaoId == null) {
             batches.transition(usuarioId, batchId, ImportBatchStatus.FAILED, ImportFailureCode.COMMIT_FAILED);
-            throw new BusinessException("Lote sem conta de destino");
+            throw new BusinessException("Lote sem destino");
         }
 
         int cursor = 0;
@@ -195,7 +224,7 @@ public class ImportCommitService {
             if (bloco.isEmpty()) break;
             for (ImportRecord record : bloco) {
                 cursor = record.getSourceLine();
-                if (lancarRegistro(usuarioId, batchId, carteiraId, record.getId())) {
+                if (lancarRegistro(usuarioId, batchId, carteiraId, cartaoId, record.getId())) {
                     lancados++;
                 } else {
                     falhas++;
@@ -208,7 +237,8 @@ public class ImportCommitService {
     }
 
     /** Uma transação por linha: falha isolada não derruba o lote nem prende conexão. */
-    private boolean lancarRegistro(Long usuarioId, Long batchId, Long carteiraId, Long registroId) {
+    private boolean lancarRegistro(Long usuarioId, Long batchId, Long carteiraId, Long cartaoId,
+                                   Long registroId) {
         try {
             return Boolean.TRUE.equals(porRegistro.execute(status -> {
                 ImportRecord record = records.findById(registroId).orElseThrow();
@@ -218,13 +248,26 @@ public class ImportCommitService {
                     return false;
                 }
 
+                if (cartaoId != null && record.getDirection() != TipoTransacao.SAIDA) {
+                    // Entrada em fatura é estorno, e estorno nasce do cancelamento da compra
+                    // original — não de uma linha solta do arquivo.
+                    marcarFalha(record, ImportRecordReasonCode.COMMIT_FAILED);
+                    return false;
+                }
+
                 Transacao transacao = new Transacao();
                 transacao.setDescricao(record.getNormalizedDescription());
                 transacao.setValorTotal(record.getAmount());
                 transacao.setData(record.getOccurredOn());
                 transacao.setTipo(record.getDirection());
                 transacao.setStatus(StatusPagamento.PAGO);
-                transacao.setCarteira(carteiras.getReferenceById(carteiraId));
+                if (cartaoId != null) {
+                    // Conta preenchida + SAIDA é o caminho de compra no cartão: TransacaoService
+                    // registra a fatura e espelha o passivo, sem duplicar regra aqui.
+                    transacao.setConta(cartoes.getReferenceById(cartaoId));
+                } else {
+                    transacao.setCarteira(carteiras.getReferenceById(carteiraId));
+                }
                 if (record.getCategoria() != null) {
                     transacao.setCategoria(record.getCategoria());
                 }

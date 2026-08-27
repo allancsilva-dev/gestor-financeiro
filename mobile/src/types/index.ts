@@ -631,6 +631,9 @@ export interface ImportBatch {
   pendingReviewRecords: number;
   duplicateRecords: number;
   failureCode?: string | null;
+  /** Destino escolhido: conta de caixa (extrato) ou cartão (fatura). */
+  contaFinanceiraId?: number | null;
+  cartaoId?: number | null;
   createdAt: string;
   updatedAt: string;
 }

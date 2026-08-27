@@ -1,7 +1,8 @@
 package com.gestor.financeiro.dto;
 
-import jakarta.validation.constraints.NotNull;
-
-/** Conta financeira de destino do lote. Sem ela não existe lançamento. */
-public record PrepararImportacaoRequest(@NotNull Long contaFinanceiraId) {
+/**
+ * Destino do lote: conta de caixa (extrato) ou cartão (fatura). Exatamente um dos dois — o arquivo
+ * pertence a uma dessas duas histórias, e misturá-las duplicaria o lançamento.
+ */
+public record PrepararImportacaoRequest(Long contaFinanceiraId, Long cartaoId) {
 }

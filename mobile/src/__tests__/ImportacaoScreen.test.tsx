@@ -39,9 +39,15 @@ jest.mock('../services/contaFinanceiraService', () => ({
   default: { listarParaCaixa: jest.fn() },
 }));
 
+jest.mock('../services/cartaoService', () => ({
+  __esModule: true,
+  default: { listarTodos: jest.fn() },
+}));
+
 const servico = importacaoService as jest.Mocked<typeof importacaoService>;
 const contas = contaFinanceiraService as unknown as { listarParaCaixa: jest.Mock };
 const picker = DocumentPicker as unknown as { getDocumentAsync: jest.Mock };
+const cartoes = jest.requireMock('../services/cartaoService').default as { listarTodos: jest.Mock };
 
 const lote = (over: Partial<ImportBatch> = {}): ImportBatch => ({
   id: 10,
@@ -91,6 +97,7 @@ beforeEach(() => {
   contas.listarParaCaixa.mockResolvedValue([
     { id: 7, nome: 'Conta corrente', natureza: 'ATIVO', subtipo: 'CORRENTE', liquidez: 'IMEDIATA', moeda: 'BRL', saldo: 100, origemDados: 'MANUAL', estadoConciliacao: 'CONCILIADA' },
   ]);
+  cartoes.listarTodos.mockResolvedValue([{ id: 4, nome: 'Nubank', limite: 1000, diaFechamento: 20, diaVencimento: 27 }]);
   servico.historico.mockResolvedValue({ content: [], totalElements: 0, totalPages: 0, size: 5, number: 0 } as any);
   servico.registros.mockResolvedValue({ registros: [registro()], proximaLinha: null });
   picker.getDocumentAsync.mockResolvedValue({
@@ -115,7 +122,7 @@ describe('tela de importação', () => {
     await escolherArquivo();
 
     expect(await screen.findByText('3 linhas lidas')).toBeTruthy();
-    expect(screen.getByText('Em qual conta entra?')).toBeTruthy();
+    expect(screen.getByText('Onde isto entra?')).toBeTruthy();
     expect(servico.lancar).not.toHaveBeenCalled();
   });
 
@@ -132,10 +139,23 @@ describe('tela de importação', () => {
     expect(botaoLancar.props.accessibilityState?.disabled).toBe(true);
 
     fireEvent.press(await screen.findByText('Conta corrente'));
-    await waitFor(() => expect(servico.preparar).toHaveBeenCalledWith(10, 7));
+    await waitFor(() => expect(servico.preparar).toHaveBeenCalledWith(10, { contaFinanceiraId: 7 }));
 
     fireEvent.press(screen.getByTestId('importacao-lancar'));
     await waitFor(() => expect(servico.lancar).toHaveBeenCalledWith(10));
+  });
+
+  it('fatura de cartão é um destino possível, e exclui a conta de caixa', async () => {
+    servico.enviar.mockResolvedValue(lote());
+    servico.consultar.mockResolvedValue(lote());
+    servico.preparar.mockResolvedValue(lote({ status: 'READY_TO_COMMIT' }));
+
+    renderizar();
+    await escolherArquivo();
+
+    fireEvent.press(await screen.findByText('💳 Nubank'));
+
+    await waitFor(() => expect(servico.preparar).toHaveBeenCalledWith(10, { cartaoId: 4 }));
   });
 
   it('linha em revisão traz o motivo e a ação de aprovar', async () => {

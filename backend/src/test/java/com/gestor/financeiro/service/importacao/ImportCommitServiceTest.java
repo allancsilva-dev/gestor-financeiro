@@ -3,6 +3,7 @@ package com.gestor.financeiro.service.importacao;
 import com.gestor.financeiro.TestDataFactory;
 import com.gestor.financeiro.exception.BusinessException;
 import com.gestor.financeiro.model.Carteira;
+import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.model.ImportBatch;
 import com.gestor.financeiro.model.ImportRecord;
@@ -18,10 +19,14 @@ import com.gestor.financeiro.service.RegistrarMovimentoCommand;
 import com.gestor.financeiro.model.enums.OrigemMovimentoCarteira;
 import com.gestor.financeiro.model.enums.TipoMovimentoCarteira;
 import com.gestor.financeiro.repository.CarteiraRepository;
+import com.gestor.financeiro.repository.ContaRepository;
+import com.gestor.financeiro.repository.FaturaCartaoRepository;
+import com.gestor.financeiro.repository.FaturaLancamentoRepository;
 import com.gestor.financeiro.repository.CategoriaRepository;
 import com.gestor.financeiro.repository.ImportBatchRepository;
 import com.gestor.financeiro.repository.ImportRecordRepository;
 import com.gestor.financeiro.repository.MovimentoCarteiraRepository;
+import com.gestor.financeiro.repository.OperacaoFinanceiraRepository;
 import com.gestor.financeiro.repository.TransacaoRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -53,9 +58,13 @@ class ImportCommitServiceTest {
     @Autowired ImportBatchRepository batchRepository;
     @Autowired ImportRecordRepository records;
     @Autowired CarteiraRepository carteiras;
+    @Autowired ContaRepository cartoes;
+    @Autowired FaturaLancamentoRepository faturaLancamentos;
+    @Autowired FaturaCartaoRepository faturas;
     @Autowired CategoriaRepository categorias;
     @Autowired TransacaoRepository transacoes;
     @Autowired MovimentoCarteiraRepository movimentos;
+    @Autowired OperacaoFinanceiraRepository operacoes;
     @Autowired UsuarioRepository usuarios;
     @Autowired ImportReversalService reversalService;
     @Autowired ReconciliacaoGlobalService reconciliacao;
@@ -93,10 +102,16 @@ class ImportCommitServiceTest {
     }
 
     private void limpar() {
+        // Ordem das FKs: lançamento de fatura aponta para transação, fatura aponta para o cartão,
+        // e o cartão aponta para a conta passiva.
         records.deleteAll();
         batchRepository.deleteAll();
+        faturaLancamentos.deleteAll();
+        faturas.deleteAll();
         movimentos.deleteAll();
         transacoes.deleteAll();
+        operacoes.deleteAll();
+        cartoes.deleteAll();
     }
 
     private ImportBatch loteComRegistros(ImportRecordStatus... status) {
@@ -267,6 +282,52 @@ class ImportCommitServiceTest {
         BusinessException erro = assertThrows(BusinessException.class,
                 () -> commitService.aprovar(usuario.getId(), batch.getId(), registro.getId(), categoria.getId()));
         assertTrue(erro.getMessage().contains("já lançado"));
+    }
+
+    @Test
+    void faturaDeCartaoEntraPelaFaturaENaoPeloCaixa() {
+        Carteira passiva = carteiras.save(TestDataFactory.contaPassivaCartao(usuario, "Cartão"));
+        Conta cartao = cartoes.save(TestDataFactory.cartao(usuario, "Cartão Nubank", passiva));
+        ImportBatch batch = loteComRegistros(ImportRecordStatus.VALID, ImportRecordStatus.VALID);
+
+        commitService.preparar(usuario.getId(), batch.getId(), null, cartao.getId());
+        batches.transition(usuario.getId(), batch.getId(), ImportBatchStatus.COMMITTING, null);
+        commitService.executar(usuario.getId(), batch.getId());
+
+        assertEquals(2, transacoes.count());
+        assertEquals(2, faturaLancamentos.count(), "cada linha vira lançamento de fatura");
+        assertEquals(new BigDecimal("1000.00"), saldo(),
+                "compra no cartão não sai do caixa: o dinheiro só sai no pagamento da fatura");
+    }
+
+    @Test
+    void entradaEmLoteDeFaturaNaoEhLancada() {
+        Carteira passiva = carteiras.save(TestDataFactory.contaPassivaCartao(usuario, "Cartão 2"));
+        Conta cartao = cartoes.save(TestDataFactory.cartao(usuario, "Cartão Itaú", passiva));
+        ImportBatch batch = loteComRegistros(ImportRecordStatus.VALID);
+        ImportRecord entrada = records.findAll().get(0);
+        entrada.setDirection(TipoTransacao.ENTRADA);
+        records.save(entrada);
+
+        commitService.preparar(usuario.getId(), batch.getId(), null, cartao.getId());
+        batches.transition(usuario.getId(), batch.getId(), ImportBatchStatus.COMMITTING, null);
+        commitService.executar(usuario.getId(), batch.getId());
+
+        assertEquals(0, transacoes.count(), "estorno nasce do cancelamento da compra, não de uma linha solta");
+        assertEquals(ImportRecordStatus.INVALID,
+                records.findById(entrada.getId()).orElseThrow().getStatus());
+    }
+
+    @Test
+    void destinoPrecisaSerUmSo() {
+        Carteira passiva = carteiras.save(TestDataFactory.contaPassivaCartao(usuario, "Cartão 3"));
+        Conta cartao = cartoes.save(TestDataFactory.cartao(usuario, "Cartão Ambíguo", passiva));
+        ImportBatch batch = loteComRegistros(ImportRecordStatus.VALID);
+
+        assertThrows(BusinessException.class,
+                () -> commitService.preparar(usuario.getId(), batch.getId(), conta.getId(), cartao.getId()));
+        assertThrows(BusinessException.class,
+                () -> commitService.preparar(usuario.getId(), batch.getId(), null, null));
     }
 
     @Test

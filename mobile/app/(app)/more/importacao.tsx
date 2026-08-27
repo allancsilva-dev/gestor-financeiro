@@ -7,6 +7,7 @@ import {
 } from '../../../src/theme';
 import importacaoService from '../../../src/services/importacaoService';
 import contaFinanceiraService from '../../../src/services/contaFinanceiraService';
+import cartaoService from '../../../src/services/cartaoService';
 import { ImportBatch, ImportRecord } from '../../../src/types';
 import { formatCurrency, formatDateOnlyBR } from '../../../src/utils/format';
 import { mensagemDeErro } from '../../../src/utils/erros';
@@ -70,12 +71,18 @@ export default function ImportacaoScreen() {
 
   const [loteId, setLoteId] = useState<number | null>(null);
   const [contaId, setContaId] = useState<number | null>(null);
+  const [cartaoId, setCartaoId] = useState<number | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
 
   const { data: contas = [] } = useQuery({
     queryKey: ['contas-para-importacao'],
     queryFn: () => contaFinanceiraService.listarParaCaixa(),
+  });
+
+  const { data: cartoes = [] } = useQuery({
+    queryKey: ['cartoes-para-importacao'],
+    queryFn: () => cartaoService.listarTodos(),
   });
 
   const { data: lote = null } = useQuery<ImportBatch | null>({
@@ -130,6 +137,7 @@ export default function ImportacaoScreen() {
       });
       setLoteId(novo.id);
       setContaId(null);
+      setCartaoId(null);
       queryClient.setQueryData(['importacao', novo.id], novo);
       queryClient.invalidateQueries({ queryKey: ['importacoes'] });
     } catch (err) {
@@ -140,10 +148,10 @@ export default function ImportacaoScreen() {
   };
 
   const preparar = useMutation({
-    mutationFn: (conta: number) => importacaoService.preparar(loteId as number, conta),
+    mutationFn: (destino: { contaFinanceiraId?: number; cartaoId?: number }) =>
+      importacaoService.preparar(loteId as number, destino),
     onSuccess: (atualizado) => {
       setErro(null);
-      setContaId(atualizado.id === loteId ? contaId : contaId);
       queryClient.setQueryData(['importacao', loteId], atualizado);
     },
     onError: falhar,
@@ -190,12 +198,22 @@ export default function ImportacaoScreen() {
 
   const escolherConta = (id: number) => {
     setContaId(id);
-    preparar.mutate(id);
+    setCartaoId(null);
+    preparar.mutate({ contaFinanceiraId: id });
+  };
+
+  // Fatura e extrato são histórias diferentes: compra no cartão nasce na fatura e só sai do caixa
+  // quando a fatura é paga. Por isso o destino é um ou outro, nunca os dois.
+  const escolherCartao = (id: number) => {
+    setCartaoId(id);
+    setContaId(null);
+    preparar.mutate({ cartaoId: id });
   };
 
   const recomecar = () => {
     setLoteId(null);
     setContaId(null);
+    setCartaoId(null);
     setErro(null);
   };
 
@@ -261,22 +279,33 @@ export default function ImportacaoScreen() {
 
         {revisavel(lote) && (
           <Card>
-            <Text style={{ ...typography.cardTitle, color: colors.textPrimary }}>Em qual conta entra?</Text>
-            {contas.length === 0 ? (
+            <Text style={{ ...typography.cardTitle, color: colors.textPrimary }}>Onde isto entra?</Text>
+            <Text style={{ ...typography.meta, color: colors.textMuted, marginTop: spacing.xxs }}>
+              Extrato de conta ou fatura de cartão — o arquivo pertence a um dos dois.
+            </Text>
+            {contas.length === 0 && cartoes.length === 0 ? (
               <EstadoVazio
                 compacto
                 emoji="🏦"
-                titulo="Nenhuma conta disponível"
-                texto="Crie uma conta de caixa antes de importar."
+                titulo="Nenhum destino disponível"
+                texto="Crie uma conta de caixa ou um cartão antes de importar."
               />
             ) : (
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.md }}>
                 {contas.map((conta) => (
                   <Chip
-                    key={conta.id}
+                    key={`conta-${conta.id}`}
                     label={conta.nome}
                     selected={contaId === conta.id}
                     onPress={() => escolherConta(conta.id)}
+                  />
+                ))}
+                {cartoes.map((cartao) => (
+                  <Chip
+                    key={`cartao-${cartao.id}`}
+                    label={`💳 ${cartao.nome}`}
+                    selected={cartaoId === cartao.id}
+                    onPress={() => escolherCartao(cartao.id)}
                   />
                 ))}
               </View>
