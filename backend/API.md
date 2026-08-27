@@ -319,6 +319,15 @@ em `status` retorna HTTP 400 (`INVALID_PARAMETER`).
 - `GET /api/v1/orcamentos`
 - `POST /api/v1/orcamentos`
 
+**Rollover (ADR-0014).** Cada categoria tem `politicaRollover`: `NONE` (cada mês recomeça),
+`SURPLUS_ONLY` (só a sobra passa), `DEFICIT_ONLY` (só o excesso passa) ou `BOTH`. A resposta traz,
+por categoria, `carryIn` (o que veio do mês anterior, negativo quando o mês passado estourou) e
+`valorDisponivel` (`valorLimite + carryIn`) — é contra o disponível que `percentualGasto` é medido.
+
+O fechamento roda **na fila** (`BUDGET_CLOSE`, um job por titular por competência) e é idempotente:
+competência fechada não é recalculada. Mudar a política vale a partir da competência seguinte —
+mês fechado guarda a política e a versão da regra que valiam na hora e não é reescrito.
+
 ## Relatórios e exportação
 - `GET /api/v1/relatorios`
 - `GET /api/v1/exportar/transacoes`

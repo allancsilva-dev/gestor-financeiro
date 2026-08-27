@@ -70,6 +70,9 @@ public class UsuarioExclusaoService {
             "DELETE FROM FaturaCartao f WHERE f.usuario.id = :id"),
         new DeleteTitular("contas_fixas",
             "DELETE FROM ContaFixa cf WHERE cf.usuario.id = :id"),
+        // Antes dos orcamentos e das categorias: o fechamento referencia as duas pontas.
+        new DeleteTitular("orcamento_fechamentos",
+            "DELETE FROM OrcamentoFechamento of WHERE of.usuario.id = :id"),
         new DeleteTitular("orcamentos_categorias",
             "DELETE FROM OrcamentoCategoria oc WHERE oc.orcamento.id IN (SELECT o.id FROM OrcamentoMensal o WHERE o.usuario.id = :id)"),
         new DeleteTitular("orcamentos_mensais",

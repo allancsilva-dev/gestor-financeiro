@@ -7,17 +7,29 @@ import {
 import { orcamentoService } from '../../../src/services/orcamentoService';
 import { categoriaService } from '../../../src/services/categoriaService';
 import { AppColors } from '../../../src/theme/colors';
-import { OrcamentoResponse, OrcamentoCategoriaItem } from '../../../src/types';
+import { OrcamentoResponse, OrcamentoCategoriaItem, PoliticaRollover } from '../../../src/types';
 import { competenciaAtual, rotuloDeCompetencia, somarMeses } from '../../../src/domain/periodo';
 import { mensagemDeErro, statusDoErro } from '../../../src/utils/erros';
 import { formatCurrency, formatNumber, parseCurrencyBR, maskCurrencyInput } from '../../../src/utils/format';
 import Botao from '../../../src/components/ui/Botao';
 import CabecalhoSubTela from '../../../src/components/ui/CabecalhoSubTela';
 import Card from '../../../src/components/ui/Card';
+import Chip from '../../../src/components/ui/Chip';
 import EstadoVazio from '../../../src/components/ui/EstadoVazio';
 import NavegadorDeMes from '../../../src/components/ui/NavegadorDeMes';
 import ProgressBar from '../../../src/components/ui/ProgressBar';
 import SkeletonBox from '../../../src/components/ui/SkeletonBox';
+
+/**
+ * O que fazer com o que sobra ou falta no fim do mês. O rótulo fala do dinheiro, não da regra:
+ * "Sobra passa" é mais claro que SURPLUS_ONLY para quem só quer saber se pode gastar depois.
+ */
+const POLITICAS: Array<{ valor: PoliticaRollover; rotulo: string }> = [
+  { valor: 'NONE', rotulo: 'Recomeça' },
+  { valor: 'SURPLUS_ONLY', rotulo: 'Sobra passa' },
+  { valor: 'DEFICIT_ONLY', rotulo: 'Excesso passa' },
+  { valor: 'BOTH', rotulo: 'Os dois passam' },
+];
 
 /** Verde até 75%, âmbar até 100%, vermelho depois. */
 function corDoProgresso(percentual: number, colors: AppColors): string {
@@ -35,6 +47,7 @@ export default function OrcamentoScreen() {
   const [ano, setAno] = useState(hoje.ano);
   const [editando, setEditando] = useState(false);
   const [limites, setLimites] = useState<Map<number, string>>(new Map());
+  const [politicas, setPoliticas] = useState<Map<number, PoliticaRollover>>(new Map());
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -64,11 +77,17 @@ export default function OrcamentoScreen() {
 
   const iniciarEdicao = () => {
     const map = new Map<number, string>();
-    data?.categorias?.forEach((c) => map.set(c.categoriaId, formatNumber(Number(c.valorLimite ?? 0))));
+    const politicaAtual = new Map<number, PoliticaRollover>();
+    data?.categorias?.forEach((c) => {
+      map.set(c.categoriaId, formatNumber(Number(c.valorLimite ?? 0)));
+      politicaAtual.set(c.categoriaId, c.politicaRollover ?? 'NONE');
+    });
     categorias.forEach((c) => {
       if (c.id && !map.has(c.id)) map.set(c.id, '');
+      if (c.id && !politicaAtual.has(c.id)) politicaAtual.set(c.id, 'NONE');
     });
     setLimites(map);
+    setPoliticas(politicaAtual);
     setSaveError(null);
     setEditando(true);
   };
@@ -76,7 +95,11 @@ export default function OrcamentoScreen() {
   const salvar = async () => {
     const cats = Array.from(limites.entries())
       .filter(([, v]) => parseCurrencyBR(v) > 0)
-      .map(([categoriaId, valorLimite]) => ({ categoriaId, valorLimite: parseCurrencyBR(valorLimite) }));
+      .map(([categoriaId, valorLimite]) => ({
+        categoriaId,
+        valorLimite: parseCurrencyBR(valorLimite),
+        politicaRollover: politicas.get(categoriaId) ?? 'NONE',
+      }));
 
     // Antes isto era um `return` mudo: o usuário tocava em Salvar e nada
     // acontecia, sem nenhuma pista do porquê.
@@ -149,6 +172,7 @@ export default function OrcamentoScreen() {
                   borderWidth: 1, borderRadius: radius.sm, padding: spacing.sm,
                 }}
               >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
                 <Text style={{ ...typography.cardTitle, width: 28 }}>{cat.icone || '📌'}</Text>
                 <Text numberOfLines={1} style={{ flex: 1, ...typography.body, color: colors.textPrimary }}>{cat.nome}</Text>
                 <TextInput
@@ -165,8 +189,31 @@ export default function OrcamentoScreen() {
                     color: colors.textPrimary, ...typography.input, ...numeric,
                   }}
                 />
+                </View>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: spacing.xs, paddingTop: spacing.sm }}
+                >
+                  {POLITICAS.map((opcao) => (
+                    <Chip
+                      key={opcao.valor}
+                      label={opcao.rotulo}
+                      selected={(politicas.get(cat.id!) ?? 'NONE') === opcao.valor}
+                      onPress={() => {
+                        const proximas = new Map(politicas);
+                        proximas.set(cat.id!, opcao.valor);
+                        setPoliticas(proximas);
+                      }}
+                    />
+                  ))}
+                </ScrollView>
               </View>
             ))}
+            <Text style={{ ...typography.meta, color: colors.textMuted }}>
+              No fim do mês, sobra e excesso podem passar para o mês seguinte. A escolha vale a
+              partir do próximo fechamento — mês já fechado não muda.
+            </Text>
             {saveError && (
               <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={{ ...typography.meta, color: colors.danger }}>
                 {saveError}
@@ -215,9 +262,17 @@ export default function OrcamentoScreen() {
                       </Text>
                     </View>
                     <Text style={{ ...typography.meta, ...numeric, fontWeight: '600', color: cor }}>
-                      {formatCurrency(cat.valorGasto)} / {formatCurrency(cat.valorLimite)}
+                      {formatCurrency(cat.valorGasto)} / {formatCurrency(cat.valorDisponivel ?? cat.valorLimite)}
                     </Text>
                   </View>
+                  {!!cat.carryIn && (
+                    <Text style={{ ...typography.meta, ...numeric, color: colors.textMuted }}>
+                      {formatCurrency(cat.valorLimite)} do mês
+                      {cat.carryIn > 0
+                        ? ` + ${formatCurrency(cat.carryIn)} que sobraram`
+                        : ` − ${formatCurrency(Math.abs(cat.carryIn))} que estouraram`} no mês passado
+                    </Text>
+                  )}
                   <ProgressBar
                     value={Math.min(cat.percentualGasto, 100)}
                     paleta={{ trilha: colors.trilha, fillDe: cor }}

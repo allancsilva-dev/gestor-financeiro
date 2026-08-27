@@ -422,6 +422,8 @@ export interface MetaProgresso {
 }
 
 // ── Orçamento ─────────────────────────────────────────────────────
+export type PoliticaRollover = 'NONE' | 'SURPLUS_ONLY' | 'DEFICIT_ONLY' | 'BOTH';
+
 export interface OrcamentoCategoriaItem {
   id: number;
   categoriaId: number;
@@ -431,6 +433,11 @@ export interface OrcamentoCategoriaItem {
   valorLimite: number;
   valorGasto: number;
   percentualGasto: number;
+  /** O que veio do mês anterior conforme a política; negativo quando o mês passado estourou. */
+  carryIn: number;
+  /** `valorLimite + carryIn` — é contra isto que o gasto do mês é medido. */
+  valorDisponivel: number;
+  politicaRollover: PoliticaRollover;
 }
 
 export interface OrcamentoResponse {

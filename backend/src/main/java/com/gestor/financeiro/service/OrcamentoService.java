@@ -7,6 +7,7 @@ import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.model.OrcamentoCategoria;
 import com.gestor.financeiro.model.OrcamentoMensal;
 import com.gestor.financeiro.model.Usuario;
+import com.gestor.financeiro.model.enums.PoliticaRollover;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.*;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,8 @@ public class OrcamentoService {
     private final TransacaoRepository transacaoRepository;
     private final CategoriaRepository categoriaRepository;
     private final UsuarioRepository usuarioRepository;
+    private final OrcamentoGastoService orcamentoGastoService;
+    private final com.gestor.financeiro.service.orcamento.OrcamentoFechamentoService fechamentoService;
 
     public OrcamentoResponse buscarOuCriarAtual(Long usuarioId) {
         YearMonth ym = YearMonth.now(clock);
@@ -75,6 +78,7 @@ public class OrcamentoService {
             oc.setCategoria(categoria);
             oc.setValorLimite(catReq.getValorLimite());
             oc.setAtivo(true);
+            oc.setPoliticaRollover(politicaDe(catReq.getPoliticaRollover()));
             orcamentoCategoriaRepository.save(oc);
 
             totalPlanejado = totalPlanejado.add(catReq.getValorLimite());
@@ -83,6 +87,16 @@ public class OrcamentoService {
         orcamento.setValorTotalPlanejado(totalPlanejado);
         OrcamentoMensal saved = orcamentoMensalRepository.save(orcamento);
         return toResponse(saved, usuarioId);
+    }
+
+    /** Política ausente ou desconhecida vale NONE: nunca inventar carregamento que o dono não pediu. */
+    private PoliticaRollover politicaDe(String valor) {
+        if (valor == null || valor.isBlank()) return PoliticaRollover.NONE;
+        try {
+            return PoliticaRollover.valueOf(valor.trim().toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException desconhecida) {
+            throw new com.gestor.financeiro.exception.BusinessException("Política de rollover inválida");
+        }
     }
 
     private OrcamentoResponse criarVazio(Long usuarioId, Integer mes, Integer ano) {
@@ -99,13 +113,19 @@ public class OrcamentoService {
         BigDecimal totalGasto = BigDecimal.ZERO;
         List<OrcamentoCategoriaResponse> catResponses = new ArrayList<>();
 
+        YearMonth competencia = YearMonth.of(orcamento.getAno(), orcamento.getMes());
         for (OrcamentoCategoria oc : categorias) {
             Categoria cat = oc.getCategoria();
             BigDecimal gasto = gastosPorCategoria.getOrDefault(cat.getId(), BigDecimal.ZERO);
             totalGasto = totalGasto.add(gasto);
 
-            int percentual = BigDecimal.ZERO.compareTo(oc.getValorLimite()) == 0 ? 0
-                    : gasto.multiply(BigDecimal.valueOf(100)).divide(oc.getValorLimite(), 0, RoundingMode.HALF_UP).intValue();
+            // O limite do mês é o planejado mais o que veio de trás: é contra o disponível que o
+            // percentual é medido, senão a barra mentiria justamente no mês em que houve carry.
+            BigDecimal carryIn = fechamentoService.carryIn(usuarioId, cat.getId(), competencia);
+            BigDecimal disponivel = oc.getValorLimite().add(carryIn);
+
+            int percentual = disponivel.signum() <= 0 ? 0
+                    : gasto.multiply(BigDecimal.valueOf(100)).divide(disponivel, 0, RoundingMode.HALF_UP).intValue();
 
             catResponses.add(new OrcamentoCategoriaResponse(
                     oc.getId(),
@@ -115,7 +135,10 @@ public class OrcamentoService {
                     cat.getIcone() != null ? cat.getIcone() : "",
                     oc.getValorLimite(),
                     gasto,
-                    percentual
+                    percentual,
+                    carryIn,
+                    disponivel,
+                    (oc.getPoliticaRollover() == null ? PoliticaRollover.NONE : oc.getPoliticaRollover()).name()
             ));
         }
 
@@ -129,22 +152,8 @@ public class OrcamentoService {
         );
     }
 
+    /** Delegado ao serviço canônico: a regra de competência tem um dono só (OrcamentoGastoService). */
     private Map<Long, BigDecimal> carregarGastosDoMes(Long usuarioId, Integer mes, Integer ano) {
-        YearMonth ym = YearMonth.of(ano, mes);
-        LocalDate inicio = ym.atDay(1);
-        LocalDate fim = ym.atEndOfMonth();
-
-        List<Object[]> gastos = transacaoRepository.sumValorEfetivoAgrupadoPorCategoria(
-                usuarioId, TipoTransacao.SAIDA, inicio, fim);
-
-        Map<Long, BigDecimal> mapa = new HashMap<>();
-        for (Object[] row : gastos) {
-            String categoriaNome = (String) row[0];
-            BigDecimal valor = (BigDecimal) row[1];
-
-            categoriaRepository.findByUsuarioIdAndNomeIgnoreCase(usuarioId, categoriaNome)
-                    .ifPresent(cat -> mapa.merge(cat.getId(), valor, BigDecimal::add));
-        }
-        return mapa;
+        return orcamentoGastoService.porCategoria(usuarioId, YearMonth.of(ano, mes));
     }
 }

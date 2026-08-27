@@ -10,5 +10,10 @@ public record OrcamentoCategoriaResponse(
     String categoriaIcone,
     BigDecimal valorLimite,
     BigDecimal valorGasto,
-    Integer percentualGasto
+    Integer percentualGasto,
+    /** O que veio do mês anterior conforme a política; negativo quando o mês passado estourou. */
+    BigDecimal carryIn,
+    /** `valorLimite + carryIn` — é contra este número que o gasto do mês é medido. */
+    BigDecimal valorDisponivel,
+    String politicaRollover
 ) {}

@@ -7,6 +7,29 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ---
 
+## [Fase 4 — PR-F4-12] - 2026-08-27
+
+### Rollover de orçamento
+- Cada categoria passa a ter política de rollover — `NONE`, `SURPLUS_ONLY`, `DEFICIT_ONLY`, `BOTH`
+  (ADR-0014). Sobra é dinheiro que a pessoa deixou de gastar e excesso é dinheiro que ela gastou
+  além: as duas leituras são legítimas, e quem escolhe é o dono do orçamento.
+- V51 cria `orcamento_fechamentos`, a memória do mês: base, `carryIn`, gasto, resultado e `carryOut`,
+  com a política e a **versão da regra** aplicadas. O banco confere a aritmética
+  (`resultado = base + carryIn - gasto`) e recusa `carryOut` que contrarie a política registrada.
+- Fechar é **idempotente** (índice único por titular, categoria e competência) e **mês fechado não é
+  reescrito**: mudar a política hoje vale a partir da competência seguinte.
+- O fechamento roda na fila (`BUDGET_CLOSE`), enfileirado todo dia — instância parada na virada do
+  mês não pode deixar a competência sem fechar, e a `job_key` determinística impede fechar duas vezes.
+- A leitura do orçamento aplica o `carryIn`: o percentual passa a ser medido contra
+  `valorLimite + carryIn`, senão a barra mentiria justamente no mês em que houve carregamento.
+- `OrcamentoGastoService` nasce da extração da regra de competência, que agora tem dois leitores
+  (tela e fechamento) e não pode ter duas implementações.
+- Mobile: a tela de orçamento mostra o disponível e **de onde ele veio** ("800,00 do mês + 150,00 que
+  sobraram no mês passado") e deixa escolher a política por categoria, com o aviso de que a escolha
+  vale do próximo fechamento em diante.
+- Validação: 373 testes unitários e 49 de integração no backend; 405 no mobile, lint e typecheck
+  limpos.
+
 ## [Fase 4 — PR-F4-11] - 2026-08-27
 
 ### Notificações agendadas e push no mobile

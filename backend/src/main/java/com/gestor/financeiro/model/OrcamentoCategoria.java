@@ -1,5 +1,6 @@
 package com.gestor.financeiro.model;
 
+import com.gestor.financeiro.model.enums.PoliticaRollover;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -30,4 +31,9 @@ public class OrcamentoCategoria {
 
     @Column(nullable = false)
     private Boolean ativo = true;
+
+    /** O que fazer com sobra ou excesso no fim do mês (ADR-0014). Default: cada mês recomeça. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "politica_rollover", nullable = false, length = 16)
+    private PoliticaRollover politicaRollover = PoliticaRollover.NONE;
 }

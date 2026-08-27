@@ -43,6 +43,9 @@ const orcamento = (over: Partial<OrcamentoResponse> = {}): OrcamentoResponse => 
       categoriaNome: 'Alimentação',
       categoriaIcone: '🍽️',
       valorLimite: 1000,
+      carryIn: 0,
+      valorDisponivel: 1000,
+      politicaRollover: 'NONE',
       valorGasto: 250,
       percentualGasto: 25,
     },
@@ -100,5 +103,33 @@ describe('OrcamentoScreen', () => {
 
     await waitFor(() => expect(screen.getByText('Criar orçamento')).toBeTruthy());
     expect(screen.queryByText('Não deu para carregar o orçamento')).toBeNull();
+  });
+
+  it('mostra de onde veio o valor carregado do mês anterior', async () => {
+    (orcamentoService.buscarAtual as jest.Mock).mockResolvedValue(orcamento({
+      categorias: [{
+        id: 5,
+        categoriaId: 5,
+        categoriaNome: 'Alimentação',
+        categoriaIcone: '🍽️',
+        categoriaCor: '#000000',
+        valorLimite: 800,
+        valorGasto: 900,
+        percentualGasto: 95,
+        carryIn: 150,
+        valorDisponivel: 950,
+        politicaRollover: 'SURPLUS_ONLY',
+      }],
+    }));
+
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <OrcamentoScreen />
+      </QueryClientProvider>,
+    );
+
+    // O gasto é medido contra o disponível, não contra o limite do mês.
+    expect(await screen.findByText(/R\$\s?900,00 \/ R\$\s?950,00/)).toBeTruthy();
+    expect(screen.getByText(/que sobraram/)).toBeTruthy();
   });
 });

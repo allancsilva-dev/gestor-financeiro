@@ -1,10 +1,10 @@
 import api from './api';
-import { OrcamentoResponse } from '../types';
+import { OrcamentoResponse, PoliticaRollover } from '../types';
 
 export interface OrcamentoRequest {
   mes: number;
   ano: number;
-  categorias: { categoriaId: number; valorLimite: number }[];
+  categorias: { categoriaId: number; valorLimite: number; politicaRollover?: PoliticaRollover }[];
 }
 
 export const orcamentoService = {
