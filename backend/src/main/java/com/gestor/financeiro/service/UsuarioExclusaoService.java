@@ -48,6 +48,8 @@ public class UsuarioExclusaoService {
     public static final List<DeleteTitular> MANIFESTO_EXCLUSAO = List.of(
         new DeleteTitular("anexos",
             "DELETE FROM Anexo a WHERE a.usuario.id = :id"),
+        new DeleteTitular("notificacao_dispositivos",
+            "DELETE FROM NotificacaoDispositivo nd WHERE nd.usuario.id = :id"),
         new DeleteTitular("notificacoes",
             "DELETE FROM Notificacao n WHERE n.usuario.id = :id"),
         new DeleteTitular("import_records",

@@ -1,10 +1,13 @@
 package com.gestor.financeiro.controller;
 
 import com.gestor.financeiro.dto.NotificacaoResponse;
+import com.gestor.financeiro.dto.RegistrarDispositivoRequest;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.NotificacaoService;
+import com.gestor.financeiro.service.notificacao.PushDispositivoService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -14,7 +17,9 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 /**
- * Notificacoes in-app (V42): o sino da home. Sem push — a caixa e lida aqui.
+ * Notificacoes in-app (V42): o sino da home, mais o registro de aparelho para push (V50).
+ * O aviso nasce da sincronizacao diaria na fila; aqui o titular le a caixa e diz em qual
+ * aparelho quer ser avisado.
  */
 @RestController
 @RequestMapping("/api/v1/notificacoes")
@@ -26,6 +31,7 @@ public class NotificacaoController {
     private static final int TAMANHO_MAXIMO = 50;
 
     private final NotificacaoService notificacaoService;
+    private final PushDispositivoService pushDispositivoService;
     private final AuthenticatedUserService authenticatedUserService;
 
     @GetMapping
@@ -38,6 +44,22 @@ public class NotificacaoController {
                 .listar(usuarioId, PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), TAMANHO_MAXIMO)))
                 .map(NotificacaoResponse::fromEntity);
         return ResponseEntity.ok(pagina);
+    }
+
+    @PostMapping("/dispositivos")
+    @Operation(summary = "Registrar aparelho para receber aviso por push")
+    public ResponseEntity<Void> registrarDispositivo(@Valid @RequestBody RegistrarDispositivoRequest request) {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        pushDispositivoService.registrar(usuarioId, request.pushToken(), request.plataforma());
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/dispositivos")
+    @Operation(summary = "Parar de receber aviso neste aparelho")
+    public ResponseEntity<Void> revogarDispositivo(@RequestParam("pushToken") String pushToken) {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        pushDispositivoService.revogar(usuarioId, pushToken);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/nao-lidas/contagem")

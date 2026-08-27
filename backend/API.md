@@ -375,6 +375,23 @@ Respostas de erro do envio:
 - `GET /api/v1/anexos/{id}/download`
 - `DELETE /api/v1/anexos/{id}`
 
+## Notificações (`/api/v1/notificacoes`)
+- `GET /api/v1/notificacoes` — caixa do titular (`Page`, `size<=50`), não lidas primeiro.
+- `GET /api/v1/notificacoes/nao-lidas/contagem` — alimenta o badge do sino.
+- `PATCH /api/v1/notificacoes/{id}/lida`, `POST /api/v1/notificacoes/marcar-todas-lidas`.
+- `POST /api/v1/notificacoes/dispositivos` — corpo `{ "pushToken": "ExponentPushToken[...]",
+  "plataforma": "IOS" | "ANDROID" }`. Registra o aparelho para push; token fora do formato do Expo
+  responde `422`. O token identifica o **aparelho**: registrar o mesmo token em outra conta migra o
+  registro, em vez de duplicar.
+- `DELETE /api/v1/notificacoes/dispositivos?pushToken=...` — desliga o aviso naquele aparelho
+  (a saída da conta chama isto). Token de outro titular responde `404`.
+
+A derivação dos avisos roda **na fila**, um job por titular por dia
+(`app.notificacoes.scheduler.cron`, default 07:00 no fuso de negócio) — antes só acontecia quando
+alguém abria a home. O envio de push é **desligado por padrão**
+(`app.notificacoes.push.enabled=false`); quando ligado, o conteúdo entregue não leva valor nem nome
+de conta, porque o aviso aparece na tela de bloqueio.
+
 ## Investimentos (`/api/v1/investimentos`)
 - `POST /api/v1/investimentos`
 - `GET /api/v1/investimentos` — `Page`, `size<=100`

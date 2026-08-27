@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Redirect, Tabs, useRouter } from 'expo-router';
 import { Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,6 +9,7 @@ import { useReducedMotion } from 'react-native-reanimated';
 import { useTheme, radius, spacing, typography, tabBar } from '../../src/theme';
 import NovaTransacaoModal from '../../src/components/NovaTransacaoModal';
 import { useAuth } from '../../src/context/AuthContext';
+import { registrarDispositivoParaPush } from '../../src/notificacoes/push';
 
 // Medidas da referência (mobile/.design/referencia-home.png, 591px ↔ 360dp):
 // painel flutuante de 69 de altura com 15 de margem lateral, tile da aba ativa
@@ -68,6 +69,13 @@ export default function AppLayout() {
   const { needsOnboarding } = useAuth();
   const [novaTransacaoVisible, setNovaTransacaoVisible] = useState(false);
   const reduceMotion = useReducedMotion();
+
+  // Registro do aparelho só depois do onboarding: pedir permissão de notificação antes de a
+  // pessoa ter qualquer dado no app é pedir para ela dizer não. Falha é silenciosa por desenho.
+  useEffect(() => {
+    if (needsOnboarding) return;
+    registrarDispositivoParaPush();
+  }, [needsOnboarding]);
 
   if (needsOnboarding) return <Redirect href="/onboarding" />;
 

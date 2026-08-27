@@ -85,6 +85,16 @@ public class NotificacaoService {
      */
     @Transactional
     public long sincronizar(Long usuarioId) {
+        sincronizarRetornandoNovas(usuarioId);
+        return notificacaoRepository.countByUsuarioIdAndLidaFalse(usuarioId);
+    }
+
+    /**
+     * Mesma sincronizacao, devolvendo o que nasceu agora. O envio de push precisa saber o que e
+     * novidade: reenviar aviso ja entregue todo dia treina o usuario a ignorar a notificacao.
+     */
+    @Transactional
+    public List<Notificacao> sincronizarRetornandoNovas(Long usuarioId) {
         Set<String> existentes = notificacaoRepository.findChavesDoUsuario(usuarioId);
         List<Notificacao> novas = new ArrayList<>();
 
@@ -95,10 +105,10 @@ public class NotificacaoService {
             existentes.add(r.chave());
             novas.add(montar(usuarioId, r));
         }
-        if (!novas.isEmpty()) {
-            notificacaoRepository.saveAll(novas);
+        if (novas.isEmpty()) {
+            return List.of();
         }
-        return notificacaoRepository.countByUsuarioIdAndLidaFalse(usuarioId);
+        return notificacaoRepository.saveAll(novas);
     }
 
     // ── derivacao ────────────────────────────────────────────────────────────

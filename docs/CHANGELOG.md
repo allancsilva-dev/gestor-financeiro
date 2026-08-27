@@ -7,6 +7,29 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ---
 
+## [Fase 4 — PR-F4-11] - 2026-08-27
+
+### Notificações agendadas e push no mobile
+- A derivação dos avisos saiu do request: um `@Scheduled` **enfileira** um job por titular por dia
+  (07:00 no fuso de negócio) e o worker executa. Antes, notificação só nascia quando alguém abria a
+  home — quem não abria o app não era avisado de fatura vencendo, que é justamente quando o aviso
+  serve. `job_key` determinística por titular e dia: cron repetido ou segunda instância não geram
+  trabalho duplicado.
+- V50 cria `notificacao_dispositivos`. O token identifica o **aparelho**, não a pessoa: entrar com
+  outra conta no mesmo aparelho migra o registro, senão o dono anterior continuaria recebendo aviso
+  da própria vida financeira em um telefone que não é mais dele. Sair da conta revoga.
+- Envio por push via Expo, **desligado por padrão** (`app.notificacoes.push.enabled=false`): sem
+  configuração explícita o app não fala com serviço externo. Token recusado com
+  `DeviceNotRegistered` é desativado; falha de entrega não derruba o job, porque push é canal e a
+  notificação in-app já foi gravada.
+- Conteúdo do push **sem PII financeira** — tipo do evento e contagem, nunca valor ou nome de conta:
+  o aviso aparece na tela de bloqueio, onde qualquer um vê. O detalhe fica dentro do app.
+- Mobile pede permissão **uma vez**, depois do onboarding, e desiste em silêncio quando não há
+  permissão, serviço de push ou `projectId` — nada disso pode atrapalhar quem só quer usar o app.
+- LGPD: `notificacao_dispositivos` entra no manifesto de exclusão do titular.
+- Validação: 365 testes unitários e 47 de integração no backend; 404 testes no mobile,
+  `expo-doctor` 18/18, lint e typecheck limpos.
+
 ## [Fase 4 — PR-F4-10] - 2026-08-27
 
 ### Alertas de gasto visíveis no app (mobile)

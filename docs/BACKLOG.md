@@ -1998,3 +1998,19 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   mostrando os mesmos alertas do mobile; dispensa coerente entre os clientes se ela virar servidor.
 - **Risco se ficar pendente:** alerta calibrado para um perfil de gasto só serve a esse perfil.
 - **Status:** ABERTO
+
+## BACKLOG-0110 — Ligar o push em produção: `projectId` do EAS e credenciais de entrega
+
+- **Título:** Configurar `extra.eas.projectId` no app mobile e habilitar `app.notificacoes.push.enabled`
+- **Prioridade:** P2
+- **Área:** mobile, infraestrutura, backend
+- **Motivo:** o registro de aparelho e o envio existem (PR-F4-11), mas `app.json` não tem
+  `extra.eas.projectId` — sem ele `getExpoPushTokenAsync` não devolve token em build, e o registro
+  desiste em silêncio. O envio também nasce desligado por decisão (`push.enabled=false`), para o
+  app nunca falar com serviço externo sem configuração explícita.
+- **Dependências:** projeto EAS do dono da conta; credenciais de push do iOS (APNs) e Android (FCM).
+- **Critério de aceite:** token registrado em aparelho real; aviso entregue com o app fechado; token
+  de aparelho desinstalado desativado sozinho ao receber `DeviceNotRegistered`.
+- **Risco se ficar pendente:** o aviso continua só na caixa in-app; quem não abre o app não é
+  avisado.
+- **Status:** ABERTO

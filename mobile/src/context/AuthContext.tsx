@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Usuario } from '../types';
 import { authService } from '../services/authService';
+import { revogarDispositivoDePush } from '../notificacoes/push';
 import {
   getAccessToken,
   getUsuarioCache,
@@ -78,6 +79,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
+    // Antes de derrubar a sessão: sair da conta desliga o push neste aparelho, senão o próximo
+    // dono da tela receberia aviso da vida financeira de outra pessoa.
+    await revogarDispositivoDePush();
     await authService.logout();
     setUsuario(null);
   };
