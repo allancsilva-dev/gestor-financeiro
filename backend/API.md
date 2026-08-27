@@ -343,6 +343,10 @@ em `status` retorna HTTP 400 (`INVALID_PARAMETER`).
   falha vira `INVALID` com motivo e o lote continua. Reexecutar o lançamento não duplica saldo: a
   chave `IMPORT:{batchId}:{registroId}` chega ao ledger e o índice único de idempotência é o
   backstop.
+- `POST /api/v1/importacoes/{id}/reverter` — `202`; estorna um lote já lançado pela fila. Cada
+  transação é cancelada pelo caminho de domínio (movimento `ESTORNO`, gasto da categoria devolvido,
+  transação preservada como inativa) e o vínculo `import_records.transacao_id` é mantido — é o que
+  torna a reversão auditável. Reexecutar não estorna duas vezes.
 - `GET /api/v1/importacoes/{id}/registros` — prévia das linhas normalizadas. Parâmetros:
   `status` (`VALID`, `INVALID`, `PENDING_REVIEW`, `DUPLICATE`, `APPROVED`, `COMMITTED`, `REVERSED`),
   `aposLinha` (cursor por `sourceLine`, começa em `0`) e `tamanho` (default `50`, teto `200`).

@@ -14,6 +14,7 @@ import com.gestor.financeiro.service.importacao.CanonicalImportOrchestrator;
 import com.gestor.financeiro.service.importacao.ImportAdmissionService;
 import com.gestor.financeiro.service.importacao.ImportBatchService;
 import com.gestor.financeiro.service.importacao.ImportCommitService;
+import com.gestor.financeiro.service.importacao.ImportReversalService;
 import com.gestor.financeiro.service.importacao.ImportPreviewService;
 import com.gestor.financeiro.service.importacao.ImportParsingException;
 import com.gestor.financeiro.service.importacao.TempFileImportSource;
@@ -54,6 +55,7 @@ public class ImportacaoController {
     private final ImportAdmissionService admission;
     private final ImportPreviewService preview;
     private final ImportCommitService commitService;
+    private final ImportReversalService reversalService;
     private final AuthenticatedUserService authenticatedUserService;
 
     @Value("${spring.servlet.multipart.location:${java.io.tmpdir}}")
@@ -115,6 +117,14 @@ public class ImportacaoController {
         // Trabalho longo vai para a fila; o cliente acompanha por GET.
         return ResponseEntity.accepted().body(ImportBatchResponse.de(
                 commitService.solicitarCommit(usuarioId, id)));
+    }
+
+    @PostMapping("/{id}/reverter")
+    @Operation(summary = "Estornar um lote já lançado, com trilha auditável")
+    public ResponseEntity<ImportBatchResponse> reverter(@PathVariable Long id) {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        return ResponseEntity.accepted().body(ImportBatchResponse.de(
+                reversalService.solicitarReversao(usuarioId, id)));
     }
 
     @GetMapping("/{id}/registros")

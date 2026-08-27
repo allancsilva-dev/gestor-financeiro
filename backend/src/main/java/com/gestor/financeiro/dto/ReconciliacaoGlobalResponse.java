@@ -17,7 +17,8 @@ public record ReconciliacaoGlobalResponse(
         SALDO_LEDGER,
         PASSIVO_FATURAS,
         COFRE_META,
-        TRANSACAO_INCOMPLETA
+        TRANSACAO_INCOMPLETA,
+        CATEGORIA_VALOR_GASTO
     }
 
     public record ResumoInvariante(

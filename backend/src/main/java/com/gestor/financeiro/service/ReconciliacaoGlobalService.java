@@ -5,8 +5,10 @@ import com.gestor.financeiro.dto.ReconciliacaoGlobalResponse.Divergencia;
 import com.gestor.financeiro.dto.ReconciliacaoGlobalResponse.Invariante;
 import com.gestor.financeiro.dto.ReconciliacaoGlobalResponse.ResumoInvariante;
 import com.gestor.financeiro.repository.CarteiraRepository;
+import com.gestor.financeiro.repository.CategoriaRepository;
 import com.gestor.financeiro.repository.MetaRepository;
 import com.gestor.financeiro.repository.TransacaoRepository;
+import com.gestor.financeiro.repository.projection.CategoriaGastoProjection;
 import com.gestor.financeiro.repository.projection.CofreMetaProjection;
 import com.gestor.financeiro.repository.projection.LedgerSaldoProjection;
 import com.gestor.financeiro.repository.projection.PassivoFaturaProjection;
@@ -29,6 +31,7 @@ import java.util.Map;
 public class ReconciliacaoGlobalService {
     private final CarteiraRepository carteiraRepository;
     private final MetaRepository metaRepository;
+    private final CategoriaRepository categoriaRepository;
     private final TransacaoRepository transacaoRepository;
     private final Clock clock;
 
@@ -70,6 +73,16 @@ public class ReconciliacaoGlobalService {
                           + ",saldo=" + money(item.getCofreSaldo());
                 detalhes.add(new Divergencia(Invariante.COFRE_META, "META", item.getMetaId(),
                         "mesmo_usuario,subtipo=COFRE,saldo=" + money(item.getValorReservado()), encontrado));
+            }
+        }
+
+        List<CategoriaGastoProjection> gastos = categoriaRepository.reconciliarGastoByUsuarioId(usuarioId);
+        verificacoes.put(Invariante.CATEGORIA_VALOR_GASTO, (long) gastos.size());
+        for (CategoriaGastoProjection item : gastos) {
+            if (different(item.getValorMaterializado(), item.getValorLancado())) {
+                detalhes.add(new Divergencia(Invariante.CATEGORIA_VALOR_GASTO, "CATEGORIA",
+                        item.getCategoriaId(), money(item.getValorLancado()),
+                        money(item.getValorMaterializado())));
             }
         }
 

@@ -72,7 +72,8 @@ class ReconciliacaoGlobalControllerTest {
                 .andExpect(jsonPath("$.status").value("OK"))
                 .andExpect(jsonPath("$.divergencias").value(0))
                 .andExpect(jsonPath("$.detalhes.length()").value(0))
-                .andExpect(jsonPath("$.resumo.length()").value(4))
+                // Cinco invariantes desde a inclusão de CATEGORIA_VALOR_GASTO.
+                .andExpect(jsonPath("$.resumo.length()").value(5))
                 .andExpect(jsonPath("$.detalhes[?(@.recursoId == " + alheia.getId() + ")]").isEmpty());
     }
 

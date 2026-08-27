@@ -7,6 +7,23 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ---
 
+## [Fase 4 — PR-F4-07] - 2026-08-27
+
+### Reversão auditável e a invariante que faltava
+- `POST /api/v1/importacoes/{id}/reverter` estorna um lote lançado, pela fila. Reversão é
+  **compensação** (ADR-0009): cada transação é cancelada pelo caminho de domínio, com movimento
+  `ESTORNO`, devolução do gasto da categoria e transação preservada como inativa. O vínculo
+  `import_records.transacao_id` é mantido — é o que torna a reversão auditável.
+- `TransacaoService.deletar` ganhou sobrecarga com chave de idempotência no estorno: o caminho de
+  cancelamento gravava no ledger sem chave, então reexecutar uma reversão estornaria duas vezes.
+  Cancelamento manual segue idêntico (chave nula).
+- Nova invariante de reconciliação **`CATEGORIA_VALOR_GASTO`**: `categorias.valor_gasto` é verdade
+  materializada e nenhuma das quatro invariantes existentes a cobria. Um caminho novo que
+  esquecesse de estorná-la deixaria a tela divergente do extrato sem nada acusar.
+- Teste fecha o ciclo: lançar e reverter deixa saldo, gasto de categoria e ledger no estado
+  anterior, com reconciliação global em zero divergência antes e depois.
+- Validação: 357 testes unitários e 44 de integração verdes; cobertura atendida.
+
 ## [Fase 4 — PR-F4-06] - 2026-08-26
 
 ### Lançamento do lote no ledger

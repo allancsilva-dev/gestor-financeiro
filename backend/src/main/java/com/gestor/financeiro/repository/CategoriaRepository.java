@@ -22,6 +22,21 @@ public interface CategoriaRepository extends JpaRepository<Categoria, Long> {
 
     Optional<Categoria> findByIdAndUsuarioId(Long id, Long usuarioId);
 
+    /** Confere o gasto materializado da categoria contra a soma das saídas ativas. */
+    @org.springframework.data.jpa.repository.Query("""
+            select c.id as categoriaId,
+                   c.valorGasto as valorMaterializado,
+                   coalesce((select sum(t.valorTotal) from Transacao t
+                              where t.categoria.id = c.id
+                                and t.ativa = true
+                                and t.tipo = com.gestor.financeiro.model.enums.TipoTransacao.SAIDA), 0)
+                       as valorLancado
+              from Categoria c
+             where c.usuario.id = :usuarioId
+            """)
+    List<com.gestor.financeiro.repository.projection.CategoriaGastoProjection>
+        reconciliarGastoByUsuarioId(@org.springframework.data.repository.query.Param("usuarioId") Long usuarioId);
+
     long countByUsuarioIdAndAtivoTrue(Long usuarioId);
 
     Optional<Categoria> findByUsuarioIdAndNomeIgnoreCase(Long usuarioId, String nome);

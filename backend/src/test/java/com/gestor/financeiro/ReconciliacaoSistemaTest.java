@@ -80,7 +80,8 @@ class ReconciliacaoSistemaTest {
         assertEquals(Status.UP, health.health().getStatus());
         metrics.registrar(system(1, 0));
         assertEquals(ReconciliacaoHealthIndicator.DEGRADED, health.health().getStatus());
-        assertEquals(8, registry.find("app.reconciliation.last.invariant.checks").meters().size()
+        // Duas métricas por invariante; são cinco invariantes.
+        assertEquals(10, registry.find("app.reconciliation.last.invariant.checks").meters().size()
                 + registry.find("app.reconciliation.last.invariant.divergences").meters().size());
         assertTrue(registry.getMeters().stream().flatMap(m -> m.getId().getTags().stream())
                 .allMatch(tag -> tag.getKey().equals("invariant")));

@@ -280,7 +280,8 @@ class PostgresMigrationIT {
         ReconciliacaoGlobalResponse report = reconciliacaoGlobalService.reconciliarUsuario(usuarioId);
         assertEquals(ReconciliacaoGlobalResponse.Status.OK, report.status());
         assertEquals(0, report.divergencias());
-        assertEquals(4, report.resumo().size());
+        // Cinco invariantes desde a inclusão de CATEGORIA_VALOR_GASTO.
+        assertEquals(5, report.resumo().size());
     }
 
     @Test

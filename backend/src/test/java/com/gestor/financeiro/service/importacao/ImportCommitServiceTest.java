@@ -11,6 +11,12 @@ import com.gestor.financeiro.model.enums.ImportBatchStatus;
 import com.gestor.financeiro.model.enums.ImportFormat;
 import com.gestor.financeiro.model.enums.ImportRecordStatus;
 import com.gestor.financeiro.model.enums.TipoTransacao;
+import com.gestor.financeiro.dto.ReconciliacaoGlobalResponse;
+import com.gestor.financeiro.service.LedgerService;
+import com.gestor.financeiro.service.ReconciliacaoGlobalService;
+import com.gestor.financeiro.service.RegistrarMovimentoCommand;
+import com.gestor.financeiro.model.enums.OrigemMovimentoCarteira;
+import com.gestor.financeiro.model.enums.TipoMovimentoCarteira;
 import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.CategoriaRepository;
 import com.gestor.financeiro.repository.ImportBatchRepository;
@@ -51,6 +57,9 @@ class ImportCommitServiceTest {
     @Autowired TransacaoRepository transacoes;
     @Autowired MovimentoCarteiraRepository movimentos;
     @Autowired UsuarioRepository usuarios;
+    @Autowired ImportReversalService reversalService;
+    @Autowired ReconciliacaoGlobalService reconciliacao;
+    @Autowired LedgerService ledgerService;
 
     private Usuario usuario;
     private Carteira conta;
@@ -60,7 +69,14 @@ class ImportCommitServiceTest {
     void setup() {
         limpar();
         usuario = usuarios.save(TestDataFactory.usuario("Commit", "commit-" + System.nanoTime() + "@test.local", "h"));
-        conta = carteiras.save(TestDataFactory.carteira(usuario, "Conta corrente", new BigDecimal("1000.00")));
+        // Saldo entra pelo ledger, não por atribuição direta: saldo materializado sem lançamento
+        // já nasceria divergente na reconciliação, e é justamente isso que os testes conferem.
+        conta = carteiras.save(TestDataFactory.carteira(usuario, "Conta corrente", BigDecimal.ZERO));
+        ledgerService.registrarMovimento(new RegistrarMovimentoCommand(
+                usuario.getId(), conta.getId(), TipoMovimentoCarteira.ENTRADA, new BigDecimal("1000.00"),
+                RegistrarMovimentoCommand.Direcao.ENTRADA, OrigemMovimentoCarteira.CARTEIRA_AJUSTE,
+                "SALDO_INICIAL", conta.getId(), "Saldo inicial do teste", "teste:saldo:" + conta.getId(),
+                java.time.LocalDateTime.now(), false));
         categoria = categorias.save(TestDataFactory.categoria(usuario, "Mercado"));
     }
 
@@ -185,6 +201,61 @@ class ImportCommitServiceTest {
         assertEquals("CURRENCY_UNSUPPORTED", recusado.getReasonCode());
         assertEquals(ImportBatchStatus.COMMITTED,
                 batchRepository.findById(batch.getId()).orElseThrow().getStatus());
+    }
+
+    @Test
+    void reversaoEstornaSaldoCategoriaEMantemTrilha() {
+        ImportBatch batch = loteComRegistros(ImportRecordStatus.PENDING_REVIEW, ImportRecordStatus.VALID);
+        ImportRecord emRevisao = records.findAll().stream()
+                .filter(r -> r.getStatus() == ImportRecordStatus.PENDING_REVIEW).findFirst().orElseThrow();
+        commitService.aprovar(usuario.getId(), batch.getId(), emRevisao.getId(), categoria.getId());
+        lancar(batch);
+        assertEquals(new BigDecimal("980.00"), saldo());
+
+        reversalService.executar(usuario.getId(), batch.getId());
+
+        assertEquals(ImportBatchStatus.REVERSED,
+                batchRepository.findById(batch.getId()).orElseThrow().getStatus());
+        assertEquals(new BigDecimal("1000.00"), saldo());
+        assertEquals(BigDecimal.ZERO.setScale(2),
+                categorias.findById(categoria.getId()).orElseThrow().getValorGasto().setScale(2));
+        records.findAll().forEach(record -> {
+            assertEquals(ImportRecordStatus.REVERSED, record.getStatus());
+            assertNotNull(record.getTransacao(), "reversão preserva o vínculo para auditoria");
+        });
+        assertEquals(2, transacoes.count(), "transação revertida continua no histórico, inativa");
+        assertTrue(transacoes.findAll().stream().noneMatch(t -> Boolean.TRUE.equals(t.getAtiva())));
+    }
+
+    @Test
+    void reexecutarAReversaoNaoEstornaDuasVezes() {
+        ImportBatch batch = loteComRegistros(ImportRecordStatus.VALID, ImportRecordStatus.VALID);
+        lancar(batch);
+        reversalService.executar(usuario.getId(), batch.getId());
+
+        // Reexecução do job de reversão: precisa ser inócua.
+        reversalService.executar(usuario.getId(), batch.getId());
+
+        assertEquals(new BigDecimal("1000.00"), saldo());
+    }
+
+    @Test
+    void reconciliacaoNaoAcusaDivergenciaDepoisDeLancarEReverter() {
+        ImportBatch batch = loteComRegistros(ImportRecordStatus.VALID, ImportRecordStatus.VALID);
+        records.findAll().forEach(record -> {
+            record.setCategoria(categoria);
+            records.save(record);
+        });
+
+        lancar(batch);
+        ReconciliacaoGlobalResponse aposCommit = reconciliacao.reconciliarUsuario(usuario.getId());
+        reversalService.executar(usuario.getId(), batch.getId());
+        ReconciliacaoGlobalResponse aposReversao = reconciliacao.reconciliarUsuario(usuario.getId());
+
+        assertEquals(0, aposCommit.divergencias(),
+                () -> "commit não pode deixar verdade materializada torta: " + aposCommit.detalhes());
+        assertEquals(0, aposReversao.divergencias(),
+                () -> "reversão não pode deixar verdade materializada torta: " + aposReversao.detalhes());
     }
 
     @Test

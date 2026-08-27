@@ -335,7 +335,19 @@ public class TransacaoService {
 
     @Transactional
     public void deletar(Long id, Long usuarioId) {
+        deletar(id, usuarioId, null);
+    }
+
+    /**
+     * Cancelamento com chave de idempotencia no estorno. Reversao em lote (importacao) precisa
+     * poder ser reexecutada apos falha sem estornar duas vezes o mesmo movimento.
+     */
+    @Transactional
+    public void deletar(Long id, Long usuarioId, String ledgerIdempotencyKey) {
         Transacao transacao = buscarPorIdDoUsuario(id, usuarioId);
+        if (Boolean.FALSE.equals(transacao.getAtiva())) {
+            return;
+        }
 
         boolean compraCartao = isCompraCartao(transacao);
         if (compraCartao) {
@@ -354,7 +366,7 @@ public class TransacaoService {
             categoriaRepository.save(categoria);
         }
 
-        registrarEstornoCancelamento(transacao, usuarioId);
+        registrarEstornoCancelamento(transacao, usuarioId, ledgerIdempotencyKey);
 
         transacao.setAtiva(false);
         transacaoRepository.save(transacao);
@@ -452,7 +464,8 @@ public class TransacaoService {
         ));
     }
 
-    private void registrarEstornoCancelamento(Transacao transacao, Long usuarioId) {
+    private void registrarEstornoCancelamento(Transacao transacao, Long usuarioId,
+                                              String ledgerIdempotencyKey) {
         if (transacao.getCarteira() == null || transacao.getCarteira().getId() == null) {
             return;
         }
@@ -475,7 +488,7 @@ public class TransacaoService {
                 "TRANSACAO",
                 transacao.getId(),
                 "Estorno por cancelamento: " + transacao.getDescricao(),
-                null,
+                ledgerIdempotencyKey,
                 LocalDateTime.now(clock),
                 false
         ));
