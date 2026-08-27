@@ -9,6 +9,33 @@
 > abaixo preservam status e evidência do momento de cada PR; não interpretar ressalva histórica
 > como falha atual sem conferir `BACKLOG.md` e `PROBLEM_LEDGER.md`.
 
+### Fase 4 de produto — PR-F4-01 a PR-F4-07 (em andamento)
+
+**Status consolidado:** `PASS_PARCIAL` — importação ponta a ponta existe no backend; clientes,
+mapeamento configurável, fatura e automações seguem abertos (BACKLOG-0106).
+
+| PR | Escopo | Status | Evidência |
+|---|---|---|---|
+| PR-F4-01 | Fundação do pipeline canônico (V45–V47, SPI, lifecycle, idempotência) | `PASS` | commit da fundação |
+| PR-F4-01b | Correção da fundação + cobertura do orquestrador | `PASS` | 326 unitários |
+| PR-F4-01c | Testes de integração passam a rodar no CI (job `backend-it`) | `PASS` | 35 ITs em PostgreSQL |
+| PR-F4-01d | Envelope de runtime, erros de upload e observabilidade | `PASS` | 330 unitários |
+| PR-F4-02 | Endpoint de envio, `TempFileImportSource` e admissão | `PASS` | 338 unitários |
+| PR-F4-03 | Worker da fila durável + ADR-0016 | `PASS` | 40 ITs |
+| PR-F4-04 | Prévia paginada por cursor | `PASS` | 340 unitários |
+| PR-F4-05 | Deduplicação (identidade forte + heurística) + V48 | `PASS` | 346 unitários |
+| PR-F4-06 | Commit no ledger pela fila + V49 | `PASS` | 354 unitários, 44 ITs |
+| PR-F4-07 | Reversão auditável + invariante `CATEGORIA_VALOR_GASTO` | `PASS` | 357 unitários, 44 ITs |
+
+**Provas que sustentam o `PASS` do bloco:** reenviar o mesmo arquivo não cria lançamento; reexecutar
+o commit não duplica saldo (conferido a centavo contra PostgreSQL); reverter devolve saldo, gasto de
+categoria e ledger ao estado anterior; reconciliação global fica em zero divergência antes e depois.
+
+**Pendências do bloco:** mapeamento configurável de colunas, importação de fatura, clientes mobile e
+web, retenção do dado importado e as automações dos Blocos B/C/D do plano.
+
+---
+
 ### Fase 3 de produto — PR-F3-01 a PR-F3-13
 
 **Status consolidado:** `PASS_COM_RESSALVA_OPERACIONAL`

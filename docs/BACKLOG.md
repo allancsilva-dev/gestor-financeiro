@@ -1945,9 +1945,11 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   trilha auditável.
 - **Risco se ficar pendente:** Importação produtiva permanece indisponível; endpoint legado não é
   arquitetura válida para produção.
-- **Status:** ABERTO — fundação PR-F4-01 e parsers CSV/OFX (PR-F4-01b) concluídos e cobertos por
-  teste. Faltam adapter `ImportSource` de produção, endpoints do pipeline, preview, mapeamento
-  configurável, dedupe, commit no ledger, reversão, conciliação e worker de fila.
+- **Status:** ABERTO (parcial) — fundação, parsers, endpoint de envio com admissão, worker de fila,
+  prévia paginada, deduplicação, commit no ledger e reversão auditável entregues em PR-F4-01b..07,
+  com prova de não-duplicação e reconciliação em zero divergência. **Faltam:** mapeamento
+  configurável de colunas, importação/revisão de fatura, clientes mobile e web, retenção do dado
+  importado e conciliação declarada de saldo do arquivo.
 
 ## BACKLOG-0107 — Reabrir a decisão de parse assíncrono quando houver segunda instância ou object storage
 
