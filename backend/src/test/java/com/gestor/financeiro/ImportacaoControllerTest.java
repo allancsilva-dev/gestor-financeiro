@@ -5,6 +5,7 @@ import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.ImportBatchStatus;
 import com.gestor.financeiro.model.enums.ImportFormat;
 import com.gestor.financeiro.repository.ImportBatchRepository;
+import com.gestor.financeiro.repository.ImportMapeamentoRepository;
 import com.gestor.financeiro.repository.ImportRecordRepository;
 import com.gestor.financeiro.repository.RateLimitBucketRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
@@ -18,6 +19,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.io.IOException;
@@ -29,6 +31,7 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -60,6 +63,7 @@ class ImportacaoControllerTest {
     @Autowired UsuarioRepository usuarioRepository;
     @Autowired ImportBatchRepository batchRepository;
     @Autowired ImportRecordRepository recordRepository;
+    @Autowired ImportMapeamentoRepository mapeamentoRepository;
     @Autowired RateLimitBucketRepository rateLimitBucketRepository;
 
     private Usuario usuario;
@@ -83,6 +87,7 @@ class ImportacaoControllerTest {
     private void limparImportacoes() {
         recordRepository.deleteAll();
         batchRepository.deleteAll();
+        mapeamentoRepository.deleteAll();
     }
 
     private MockMultipartFile arquivo(String conteudo) {
@@ -225,6 +230,53 @@ class ImportacaoControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.content[0].fileSha256").value("d".repeat(64)));
+    }
+
+    @Test
+    @WithMockUser(username = EMAIL)
+    void inspecionarDevolveSoOsCabecalhosDoArquivo() throws Exception {
+        String csv = "Data Mov;Historico;Vlr (R$)\n01/08/2026;Mercado;-12,34\n";
+
+        mockMvc.perform(multipart("/api/v1/importacoes/inspecionar").file(arquivo(csv)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.delimitador").value(";"))
+                .andExpect(jsonPath("$.cabecalhos.length()").value(3))
+                .andExpect(jsonPath("$.cabecalhos[2]").value("Vlr (R$)"))
+                // Estrutura basta: nenhuma linha de dado precisa trafegar para montar o mapeamento.
+                .andExpect(jsonPath("$.linhas").doesNotExist());
+    }
+
+    @Test
+    @WithMockUser(username = EMAIL)
+    void mapeamentoDoTitularFazArquivoDesconhecidoSerLido() throws Exception {
+        String csv = "Data Mov;Historico;Vlr (R$)\n01/08/2026;Mercado;-12,34\n";
+
+        // Sem mapeamento, cabeçalho fora do padrão não é reconhecido.
+        mockMvc.perform(multipart("/api/v1/importacoes").file(arquivo(csv)))
+                .andExpect(status().isUnprocessableEntity());
+
+        String mapeamento = mockMvc.perform(post("/api/v1/importacoes/mapeamentos")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nome\":\"Banco X\",\"delimitador\":\";\",\"colunas\":"
+                                + "{\"date\":\"Data Mov\",\"description\":\"Historico\",\"amount\":\"Vlr (R$)\"}}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long mapeamentoId = idDe(mapeamento);
+
+        mockMvc.perform(multipart("/api/v1/importacoes")
+                        .file(arquivo(csv))
+                        .param("mapeamentoId", String.valueOf(mapeamentoId)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.totalRecords").value(1));
+    }
+
+    @Test
+    @WithMockUser(username = EMAIL)
+    void mapeamentoSemDataOuValorEhRecusado() throws Exception {
+        mockMvc.perform(post("/api/v1/importacoes/mapeamentos")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nome\":\"Incompleto\",\"colunas\":{\"description\":\"Historico\"}}"))
+                .andExpect(status().isUnprocessableEntity());
     }
 
     @Test

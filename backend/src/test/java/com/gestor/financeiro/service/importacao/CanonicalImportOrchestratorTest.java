@@ -76,9 +76,10 @@ class CanonicalImportOrchestratorTest {
         ImportLimits limits = new ImportLimits(fileBytes, 65536, maxRecords, 65536, 8192, 64, 32,
                 500000, 8192, stagingFlush);
         // Registry proprio: os conectores precisam enxergar os mesmos limites do orquestrador.
+        CsvImportConnector csv = new CsvImportConnector(limits, normalizer);
         ImportConnectorRegistry registry = new ImportConnectorRegistry(List.of(
-                new CsvImportConnector(limits, normalizer), new OfxImportConnector(limits, normalizer)));
-        return new CanonicalImportOrchestrator(batches, registry, deduplicacao, categorizacao, records, batchRepository, limits,
+                csv, new OfxImportConnector(limits, normalizer)));
+        return new CanonicalImportOrchestrator(batches, registry, csv, deduplicacao, categorizacao, records, batchRepository, limits,
                 entityManager, transactionManager);
     }
 

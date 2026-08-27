@@ -7,6 +7,24 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ---
 
+## [Fase 4 — PR-F4-17] - 2026-08-27
+
+### Mapeamento configurável de colunas — Fase 4 fecha o escopo
+- V56 cria `import_mapeamentos`: perfis de coluna por titular, com CHECK exigindo `date` e `amount`
+  — mapeamento sem data e valor não gera lançamento e não deveria nem ser salvo.
+- `POST /api/v1/importacoes/inspecionar` devolve **só cabeçalhos e delimitador**. O cabeçalho é
+  estrutura; as linhas são a vida financeira da pessoa, e não precisam trafegar para montar um
+  mapeamento.
+- Com mapeamento, a detecção automática é dispensada: exigir que o cabeçalho seja reconhecível
+  recusaria justamente o arquivo que o mapeamento existe para resolver.
+- Campo de mapeamento desconhecido é recusado em vez de ignorado — ignorar faria o usuário acreditar
+  que mapeou algo que o parse descartaria.
+- Mobile: quando o arquivo não é reconhecido, a tela oferece reusar um mapeamento salvo ou dizer
+  quais são as colunas, escolhendo campo e coluna; salvar já reenvia o mesmo arquivo.
+- `ddl-auto=validate` pegou duas divergências entre migration e entidade (`jsonb` e `char(1)`) antes
+  de qualquer teste de negócio rodar.
+- Validação: 407 testes unitários e 49 de integração no backend; 420 no mobile.
+
 ## [Fase 4 — PR-F4-16] - 2026-08-27
 
 ### Importação de fatura de cartão

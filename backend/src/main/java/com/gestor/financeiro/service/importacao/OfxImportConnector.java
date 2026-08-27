@@ -39,7 +39,9 @@ public final class OfxImportConnector implements FinancialDataConnector {
         return new ConnectorDetection(ImportFormat.OFX, institution(value), score);
     }
 
-    @Override public void parse(ImportSource source, RecordConsumer consumer) throws IOException {
+    /** OFX é marcado por tag, não por coluna: mapeamento de colunas não se aplica. */
+    @Override public void parse(ImportSource source, ImportMapping mapeamento, RecordConsumer consumer)
+            throws IOException {
         if (source.size() > limits.fileBytes()) throw new ImportParsingException(ImportFailureCode.FILE_LIMIT_EXCEEDED, "Arquivo excede limite");
         byte[] prefix;
         try (InputStream input = new BufferedInputStream(source.openStream())) { prefix = input.readNBytes(limits.ofxHeaderBytes()); }

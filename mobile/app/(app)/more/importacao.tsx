@@ -8,7 +8,7 @@ import {
 import importacaoService from '../../../src/services/importacaoService';
 import contaFinanceiraService from '../../../src/services/contaFinanceiraService';
 import cartaoService from '../../../src/services/cartaoService';
-import { ImportBatch, ImportRecord } from '../../../src/types';
+import { ImportBatch, ImportInspecao, ImportRecord } from '../../../src/types';
 import { formatCurrency, formatDateOnlyBR } from '../../../src/utils/format';
 import { mensagemDeErro } from '../../../src/utils/erros';
 import Badge from '../../../src/components/ui/Badge';
@@ -37,6 +37,16 @@ const TIPOS_ACEITOS = [
 ];
 
 const EXTENSOES = ['csv', 'ofx'];
+
+/** Campos que o pipeline entende. Rótulos falam do extrato, não do vocabulário do backend. */
+const CAMPOS: Array<{ valor: string; rotulo: string }> = [
+  { valor: 'date', rotulo: 'Data' },
+  { valor: 'amount', rotulo: 'Valor' },
+  { valor: 'description', rotulo: 'Descrição' },
+  { valor: 'currency', rotulo: 'Moeda' },
+  { valor: 'direction', rotulo: 'Entrada/saída' },
+  { valor: 'externalId', rotulo: 'Identificador' },
+];
 
 /** Motivos vêm do backend em enum fechado; aqui viram frase de gente. */
 const MOTIVO: Record<string, string> = {
@@ -74,6 +84,11 @@ export default function ImportacaoScreen() {
   const [cartaoId, setCartaoId] = useState<number | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+  // Guardado para o caso de o arquivo precisar de mapeamento: o reenvio usa o mesmo arquivo.
+  const [arquivo, setArquivo] = useState<{ uri: string; name: string; type: string } | null>(null);
+  const [inspecao, setInspecao] = useState<ImportInspecao | null>(null);
+  const [colunas, setColunas] = useState<Record<string, string>>({});
+  const [campoEmFoco, setCampoEmFoco] = useState<string>('date');
 
   const { data: contas = [] } = useQuery({
     queryKey: ['contas-para-importacao'],
@@ -129,12 +144,14 @@ export default function ImportacaoScreen() {
         setErro('Selecione um arquivo .csv ou .ofx.');
         return;
       }
-      setEnviando(true);
-      const novo = await importacaoService.enviar({
+      const selecionado = {
         uri: arquivo.uri,
         name: arquivo.name || 'extrato.csv',
         type: arquivo.mimeType || 'text/csv',
-      });
+      };
+      setArquivo(selecionado);
+      setEnviando(true);
+      const novo = await importacaoService.enviar(selecionado);
       setLoteId(novo.id);
       setContaId(null);
       setCartaoId(null);
@@ -143,6 +160,58 @@ export default function ImportacaoScreen() {
     } catch (err) {
       falhar(err);
     } finally {
+      setEnviando(false);
+    }
+  };
+
+  const { data: mapeamentos = [] } = useQuery({
+    queryKey: ['importacao-mapeamentos'],
+    queryFn: () => importacaoService.listarMapeamentos(),
+  });
+
+  /** Lê os cabeçalhos do arquivo que o app não reconheceu, para o usuário dizer o que é o quê. */
+  const inspecionar = async () => {
+    if (!arquivo) return;
+    setErro(null);
+    try {
+      setInspecao(await importacaoService.inspecionar(arquivo));
+      setColunas({});
+      setCampoEmFoco('date');
+    } catch (err) {
+      falhar(err);
+    }
+  };
+
+  const enviarComMapeamento = async (mapeamentoId: number) => {
+    if (!arquivo) return;
+    setErro(null);
+    setEnviando(true);
+    try {
+      const novo = await importacaoService.enviar(arquivo, undefined, mapeamentoId);
+      setLoteId(novo.id);
+      setInspecao(null);
+      queryClient.setQueryData(['importacao', novo.id], novo);
+    } catch (err) {
+      falhar(err);
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  const salvarMapeamentoEImportar = async () => {
+    if (!arquivo || !inspecao) return;
+    setErro(null);
+    setEnviando(true);
+    try {
+      const salvo = await importacaoService.salvarMapeamento({
+        nome: `Meu banco ${mapeamentos.length + 1}`,
+        delimitador: inspecao.delimitador,
+        colunas,
+      });
+      queryClient.invalidateQueries({ queryKey: ['importacao-mapeamentos'] });
+      await enviarComMapeamento(salvo.id);
+    } catch (err) {
+      falhar(err);
       setEnviando(false);
     }
   };
@@ -235,6 +304,71 @@ export default function ImportacaoScreen() {
         {erro && (
           <Card>
             <Text style={{ ...typography.body, color: colors.danger }}>{erro}</Text>
+            {arquivo && loteId == null && !inspecao && (
+              <View style={{ marginTop: spacing.md, gap: spacing.sm }}>
+                <Text style={{ ...typography.meta, color: colors.textMuted }}>
+                  Se o seu extrato usa outros nomes de coluna, você pode dizer qual é qual.
+                </Text>
+                {mapeamentos.map((mapeamento) => (
+                  <Botao
+                    key={mapeamento.id}
+                    titulo={`Usar “${mapeamento.nome}”`}
+                    variante="secundario"
+                    tamanho="pill"
+                    onPress={() => enviarComMapeamento(mapeamento.id)}
+                  />
+                ))}
+                <Botao
+                  titulo="Dizer quais são as colunas"
+                  variante="secundario"
+                  onPress={inspecionar}
+                  testID="importacao-inspecionar"
+                />
+              </View>
+            )}
+          </Card>
+        )}
+
+        {inspecao && (
+          <Card>
+            <Text style={{ ...typography.cardTitle, color: colors.textPrimary }}>Quais são as colunas?</Text>
+            <Text style={{ ...typography.meta, color: colors.textMuted, marginTop: spacing.xxs }}>
+              Escolha o campo e toque na coluna correspondente do seu arquivo. Data e valor são
+              obrigatórios.
+            </Text>
+
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.md }}>
+              {CAMPOS.map((campo) => (
+                <Chip
+                  key={campo.valor}
+                  label={colunas[campo.valor] ? `${campo.rotulo}: ${colunas[campo.valor]}` : campo.rotulo}
+                  selected={campoEmFoco === campo.valor}
+                  onPress={() => setCampoEmFoco(campo.valor)}
+                />
+              ))}
+            </View>
+
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.md }}>
+              {inspecao.cabecalhos.map((cabecalho) => (
+                <Chip
+                  key={cabecalho}
+                  label={cabecalho}
+                  selected={colunas[campoEmFoco] === cabecalho}
+                  onPress={() => setColunas({ ...colunas, [campoEmFoco]: cabecalho })}
+                />
+              ))}
+            </View>
+
+            <View style={{ marginTop: spacing.lg }}>
+              <Botao
+                titulo="Salvar e importar"
+                onPress={salvarMapeamentoEImportar}
+                carregando={enviando}
+                desabilitado={!colunas.date || !colunas.amount}
+                testID="importacao-salvar-mapeamento"
+                dica={!colunas.date || !colunas.amount ? 'Indique ao menos data e valor' : undefined}
+              />
+            </View>
           </Card>
         )}
 

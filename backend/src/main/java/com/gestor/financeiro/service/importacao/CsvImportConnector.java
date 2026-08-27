@@ -36,11 +36,18 @@ public final class CsvImportConnector implements FinancialDataConnector {
         return new ConnectorDetection(ImportFormat.CSV, null, shape.score());
     }
 
-    @Override public void parse(ImportSource source, RecordConsumer consumer) throws IOException {
+    @Override public void parse(ImportSource source, ImportMapping mapeamento, RecordConsumer consumer)
+            throws IOException {
         CsvShape shape = inspect(source);
-        if (shape.score() < 80) throw new ImportParsingException(ImportFailureCode.FORMAT_MISMATCH, "Estrutura CSV inválida");
+        // Mapeamento do titular manda sobre a detecção: ele viu o arquivo e disse qual coluna é qual.
+        char delimitador = mapeamento != null && mapeamento.delimitador() != null
+                ? mapeamento.delimitador() : shape.delimiter();
+        boolean comMapeamento = mapeamento != null && !mapeamento.vazio();
+        if (!comMapeamento && shape.score() < 80) {
+            throw new ImportParsingException(ImportFailureCode.FORMAT_MISMATCH, "Estrutura CSV inválida");
+        }
         CsvParserSettings settings = new CsvParserSettings();
-        settings.getFormat().setDelimiter(shape.delimiter());
+        settings.getFormat().setDelimiter(delimitador);
         settings.setHeaderExtractionEnabled(true);
         settings.setMaxColumns(limits.csvColumns());
         settings.setMaxCharsPerColumn(limits.recordChars());
@@ -61,7 +68,12 @@ public final class CsvImportConnector implements FinancialDataConnector {
                 for (int i = 0; i < row.length; i++) {
                     String value = row[i]; logicalChars += value == null ? 0 : value.length();
                     if (logicalChars > limits.recordChars()) throw new ImportParsingException(ImportFailureCode.STRUCTURE_LIMIT_EXCEEDED, "Registro excede limite estrutural");
-                    String canonical = i < headers.length ? ALIASES.get(key(headers[i])) : null;
+                    String canonical = null;
+                    if (i < headers.length) {
+                        canonical = comMapeamento
+                                ? mapeamento.campoDaColuna(key(headers[i]))
+                                : ALIASES.get(key(headers[i]));
+                    }
                     if (canonical != null) fields.put(canonical, value);
                 }
                 consumer.accept(normalizer.normalize(records + 1, null, fields.get("externalId"), fields.get("date"),
@@ -71,6 +83,39 @@ public final class CsvImportConnector implements FinancialDataConnector {
         catch (RuntimeException e) { throw new ImportParsingException(ImportFailureCode.PARSE_FAILED, "CSV inválido", e); }
         finally { parser.stopParsing(); }
     }
+
+    /**
+     * Cabeçalhos e delimitador do arquivo, para o titular montar um mapeamento.
+     *
+     * <p>Devolve só os nomes das colunas — nenhuma linha de dado. O cabeçalho é estrutura; as
+     * linhas são a vida financeira da pessoa, e elas não precisam trafegar para isto.</p>
+     */
+    public CsvInspecao inspecionarCabecalhos(ImportSource source) throws IOException {
+        CsvShape shape = inspect(source);
+        CsvParserSettings settings = new CsvParserSettings();
+        settings.getFormat().setDelimiter(shape.delimiter());
+        settings.setHeaderExtractionEnabled(true);
+        settings.setMaxColumns(limits.csvColumns());
+        settings.setMaxCharsPerColumn(limits.recordChars());
+        settings.setLineSeparatorDetectionEnabled(true);
+        settings.setSkipEmptyLines(true);
+
+        CsvParser parser = new CsvParser(settings);
+        try (InputStream input = source.openStream();
+             InputStreamReader reader = new InputStreamReader(input, shape.charset())) {
+            parser.beginParsing(reader);
+            parser.parseNext();
+            String[] headers = parser.getContext() == null ? null : parser.getContext().headers();
+            java.util.List<String> cabecalhos = headers == null ? java.util.List.of()
+                    : java.util.Arrays.stream(headers).filter(java.util.Objects::nonNull).toList();
+            return new CsvInspecao(String.valueOf(shape.delimiter()), cabecalhos);
+        } finally {
+            parser.stopParsing();
+        }
+    }
+
+    /** Estrutura do arquivo, sem conteúdo. */
+    public record CsvInspecao(String delimitador, java.util.List<String> cabecalhos) { }
 
     private CsvShape inspect(ImportSource source) throws IOException {
         if (source.size() == 0) throw new ImportParsingException(ImportFailureCode.EMPTY_FILE, "Arquivo vazio");

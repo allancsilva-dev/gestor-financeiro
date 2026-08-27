@@ -27,6 +27,10 @@ jest.mock('../services/importacaoService', () => ({
     consultar: jest.fn(),
     historico: jest.fn(),
     registros: jest.fn(),
+    inspecionar: jest.fn(),
+    listarMapeamentos: jest.fn(),
+    salvarMapeamento: jest.fn(),
+    removerMapeamento: jest.fn(),
     preparar: jest.fn(),
     aprovar: jest.fn(),
     lancar: jest.fn(),
@@ -100,6 +104,7 @@ beforeEach(() => {
   cartoes.listarTodos.mockResolvedValue([{ id: 4, nome: 'Nubank', limite: 1000, diaFechamento: 20, diaVencimento: 27 }]);
   servico.historico.mockResolvedValue({ content: [], totalElements: 0, totalPages: 0, size: 5, number: 0 } as any);
   servico.registros.mockResolvedValue({ registros: [registro()], proximaLinha: null });
+  servico.listarMapeamentos.mockResolvedValue([]);
   picker.getDocumentAsync.mockResolvedValue({
     canceled: false,
     assets: [{ uri: 'file:///extrato.csv', name: 'extrato.csv', mimeType: 'text/csv' }],
@@ -156,6 +161,44 @@ describe('tela de importação', () => {
     fireEvent.press(await screen.findByText('💳 Nubank'));
 
     await waitFor(() => expect(servico.preparar).toHaveBeenCalledWith(10, { cartaoId: 4 }));
+  });
+
+  it('arquivo não reconhecido oferece dizer quais são as colunas, e reenvia com o mapeamento', async () => {
+    servico.enviar
+      .mockRejectedValueOnce(Object.assign(new Error('Falha ao processar importação'), {
+        userMessage: 'Falha ao processar importação',
+        status: 422,
+      }))
+      .mockResolvedValueOnce(lote());
+    servico.consultar.mockResolvedValue(lote());
+    servico.inspecionar.mockResolvedValue({
+      delimitador: ';',
+      cabecalhos: ['Data Mov', 'Historico', 'Vlr (R$)'],
+    });
+    servico.salvarMapeamento.mockResolvedValue({
+      id: 3, nome: 'Meu banco 1', delimitador: ';', colunas: {},
+    });
+
+    renderizar();
+    await escolherArquivo();
+
+    fireEvent.press(await screen.findByTestId('importacao-inspecionar'));
+
+    // Data já vem em foco: escolher a coluna preenche o campo selecionado.
+    fireEvent.press(await screen.findByText('Data Mov'));
+    // Só com data o botão continua travado: sem valor não existe lançamento.
+    expect(screen.getByTestId('importacao-salvar-mapeamento').props.accessibilityState?.disabled).toBe(true);
+
+    fireEvent.press(screen.getByText('Valor'));
+    fireEvent.press(screen.getByText('Vlr (R$)'));
+    fireEvent.press(screen.getByTestId('importacao-salvar-mapeamento'));
+
+    await waitFor(() => expect(servico.salvarMapeamento).toHaveBeenCalledWith(expect.objectContaining({
+      delimitador: ';',
+      colunas: { date: 'Data Mov', amount: 'Vlr (R$)' },
+    })));
+    await waitFor(() => expect(servico.enviar).toHaveBeenLastCalledWith(
+      expect.objectContaining({ name: 'extrato.csv' }), undefined, 3));
   });
 
   it('linha em revisão traz o motivo e a ação de aprovar', async () => {

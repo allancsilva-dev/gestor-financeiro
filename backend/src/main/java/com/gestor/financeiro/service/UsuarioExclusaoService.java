@@ -52,6 +52,8 @@ public class UsuarioExclusaoService {
             "DELETE FROM NotificacaoDispositivo nd WHERE nd.usuario.id = :id"),
         new DeleteTitular("notificacoes",
             "DELETE FROM Notificacao n WHERE n.usuario.id = :id"),
+        new DeleteTitular("import_mapeamentos",
+            "DELETE FROM ImportMapeamento im WHERE im.usuario.id = :id"),
         new DeleteTitular("import_records",
             "DELETE FROM ImportRecord ir WHERE ir.batch.id IN (SELECT ib.id FROM ImportBatch ib WHERE ib.usuario.id = :id)"),
         new DeleteTitular("import_batches",

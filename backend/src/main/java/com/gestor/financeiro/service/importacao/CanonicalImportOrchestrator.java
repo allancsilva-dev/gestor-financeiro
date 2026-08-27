@@ -22,6 +22,7 @@ import java.util.HexFormat;
 public final class CanonicalImportOrchestrator {
     private final ImportBatchService batches;
     private final ImportConnectorRegistry connectors;
+    private final CsvImportConnector csvConnector;
     private final ImportDeduplicationService deduplicacao;
     private final ImportCategorizacaoService categorizacao;
     private final ImportRecordRepository records;
@@ -31,17 +32,24 @@ public final class CanonicalImportOrchestrator {
     private final TransactionTemplate transactions;
 
     public CanonicalImportOrchestrator(ImportBatchService batches, ImportConnectorRegistry connectors,
+                                       CsvImportConnector csvConnector,
                                        ImportDeduplicationService deduplicacao,
                                        ImportCategorizacaoService categorizacao,
                                        ImportRecordRepository records, ImportBatchRepository batchRepository,
                                        ImportLimits limits, EntityManager entityManager,
                                        PlatformTransactionManager transactionManager) {
-        this.batches = batches; this.connectors = connectors; this.deduplicacao = deduplicacao; this.categorizacao = categorizacao; this.records = records;
+        this.batches = batches; this.connectors = connectors; this.csvConnector = csvConnector; this.deduplicacao = deduplicacao; this.categorizacao = categorizacao; this.records = records;
         this.batchRepository = batchRepository; this.limits = limits; this.entityManager = entityManager;
         this.transactions = new TransactionTemplate(transactionManager);
     }
 
     public ImportBatch stage(Long usuarioId, ImportSource source, String idempotencyKey) throws IOException {
+        return stage(usuarioId, source, idempotencyKey, ImportMapping.automatico());
+    }
+
+    /** Com mapeamento do titular, o cabeçalho do arquivo deixa de precisar ser reconhecível. */
+    public ImportBatch stage(Long usuarioId, ImportSource source, String idempotencyKey,
+                             ImportMapping mapeamento) throws IOException {
         String declaredHash = source.sha256();
         String initialHash = declaredHash == null ? sha256(source) : declaredHash;
         ImportBatch created = batches.create(usuarioId, ImportFormat.UNKNOWN, null, initialHash, idempotencyKey);
@@ -51,10 +59,16 @@ public final class CanonicalImportOrchestrator {
             // valor acima já é a leitura íntegra do arquivo e um segundo passe não prova nada.
             if (declaredHash != null && !sha256(source).equals(declaredHash))
                 throw new ImportParsingException(ImportFailureCode.HASH_MISMATCH, "Hash do arquivo não confere");
-            ImportConnectorRegistry.DetectedConnector detected = connectors.detect(source);
+            // Com mapeamento em mãos o titular já disse o que o arquivo é. Exigir que a detecção
+            // reconheça o cabeçalho recusaria justamente o arquivo que o mapeamento existe para
+            // resolver — mapeamento de coluna é conceito de CSV.
+            ImportConnectorRegistry.DetectedConnector detected = mapeamento != null && !mapeamento.vazio()
+                    ? new ImportConnectorRegistry.DetectedConnector(csvConnector,
+                            new ConnectorDetection(ImportFormat.CSV, null, 100))
+                    : connectors.detect(source);
             batches.setDetected(usuarioId, created.getId(), detected.detection().format(), detected.detection().institutionCode());
             transactions.executeWithoutResult(status -> {
-                try { parseTransaction(usuarioId, created.getId(), source, detected.connector()); }
+                try { parseTransaction(usuarioId, created.getId(), source, detected.connector(), mapeamento); }
                 catch (IOException e) { throw new ParsingRuntimeException(e); }
             });
             return batches.get(usuarioId, created.getId());
@@ -72,10 +86,10 @@ public final class CanonicalImportOrchestrator {
     }
 
     private void parseTransaction(Long usuarioId, Long batchId, ImportSource source,
-                                  FinancialDataConnector connector) throws IOException {
+                                  FinancialDataConnector connector, ImportMapping mapeamento) throws IOException {
         ImportBatch batch = batchRepository.findByIdAndUsuarioId(batchId, usuarioId).orElseThrow();
         int[] counts = new int[3];
-        connector.parse(source, canonical -> {
+        connector.parse(source, mapeamento, canonical -> {
             ImportRecord record = new ImportRecord();
             record.setBatch(entityManager.getReference(ImportBatch.class, batchId));
             record.setSourceLine(canonical.sourceLine()); record.setExternalId(canonical.externalId());

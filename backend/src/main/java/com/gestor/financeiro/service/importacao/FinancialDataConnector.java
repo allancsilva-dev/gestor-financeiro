@@ -6,7 +6,12 @@ import java.io.IOException;
 public interface FinancialDataConnector {
     ConnectorDetection detect(ImportSource source) throws IOException;
 
-    void parse(ImportSource source, RecordConsumer consumer) throws IOException;
+    /** Sem mapeamento explícito valem os apelidos conhecidos de cada formato. */
+    default void parse(ImportSource source, RecordConsumer consumer) throws IOException {
+        parse(source, ImportMapping.automatico(), consumer);
+    }
+
+    void parse(ImportSource source, ImportMapping mapeamento, RecordConsumer consumer) throws IOException;
 
     @FunctionalInterface
     interface RecordConsumer {

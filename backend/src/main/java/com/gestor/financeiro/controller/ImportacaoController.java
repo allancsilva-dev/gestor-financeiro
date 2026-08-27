@@ -3,6 +3,8 @@ package com.gestor.financeiro.controller;
 import com.gestor.financeiro.config.IdempotencyFilter;
 import com.gestor.financeiro.dto.AprovarRegistroImportacaoRequest;
 import com.gestor.financeiro.dto.ImportBatchResponse;
+import com.gestor.financeiro.dto.ImportMapeamentoRequest;
+import com.gestor.financeiro.dto.ImportMapeamentoResponse;
 import com.gestor.financeiro.dto.ImportRecordPageResponse;
 import com.gestor.financeiro.dto.ImportRecordResponse;
 import com.gestor.financeiro.dto.PrepararImportacaoRequest;
@@ -14,14 +16,17 @@ import com.gestor.financeiro.service.importacao.CanonicalImportOrchestrator;
 import com.gestor.financeiro.service.importacao.ImportAdmissionService;
 import com.gestor.financeiro.repository.ImportBatchRepository;
 import com.gestor.financeiro.service.importacao.ImportBatchService;
+import com.gestor.financeiro.service.importacao.ImportMapeamentoService;
 import com.gestor.financeiro.service.importacao.ImportCommitService;
 import com.gestor.financeiro.service.importacao.ImportReversalService;
+import com.gestor.financeiro.service.importacao.CsvImportConnector;
 import com.gestor.financeiro.service.importacao.ImportPreviewService;
 import com.gestor.financeiro.service.importacao.ImportParsingException;
 import com.gestor.financeiro.service.importacao.TempFileImportSource;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
@@ -31,6 +36,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -41,6 +47,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
 
 /**
  * Pipeline canônico de importação. O caminho legado (`/api/v1/importar/csv`) grava direto no
@@ -60,6 +67,8 @@ public class ImportacaoController {
     private final ImportCommitService commitService;
     private final ImportReversalService reversalService;
     private final ImportBatchRepository batchRepository;
+    private final ImportMapeamentoService mapeamentos;
+    private final CsvImportConnector csvConnector;
     private final AuthenticatedUserService authenticatedUserService;
 
     @Value("${spring.servlet.multipart.location:${java.io.tmpdir}}")
@@ -67,15 +76,18 @@ public class ImportacaoController {
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Enviar arquivo CSV/OFX para revisão antes do lançamento")
-    public ResponseEntity<ImportBatchResponse> enviar(@RequestParam("file") MultipartFile file,
-                                                      HttpServletRequest request) throws IOException {
+    public ResponseEntity<ImportBatchResponse> enviar(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "mapeamentoId", required = false) Long mapeamentoId,
+            HttpServletRequest request) throws IOException {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         String idempotencyKey = (String) request.getAttribute(IdempotencyFilter.ATTRIBUTE);
 
         // A vaga de parse e o arquivo temporário são liberados em qualquer saída, inclusive erro.
         try (ImportAdmissionService.Passe passe = admission.admitir(usuarioId);
              TempFileImportSource source = TempFileImportSource.of(file, Path.of(diretorioTemporario))) {
-            ImportBatch batch = orchestrator.stage(usuarioId, source, idempotencyKey);
+            ImportBatch batch = orchestrator.stage(usuarioId, source, idempotencyKey,
+                    mapeamentos.carregar(usuarioId, mapeamentoId));
             // Replay de uma chave cujo lote falhou volta pelo mesmo caminho de erro da primeira
             // tentativa: mesma requisição, mesma resposta.
             if (batch.getStatus() == ImportBatchStatus.FAILED) {
@@ -84,6 +96,48 @@ public class ImportacaoController {
             }
             return ResponseEntity.status(HttpStatus.CREATED).body(ImportBatchResponse.de(batch));
         }
+    }
+
+    @PostMapping(value = "/inspecionar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Ler apenas os cabeçalhos do CSV, para montar um mapeamento")
+    public ResponseEntity<CsvImportConnector.CsvInspecao> inspecionar(@RequestParam("file") MultipartFile file)
+            throws IOException {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        // Mesma admissão do envio: inspecionar também lê arquivo e custa memória.
+        try (ImportAdmissionService.Passe passe = admission.admitir(usuarioId);
+             TempFileImportSource source = TempFileImportSource.of(file, Path.of(diretorioTemporario))) {
+            return ResponseEntity.ok(csvConnector.inspecionarCabecalhos(source));
+        }
+    }
+
+    @GetMapping("/mapeamentos")
+    @Operation(summary = "Mapeamentos de coluna salvos pelo titular")
+    public ResponseEntity<List<ImportMapeamentoResponse>> listarMapeamentos() {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        return ResponseEntity.ok(mapeamentos.listar(usuarioId).stream()
+                .map(m -> new ImportMapeamentoResponse(m.getId(), m.getNome(), m.getInstituicao(),
+                        m.getDelimitador(), mapeamentos.colunasDe(m)))
+                .toList());
+    }
+
+    @PostMapping("/mapeamentos")
+    @Operation(summary = "Salvar mapeamento; mesmo nome atualiza em vez de duplicar")
+    public ResponseEntity<ImportMapeamentoResponse> salvarMapeamento(
+            @Valid @RequestBody ImportMapeamentoRequest request) {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        var salvo = mapeamentos.salvar(usuarioId, request.nome(), request.instituicao(),
+                request.delimitador(), request.colunas());
+        return ResponseEntity.status(HttpStatus.CREATED).body(new ImportMapeamentoResponse(
+                salvo.getId(), salvo.getNome(), salvo.getInstituicao(), salvo.getDelimitador(),
+                mapeamentos.colunasDe(salvo)));
+    }
+
+    @DeleteMapping("/mapeamentos/{id}")
+    @Operation(summary = "Remover mapeamento")
+    public ResponseEntity<Void> removerMapeamento(@PathVariable Long id) {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        mapeamentos.remover(usuarioId, id);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping

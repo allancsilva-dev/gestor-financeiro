@@ -654,6 +654,20 @@ export interface ImportRecord {
   categoriaNome?: string | null;
 }
 
+export interface ImportMapeamento {
+  id: number;
+  nome: string;
+  instituicao?: string | null;
+  delimitador?: string | null;
+  /** Campo canônico (date, description, amount, currency, direction, externalId) → nome da coluna. */
+  colunas: Record<string, string>;
+}
+
+export interface ImportInspecao {
+  delimitador: string;
+  cabecalhos: string[];
+}
+
 export interface ImportRecordPage {
   registros: ImportRecord[];
   proximaLinha: number | null;

@@ -341,6 +341,16 @@ mês fechado guarda a política e a versão da regra que valiam na hora e não �
 - `POST /api/v1/importacoes` — `multipart/form-data`, parte `file` (CSV ou OFX). Aceita
   `Idempotency-Key`. Devolve `201` com o lote (`status`, `format`, contadores). O arquivo é
   detectado, normalizado e persistido como lote auditável; **nada é lançado no ledger neste passo**.
+- `POST /api/v1/importacoes/inspecionar` — multipart; devolve `{ "delimitador": ";", "cabecalhos":
+  [...] }`. **Só a estrutura**: nenhuma linha de dado trafega para montar o mapeamento.
+- `GET /api/v1/importacoes/mapeamentos`, `POST /api/v1/importacoes/mapeamentos`,
+  `DELETE /api/v1/importacoes/mapeamentos/{id}` — perfis de coluna do titular. O corpo liga o campo
+  canônico (`date`, `description`, `amount`, `currency`, `direction`, `externalId`) ao nome da coluna
+  no arquivo; **data e valor são obrigatórios** e campo desconhecido é recusado (`422`), em vez de
+  ignorado em silêncio. Mesmo nome atualiza em vez de duplicar.
+- O envio aceita `mapeamentoId` como campo do formulário. Com mapeamento, a detecção automática é
+  dispensada — o titular já disse o que o arquivo é, e exigir cabeçalho reconhecível recusaria
+  justamente o arquivo que o mapeamento existe para resolver.
 - `GET /api/v1/importacoes` — histórico do titular (`Page`, `size<=100`), do mais recente para o
   mais antigo.
 - `GET /api/v1/importacoes/{id}` — situação do lote do titular; `404` para lote de outro titular.

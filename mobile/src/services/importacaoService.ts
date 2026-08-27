@@ -1,5 +1,8 @@
 import api from './api';
-import { ImportBatch, ImportRecord, ImportRecordPage, ImportRecordStatus, PagedResponse } from '../types';
+import {
+  ImportBatch, ImportInspecao, ImportMapeamento, ImportRecord, ImportRecordPage, ImportRecordStatus,
+  PagedResponse,
+} from '../types';
 import { UploadFile } from './anexoService';
 
 const baseUrl = '/v1/importacoes';
@@ -9,9 +12,10 @@ const baseUrl = '/v1/importacoes';
  * usuário confirmar. O endpoint legado (`/v1/importar/csv`) gravava direto e está desligado.
  */
 const importacaoService = {
-  enviar: (file: UploadFile, idempotencyKey?: string) => {
+  enviar: (file: UploadFile, idempotencyKey?: string, mapeamentoId?: number) => {
     const form = new FormData();
     form.append('file', { uri: file.uri, name: file.name, type: file.type } as any);
+    if (mapeamentoId != null) form.append('mapeamentoId', String(mapeamentoId));
     return api
       .post<ImportBatch>(baseUrl, form, {
         headers: {
@@ -21,6 +25,30 @@ const importacaoService = {
       })
       .then(r => r.data);
   },
+
+  /** Lê só os cabeçalhos do arquivo, para o usuário montar um mapeamento. Nenhuma linha trafega. */
+  inspecionar: (file: UploadFile) => {
+    const form = new FormData();
+    form.append('file', { uri: file.uri, name: file.name, type: file.type } as any);
+    return api
+      .post<ImportInspecao>(`${baseUrl}/inspecionar`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      .then(r => r.data);
+  },
+
+  listarMapeamentos: () =>
+    api.get<ImportMapeamento[]>(`${baseUrl}/mapeamentos`).then(r => r.data),
+
+  salvarMapeamento: (dados: {
+    nome: string;
+    instituicao?: string;
+    delimitador?: string;
+    colunas: Record<string, string>;
+  }) => api.post<ImportMapeamento>(`${baseUrl}/mapeamentos`, dados).then(r => r.data),
+
+  removerMapeamento: (id: number) =>
+    api.delete<void>(`${baseUrl}/mapeamentos/${id}`).then(() => undefined),
 
   consultar: (id: number) => api.get<ImportBatch>(`${baseUrl}/${id}`).then(r => r.data),
 
