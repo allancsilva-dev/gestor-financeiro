@@ -214,6 +214,21 @@ class ImportacaoControllerTest {
 
     @Test
     @WithMockUser(username = EMAIL)
+    void historicoListaSomenteOsLotesDoTitular() throws Exception {
+        batchRepository.save(loteRecebido("d".repeat(64)));
+        Usuario outro = usuarioRepository.save(TestDataFactory.usuario("Outro", OUTRO_EMAIL, "hash"));
+        ImportBatch alheio = loteRecebido("e".repeat(64));
+        alheio.setUsuario(outro);
+        batchRepository.save(alheio);
+
+        mockMvc.perform(get("/api/v1/importacoes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].fileSha256").value("d".repeat(64)));
+    }
+
+    @Test
+    @WithMockUser(username = EMAIL)
     void parteFileAusenteViraBadRequest() throws Exception {
         mockMvc.perform(multipart("/api/v1/importacoes"))
                 .andExpect(status().isBadRequest())

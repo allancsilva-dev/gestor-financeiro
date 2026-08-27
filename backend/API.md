@@ -332,6 +332,8 @@ em `status` retorna HTTP 400 (`INVALID_PARAMETER`).
 - `POST /api/v1/importacoes` — `multipart/form-data`, parte `file` (CSV ou OFX). Aceita
   `Idempotency-Key`. Devolve `201` com o lote (`status`, `format`, contadores). O arquivo é
   detectado, normalizado e persistido como lote auditável; **nada é lançado no ledger neste passo**.
+- `GET /api/v1/importacoes` — histórico do titular (`Page`, `size<=100`), do mais recente para o
+  mais antigo.
 - `GET /api/v1/importacoes/{id}` — situação do lote do titular; `404` para lote de outro titular.
 - `POST /api/v1/importacoes/{id}/preparar` — corpo `{ "contaFinanceiraId": 1 }`. Define a conta de
   destino e leva o lote a `READY_TO_COMMIT`. Conta de cartão é recusada (`422`): compra de cartão

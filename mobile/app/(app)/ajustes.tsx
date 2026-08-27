@@ -5,7 +5,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Sharing from 'expo-sharing';
 import { File, Paths } from 'expo-file-system';
-import * as DocumentPicker from 'expo-document-picker';
 import { useTheme, useTabBarSpace, spacing, radius, typography } from '../../src/theme';
 import { iconeDecorativo } from '../../src/utils/acessibilidade';
 import { misturar } from '../../src/theme/metaCores';
@@ -13,7 +12,6 @@ import { useAuth } from '../../src/context/AuthContext';
 import { useTema } from '../../src/context/TemaContext';
 import { TemaPreferido } from '../../src/store/temaPreferido';
 import api from '../../src/services/api';
-import importService from '../../src/services/importService';
 import notificacaoService from '../../src/services/notificacaoService';
 import usuarioService from '../../src/services/usuarioService';
 import { getInitials } from '../../src/utils/format';
@@ -31,19 +29,6 @@ import Chip from '../../src/components/ui/Chip';
 import IconTile from '../../src/components/ui/IconTile';
 import ListRow from '../../src/components/ui/ListRow';
 import Entrance from '../../src/components/ui/Entrance';
-
-// O SAF do Android filtra pelo MIME que o provedor do arquivo declara, e CSV
-// vindo de Downloads, Drive ou WhatsApp quase sempre chega como octet-stream ou
-// text/plain: com o filtro estrito o arquivo aparece cinza e não dá pra tocar.
-// Abre-se o filtro e revalida-se pela extensão — mesmo padrão do anexo em
-// EditarTransacaoModal. O backend não valida content-type, só lê o stream.
-const TIPOS_CSV = [
-  'text/csv',
-  'text/comma-separated-values',
-  'application/vnd.ms-excel',
-  'text/plain',
-  'application/octet-stream',
-];
 
 // Ferramentas do app. Os rótulos "Categorias", "Carteira", "Contas" e "Relatórios"
 // são tocados por texto em .maestro/financial-critical.yaml — não renomear.
@@ -112,36 +97,6 @@ export default function Ajustes() {
       }
     } catch (err: any) {
       Alert.alert('Exportar dados', err?.userMessage ?? 'Não foi possível exportar. Tente novamente.');
-    }
-  };
-
-  const importarCsv = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: TIPOS_CSV,
-        multiple: false,
-        copyToCacheDirectory: true,
-      });
-
-      if (result.canceled || !result.assets?.[0]) return;
-      const asset = result.assets[0];
-      if ((asset.name?.split('.').pop() ?? '').toLowerCase() !== 'csv') {
-        Alert.alert('Importar CSV', 'Selecione um arquivo .csv.');
-        return;
-      }
-      const data = await importService.csv({
-        uri: asset.uri,
-        name: asset.name || 'extrato.csv',
-        type: asset.mimeType || 'text/csv',
-      });
-
-      Alert.alert(
-        'Importar CSV',
-        `${data.importadas} importadas · ${data.ignoradas} ignoradas · ${data.erros} erros`
-      );
-      queryClient.invalidateQueries();
-    } catch (err: any) {
-      Alert.alert('Importar CSV', err?.userMessage ?? 'Não foi possível importar. Verifique o arquivo e tente novamente.');
     }
   };
 
@@ -341,9 +296,9 @@ export default function Ajustes() {
             <ListRow
               icon="⇪"
               iconTone="neutral"
-              title="Importar CSV"
-              subtitle="Extrato do seu banco"
-              onPress={importarCsv}
+              title="Importar extrato"
+              subtitle="CSV ou OFX, com revisão antes"
+              onPress={() => router.push('/(app)/more/importacao')}
               trailing={<Ionicons name="chevron-forward" size={18} color={colors.textMuted} {...iconeDecorativo} />}
             />
             <ListRow

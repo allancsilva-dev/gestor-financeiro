@@ -7,6 +7,23 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ---
 
+## [Fase 4 — PR-F4-08] - 2026-08-27
+
+### Importação no app (mobile)
+- Nova tela `Importar extrato` (`app/(app)/more/importacao.tsx`): escolher CSV ou OFX, ver o que foi
+  lido, escolher a conta de destino, decidir linha a linha o que está em revisão ou repetido,
+  lançar, acompanhar o lançamento e desfazer.
+- O botão de Ajustes deixou de chamar o importador legado — que hoje responde `410` em produção — e
+  passa a abrir o fluxo canônico. `importService.ts` (legado) foi removido junto com o tipo morto.
+- A tela acompanha o lançamento sozinha enquanto o lote está `COMMITTING` e para de consultar
+  quando termina; sair da tela não interrompe nada, porque o trabalho está na fila.
+- Motivo técnico do backend (`CURRENCY_MISSING`, `DIRECTION_CONFLICT`, …) vira frase de gente na
+  prévia; linha repetida aparece marcada, com ação explícita de trazer mesmo assim.
+- `GET /api/v1/importacoes` (histórico paginado por titular) fecha o que faltava para desfazer uma
+  importação antiga.
+- Validação: 385 testes no mobile (5 novos da tela), trinco visual verde, lint e typecheck limpos;
+  358 testes unitários no backend.
+
 ## [Fase 4 — PR-F4-07] - 2026-08-27
 
 ### Reversão auditável e a invariante que faltava

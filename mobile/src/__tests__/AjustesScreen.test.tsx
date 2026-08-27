@@ -46,7 +46,6 @@ jest.mock('../services/usuarioService', () => ({
   default: { excluirConta: jest.fn() },
 }));
 
-jest.mock('../services/importService', () => ({ __esModule: true, default: { csv: jest.fn() } }));
 jest.mock('../services/api', () => ({ __esModule: true, default: { get: jest.fn() } }));
 jest.mock('expo-sharing', () => ({ isAvailableAsync: jest.fn(), shareAsync: jest.fn() }));
 jest.mock('expo-document-picker', () => ({ getDocumentAsync: jest.fn() }));

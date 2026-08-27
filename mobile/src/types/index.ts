@@ -573,11 +573,48 @@ export interface Anexo {
   dataUpload: string;
 }
 
-export interface ImportResult {
-  total: number;
-  importadas: number;
-  ignoradas: number;
-  erros: number;
+// ── Importação canônica (CSV/OFX com prévia e reversão) ────────────
+export type ImportBatchStatus =
+  | 'RECEIVED' | 'PARSED' | 'PENDING_REVIEW' | 'READY_TO_COMMIT'
+  | 'COMMITTING' | 'COMMITTED' | 'FAILED' | 'REVERSED';
+
+export type ImportRecordStatus =
+  | 'VALID' | 'INVALID' | 'DUPLICATE' | 'PENDING_REVIEW'
+  | 'APPROVED' | 'COMMITTED' | 'REVERSED';
+
+export interface ImportBatch {
+  id: number;
+  status: ImportBatchStatus;
+  format: 'CSV' | 'OFX' | 'UNKNOWN';
+  institutionCode?: string | null;
+  fileSha256: string;
+  totalRecords: number;
+  validRecords: number;
+  invalidRecords: number;
+  pendingReviewRecords: number;
+  duplicateRecords: number;
+  failureCode?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ImportRecord {
+  id: number;
+  sourceLine: number;
+  externalId?: string | null;
+  occurredOn?: string | null;
+  description?: string | null;
+  amount?: number | null;
+  currency?: string | null;
+  direction?: 'ENTRADA' | 'SAIDA' | null;
+  status: ImportRecordStatus;
+  reasonCode?: string | null;
+  transacaoId?: number | null;
+}
+
+export interface ImportRecordPage {
+  registros: ImportRecord[];
+  proximaLinha: number | null;
 }
 
 // ── Parcelas ───────────────────────────────────────────────────────

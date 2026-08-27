@@ -1968,3 +1968,17 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Risco se ficar pendente:** baixo enquanto houver uma instância; alto no dia em que houver duas sem
   revisar esta decisão.
 - **Status:** ABERTO — gatilho explícito, não trabalho pendente.
+
+## BACKLOG-0108 — Flow Maestro da importação no mobile
+
+- **Título:** Cobrir a jornada de importação (enviar, revisar, lançar, desfazer) em E2E de aparelho
+- **Prioridade:** P2
+- **Área:** mobile, testes
+- **Motivo:** a tela de importação entrou com teste de unidade (Testing Library), mas nenhum flow
+  Maestro cobre a jornada. Escolher arquivo depende do seletor do sistema, que só dá para exercitar
+  em simulador/aparelho.
+- **Dependências:** simulador com arquivo de extrato preparado no dispositivo.
+- **Critério de aceite:** flow em `mobile/.maestro` que envia um CSV, aprova uma linha em revisão,
+  lança e desfaz, verde em iOS e Android.
+- **Risco se ficar pendente:** regressão de fluxo longo só aparece em uso real.
+- **Status:** ABERTO

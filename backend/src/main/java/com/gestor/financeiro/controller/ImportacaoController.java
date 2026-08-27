@@ -12,6 +12,7 @@ import com.gestor.financeiro.model.enums.ImportFailureCode;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.importacao.CanonicalImportOrchestrator;
 import com.gestor.financeiro.service.importacao.ImportAdmissionService;
+import com.gestor.financeiro.repository.ImportBatchRepository;
 import com.gestor.financeiro.service.importacao.ImportBatchService;
 import com.gestor.financeiro.service.importacao.ImportCommitService;
 import com.gestor.financeiro.service.importacao.ImportReversalService;
@@ -24,6 +25,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -56,6 +60,7 @@ public class ImportacaoController {
     private final ImportPreviewService preview;
     private final ImportCommitService commitService;
     private final ImportReversalService reversalService;
+    private final ImportBatchRepository batchRepository;
     private final AuthenticatedUserService authenticatedUserService;
 
     @Value("${spring.servlet.multipart.location:${java.io.tmpdir}}")
@@ -80,6 +85,17 @@ public class ImportacaoController {
             }
             return ResponseEntity.status(HttpStatus.CREATED).body(ImportBatchResponse.de(batch));
         }
+    }
+
+    @GetMapping
+    @Operation(summary = "Histórico de importações do titular")
+    public ResponseEntity<Page<ImportBatchResponse>> historico(
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
+        Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100));
+        return ResponseEntity.ok(batchRepository.findByUsuarioIdOrderByCreatedAtDesc(usuarioId, pageable)
+                .map(ImportBatchResponse::de));
     }
 
     @GetMapping("/{id}")
