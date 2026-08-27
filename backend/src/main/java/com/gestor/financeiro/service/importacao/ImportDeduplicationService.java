@@ -42,11 +42,17 @@ public class ImportDeduplicationService {
         int total = porIdentidade + porImpressao;
 
         if (total > 0) {
+            // Contar ANTES de tocar na entidade. Cada consulta dispara auto-flush do contexto, e
+            // aplicar os contadores um a um faria o flush gravar estado intermediário incoerente
+            // (duplicados novos com válidos antigos), que o CHECK ck_import_batches_counts recusa.
+            int duplicados = (int) records.countByBatchIdAndStatus(batchId, ImportRecordStatus.DUPLICATE);
+            int validos = (int) records.countByBatchIdAndStatus(batchId, ImportRecordStatus.VALID);
+            int emRevisao = (int) records.countByBatchIdAndStatus(batchId, ImportRecordStatus.PENDING_REVIEW);
+
             ImportBatch batch = batches.findByIdAndUsuarioId(batchId, usuarioId).orElseThrow();
-            batch.setDuplicateRecords((int) records.countByBatchIdAndStatus(batchId, ImportRecordStatus.DUPLICATE));
-            batch.setValidRecords((int) records.countByBatchIdAndStatus(batchId, ImportRecordStatus.VALID));
-            batch.setPendingReviewRecords(
-                    (int) records.countByBatchIdAndStatus(batchId, ImportRecordStatus.PENDING_REVIEW));
+            batch.setDuplicateRecords(duplicados);
+            batch.setValidRecords(validos);
+            batch.setPendingReviewRecords(emRevisao);
             batches.save(batch);
         }
         return total;

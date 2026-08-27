@@ -7,6 +7,22 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ---
 
+## [Fase 4 — PR-F4-09] - 2026-08-27
+
+### Verificação em runtime e o defeito que ela achou
+- Pipeline exercitado ponta a ponta contra PostgreSQL real (stack local, backend na 8081):
+  CSV pt-BR com coluna `tipo` e OFX SGML com `TRNTYPE` descritivo, prévia, escolha de conta,
+  lançamento pela fila, reenvio, reversão e reconciliação.
+- **BUG-0100 corrigido:** reenviar o mesmo arquivo depois do lançamento derrubava a importação com
+  violação de `ck_import_batches_counts`. A deduplicação aplicava os contadores um a um e consultava
+  entre eles; o auto-flush gravava `duplicate` novo com `valid` antigo. Em H2 o CHECK não existe, e
+  por isso três PRs passaram por cima do defeito. `ImportReenvioIT` cobre o caminho contra
+  PostgreSQL real.
+- Números da verificação: saldo 2.500,00 → 5.333,60 após lançar 3 linhas; reenvio marcou 3
+  duplicados e 0 válidos; reversão devolveu 2.500,00 exatos; reconciliação global em zero
+  divergências antes e depois; jobs `IMPORT_COMMIT` e `IMPORT_REVERSAL` concluídos em uma tentativa.
+- Validação: 358 testes unitários e 45 de integração verdes.
+
 ## [Fase 4 — PR-F4-08] - 2026-08-27
 
 ### Importação no app (mobile)

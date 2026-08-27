@@ -4,6 +4,35 @@ Registro de bugs corrigidos. Mantido pelo `docs-reporter`.
 
 ---
 
+## BUG-0100 — Reenviar o mesmo arquivo derrubava a importação com violação de CHECK
+
+- **Data:** 2026-08-27
+- **Area:** backend, importação
+- **Origem:** verificação em runtime do pipeline canônico (stack local, PostgreSQL descartável,
+  backend na 8081). Primeira importação passa; o **reenvio do mesmo arquivo depois do lançamento**
+  respondia `422 IMPORT_PARSING_FAILED` com `failureCode=PARSE_FAILED`, e o lote ficava `FAILED`.
+- **Sintoma no banco:** `ERROR: new row for relation "import_batches" violates check constraint
+  "ck_import_batches_counts"`, com a linha `total=4, valid=3, pending=1, duplicate=3` — soma 7 para
+  4 registros.
+- **Causa:** `ImportDeduplicationService.marcarDuplicados` aplicava os contadores um a um na
+  entidade e **consultava entre um `set` e outro**. Cada consulta dispara auto-flush do contexto de
+  persistência, então o flush intermediário gravava `duplicate` já atualizado com `valid` ainda
+  antigo — estado incoerente que o CHECK recusa. Em H2 o defeito não aparece: o CHECK só existe no
+  PostgreSQL, e o teste unitário montava os contadores à mão.
+- **Correção:** contar os três status **antes** de tocar na entidade e aplicar os valores de uma vez.
+- **Arquivos alterados:**
+  `backend/src/main/java/com/gestor/financeiro/service/importacao/ImportDeduplicationService.java`,
+  `backend/src/test/java/com/gestor/financeiro/ImportReenvioIT.java` (novo).
+- **Testes/validacoes executadas:** `ImportReenvioIT` reproduz o defeito (falha antes, passa depois),
+  cobrindo enviar → lançar → reenviar contra PostgreSQL real. Suíte: 358 unitários e 45 de
+  integração verdes. Runtime: reenvio passou a marcar 3 duplicados e 0 válidos; reversão devolveu o
+  saldo de 5333,60 para 2500,00 e a reconciliação global ficou em zero divergências.
+- **Resultado:** PASS
+- **Licao:** invariante que só existe no banco de produção precisa de teste no banco de produção.
+  O caminho feliz rodava em H2 desde o início e escondeu a incoerência por três PRs.
+
+---
+
 ## BUG-0073 — Rodada de Maestro no simulador: quatro defeitos de UI achados e corrigidos
 
 - **Data:** 2026-08-21
