@@ -5,6 +5,7 @@ import {
   useTheme, useTabBarSpace, cardRadius, numeric, radius, screenPadding, spacing, typography,
 } from '../../src/theme';
 import Badge from '../../src/components/ui/Badge';
+import AlertasDeGasto from '../../src/components/AlertasDeGasto';
 import CabecalhoDeTela from '../../src/components/ui/CabecalhoDeTela';
 import Card from '../../src/components/ui/Card';
 import Chip from '../../src/components/ui/Chip';
@@ -127,6 +128,12 @@ export default function RelatorioScreen() {
                 </Card>
               ))}
             </View>
+          </Entrance>
+
+          {/* Alertas antes dos gráficos: quem abre Relatórios quer saber o que saiu
+              do padrão, não folhear série histórica para descobrir sozinho. */}
+          <Entrance delay={75}>
+            <AlertasDeGasto />
           </Entrance>
 
           {evolucaoQuery.data && evolucaoQuery.data.some(m => m.entradas > 0 || m.saidas > 0) && (

@@ -1982,3 +1982,19 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   lança e desfaz, verde em iOS e Android.
 - **Risco se ficar pendente:** regressão de fluxo longo só aparece em uso real.
 - **Status:** ABERTO
+
+## BACKLOG-0109 — Thresholds de alerta configuráveis e alertas no web
+
+- **Título:** Tornar os limiares de `InsightsService` configuráveis pelo titular e levar os alertas ao web
+- **Prioridade:** P2
+- **Área:** backend, frontend web
+- **Motivo:** os limiares são constantes no código (`variação > 20%`, `gasto > R$ 500`, top 5
+  categorias): quem gasta R$ 300 por mês nunca vê alerta de categoria, e quem gasta R$ 20 mil vê
+  ruído. O mobile já consome os alertas (PR-F4-10); `frontend/src/services/insightsService.ts`
+  continua sendo código morto.
+- **Dependências:** decisão de produto sobre o que é configurável (percentual, valor mínimo, número
+  de categorias) e onde a preferência mora — hoje a dispensa é local no dispositivo.
+- **Critério de aceite:** limiar por titular persistido e respeitado pelo cálculo; tela web
+  mostrando os mesmos alertas do mobile; dispensa coerente entre os clientes se ela virar servidor.
+- **Risco se ficar pendente:** alerta calibrado para um perfil de gasto só serve a esse perfil.
+- **Status:** ABERTO

@@ -7,6 +7,23 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ---
 
+## [Fase 4 — PR-F4-10] - 2026-08-27
+
+### Alertas de gasto visíveis no app (mobile)
+- `InsightsService` e `GET /api/v1/insights` existiam, testados, e **nenhuma tela consumia** —
+  `insightsService.ts` era código morto desde que foi escrito. Agora a tela de Relatórios abre com
+  um bloco de alertas, antes dos gráficos: quem entra ali quer saber o que saiu do padrão, não
+  folhear série histórica para descobrir sozinho.
+- O bloco mostra o resumo do mês, aviso quando a previsão fecha negativa, cada categoria acima da
+  média (gasto do mês, média dos três anteriores e variação) e as recomendações do backend.
+  Categoria **abaixo** da média não vira alerta: economizar não precisa de aviso.
+- Dispensar (`Ok, entendi`) é local, no dispositivo, e vale **pela competência**: o alerta some
+  deste mês e volta no mês que vem se o gasto continuar alto — dispensa não é "nunca mais me avise".
+  Recomendação que cita uma categoria dispensada some junto, para não repetir o que o usuário
+  acabou de mandar embora.
+- Falha do endpoint não derruba o relatório: o bloco some e o resto da tela continua.
+- Validação: 397 testes no mobile (10 novos), trinco visual, lint e typecheck limpos.
+
 ## [Fase 4 — PR-F4-09] - 2026-08-27
 
 ### Verificação em runtime e o defeito que ela achou
