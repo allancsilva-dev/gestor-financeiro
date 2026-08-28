@@ -18,6 +18,7 @@ import com.gestor.financeiro.repository.MetaRepository;
 import com.gestor.financeiro.repository.TransacaoRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
 import com.gestor.financeiro.service.UsuarioExclusaoService;
+import com.gestor.financeiro.service.ExportService;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -154,6 +155,29 @@ class UsuarioExclusaoLgpdIT {
                         + "Adicione-as a UsuarioExclusaoService.MANIFESTO_EXCLUSAO (ou aceite explicitamente no teste).",
                         foraDoManifesto)
                 .isEmpty();
+    }
+
+    @Test
+    void guardiaoAssistant_espelhaCatalogoNaExclusaoENaExportacao() {
+        Set<String> catalogo = new HashSet<>(jdbcTemplate.queryForList("""
+                select distinct table_name
+                  from information_schema.columns
+                 where table_schema = 'public'
+                   and table_name like 'assistant\\_%' escape '\\'
+                   and column_name = 'usuario_id'
+                """, String.class));
+        Set<String> exclusao = UsuarioExclusaoService.MANIFESTO_EXCLUSAO.stream()
+                .map(UsuarioExclusaoService.DeleteTitular::tabela)
+                .filter(tabela -> tabela.startsWith("assistant_"))
+                .collect(java.util.stream.Collectors.toSet());
+        Set<String> exportacao = ExportService.ASSISTANT_EXPORT_TABLES.stream()
+                .map(ExportService.AssistantExportTable::table)
+                .collect(java.util.stream.Collectors.toSet());
+
+        assertThat(exclusao).as("manifesto de exclusão assistant_* deve espelhar o catálogo PostgreSQL")
+                .containsExactlyInAnyOrderElementsOf(catalogo);
+        assertThat(exportacao).as("catálogo executado pela exportação deve espelhar o PostgreSQL")
+                .containsExactlyInAnyOrderElementsOf(catalogo);
     }
 
     @Test

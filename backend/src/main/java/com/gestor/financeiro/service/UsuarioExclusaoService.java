@@ -43,9 +43,21 @@ public class UsuarioExclusaoService {
      * precisa entrar aqui — o teste-guardião ({@code UsuarioExclusaoLgpdIT}) compara este
      * manifesto com o catálogo de FKs do PostgreSQL e falha se algo ficar de fora.
      */
-    public record DeleteTitular(String tabela, String jpql) {}
+    public record DeleteTitular(String tabela, String jpql, boolean nativeSql) {
+        public DeleteTitular(String tabela, String jpql) { this(tabela, jpql, false); }
+        public static DeleteTitular sql(String tabela, String sql) { return new DeleteTitular(tabela, sql, true); }
+    }
 
     public static final List<DeleteTitular> MANIFESTO_EXCLUSAO = List.of(
+        DeleteTitular.sql("assistant_messages", "DELETE FROM assistant_messages WHERE usuario_id = :id"),
+        DeleteTitular.sql("assistant_recommendations", "DELETE FROM assistant_recommendations WHERE usuario_id = :id"),
+        DeleteTitular.sql("assistant_confirmations", "DELETE FROM assistant_confirmations WHERE usuario_id = :id"),
+        DeleteTitular.sql("assistant_drafts", "DELETE FROM assistant_drafts WHERE usuario_id = :id"),
+        DeleteTitular.sql("assistant_invocations", "DELETE FROM assistant_invocations WHERE usuario_id = :id"),
+        DeleteTitular.sql("assistant_channel_events", "DELETE FROM assistant_channel_events WHERE usuario_id = :id"),
+        DeleteTitular.sql("assistant_whatsapp_links", "DELETE FROM assistant_whatsapp_links WHERE usuario_id = :id"),
+        DeleteTitular.sql("assistant_usage_daily", "DELETE FROM assistant_usage_daily WHERE usuario_id = :id"),
+        DeleteTitular.sql("assistant_conversations", "DELETE FROM assistant_conversations WHERE usuario_id = :id"),
         new DeleteTitular("anexos",
             "DELETE FROM Anexo a WHERE a.usuario.id = :id"),
         new DeleteTitular("notificacao_dispositivos",
@@ -115,7 +127,10 @@ public class UsuarioExclusaoService {
     @Transactional
     public void excluirConta(Long usuarioId) {
         for (DeleteTitular delete : MANIFESTO_EXCLUSAO) {
-            entityManager.createQuery(delete.jpql())
+            var query = delete.nativeSql()
+                    ? entityManager.createNativeQuery(delete.jpql())
+                    : entityManager.createQuery(delete.jpql());
+            query
                 .setParameter("id", usuarioId)
                 .executeUpdate();
         }

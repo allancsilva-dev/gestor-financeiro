@@ -33,6 +33,12 @@ public class BackgroundJobService {
     @Transactional
     public long enqueue(String key, String type, String payload, short payloadVersion,
                         int priority, Instant availableAt, int maxAttempts) {
+        return enqueue(JobLane.FINANCIAL, key, type, payload, payloadVersion, priority, availableAt, maxAttempts);
+    }
+
+    @Transactional
+    public long enqueue(JobLane lane, String key, String type, String payload, short payloadVersion,
+                        int priority, Instant availableAt, int maxAttempts) {
         requireIdentifier(key, "job key", 180);
         requireIdentifier(type, "job type", 80);
         validatePayload(payload);
@@ -42,11 +48,11 @@ public class BackgroundJobService {
 
         List<Long> inserted = jdbcTemplate.queryForList("""
                 insert into background_jobs
-                    (job_key, job_type, payload, payload_version, priority, available_at, max_attempts)
-                values (?, ?, cast(? as jsonb), ?, ?, ?, ?)
+                    (lane, job_key, job_type, payload, payload_version, priority, available_at, max_attempts)
+                values (?, ?, ?, cast(? as jsonb), ?, ?, ?, ?)
                 on conflict (job_key) do nothing
                 returning id
-                """, Long.class, key, type, payload, payloadVersion, priority,
+                """, Long.class, lane.name(), key, type, payload, payloadVersion, priority,
                 Timestamp.from(Objects.requireNonNullElseGet(availableAt, Instant::now)), maxAttempts);
         if (!inserted.isEmpty()) {
             return inserted.get(0);
@@ -64,6 +70,11 @@ public class BackgroundJobService {
 
     @Transactional
     public List<BackgroundJob> claim(String workerId, int limit, Duration leaseDuration) {
+        return claim(JobLane.FINANCIAL, workerId, limit, leaseDuration);
+    }
+
+    @Transactional
+    public List<BackgroundJob> claim(JobLane lane, String workerId, int limit, Duration leaseDuration) {
         requireIdentifier(workerId, "worker id", 100);
         if (limit < 1 || limit > 200 || leaseDuration.isNegative() || leaseDuration.isZero()
                 || leaseDuration.compareTo(Duration.ofHours(1)) > 0) {
@@ -83,6 +94,7 @@ public class BackgroundJobService {
                     select id
                     from background_jobs
                     where attempts < max_attempts
+                      and lane = ?
                       and available_at <= current_timestamp
                       and (status in ('PENDING', 'RETRY')
                            or (status = 'RUNNING' and lease_until < current_timestamp))
@@ -109,7 +121,7 @@ public class BackgroundJobService {
                 rs.getInt("attempts"),
                 rs.getInt("max_attempts"),
                 rs.getTimestamp("lease_until").toInstant()
-        ), limit, workerId, leaseDuration.toSeconds());
+        ), lane.name(), limit, workerId, leaseDuration.toSeconds());
     }
 
     @Transactional

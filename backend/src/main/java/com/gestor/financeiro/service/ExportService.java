@@ -15,6 +15,7 @@ import java.util.StringJoiner;
 @RequiredArgsConstructor
 public class ExportService {
     private final java.time.Clock clock;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
     private final TransacaoRepository transacaoRepository;
     private final CategoriaRepository categoriaRepository;
     private final ContaRepository contaRepository;
@@ -24,6 +25,24 @@ public class ExportService {
     private final UsuarioRepository usuarioRepository;
 
     private static final DateTimeFormatter DF = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    public record AssistantExportTable(String table, String sql) { }
+    public static final List<AssistantExportTable> ASSISTANT_EXPORT_TABLES = List.of(
+        new AssistantExportTable("assistant_conversations", "select 'CONVERSA' tipo, id, channel papel, '' conteudo, created_at from assistant_conversations where usuario_id = ?"),
+        new AssistantExportTable("assistant_messages", "select 'MENSAGEM' tipo, id, role papel, "
+                + "concat(content, case when request_hash is null then '' else concat(' | request_hash=', request_hash) end, "
+                + "case when response_json is null then '' else concat(' | response_json=', response_json) end) conteudo, "
+                + "created_at from assistant_messages where usuario_id = ?"),
+        new AssistantExportTable("assistant_drafts", "select 'RASCUNHO' tipo, id, status papel, input_hash conteudo, created_at from assistant_drafts where usuario_id = ?"),
+        new AssistantExportTable("assistant_invocations", "select 'INVOCACAO' tipo, id, provider papel, "
+                + "concat('result=', result, case when request_hash is null then '' else concat(' | request_hash=', request_hash) end, "
+                + "case when response_json is null then '' else concat(' | response_json=', response_json) end) conteudo, "
+                + "created_at from assistant_invocations where usuario_id = ?"),
+        new AssistantExportTable("assistant_confirmations", "select 'CONFIRMACAO' tipo, id, provider papel, input_hash conteudo, created_at from assistant_confirmations where usuario_id = ?"),
+        new AssistantExportTable("assistant_recommendations", "select 'RECOMENDACAO' tipo, id, rule_code papel, facts_json conteudo, created_at from assistant_recommendations where usuario_id = ?"),
+        new AssistantExportTable("assistant_channel_events", "select 'EVENTO_CANAL' tipo, id, channel papel, payload_hash conteudo, received_at created_at from assistant_channel_events where usuario_id = ?"),
+        new AssistantExportTable("assistant_whatsapp_links", "select 'VINCULO_WHATSAPP' tipo, id, wa_key_version papel, coalesce(wa_hmac, code_hash) conteudo, created_at from assistant_whatsapp_links where usuario_id = ?"),
+        new AssistantExportTable("assistant_usage_daily", "select 'USO_DIARIO' tipo, id, 'EXTERNAL_CALLS' papel, cast(external_calls as varchar) conteudo, cast(usage_date as timestamp) created_at from assistant_usage_daily where usuario_id = ?")
+    );
 
     public String exportarTransacoesCsv(Long usuarioId, LocalDate inicio, LocalDate fim) {
         if (inicio == null) inicio = LocalDate.of(2000, 1, 1);
@@ -102,7 +121,22 @@ public class ExportService {
         sj.add("=== CARTEIRAS ===\n" + exportarCarteirasCsv(usuarioId));
         sj.add("=== METAS ===\n" + exportarMetasCsv(usuarioId));
         sj.add("=== CONTAS FIXAS ===\n" + exportarContasFixasCsv(usuarioId));
+        sj.add("=== ASSISTENTE — CONVERSAS E MENSAGENS ===\n" + exportarAssistente(usuarioId));
         return sj.toString();
+    }
+
+    /** Exporta conteúdo e proveniência; hashes continuam classificados como dado pseudonimizado. */
+    private String exportarAssistente(Long usuarioId) {
+        StringBuilder csv = new StringBuilder("Tipo,ID,Canal/Papel,Conteúdo/Hash,Criado em\n");
+        for (AssistantExportTable export : ASSISTANT_EXPORT_TABLES) {
+            jdbcTemplate.query(export.sql(), (org.springframework.jdbc.core.RowCallbackHandler) rs -> csv.append(rs.getString("tipo")).append(',')
+                    .append(rs.getLong("id")).append(',')
+                    .append(escapeCsv(rs.getString("papel"))).append(',')
+                    .append(escapeCsv(rs.getString("conteudo"))).append(',')
+                    .append(rs.getTimestamp("created_at")).append('\n'),
+                usuarioId);
+        }
+        return csv.toString();
     }
 
     private String exportarCadastroCsv(Long usuarioId) {

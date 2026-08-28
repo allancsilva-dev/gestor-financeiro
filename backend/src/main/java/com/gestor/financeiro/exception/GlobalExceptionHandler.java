@@ -24,6 +24,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.time.Instant;
@@ -73,6 +74,13 @@ public class GlobalExceptionHandler {
         ApiError apiError = buildError("BUSINESS_ERROR", ex.getMessage(), null, request);
 
         return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(apiError);
+    }
+
+    @ExceptionHandler(AssistantException.class)
+    public ResponseEntity<ApiError> handleAssistant(AssistantException ex, HttpServletRequest request) {
+        var response = ResponseEntity.status(ex.status());
+        if (ex.retryAfterSeconds() != null) response.header("Retry-After", ex.retryAfterSeconds().toString());
+        return response.body(buildError(ex.code(), ex.getMessage(), null, request));
     }
 
     @ExceptionHandler(CardParcelDeprecatedException.class)
@@ -200,6 +208,13 @@ public class GlobalExceptionHandler {
         ApiError apiError = buildError("METHOD_NOT_ALLOWED", "Método HTTP não suportado neste endpoint.", null, request);
 
         return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED).body(apiError);
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ApiError> handleResponseStatus(ResponseStatusException ex, HttpServletRequest request) {
+        String message = ex.getReason() == null ? "Requisição inválida" : ex.getReason();
+        ApiError apiError = buildError("HTTP_" + ex.getStatusCode().value(), message, null, request);
+        return ResponseEntity.status(ex.getStatusCode()).body(apiError);
     }
 
     @ExceptionHandler(Exception.class)

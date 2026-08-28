@@ -107,6 +107,7 @@ public class SecurityConfig {
                 // Mais específico primeiro: logout-all revoga sessões e exige usuário autenticado.
                 auth.requestMatchers("/api/auth/logout-all").authenticated();
                 auth.requestMatchers("/api/auth/**", "/actuator/health", "/actuator/info").permitAll();
+                auth.requestMatchers("/api/v1/webhooks/meta/whatsapp").permitAll();
 
                 // Swagger fica livre em dev e protegido em produção via app.docs.public.
                 if (docsPublic) {

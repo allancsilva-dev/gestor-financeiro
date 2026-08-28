@@ -7,6 +7,7 @@ import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.Parcela;
+import com.gestor.financeiro.model.OperacaoFinanceira;
 import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.EstadoConciliacaoTransacao;
@@ -132,7 +133,14 @@ public class TransacaoService {
 
     @Transactional
     public Transacao criar(Transacao transacao, Long usuarioId, String ledgerIdempotencyKey) {
-        return criar(transacao, usuarioId, ledgerIdempotencyKey, false);
+        return criar(transacao, usuarioId, ledgerIdempotencyKey, false, null);
+    }
+
+    /** Fluxos auditáveis novos vinculam o movimento à operação agrupadora (ADR-0009). */
+    @Transactional
+    public Transacao criar(Transacao transacao, Long usuarioId, String ledgerIdempotencyKey,
+                           OperacaoFinanceira operacao) {
+        return criar(transacao, usuarioId, ledgerIdempotencyKey, false, operacao);
     }
 
     /**
@@ -141,12 +149,12 @@ public class TransacaoService {
      */
     @Transactional
     public Transacao criarImportada(Transacao transacao, Long usuarioId) {
-        return criar(transacao, usuarioId, null, true);
+        return criar(transacao, usuarioId, null, true, null);
     }
 
     @Transactional
     protected Transacao criar(Transacao transacao, Long usuarioId, String ledgerIdempotencyKey,
-                              boolean importacao) {
+                              boolean importacao, OperacaoFinanceira operacao) {
         Usuario usuario = usuarioRepository.findById(usuarioId)
             .orElseThrow(() -> new ResourceNotFoundException("Usuário não encontrado"));
 
@@ -211,7 +219,7 @@ public class TransacaoService {
 
         Transacao salva = transacaoRepository.save(transacao);
 
-        registrarMovimentoCriacao(salva, usuarioId, ledgerIdempotencyKey);
+        registrarMovimentoCriacao(salva, usuarioId, ledgerIdempotencyKey, operacao);
         if (compraCartao) {
             faturaService.registrarCompraCartao(salva, usuarioId);
         }
@@ -387,7 +395,8 @@ public class TransacaoService {
             .orElseThrow(() -> new ResourceNotFoundException("Transação não encontrada"));
     }
 
-    private void registrarMovimentoCriacao(Transacao transacao, Long usuarioId, String idempotencyKey) {
+    private void registrarMovimentoCriacao(Transacao transacao, Long usuarioId, String idempotencyKey,
+                                           OperacaoFinanceira operacao) {
         if (transacao.getCarteira() == null || transacao.getCarteira().getId() == null) {
             return;
         }
@@ -415,7 +424,7 @@ public class TransacaoService {
                 idempotencyKey,
                 LocalDateTime.now(clock),
                 false
-        ));
+        ), operacao);
     }
 
     // Contract V41: toda conta referenciada e cartao

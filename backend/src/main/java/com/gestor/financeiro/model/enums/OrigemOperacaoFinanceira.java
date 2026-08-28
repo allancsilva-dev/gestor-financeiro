@@ -6,5 +6,6 @@ public enum OrigemOperacaoFinanceira {
     SISTEMA,
     CSV,
     OFX,
-    INTEGRACAO
+    INTEGRACAO,
+    ASSISTENTE
 }
