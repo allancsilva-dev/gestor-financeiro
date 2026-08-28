@@ -6,6 +6,8 @@ import com.gestor.financeiro.model.enums.ImportBatchStatus;
 import com.gestor.financeiro.model.enums.ImportFailureCode;
 import com.gestor.financeiro.model.enums.ImportFormat;
 import com.gestor.financeiro.model.enums.ImportRecordStatus;
+import com.gestor.financeiro.model.enums.ImportBalanceReconciliation;
+import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.ImportBatchRepository;
 import com.gestor.financeiro.repository.ImportRecordRepository;
 import jakarta.persistence.EntityManager;
@@ -17,6 +19,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.security.MessageDigest;
 import java.util.HexFormat;
+import java.math.BigDecimal;
 
 @Service
 public final class CanonicalImportOrchestrator {
@@ -89,6 +92,8 @@ public final class CanonicalImportOrchestrator {
                                   FinancialDataConnector connector, ImportMapping mapeamento) throws IOException {
         ImportBatch batch = batchRepository.findByIdAndUsuarioId(batchId, usuarioId).orElseThrow();
         int[] counts = new int[3];
+        BigDecimal[] movement = { BigDecimal.ZERO };
+        ImportStatementBalances declared = connector.declaredBalances(source, mapeamento);
         connector.parse(source, mapeamento, canonical -> {
             ImportRecord record = new ImportRecord();
             record.setBatch(entityManager.getReference(ImportBatch.class, batchId));
@@ -98,6 +103,10 @@ public final class CanonicalImportOrchestrator {
             record.setCurrency(canonical.currency()); record.setDirection(canonical.direction());
             record.setStatus(canonical.status()); record.setReasonCode(canonical.reasonCode() == null ? null : canonical.reasonCode().name());
             records.save(record);
+            if (canonical.amount() != null && canonical.direction() != null) {
+                movement[0] = movement[0].add(canonical.direction() == TipoTransacao.SAIDA
+                        ? canonical.amount().negate() : canonical.amount());
+            }
             if (canonical.status() == ImportRecordStatus.VALID) counts[0]++;
             else if (canonical.status() == ImportRecordStatus.INVALID) counts[1]++; else counts[2]++;
             int total = counts[0] + counts[1] + counts[2];
@@ -106,6 +115,17 @@ public final class CanonicalImportOrchestrator {
         batch = batchRepository.findByIdAndUsuarioId(batchId, usuarioId).orElseThrow();
         batch.setTotalRecords(counts[0] + counts[1] + counts[2]); batch.setValidRecords(counts[0]);
         batch.setInvalidRecords(counts[1]); batch.setPendingReviewRecords(counts[2]);
+        batch.setDeclaredOpeningBalance(declared.opening());
+        batch.setDeclaredClosingBalance(declared.closing());
+        batch.setDeclaredMovementTotal(movement[0]);
+        if (declared.opening() == null || declared.closing() == null) {
+            batch.setBalanceReconciliation(ImportBalanceReconciliation.UNAVAILABLE);
+        } else {
+            BigDecimal calculated = declared.opening().add(movement[0]);
+            batch.setBalanceReconciliation(calculated.compareTo(declared.closing()) == 0
+                    ? ImportBalanceReconciliation.MATCH : ImportBalanceReconciliation.MISMATCH);
+        }
+        batch.setBalanceMismatchAcknowledged(false);
         batchRepository.saveAndFlush(batch);
         // Dedupe e categorização antes de encerrar o parse: quem revisa a prévia já vê o que é
         // reenvio e em qual categoria cada linha vai cair.

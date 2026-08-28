@@ -12,6 +12,7 @@ import com.gestor.financeiro.model.enums.ImportBatchStatus;
 import com.gestor.financeiro.model.enums.ImportFailureCode;
 import com.gestor.financeiro.model.enums.ImportRecordReasonCode;
 import com.gestor.financeiro.model.enums.ImportRecordStatus;
+import com.gestor.financeiro.model.enums.ImportBalanceReconciliation;
 import com.gestor.financeiro.model.enums.StatusPagamento;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.model.enums.SubtipoContaFinanceira;
@@ -109,9 +110,22 @@ public class ImportCommitService {
      */
     @Transactional
     public ImportBatch preparar(Long usuarioId, Long batchId, Long contaFinanceiraId, Long cartaoId) {
+        return preparar(usuarioId, batchId, contaFinanceiraId, cartaoId, false);
+    }
+
+    @Transactional
+    public ImportBatch preparar(Long usuarioId, Long batchId, Long contaFinanceiraId, Long cartaoId,
+                                boolean reconhecerDivergenciaSaldo) {
         ImportBatch batch = batches.get(usuarioId, batchId);
         if ((contaFinanceiraId == null) == (cartaoId == null)) {
             throw new BusinessException("Escolha uma conta de caixa ou um cartão como destino");
+        }
+        if (batch.getBalanceReconciliation() == ImportBalanceReconciliation.MISMATCH
+                && !reconhecerDivergenciaSaldo && !batch.isBalanceMismatchAcknowledged()) {
+            throw new BusinessException("O saldo declarado diverge dos movimentos; reconheça a divergência antes de lançar");
+        }
+        if (batch.getBalanceReconciliation() == ImportBalanceReconciliation.MISMATCH) {
+            batch.setBalanceMismatchAcknowledged(true);
         }
 
         if (cartaoId != null) {

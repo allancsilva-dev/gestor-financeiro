@@ -19,7 +19,8 @@ import java.util.Set;
 public record ImportMapping(Map<String, String> colunaPorCampo, Character delimitador) {
 
     public static final Set<String> CAMPOS =
-            Set.of("date", "description", "amount", "currency", "direction", "externalId");
+            Set.of("date", "description", "amount", "currency", "direction", "externalId",
+                    "openingBalance", "closingBalance");
 
     /** Sem mapeamento: valem os apelidos conhecidos do connector. */
     public static ImportMapping automatico() {

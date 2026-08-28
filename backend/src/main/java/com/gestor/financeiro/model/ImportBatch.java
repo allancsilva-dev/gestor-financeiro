@@ -7,6 +7,8 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.Instant;
+import java.math.BigDecimal;
+import com.gestor.financeiro.model.enums.ImportBalanceReconciliation;
 
 @Entity
 @Table(name = "import_batches")
@@ -65,6 +67,22 @@ public class ImportBatch {
 
     @Column(name = "failure_code", length = 80)
     private String failureCode;
+
+    @Column(name = "declared_opening_balance", precision = 19, scale = 2)
+    private BigDecimal declaredOpeningBalance;
+
+    @Column(name = "declared_closing_balance", precision = 19, scale = 2)
+    private BigDecimal declaredClosingBalance;
+
+    @Column(name = "declared_movement_total", precision = 19, scale = 2)
+    private BigDecimal declaredMovementTotal;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "balance_reconciliation", nullable = false, length = 12)
+    private ImportBalanceReconciliation balanceReconciliation = ImportBalanceReconciliation.UNAVAILABLE;
+
+    @Column(name = "balance_mismatch_acknowledged", nullable = false)
+    private boolean balanceMismatchAcknowledged;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

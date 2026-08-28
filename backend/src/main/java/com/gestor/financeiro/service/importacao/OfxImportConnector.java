@@ -20,7 +20,8 @@ import java.util.Set;
 
 @Component
 public final class OfxImportConnector implements FinancialDataConnector {
-    private static final Set<String> FIELDS = Set.of("FITID", "DTPOSTED", "TRNAMT", "TRNTYPE", "NAME", "MEMO", "CURDEF", "ORG", "FID", "BANKID");
+    private static final Set<String> FIELDS = Set.of("FITID", "DTPOSTED", "TRNAMT", "TRNTYPE", "NAME", "MEMO",
+            "CURDEF", "ORG", "FID", "BANKID", "BALAMT", "OPENINGBAL", "CLOSINGBAL", "BALOPEN", "BALCLOSE");
     private final ImportLimits limits;
     private final CanonicalNormalizer normalizer;
 
@@ -52,6 +53,22 @@ public final class OfxImportConnector implements FinancialDataConnector {
         if (!header.contains("<OFX>")) throw new ImportParsingException(ImportFailureCode.FORMAT_MISMATCH, "Estrutura OFX inválida");
         boolean xml = header.stripLeading().startsWith("<?XML") || !header.startsWith("OFXHEADER:");
         if (xml) parseXml(source, consumer); else parseSgml(source, consumer);
+    }
+
+    @Override
+    public ImportStatementBalances declaredBalances(ImportSource source, ImportMapping ignored) throws IOException {
+        if (source.size() > limits.fileBytes()) throw new ImportParsingException(
+                ImportFailureCode.FILE_LIMIT_EXCEEDED, "Arquivo excede limite");
+        byte[] bytes;
+        try (InputStream input = source.openStream()) { bytes = input.readNBytes((int) limits.fileBytes() + 1); }
+        if (bytes.length > limits.fileBytes()) throw new ImportParsingException(
+                ImportFailureCode.FILE_LIMIT_EXCEEDED, "Arquivo excede limite");
+        String value = new String(bytes, StandardCharsets.US_ASCII).toUpperCase(Locale.ROOT);
+        rejectDangerous(value);
+        String opening = first(leafUnchecked(value, "OPENINGBAL"), leafUnchecked(value, "BALOPEN"));
+        String closing = first(leafUnchecked(value, "CLOSINGBAL"), leafUnchecked(value, "BALCLOSE"),
+                leafUnchecked(value, "BALAMT"));
+        return new ImportStatementBalances(DeclaredBalanceParser.parse(opening), DeclaredBalanceParser.parse(closing));
     }
 
     private void parseXml(ImportSource source, RecordConsumer consumer) throws IOException {

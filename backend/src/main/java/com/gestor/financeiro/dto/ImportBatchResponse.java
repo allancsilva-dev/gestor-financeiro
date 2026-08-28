@@ -3,6 +3,7 @@ package com.gestor.financeiro.dto;
 import com.gestor.financeiro.model.ImportBatch;
 
 import java.time.Instant;
+import java.math.BigDecimal;
 
 /** Contrato público do lote de importação; nunca expõe entidade nem conteúdo do arquivo. */
 public record ImportBatchResponse(
@@ -20,6 +21,11 @@ public record ImportBatchResponse(
         /** Destino escolhido: conta de caixa (extrato) ou cartão (fatura). */
         Long contaFinanceiraId,
         Long cartaoId,
+        BigDecimal saldoInicialDeclarado,
+        BigDecimal saldoFinalDeclarado,
+        BigDecimal totalMovimentosDeclarado,
+        String conciliacaoSaldo,
+        boolean divergenciaSaldoReconhecida,
         Instant createdAt,
         Instant updatedAt
 ) {
@@ -38,6 +44,11 @@ public record ImportBatchResponse(
                 batch.getFailureCode(),
                 batch.getCarteira() == null ? null : batch.getCarteira().getId(),
                 batch.getConta() == null ? null : batch.getConta().getId(),
+                batch.getDeclaredOpeningBalance(),
+                batch.getDeclaredClosingBalance(),
+                batch.getDeclaredMovementTotal(),
+                batch.getBalanceReconciliation().name(),
+                batch.isBalanceMismatchAcknowledged(),
                 batch.getCreatedAt(),
                 batch.getUpdatedAt());
     }

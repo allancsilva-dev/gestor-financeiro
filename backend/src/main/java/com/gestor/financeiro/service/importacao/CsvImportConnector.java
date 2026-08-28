@@ -84,6 +84,44 @@ public final class CsvImportConnector implements FinancialDataConnector {
         finally { parser.stopParsing(); }
     }
 
+    @Override
+    public ImportStatementBalances declaredBalances(ImportSource source, ImportMapping mapeamento) throws IOException {
+        CsvShape shape = inspect(source);
+        char delimiter = mapeamento != null && mapeamento.delimitador() != null
+                ? mapeamento.delimitador() : shape.delimiter();
+        boolean mapped = mapeamento != null && !mapeamento.vazio();
+        CsvParserSettings settings = new CsvParserSettings();
+        settings.getFormat().setDelimiter(delimiter);
+        settings.setHeaderExtractionEnabled(true);
+        settings.setMaxColumns(limits.csvColumns());
+        settings.setMaxCharsPerColumn(limits.recordChars());
+        settings.setLineSeparatorDetectionEnabled(true);
+        settings.setSkipEmptyLines(true);
+        CsvParser parser = new CsvParser(settings);
+        java.math.BigDecimal opening = null, closing = null;
+        try (InputStream input = source.openStream(); InputStreamReader reader = new InputStreamReader(input, shape.charset())) {
+            parser.beginParsing(reader); String[] row; int records = 0;
+            while ((row = parser.parseNext()) != null) {
+                if (++records > limits.records()) throw new ImportParsingException(
+                        ImportFailureCode.ROW_LIMIT_EXCEEDED, "Limite de registros excedido");
+                String[] headers = parser.getContext().headers();
+                for (int i = 0; i < row.length && i < headers.length; i++) {
+                    String canonical = mapped ? mapeamento.campoDaColuna(key(headers[i])) : ALIASES.get(key(headers[i]));
+                    if ("openingBalance".equals(canonical) && opening == null)
+                        opening = DeclaredBalanceParser.parse(row[i]);
+                    if ("closingBalance".equals(canonical)) {
+                        java.math.BigDecimal candidate = DeclaredBalanceParser.parse(row[i]);
+                        if (candidate != null) closing = candidate;
+                    }
+                }
+            }
+            return new ImportStatementBalances(opening, closing);
+        } catch (ImportParsingException failure) { throw failure; }
+        catch (RuntimeException failure) {
+            throw new ImportParsingException(ImportFailureCode.PARSE_FAILED, "Saldos CSV inválidos", failure);
+        } finally { parser.stopParsing(); }
+    }
+
     /**
      * Cabeçalhos e delimitador do arquivo, para o titular montar um mapeamento.
      *
@@ -167,6 +205,8 @@ public final class CsvImportConnector implements FinancialDataConnector {
         for (String value : Set.of("moeda", "currency")) map.put(value, "currency");
         for (String value : Set.of("direcao", "tipo", "type", "trntype")) map.put(value, "direction");
         for (String value : Set.of("external id", "external_id", "fitid")) map.put(value, "externalId");
+        for (String value : Set.of("saldo inicial", "opening balance", "opening_balance")) map.put(value, "openingBalance");
+        for (String value : Set.of("saldo final", "closing balance", "closing_balance")) map.put(value, "closingBalance");
         return Map.copyOf(map);
     }
     private record CsvShape(Charset charset, char delimiter, int score) { }

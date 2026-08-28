@@ -63,6 +63,8 @@ const lote = (over: Partial<ImportBatch> = {}): ImportBatch => ({
   invalidRecords: 0,
   pendingReviewRecords: 1,
   duplicateRecords: 0,
+  conciliacaoSaldo: 'UNAVAILABLE',
+  divergenciaSaldoReconhecida: false,
   createdAt: '2026-08-27T10:00:00Z',
   updatedAt: '2026-08-27T10:00:00Z',
   ...over,
@@ -161,6 +163,33 @@ describe('tela de importação', () => {
     fireEvent.press(await screen.findByText('💳 Nubank'));
 
     await waitFor(() => expect(servico.preparar).toHaveBeenCalledWith(10, { cartaoId: 4 }));
+  });
+
+  it('divergência de saldo exige reconhecimento explícito antes de escolher o destino', async () => {
+    const divergente = lote({
+      conciliacaoSaldo: 'MISMATCH',
+      saldoInicialDeclarado: 100,
+      totalMovimentosDeclarado: -20,
+      saldoFinalDeclarado: 90,
+    });
+    servico.enviar.mockResolvedValue(divergente);
+    servico.consultar.mockResolvedValue(divergente);
+    servico.preparar.mockResolvedValue(lote({ status: 'READY_TO_COMMIT', divergenciaSaldoReconhecida: true }));
+
+    renderizar();
+    await escolherArquivo();
+
+    expect(await screen.findByText('Saldo não confere')).toBeTruthy();
+    fireEvent.press(await screen.findByText('Conta corrente'));
+    expect(servico.preparar).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByTestId('importacao-reconhecer-divergencia'));
+    fireEvent.press(screen.getByText('Conta corrente'));
+
+    await waitFor(() => expect(servico.preparar).toHaveBeenCalledWith(10, {
+      contaFinanceiraId: 7,
+      reconhecerDivergenciaSaldo: true,
+    }));
   });
 
   it('arquivo não reconhecido oferece dizer quais são as colunas, e reenvia com o mapeamento', async () => {

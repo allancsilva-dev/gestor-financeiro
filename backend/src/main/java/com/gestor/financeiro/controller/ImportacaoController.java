@@ -164,7 +164,8 @@ public class ImportacaoController {
                                                         @RequestBody PrepararImportacaoRequest request) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         return ResponseEntity.ok(ImportBatchResponse.de(
-                commitService.preparar(usuarioId, id, request.contaFinanceiraId(), request.cartaoId())));
+                commitService.preparar(usuarioId, id, request.contaFinanceiraId(), request.cartaoId(),
+                        Boolean.TRUE.equals(request.reconhecerDivergenciaSaldo()))));
     }
 
     @PostMapping("/{id}/registros/{registroId}/aprovar")

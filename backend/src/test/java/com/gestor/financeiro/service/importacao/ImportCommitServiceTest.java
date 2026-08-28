@@ -11,6 +11,7 @@ import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.ImportBatchStatus;
 import com.gestor.financeiro.model.enums.ImportFormat;
 import com.gestor.financeiro.model.enums.ImportRecordStatus;
+import com.gestor.financeiro.model.enums.ImportBalanceReconciliation;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.dto.ReconciliacaoGlobalResponse;
 import com.gestor.financeiro.service.LedgerService;
@@ -199,6 +200,24 @@ class ImportCommitServiceTest {
 
         assertEquals(1, transacoes.count());
         assertEquals(categoria.getId(), transacoes.findAll().get(0).getCategoria().getId());
+    }
+
+    @Test
+    void divergenciaDeSaldoExigeReconhecimentoExplicitoAntesDePreparar() {
+        ImportBatch batch = loteComRegistros(ImportRecordStatus.VALID);
+        batch.setDeclaredOpeningBalance(new BigDecimal("100.00"));
+        batch.setDeclaredMovementTotal(new BigDecimal("-20.00"));
+        batch.setDeclaredClosingBalance(new BigDecimal("70.00"));
+        batch.setBalanceReconciliation(ImportBalanceReconciliation.MISMATCH);
+        batchRepository.saveAndFlush(batch);
+
+        assertThrows(BusinessException.class,
+                () -> commitService.preparar(usuario.getId(), batch.getId(), conta.getId(), null, false));
+        ImportBatch acknowledged = commitService.preparar(
+                usuario.getId(), batch.getId(), conta.getId(), null, true);
+
+        assertTrue(acknowledged.isBalanceMismatchAcknowledged());
+        assertEquals(ImportBalanceReconciliation.MISMATCH, acknowledged.getBalanceReconciliation());
     }
 
     @Test

@@ -13,6 +13,7 @@ import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -130,6 +131,28 @@ class SecureImportParsingTest {
         assertEquals(ImportRecordStatus.INVALID, record.status());
         assertEquals(ImportRecordReasonCode.MULTIPLE_ISSUES, record.reasonCode());
         assertNull(record.direction());
+    }
+
+    @Test void extraiSaldosOpcionaisDeCsvMapeado() throws Exception {
+        String csv = "dia;historico;valor;moeda;saldo antes;saldo depois\n"
+                + "2026-08-20;Mercado;-20,00;BRL;100,00;80,00\n";
+        CsvImportConnector connector = new CsvImportConnector(limits, normalizer);
+        ImportMapping mapping = new ImportMapping(java.util.Map.of(
+                "date", "dia", "description", "historico", "amount", "valor", "currency", "moeda",
+                "openingBalance", "saldo antes", "closingBalance", "saldo depois"), ';');
+        ImportStatementBalances balances = connector.declaredBalances(source(csv, "text/csv"), mapping);
+        assertEquals(new BigDecimal("100.00"), balances.opening());
+        assertEquals(new BigDecimal("80.00"), balances.closing());
+    }
+
+    @Test void extraiSaldoInicialEFinalQuandoOfxFornece() throws Exception {
+        String ofx = "<?xml version=\"1.0\"?><OFX><STMTRS><OPENINGBAL>100.00</OPENINGBAL>"
+                + "<BANKTRANLIST></BANKTRANLIST><LEDGERBAL><BALAMT>80.00</BALAMT></LEDGERBAL>"
+                + "</STMTRS></OFX>";
+        ImportStatementBalances balances = new OfxImportConnector(limits, normalizer)
+                .declaredBalances(source(ofx, "application/x-ofx"), ImportMapping.automatico());
+        assertEquals(new BigDecimal("100.00"), balances.opening());
+        assertEquals(new BigDecimal("80.00"), balances.closing());
     }
 
     private ImportSource source(byte[] bytes, String contentType) {

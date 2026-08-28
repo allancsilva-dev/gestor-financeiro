@@ -13,6 +13,10 @@ public interface FinancialDataConnector {
 
     void parse(ImportSource source, ImportMapping mapeamento, RecordConsumer consumer) throws IOException;
 
+    default ImportStatementBalances declaredBalances(ImportSource source, ImportMapping mapeamento) throws IOException {
+        return ImportStatementBalances.unavailable();
+    }
+
     @FunctionalInterface
     interface RecordConsumer {
         void accept(CanonicalImportRecord record) throws IOException;

@@ -1,0 +1,55 @@
+appId: com.gestorfinanceiro.mobile
+name: Importação mobile (arquivo preparado no aparelho)
+tags:
+  - financial-critical
+  - importacao
+---
+# Pré-condição: IMPORT_FILE_NAME aponta para um CSV de teste já salvo em Arquivos/Downloads.
+# O CSV deve conter ao menos uma linha marcada para revisão pelo backend da stack E2E.
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "login-email"
+- inputText: ${E2E_EMAIL}
+- pressKey: Enter
+- inputText: ${E2E_PASSWORD}
+- tapOn:
+    id: "login-submit"
+- extendedWaitUntil:
+    visible: "Saldo Disponível"
+    timeout: 20000
+
+# Mais > Importar extrato
+- tapOn:
+    point: "89%,92%"
+- scrollUntilVisible:
+    element:
+      text: "Importar extrato"
+    direction: DOWN
+- tapOn: "Importar extrato"
+- assertVisible: "CSV ou OFX. Você revisa antes de qualquer coisa entrar no extrato."
+- tapOn:
+    id: "importacao-escolher-arquivo"
+
+# O seletor nativo tem árvores diferentes, mas o nome do fixture é estável nos dois sistemas.
+- extendedWaitUntil:
+    visible: ${IMPORT_FILE_NAME}
+    timeout: 10000
+- tapOn: ${IMPORT_FILE_NAME}
+- extendedWaitUntil:
+    visible: "Onde isto entra?"
+    timeout: 20000
+- assertVisible: "Precisam da sua decisão"
+- tapOn: ".*Trazer .* para o extrato"
+- tapOn: "Conta Principal"
+- tapOn:
+    id: "importacao-lancar"
+- extendedWaitUntil:
+    visible: "Importação concluída"
+    timeout: 30000
+- tapOn: "Desfazer importação"
+- assertVisible: "Os lançamentos desta importação saem do extrato.*"
+- tapOn: "Desfazer"
+- extendedWaitUntil:
+    visible: "Desfeita"
+    timeout: 20000

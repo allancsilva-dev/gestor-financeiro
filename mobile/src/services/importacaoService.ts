@@ -67,7 +67,11 @@ const importacaoService = {
       .then(r => r.data),
 
   /** Destino do lote: conta de caixa (extrato) ou cartão (fatura) — um ou outro, nunca os dois. */
-  preparar: (id: number, destino: { contaFinanceiraId?: number; cartaoId?: number }) =>
+  preparar: (id: number, destino: {
+    contaFinanceiraId?: number;
+    cartaoId?: number;
+    reconhecerDivergenciaSaldo?: boolean;
+  }) =>
     api.post<ImportBatch>(`${baseUrl}/${id}/preparar`, destino).then(r => r.data),
 
   aprovar: (id: number, registroId: number, categoriaId?: number) =>

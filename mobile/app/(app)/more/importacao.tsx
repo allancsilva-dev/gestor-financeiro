@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, ScrollView, Text, View } from 'react-native';
+import { Alert, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as DocumentPicker from 'expo-document-picker';
 import {
@@ -46,6 +46,8 @@ const CAMPOS: Array<{ valor: string; rotulo: string }> = [
   { valor: 'currency', rotulo: 'Moeda' },
   { valor: 'direction', rotulo: 'Entrada/saída' },
   { valor: 'externalId', rotulo: 'Identificador' },
+  { valor: 'openingBalance', rotulo: 'Saldo inicial' },
+  { valor: 'closingBalance', rotulo: 'Saldo final' },
 ];
 
 /** Motivos vêm do backend em enum fechado; aqui viram frase de gente. */
@@ -82,6 +84,7 @@ export default function ImportacaoScreen() {
   const [loteId, setLoteId] = useState<number | null>(null);
   const [contaId, setContaId] = useState<number | null>(null);
   const [cartaoId, setCartaoId] = useState<number | null>(null);
+  const [reconheceuDivergencia, setReconheceuDivergencia] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
   // Guardado para o caso de o arquivo precisar de mapeamento: o reenvio usa o mesmo arquivo.
@@ -155,6 +158,7 @@ export default function ImportacaoScreen() {
       setLoteId(novo.id);
       setContaId(null);
       setCartaoId(null);
+      setReconheceuDivergencia(false);
       queryClient.setQueryData(['importacao', novo.id], novo);
       queryClient.invalidateQueries({ queryKey: ['importacoes'] });
     } catch (err) {
@@ -189,6 +193,7 @@ export default function ImportacaoScreen() {
     try {
       const novo = await importacaoService.enviar(arquivo, undefined, mapeamentoId);
       setLoteId(novo.id);
+      setReconheceuDivergencia(false);
       setInspecao(null);
       queryClient.setQueryData(['importacao', novo.id], novo);
     } catch (err) {
@@ -217,7 +222,11 @@ export default function ImportacaoScreen() {
   };
 
   const preparar = useMutation({
-    mutationFn: (destino: { contaFinanceiraId?: number; cartaoId?: number }) =>
+    mutationFn: (destino: {
+      contaFinanceiraId?: number;
+      cartaoId?: number;
+      reconhecerDivergenciaSaldo?: boolean;
+    }) =>
       importacaoService.preparar(loteId as number, destino),
     onSuccess: (atualizado) => {
       setErro(null);
@@ -266,23 +275,32 @@ export default function ImportacaoScreen() {
   };
 
   const escolherConta = (id: number) => {
+    if (lote?.conciliacaoSaldo === 'MISMATCH' && !reconheceuDivergencia) return;
     setContaId(id);
     setCartaoId(null);
-    preparar.mutate({ contaFinanceiraId: id });
+    preparar.mutate({
+      contaFinanceiraId: id,
+      ...(lote?.conciliacaoSaldo === 'MISMATCH' ? { reconhecerDivergenciaSaldo: true } : {}),
+    });
   };
 
   // Fatura e extrato são histórias diferentes: compra no cartão nasce na fatura e só sai do caixa
   // quando a fatura é paga. Por isso o destino é um ou outro, nunca os dois.
   const escolherCartao = (id: number) => {
+    if (lote?.conciliacaoSaldo === 'MISMATCH' && !reconheceuDivergencia) return;
     setCartaoId(id);
     setContaId(null);
-    preparar.mutate({ cartaoId: id });
+    preparar.mutate({
+      cartaoId: id,
+      ...(lote?.conciliacaoSaldo === 'MISMATCH' ? { reconhecerDivergenciaSaldo: true } : {}),
+    });
   };
 
   const recomecar = () => {
     setLoteId(null);
     setContaId(null);
     setCartaoId(null);
+    setReconheceuDivergencia(false);
     setErro(null);
   };
 
@@ -408,6 +426,66 @@ export default function ImportacaoScreen() {
               <Contagem rotulo="Repetidas" valor={lote.duplicateRecords} cor={colors.textMuted} />
               <Contagem rotulo="Com erro" valor={lote.invalidRecords} cor={colors.danger} />
             </View>
+          </Card>
+        )}
+
+        {lote && revisavel(lote) && lote.conciliacaoSaldo === 'MATCH' && (
+          <Card>
+            <Badge tone="success">Saldo conferido</Badge>
+            <Text style={{ ...typography.body, color: colors.textPrimary, marginTop: spacing.sm }}>
+              {formatCurrency(lote.saldoInicialDeclarado ?? 0)} + movimentos de{' '}
+              {formatCurrency(lote.totalMovimentosDeclarado ?? 0)} = {formatCurrency(lote.saldoFinalDeclarado ?? 0)}
+            </Text>
+            <Text style={{ ...typography.meta, color: colors.textMuted, marginTop: spacing.xs }}>
+              Os saldos declarados pelo arquivo fecham com os movimentos importados.
+            </Text>
+          </Card>
+        )}
+
+        {lote && revisavel(lote) && lote.conciliacaoSaldo === 'MISMATCH' && (
+          <Card>
+            <Badge tone="danger">Saldo não confere</Badge>
+            <Text style={{ ...typography.body, color: colors.textPrimary, marginTop: spacing.sm }}>
+              {formatCurrency(lote.saldoInicialDeclarado ?? 0)} + movimentos de{' '}
+              {formatCurrency(lote.totalMovimentosDeclarado ?? 0)} não chega a {formatCurrency(lote.saldoFinalDeclarado ?? 0)}.
+            </Text>
+            <Text style={{ ...typography.meta, color: colors.danger, marginTop: spacing.xs }}>
+              Nada será corrigido automaticamente. Revise o arquivo antes de continuar.
+            </Text>
+            <TouchableOpacity
+              onPress={() => setReconheceuDivergencia(valor => !valor)}
+              activeOpacity={0.7}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: reconheceuDivergencia }}
+              accessibilityLabel="Reconhecer divergência de saldo"
+              testID="importacao-reconhecer-divergencia"
+              style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.md, minHeight: 44 }}
+            >
+              <View style={{
+                width: 22,
+                height: 22,
+                borderRadius: radius.sm,
+                borderWidth: 2,
+                borderColor: reconheceuDivergencia ? colors.brand : colors.border,
+                backgroundColor: reconheceuDivergencia ? colors.brand : 'transparent',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                {reconheceuDivergencia && <Text style={{ color: colors.brandFg, fontWeight: '700' }}>✓</Text>}
+              </View>
+              <Text style={{ ...typography.body, color: colors.textPrimary, flex: 1 }}>
+                Estou ciente da divergência e quero continuar
+              </Text>
+            </TouchableOpacity>
+          </Card>
+        )}
+
+        {lote && revisavel(lote) && lote.conciliacaoSaldo === 'UNAVAILABLE' && (
+          <Card>
+            <Text style={{ ...typography.cardTitle, color: colors.textPrimary }}>Conferência de saldo indisponível</Text>
+            <Text style={{ ...typography.meta, color: colors.textMuted, marginTop: spacing.xs }}>
+              O arquivo não informa saldo inicial e final. Você ainda pode revisar os movimentos normalmente.
+            </Text>
           </Card>
         )}
 
