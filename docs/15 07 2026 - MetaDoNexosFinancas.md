@@ -945,7 +945,7 @@ Antes de migration ou código:
 - alertas úteis;
 - automações de metas.
 
-### Fase 5 — Assistente conversacional
+### Fase 5 — Assistente conversacional (`CONCLUÍDA_COM_RESSALVAS_OPERACIONAIS` em 2026-08-28)
 
 - interpretação de texto com schema fechado;
 - rascunho e confirmação antes do ledger;
@@ -955,7 +955,7 @@ Antes de migration ou código:
 - recomendações explicáveis ligadas a ações;
 - observabilidade, privacidade, limites de custo e fallback de fornecedor.
 
-### Fase 6 — Conectores regulados e expansão
+### Fase 6 — Conectores regulados e expansão (`PRÓXIMA`)
 
 - interface `FinancialDataConnector` estabilizada;
 - avaliar parceiro Open Finance autorizado, cobertura, custo e SLA;

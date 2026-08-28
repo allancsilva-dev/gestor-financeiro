@@ -7,6 +7,90 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ---
 
+## [Fase 5 — Automação mobile do Assistente] - 2026-08-28
+
+**Status consolidado:** `CONCLUÍDA_COM_RESSALVAS_OPERACIONAIS`. O escopo PR-F5-00..09 está
+implementado; flags externas permanecem desligadas até PostgreSQL/reconciliação, E2E em aparelho,
+contratos com socket, billing/política de dados e homologação Meta ficarem verdes.
+
+### Texto, ambiguidade e áudio no Maestro
+- A tela do Assistente e o botão de confirmação do formulário ganharam identificadores de teste
+  estáveis, sem mudança visual ou criação de um segundo formulário financeiro.
+- Três flows independentes cobrem texto até confirmação, uma única pergunta seguida de fallback
+  para formulário e áudio com transcript visível antes da confirmação.
+- Validação local: YAML válido, typecheck e lint verdes; 13 testes focados de Assistente/importação
+  verdes. A execução Maestro exige stack E2E com provider fake e aparelho/simulador.
+- Retry textual preserva a mesma `Idempotency-Key`. V59 grava hash do request e resposta na mensagem
+  retida por 30 dias; replay igual devolve a resposta original sem duplicar conversa, mensagens ou
+  rascunho, enquanto a mesma chave com payload diferente retorna `409`. O titular é travado durante
+  a decisão, e o índice único fecha corridas concorrentes.
+- O teste Spring de replay foi adicionado e compila, mas a execução local continua impedida pela
+  proibição de self-attach do Mockito/Byte Buddy no sandbox; o gate permanece obrigatório no CI.
+- A confirmação mobile mantém um checkpoint da versão corrigida, do conteúdo e da chave. Se a
+  resposta do commit se perder, o segundo toque não reaplica o patch: repete o `confirm` com a mesma
+  versão/chave. Um flow Maestro específico fixa esse cenário.
+- V60 estende a mesma garantia ao patch: `assistant_invocations` guarda chave, hash e resposta;
+  replay igual devolve a versão já criada e payload diferente responde `409`. A tabela já estava nos
+  manifestos LGPD; exportação passa a incluir o hash pseudonimizado. O teste de replay do patch foi
+  adicionado ao gate Spring e a compilação backend está verde.
+- Cancelamento passou pelo mesmo replay: repetir chave e rascunho é `204` sem efeito adicional;
+  tentar usar a chave para outro rascunho responde `409`. O teste fixa os dois comportamentos.
+- A confirmação agora vincula a chave ao par rascunho/versão além da chave financeira
+  `ASSISTANT:{draftId}`: replay devolve o snapshot original e reutilizar a chave em outro rascunho
+  responde `409` antes de tocar no ledger. O teste também exige uma única transação resultante.
+- Feedback de recomendação também usa replay por titular/chave/hash: repetição não altera novamente
+  o registro e a chave não pode ser reaproveitada com outra recomendação ou valor. A validação de
+  ownership acontece antes da gravação e o feedback continua estritamente local.
+- V61 torna a criação do vínculo WhatsApp retomável: a chave aponta para o mesmo código cifrado e
+  ainda válido, sem gerar códigos concorrentes após perda da resposta. O código é removido ao ativar
+  o vínculo; vínculos não usados e expirados são eliminados a cada 15 minutos. Texto puro não entra
+  no banco, exportação ou logs.
+- Áudio agora calcula SHA-256 por streaming do arquivo e vincula chave, conversa e conteúdo antes
+  da chamada externa. Replay em até 24 horas devolve transcript/rascunho originais sem retranscrever
+  nem executar parser novamente; conteúdo diferente retorna `409`. V62 adiciona expiração e expurgo
+  horário dos replays internos, preservando auditorias externas sem prazo artificial.
+- V63 elimina duplicatas históricas e torna recomendação única por titular, regra e período. Leituras
+  repetidas atualizam fatos/explicação na mesma linha, preservam feedback e não fazem a tabela crescer;
+  lock por titular e constraint fecham chamadas concorrentes.
+- V64 ativa a retenção que antes existia apenas como data: executor horário remove rascunhos após
+  24 h, mensagens/transcripts e eventos de canal após 30 dias, então elimina conversas órfãs sem
+  vínculo WhatsApp. Confirmações sobrevivem pelo snapshot sem FK para conversa. Métricas usam apenas
+  quatro rótulos fechados; teste sem Mockito valida ordem filhos→pai e contagens.
+- O orçamento diário deixou de depender de `synchronized` da JVM: uma linha global com
+  `usuario_id IS NULL` é travada antes da linha do titular, tornando o teto de US$ 5 consistente
+  entre múltiplas instâncias. A reserva atualiza global e titular atomicamente; recusa ocorre antes
+  do provider e não debita nenhum contador. Testes sem Mockito cobrem sucesso e esgotamento global.
+- A pergunta de esclarecimento agora continua o rascunho pendente da conversa sob lock. Uma resposta
+  válida preenche o único campo e abre revisão no mesmo `draftId`; resposta irrelevante, nova dúvida
+  ou campo ainda ausente retorna `NEEDS_FORM` sem chamar uma segunda pergunta. O teste Spring cobre
+  valor válido e fallback após “não sei”.
+- Fechamento local das suítes: mobile passou typecheck, lint e 433 testes (39 suites). Backend rodou
+  457 testes com o Mockito carregado como agente: zero falhas de asserção e um único erro ambiental,
+  `EmailServiceTest`, porque o sandbox proíbe abrir o socket do GreenMail; repetição excluindo somente
+  essa classe ficou verde. A rodada corrigiu SQL de expiração H2/PostgreSQL, handler de
+  `ResponseStatusException`, schema JPA das tabelas LGPD e isolamento do teste de confirmação.
+- A auditoria final de LGPD encontrou e fechou uma lacuna de proveniência: mensagens e invocações
+  agora exportam, durante sua retenção, tanto o `request_hash` pseudonimizado quanto a resposta de
+  replay idempotente. Um teste-guardião impede que esses campos desapareçam silenciosamente do
+  manifesto de exportação. Gates locais de enum, contratos de controller, arquitetura de importação
+  e exportação ficaram verdes; os gates PostgreSQL continuam dependentes de Docker acessível.
+
+## [Fase 4 — PR-F4-18] - 2026-08-28
+
+### Conciliação de saldo declarado e encerramento mobile-first
+- V58 acrescenta ao lote saldos inicial/final declarados, soma assinada dos movimentos, estado
+  `MATCH`/`MISMATCH`/`UNAVAILABLE` e o reconhecimento auditável da divergência.
+- OFX lê saldos declarados do extrato; CSV aceita `openingBalance` e `closingBalance` como campos
+  opcionais no detector e no mapeamento configurável.
+- Divergência nunca é corrigida automaticamente: o backend recusa preparar o lote até receber
+  reconhecimento explícito, e o mobile bloqueia a escolha do destino até a pessoa marcar o aceite.
+- O mobile diferencia saldo conferido, divergente e arquivo sem saldos, preservando a mesma tela de
+  revisão. O flow Maestro `importacao-mobile.yaml` cobre arquivo, revisão, commit e reversão; a
+  execução em iOS/Android continua sendo gate ambiental antes do `PASS` final.
+- Validação local: compilação backend e parser seguro verdes; typecheck, lint e suíte mobile completa
+  verde (39 suites, 432 testes). PostgreSQL, reconciliação global e Maestro não foram executados
+  nesta sessão.
+
 ## [Fase 4 — PR-F4-17] - 2026-08-27
 
 ### Mapeamento configurável de colunas — Fase 4 fecha o escopo

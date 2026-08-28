@@ -9,10 +9,11 @@
 > abaixo preservam status e evidência do momento de cada PR; não interpretar ressalva histórica
 > como falha atual sem conferir `BACKLOG.md` e `PROBLEM_LEDGER.md`.
 
-### Fase 4 de produto — PR-F4-01 a PR-F4-07 (em andamento)
+### Fase 4 de produto — PR-F4-01 a PR-F4-18 (encerramento mobile-first)
 
-**Status consolidado:** `PASS_PARCIAL` — importação ponta a ponta existe no backend; clientes,
-mapeamento configurável, fatura e automações seguem abertos (BACKLOG-0106).
+**Status consolidado:** `CONCLUÍDA_MOBILE` — pipeline canônico, mapeamento configurável, fatura,
+mobile e automações entregues. O web foi retirado do escopo por decisão de produto mobile-first;
+isso é desvio deliberado, não implementação pendente da Fase 4.
 
 | PR | Escopo | Status | Evidência |
 |---|---|---|---|
@@ -26,13 +27,53 @@ mapeamento configurável, fatura e automações seguem abertos (BACKLOG-0106).
 | PR-F4-05 | Deduplicação (identidade forte + heurística) + V48 | `PASS` | 346 unitários |
 | PR-F4-06 | Commit no ledger pela fila + V49 | `PASS` | 354 unitários, 44 ITs |
 | PR-F4-07 | Reversão auditável + invariante `CATEGORIA_VALOR_GASTO` | `PASS` | 357 unitários, 44 ITs |
+| PR-F4-08..17 | Mapeamento, fatura, alertas/automações e cliente mobile | `PASS` | commits até `e6bd4c0`; 407 unitários, 49 ITs e 420 testes mobile |
+| PR-F4-18 | Encerramento mobile-first, retenção e saldo declarado | `EM_VALIDACAO` | V58 + CSV/OFX + bloqueio explícito mobile/backend implementados; flow Maestro criado; execução PostgreSQL/reconciliação/Maestro iOS+Android ainda é gate |
 
 **Provas que sustentam o `PASS` do bloco:** reenviar o mesmo arquivo não cria lançamento; reexecutar
 o commit não duplica saldo (conferido a centavo contra PostgreSQL); reverter devolve saldo, gasto de
 categoria e ledger ao estado anterior; reconciliação global fica em zero divergência antes e depois.
 
-**Pendências do bloco:** mapeamento configurável de colunas, importação de fatura, clientes mobile e
-web, retenção do dado importado e as automações dos Blocos B/C/D do plano.
+**Retenção:** o arquivo bruto é apagado ao fim do request; lotes não confirmados expiram em 30 dias;
+lotes confirmados/revertidos preservam resumo, hashes, registros normalizados e vínculos de reversão
+até a exclusão do titular. Saldo declarado usa `MATCH`, `MISMATCH` ou `UNAVAILABLE`; divergência
+exige reconhecimento explícito e nunca é corrigida automaticamente. Saldo inicial/final CSV/OFX e
+o flow Maestro estão implementados; o fechamento técnico depende agora da execução verde dos gates
+PostgreSQL, reconciliação global e Maestro em iOS/Android.
+
+### Fase 5 — Assistente mobile-first
+
+**Status consolidado:** `CONCLUÍDA_COM_RESSALVAS_OPERACIONAIS` — PR-F5-00..09 implementados no
+recorte mobile-first, com produção desligada por padrão. As ressalvas abaixo são gates de ambiente,
+homologação e ativação; não representam escopo funcional de código ainda aberto na Fase 5.
+
+| PR | Escopo | Status | Evidência |
+|---|---|---|---|
+| PR-F5-00 | ADR-0017 e invariantes | `PASS` | `docs/adr/ADR-0017-assistente-financeiro-mobile-first.md` |
+| PR-F5-01 | Lane de jobs e limites fail-closed | `PASS_COM_RESSALVA` | lane isolada; Resilience4j 2.4 com bulkhead sem espera, timeout total, circuit breaker e retry seletivo; orçamento trava linha global+titular e recusa antes do provider mesmo multi-instância; `Retry-After`, métricas fechadas e WireMock permanecem gates de CI |
+| PR-F5-02 | Persistência, retenção, exportação e exclusão | `PASS` | nove tabelas, manifesto/exportação e guardião PostgreSQL completos; hashes e respostas idempotentes retidas de mensagens/invocações participam da exportação e têm gate unitário; V64 executa expurgo horário de rascunhos 24 h, mensagens/transcripts/eventos 30 d e conversas órfãs, preservando snapshots de confirmação |
+| PR-F5-03 | Confirmação financeira exatamente uma vez | `PASS` | lock pessimista, `@Version`, operação `ASSISTENTE`, snapshot imutável; V60 vincula chave/hash ao patch, confirmação e cancelamento, com `409` para reuso divergente; mobile preserva versão/chave após perda da resposta; corrida real cria uma transação e reconciliação permanece `OK` |
+| PR-F5-04 | Parser determinístico | `PASS` | parser primeiro; continuidade sob lock preenche o mesmo rascunho após uma pergunta e força `NEEDS_FORM` na segunda ambiguidade; cenários unitários e Spring registrados |
+| PR-F5-05 | API textual/providers/mobile | `PASS_COM_RESSALVA` | DTOs e contrato autenticado sob `/api/v1`, limite de 2.000 caracteres; V59 torna retry textual realmente idempotente por titular/chave/hash e responde `409` a payload divergente; rota mobile reutiliza `NovaTransacaoModal`; flows Maestro de texto, ambiguidade e retry criados, execução em aparelho com provider fake pendente |
+| PR-F5-06 | Perguntas financeiras seguras | `PASS` | intenção/período fechados, serviços oficiais, resposta determinística com competência, atualização, rota e ressalva de reconciliação |
+| PR-F5-07 | Recomendações explicáveis | `PASS` | regras e fatos determinísticos persistidos com período, fontes e ação somente navegável; V63 evita duplicação por titular/regra/período preservando feedback; feedback local não alimenta providers e possui replay por chave/hash |
+| PR-F5-08 | Áudio síncrono limitado | `PASS_COM_RESSALVA` | Expo SDK 54/`expo-audio ~1.1.1`, M4A pré-gravado e transcript antes da revisão; 8 MB/60 s, executor isolado e timeout; arquivos limpos em `finally`; SHA-256 streaming e replay de 24 h evitam nova transcrição/parser; flow Maestro criado; instalação nativa e aparelho pendentes |
+| PR-F5-09 | WhatsApp homologado, produção desligada | `PASS_COM_RESSALVA` | texto e áudio Ogg/Opus no pipeline comum; vínculo forte com replay cifrado por chave, limpeza imediata no uso e expurgo a cada 15 min; número desconhecido silencioso; assinatura, janela temporal, ID externo único, evento cifrado e job somente com `eventId`; homologação Meta segue aberta |
+
+**Gate local em 28/08/2026:** mobile verde em typecheck, lint e 433 testes. Backend executou 457
+testes com zero falhas; apenas `EmailServiceTest` não iniciou o GreenMail por proibição de socket do
+sandbox. A suíte sem essa única classe ficou verde. PostgreSQL/IT, SMTP real, WireMock com socket e
+Maestro em aparelho continuam gates ambientais, não foram declarados como executados.
+
+**Pendências antes de ativar em produção:** executar migrations e guardiões LGPD em PostgreSQL real;
+comprovar reconciliação global zero; rodar os flows Maestro em iOS/Android; validar contratos
+WireMock e SMTP em ambiente com socket; configurar billing, política de dados, chaves e teto de
+custo; homologar Meta Business, número e webhook. `assistant.text.enabled`,
+`assistant.audio.enabled`, `assistant.whatsapp.enabled` e integrações externas permanecem
+desligados por padrão até esses gates ficarem verdes.
+
+**Próxima fase do roadmap:** Fase 6 — conectores regulados e expansão. Ela não deve começar como
+integração de produção enquanto `PROB-0081` e os gates de promoção/reconciliação continuarem abertos.
 
 ---
 

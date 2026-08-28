@@ -1945,11 +1945,12 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   trilha auditável.
 - **Risco se ficar pendente:** Importação produtiva permanece indisponível; endpoint legado não é
   arquitetura válida para produção.
-- **Status:** ABERTO (parcial) — fundação, parsers, endpoint de envio com admissão, worker de fila,
-  prévia paginada, deduplicação, commit no ledger e reversão auditável entregues em PR-F4-01b..07,
-  com prova de não-duplicação e reconciliação em zero divergência. **Faltam:** mapeamento
-  configurável de colunas, importação/revisão de fatura, clientes mobile e web, retenção do dado
-  importado e conciliação declarada de saldo do arquivo.
+- **Status:** FECHADO_MOBILE — mapeamento, fatura e cliente mobile concluídos. O cliente web foi
+  retirado do escopo por decisão mobile-first. Retenção: bruto apagado ao fim do request; lote não
+  confirmado expira em 30 dias; confirmado/revertido mantém resumo, hashes, normalizados e vínculos
+  até exclusão do titular. O encerramento PR-F4-18 implementou saldo declarado (`MATCH`, `MISMATCH`,
+  `UNAVAILABLE`) e seu reconhecimento explícito antes do commit; faltam somente os gates ambientais
+  de PostgreSQL/reconciliação e Maestro para o `PASS` documental.
 
 ## BACKLOG-0107 — Reabrir a decisão de parse assíncrono quando houver segunda instância ou object storage
 
@@ -1981,7 +1982,9 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Critério de aceite:** flow em `mobile/.maestro` que envia um CSV, aprova uma linha em revisão,
   lança e desfaz, verde em iOS e Android.
 - **Risco se ficar pendente:** regressão de fluxo longo só aparece em uso real.
-- **Status:** ABERTO
+- **Status:** EM_VALIDACAO — `mobile/.maestro/importacao-mobile.yaml` cobre seleção, revisão,
+  lançamento e reversão usando fixture preparado no aparelho; execução verde em iOS e Android
+  permanece pendente.
 
 ## BACKLOG-0109 — Thresholds de alerta configuráveis e alertas no web
 

@@ -504,9 +504,11 @@ Mínimo operacional:
 
 ---
 
-## 10. Fase 4 — Recursos avançados de produto
+## 10. Fase 4 — Recursos avançados de produto (`CONCLUÍDA_MOBILE`)
 
-Depois da base sólida, as features avançadas fazem sentido.
+Encerrada no recorte mobile-first. O cliente web não é canônico e foi explicitamente retirado do
+escopo das Fases 4 e 5. A promoção pública continua bloqueada por `PROB-0081`, sem bloquear o
+desenvolvimento local da Fase 5.
 
 ### 10.1 Importação de dados
 
