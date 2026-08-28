@@ -44,7 +44,10 @@ const FERRAMENTAS: Array<{
   { label: 'Categorias', sub: 'Organizar', rota: '/more/categorias', icone: '🏷' },
   { label: 'Categorizar sozinho', sub: 'Regras suas', rota: '/more/regras-categoria', icone: '🪄' },
   { label: 'Investimentos', sub: 'Posições', rota: '/more/investimentos', icone: '📦' },
-  { label: 'Entrada por IA', sub: 'Lançar conversando', rota: null, icone: '🤖', desabilitado: true },
+  {
+    label: 'Assistente', sub: 'Lançar conversando', rota: '/more/assistente', icone: '💬',
+    desabilitado: process.env.EXPO_PUBLIC_ASSISTANT_TEXT_ENABLED !== 'true',
+  },
 ];
 
 const TEMAS: Array<{ id: TemaPreferido; label: string }> = [

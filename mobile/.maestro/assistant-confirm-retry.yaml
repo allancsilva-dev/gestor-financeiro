@@ -1,0 +1,42 @@
+appId: com.gestorfinanceiro.mobile
+name: Assistente — retry da confirmação sem novo patch
+tags:
+  - assistant
+  - resilience
+  - financial-critical
+---
+# A stack E2E confirma a transação, mas encerra a primeira resposta do confirm sem entregá-la.
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "login-email"
+- inputText: ${E2E_EMAIL}
+- pressKey: Enter
+- inputText: ${E2E_PASSWORD}
+- tapOn:
+    id: "login-submit"
+- extendedWaitUntil:
+    visible: "Saldo Disponível"
+    timeout: 20000
+- tapOn:
+    point: "89%,92%"
+- tapOn: "Assistente"
+- tapOn:
+    id: "assistant-message"
+- inputText: "e2e confirm retry mercado 50 hoje"
+- tapOn:
+    id: "assistant-send"
+- extendedWaitUntil:
+    visible: "Revisar lançamento"
+    timeout: 15000
+- tapOn:
+    id: "transaction-save"
+- extendedWaitUntil:
+    visible: ".*Erro ao salvar.*"
+    timeout: 15000
+- tapOn:
+    id: "transaction-save"
+- extendedWaitUntil:
+    visible: "Transações"
+    timeout: 20000
+- assertVisible: "Mercado"

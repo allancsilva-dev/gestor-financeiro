@@ -30,6 +30,12 @@
       "expo-router",
       "expo-secure-store",
       [
+        "expo-audio",
+        {
+          "microphonePermission": "Permita que o Nexos Finanças use o microfone para registrar lançamentos por voz."
+        }
+      ],
+      [
         "expo-local-authentication",
         {
           "faceIDPermission": "Permita que o Nexos Finanças use o Face ID para proteger seus dados financeiros."

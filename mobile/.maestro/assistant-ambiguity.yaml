@@ -1,0 +1,41 @@
+appId: com.gestorfinanceiro.mobile
+name: Assistente — uma pergunta e fallback para formulário
+tags:
+  - assistant
+  - financial-critical
+---
+# O provider fake deve manter as respostas determinísticas descritas neste contrato.
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "login-email"
+- inputText: ${E2E_EMAIL}
+- pressKey: Enter
+- inputText: ${E2E_PASSWORD}
+- tapOn:
+    id: "login-submit"
+- extendedWaitUntil:
+    visible: "Saldo Disponível"
+    timeout: 20000
+- tapOn:
+    point: "89%,92%"
+- tapOn: "Assistente"
+- tapOn:
+    id: "assistant-message"
+- inputText: "mercado ontem"
+- tapOn:
+    id: "assistant-send"
+- extendedWaitUntil:
+    visible: ".*[Vv]alor.*"
+    timeout: 15000
+- tapOn:
+    id: "assistant-message"
+- inputText: "nao sei"
+- tapOn:
+    id: "assistant-send"
+- extendedWaitUntil:
+    visible: "Revisar lançamento"
+    timeout: 15000
+- assertVisible: "Rascunho preparado pelo Assistente.*"
+- assertVisible:
+    id: "transaction-value"

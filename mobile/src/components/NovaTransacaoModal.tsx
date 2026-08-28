@@ -2,11 +2,12 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Modal, TouchableOpacity, ActivityIndicator, ScrollView, TextInput } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { transacaoService } from '../services/transacaoService';
+import assistantService, { assistantIdempotencyKey } from '../services/assistantService';
 import { categoriaService } from '../services/categoriaService';
 import contaFinanceiraService from '../services/contaFinanceiraService';
 import cartaoService from '../services/cartaoService';
 import { useModalTopInset, useTheme } from '../theme';
-import { parseDateBR, isValidDateBR, parseCurrencyBR, maskCurrencyInput, maskDateInput, todayBR } from '../utils/format';
+import { parseDateBR, isValidDateBR, parseCurrencyBR, maskCurrencyInput, maskDateInput, todayBR, formatDateOnlyBR } from '../utils/format';
 import { TransacaoRequest, TipoTransacao, SugestaoCategoria } from '../types';
 import { getLancamentoPrefs, setLancamentoPrefs } from '../store/lancamentoPrefs';
 import { CATEGORIAS_INICIAIS } from '../domain/categoriasIniciais';
@@ -23,7 +24,12 @@ export interface LancamentoInicial {
   valor: number;
   tipo: TipoTransacao;
   categoriaId?: number;
+  carteiraId?: number;
   cartaoId?: number;
+  data?: string;
+  mode?: 'ASSISTANT_DRAFT';
+  draftId?: number;
+  draftVersion?: number;
 }
 
 interface NovaTransacaoModalProps {
@@ -88,19 +94,34 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
   const [setupError, setSetupError] = useState<string | null>(null);
   const categoriaEscolhidaManualmente = useRef(false);
   const prefsAplicadas = useRef(false);
+  const assistantSave = useRef<{
+    draftId: number;
+    fingerprint: string;
+    version: number;
+    confirmKey: string;
+  } | null>(null);
+
+  useEffect(() => {
+    assistantSave.current = null;
+  }, [visible, initialData?.draftId, initialData?.draftVersion]);
 
   // Abertura: data default hoje, pré-preenchimento do repetir e última
   // conta/cartão usados no dispositivo (nunca sobrescreve o repetir)
   useEffect(() => {
     if (!visible) return;
     setTipo(initialData?.tipo ?? initialTipo);
-    setData(todayBR());
+    setData(initialData?.data ? formatDateOnlyBR(initialData.data) : todayBR());
     if (initialData) {
       setDescricao(initialData.descricao);
       setValor(maskCurrencyInput(String(Math.round(initialData.valor * 100))));
       if (initialData.categoriaId != null) {
         setCategoriaId(initialData.categoriaId);
         categoriaEscolhidaManualmente.current = true;
+      }
+      if (initialData.carteiraId != null) {
+        setFormaPagamento('CARTEIRA');
+        setCarteiraId(initialData.carteiraId);
+        prefsAplicadas.current = true;
       }
       if (initialData.cartaoId != null) {
         setFormaPagamento('CARTAO');
@@ -263,6 +284,7 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
     setNovoCartao({ nome: 'Cartão Principal', limite: '', fechamento: '5', vencimento: '12' });
     categoriaEscolhidaManualmente.current = false;
     prefsAplicadas.current = false;
+    assistantSave.current = null;
   };
 
   const handleSalvar = async () => {
@@ -299,7 +321,37 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
       } else {
         request.carteiraId = carteiraId ?? undefined;
       }
-      await transacaoService.criar(request);
+      if (initialData?.mode === 'ASSISTANT_DRAFT' && initialData.draftId != null && initialData.draftVersion != null) {
+        if (!request.carteiraId) throw new Error('Conta financeira obrigatória');
+        const patch = {
+          version: assistantSave.current?.version ?? initialData.draftVersion,
+          tipo: request.tipo,
+          valor: request.valor,
+          descricao: request.descricao,
+          data: request.data,
+          carteiraId: request.carteiraId,
+          categoriaId: request.categoriaId,
+        };
+        const fingerprint = JSON.stringify({ ...patch, version: undefined });
+        let pending = assistantSave.current;
+        if (!pending || pending.draftId !== initialData.draftId || pending.fingerprint !== fingerprint) {
+          const updated = await assistantService.patchDraft(
+            initialData.draftId,
+            patch,
+            assistantIdempotencyKey(`draft:${initialData.draftId}`),
+          );
+          pending = {
+            draftId: initialData.draftId,
+            fingerprint,
+            version: updated.version,
+            confirmKey: assistantIdempotencyKey(`confirm:${initialData.draftId}`),
+          };
+          assistantSave.current = pending;
+        }
+        await assistantService.confirmDraft(initialData.draftId, pending.version, pending.confirmKey);
+      } else {
+        await transacaoService.criar(request);
+      }
       // Última conta/cartão ficam somente no dispositivo (PR-F3-05)
       setLancamentoPrefs(tipo === 'SAIDA' && formaPagamento === 'CARTAO'
         ? { formaPagamento: 'CARTAO', cartaoId: cartaoId ?? undefined }
@@ -316,7 +368,9 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
     }
   };
 
-  const tituloModal = initialData ? 'Repetir lançamento' : 'Nova Transação';
+  const tituloModal = initialData?.mode === 'ASSISTANT_DRAFT'
+    ? 'Revisar lançamento'
+    : initialData ? 'Repetir lançamento' : 'Nova Transação';
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" statusBarTranslucent onRequestClose={onClose}>
@@ -326,14 +380,21 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
             <Text style={{ color: colors.brandFg, fontSize: 15 }}>Cancelar</Text>
           </TouchableOpacity>
           <Text style={{ color: colors.textPrimary, fontSize: 16, fontWeight: '700' }}>{tituloModal}</Text>
-          <TouchableOpacity onPress={handleSalvar} disabled={salvando} accessibilityRole="button">
+          <TouchableOpacity
+            testID="transaction-save"
+            onPress={handleSalvar}
+            disabled={salvando}
+            accessibilityRole="button"
+          >
             {salvando ? <ActivityIndicator color={colors.brand} size="small" /> : <Text style={{ color: colors.brandFg, fontSize: 15, fontWeight: '700' }}>Salvar</Text>}
           </TouchableOpacity>
         </View>
         <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
           {initialData && (
             <Text style={{ color: colors.textSecondary, fontSize: 12, marginBottom: 12 }}>
-              Dados pré-preenchidos do lançamento anterior. Revise e confirme em Salvar.
+              {initialData.mode === 'ASSISTANT_DRAFT'
+                ? 'Rascunho preparado pelo Assistente. Confira cada campo antes de salvar.'
+                : 'Dados pré-preenchidos do lançamento anterior. Revise e confirme em Salvar.'}
             </Text>
           )}
           <Text style={{ color: colors.textSecondary, fontSize: 10, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Tipo</Text>
@@ -411,7 +472,9 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
               <Text style={{ color: colors.textSecondary, fontSize: 10, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Pagar com</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
                 <Chip label="Conta" selected={formaPagamento === 'CARTEIRA'} onPress={() => { setFormaPagamento('CARTEIRA'); setParcelado(false); }} />
-                <Chip label="Cartão" selected={formaPagamento === 'CARTAO'} onPress={() => setFormaPagamento('CARTAO')} />
+                {initialData?.mode !== 'ASSISTANT_DRAFT' && (
+                  <Chip label="Cartão" selected={formaPagamento === 'CARTAO'} onPress={() => setFormaPagamento('CARTAO')} />
+                )}
               </View>
             </>
           )}

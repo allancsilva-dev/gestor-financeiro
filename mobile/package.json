@@ -27,6 +27,7 @@
     "@tanstack/react-query": "^5.96.2",
     "axios": "^1.18.1",
     "expo": "~54.0.37",
+    "expo-audio": "~1.1.1",
     "expo-constants": "~18.0.14",
     "expo-document-picker": "~14.0.8",
     "expo-file-system": "~19.0.24",

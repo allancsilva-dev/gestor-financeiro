@@ -129,7 +129,7 @@ describe('AjustesScreen', () => {
   it('não navega no item marcado como "Em breve"', async () => {
     await renderizar();
     await waitFor(() => expect(screen.getByText('Em breve')).toBeTruthy());
-    fireEvent.press(screen.getByLabelText('Entrada por IA (em breve)'));
+    fireEvent.press(screen.getByLabelText('Assistente (em breve)'));
     expect(mockPush).not.toHaveBeenCalled();
   });
 

@@ -634,6 +634,11 @@ export interface ImportBatch {
   /** Destino escolhido: conta de caixa (extrato) ou cartão (fatura). */
   contaFinanceiraId?: number | null;
   cartaoId?: number | null;
+  saldoInicialDeclarado?: number | null;
+  saldoFinalDeclarado?: number | null;
+  totalMovimentosDeclarado?: number | null;
+  conciliacaoSaldo: 'MATCH' | 'MISMATCH' | 'UNAVAILABLE';
+  divergenciaSaldoReconhecida: boolean;
   createdAt: string;
   updatedAt: string;
 }

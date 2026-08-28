@@ -1,0 +1,40 @@
+appId: com.gestorfinanceiro.mobile
+name: Assistente — texto, revisão e confirmação
+tags:
+  - assistant
+  - financial-critical
+---
+# Executar contra a stack E2E com providers fake e uma conta/categoria do fixture.
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "login-email"
+- inputText: ${E2E_EMAIL}
+- pressKey: Enter
+- inputText: ${E2E_PASSWORD}
+- tapOn:
+    id: "login-submit"
+- extendedWaitUntil:
+    visible: "Saldo Disponível"
+    timeout: 20000
+- tapOn:
+    point: "89%,92%"
+- tapOn: "Assistente"
+- assertVisible: "Lançamentos por texto, sempre com revisão"
+- tapOn:
+    id: "assistant-message"
+- inputText: "mercado 50 hoje"
+- tapOn:
+    id: "assistant-send"
+- extendedWaitUntil:
+    visible: "Revisar lançamento"
+    timeout: 15000
+- assertVisible: "Rascunho preparado pelo Assistente.*"
+- assertVisible:
+    id: "transaction-value"
+- tapOn:
+    id: "transaction-save"
+- extendedWaitUntil:
+    visible: "Transações"
+    timeout: 20000
+- assertVisible: "Mercado"

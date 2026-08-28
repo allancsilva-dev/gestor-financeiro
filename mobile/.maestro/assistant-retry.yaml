@@ -1,0 +1,44 @@
+appId: com.gestorfinanceiro.mobile
+name: Assistente — falha e retry idempotente
+tags:
+  - assistant
+  - resilience
+---
+# A stack E2E deve responder 503 à primeira tentativa desta mensagem e sucesso ao replay da chave.
+- launchApp:
+    clearState: true
+- tapOn:
+    id: "login-email"
+- inputText: ${E2E_EMAIL}
+- pressKey: Enter
+- inputText: ${E2E_PASSWORD}
+- tapOn:
+    id: "login-submit"
+- extendedWaitUntil:
+    visible: "Saldo Disponível"
+    timeout: 20000
+- tapOn:
+    point: "89%,92%"
+- tapOn: "Assistente"
+- tapOn:
+    id: "assistant-message"
+- inputText: "e2e retry mercado 50 hoje"
+- tapOn:
+    id: "assistant-send"
+- extendedWaitUntil:
+    visible: ".*[Tt]ente novamente.*"
+    timeout: 15000
+- assertVisible:
+    id: "assistant-message"
+- tapOn:
+    id: "assistant-send"
+- extendedWaitUntil:
+    visible: "Revisar lançamento"
+    timeout: 15000
+- tapOn:
+    id: "transaction-save"
+- extendedWaitUntil:
+    visible: "Transações"
+    timeout: 20000
+# O fixture e a API verificam que a chave repetida gerou um único rascunho/confirmação.
+- assertVisible: "Mercado"
