@@ -2094,3 +2094,131 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Risco se ficar pendente:** baixo — competência e vencimento de fatura seguem iguais ao que o
   sistema já calculava antes da migration.
 - **Status:** ABERTO
+
+---
+
+## BACKLOG-0115 — Web (`frontend/src/pages/Carteira.tsx`) não expõe edição de saldo nem "conta principal"
+
+- **Titulo:** PROB-0093 deu ao mobile CRUD completo de carteira (editar nome/banco/tipo/saldo,
+  marcar principal); o frontend web não recebeu a mesma tela
+- **Prioridade:** P2
+- **Área:** frontend
+- **Motivo:** o backend (`ContaFinanceiraController`, `ContaFinanceiraRequest.principal`,
+  migration `V66__carteira_principal.sql`) já suporta editar saldo (com conversão de diferença em
+  `AJUSTE_MANUAL`) e marcar conta principal desde 2026-08-29. `frontend/src/pages/Carteira.tsx` não
+  tem nenhuma ocorrência de `principal` (`grep -n "principal" frontend/src/pages/Carteira.tsx` sem
+  hits) e continua sem UI de edição — o único arquivo web tocado na correção foi
+  `Onboarding.tsx`, para manter o contrato de criação consistente com o mobile.
+- **Dependências:** nenhuma; o contrato de API já existe e está coberto por teste no
+  `ContaFinanceiraControllerTest`.
+- **Critério de aceite:** `Carteira.tsx` ganha formulário de edição equivalente ao
+  `mobile/app/(app)/more/carteiras.tsx` — nome, banco, tipo, saldo e toggle "conta principal", com
+  selo visual na conta marcada.
+- **Risco se ficar pendente:** paridade mobile/web quebrada nesta função; usuário que só usa a web
+  continua sem forma de corrigir saldo divergente ou trocar a conta principal.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0116 — Adição de troubleshooting do Assistente a `docs/DEPLOY.md` escrita e revertida (arquivo em deny)
+
+- **Titulo:** Patch de troubleshooting do Assistente para operadores de deploy ficou pronto, mas
+  `docs/DEPLOY.md` está fora do escopo de edição do `docs-reporter` (`settings.json`)
+- **Prioridade:** P3
+- **Área:** documentação
+- **Motivo:** durante a correção de PROB-0092 (Assistente inacessível por dois gates independentes),
+  foi redigida uma seção de troubleshooting para `docs/DEPLOY.md` cobrindo os sintomas
+  ("Assistente aparece desabilitado no app", "`/api/v1/assistant/**` responde 404") e o diagnóstico
+  via `GET /api/v1/capacidades`. A edição foi revertida por `docs/DEPLOY.md` constar em deny no
+  `settings.json`, na mesma categoria de restrição que já bloqueia `CHANGELOG.md` e
+  `CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md` (ver BACKLOG-0089).
+- **Dependências:** decisão do dono do produto sobre liberar `docs/DEPLOY.md` (e os demais arquivos
+  em deny) para o `docs-reporter`, ou aplicar o patch manualmente.
+- **Critério de aceite:** o patch salvo em
+  `/private/tmp/claude-501/-Users-Zero-Projetos-gestor-financeiro/8bd615be-fc04-43cd-bbf8-7b3db7943655/scratchpad/deploy-md-troubleshooting.patch`
+  é aplicado a `docs/DEPLOY.md` por quem tiver permissão, ou descartado por decisão explícita.
+- **Risco se ficar pendente:** o patch vive num diretório de scratchpad de sessão — não é
+  garantidamente persistente; se a sessão for limpa antes de uma decisão, o conteúdo se perde e
+  precisa ser reescrito.
+- **Status:** FECHADO (2026-08-29) — o dono do produto autorizou e o patch foi aplicado
+  (`git apply`, sem conflito). A seção "item 'Assistente' aparece como 'Em breve' no app" está em
+  `docs/DEPLOY.md`, logo após "Refresh token não funciona". Os comandos documentados foram
+  executados verbatim contra Postgres 16 e backend novos: a query do Flyway devolveu `66` e
+  `GET /api/v1/capacidades` devolveu exatamente o JSON que o doc mostra como exemplo; os nomes de
+  serviço (`postgres`, `api`) e as variáveis (`POSTGRES_USER`, `POSTGRES_DB`) conferem com
+  `docker-compose.vps.yml`. **`docs/DEPLOY.md` continua em deny no `settings.json`** — a
+  autorização foi pontual, não uma mudança de regra; BACKLOG-0089 segue valendo para os demais.
+
+---
+
+## BACKLOG-0117 — `AssistantUsageBudget` lê property que ninguém declarou; teto de custo de IA calcula com default silencioso
+
+- **Titulo:** `assistant.limits.estimated-call-cost-usd` não existe em `application.properties` —
+  `AssistantUsageBudget.java:25` cai no default `0.01` sem aviso
+- **Prioridade:** P2
+- **Área:** backend, seguranca
+- **Motivo:** encontrado na rodada de verificação de UI/UX de 2026-08-29 (revisão colateral de
+  código durante a investigação de PROB-0095). O teto de custo diário do ADR-0017 (US$ 5/dia
+  global) é calculado com um número que ninguém declarou explicitamente. Hoje é inócuo porque
+  `assistant.external.enabled=false` em produção (decisão do dono do produto: só parser
+  determinístico) — nenhuma chamada paga acontece, então o default nunca é exercitado com dinheiro
+  real. Vira risco financeiro real no dia em que a IA externa for ligada, porque o teto pode estar
+  sendo calculado com um custo por chamada que não corresponde ao custo real do provider.
+- **Dependências:** nenhuma — a correção é independente da decisão de ligar ou não a IA externa.
+- **Critério de aceite:** `assistant.limits.estimated-call-cost-usd` declarada explicitamente em
+  `application.properties` com variável de ambiente correspondente, ou o valor `0.01` documentado
+  no ADR-0017 como constante deliberada (com justificativa de por que aquele número).
+- **Risco se ficar pendente:** no dia em que `assistant.external.enabled=true`, o teto de US$ 5/dia
+  do ADR-0017 pode estourar (ou frear cedo demais) porque o custo por chamada usado no cálculo
+  nunca foi validado contra o custo real dos providers Gemini/OpenAI.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0118 — `scripts/e2e-mobile-ios.sh` e `scripts/e2e-assistant-ios.sh` compartilham o mesmo DerivedData
+
+- **Titulo:** Dois runners de E2E escrevendo no mesmo `mobile/.e2e-derived-data` é armadilha
+  estrutural para a próxima variação de build
+- **Prioridade:** P2
+- **Área:** mobile, infra
+- **Motivo:** causa raiz do ACHADO 1(a) de PROB-0095 (smoke de UI instalando o app errado porque um
+  `Release-iphonesimulator` deixado pelo runner do assistente sombreava o `Debug-iphonesimulator`
+  recém-compilado do outro script). A correção aplicada em PROB-0095 ancorou cada script na sua
+  própria configuração (`find` restrito a `Release-iphonesimulator`/`Debug-iphonesimulator`
+  explicitamente), o que elimina o sintoma desta rodada, mas não a causa: dois runners
+  independentes continuam escrevendo no mesmo `BUILD_DIR`
+  (`mobile/.e2e-derived-data`), esperando a próxima variação (nova configuração de build, novo
+  scheme, build parcial interrompido) para reproduzir o mesmo tipo de contaminação cruzada.
+- **Dependências:** nenhuma.
+- **Critério de aceite:** `DerivedData` isolado por runner (cada script com seu próprio
+  `BUILD_DIR`), ou os dois scripts consolidados num único runner parametrizado que builda uma vez e
+  reaproveita o artefato para os dois conjuntos de flows.
+- **Risco se ficar pendente:** recorrência do sintoma de PROB-0095 (smoke passando verde testando
+  um app diferente do que acabou de ser compilado) em uma configuração futura ainda não coberta
+  pela guarda atual.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0119 — Verificação de UI/UX de 2026-08-29 cobriu só iPhone 17 Pro / iOS 26.5 / tema escuro
+
+- **Titulo:** Android, telas pequenas, tema claro e fonte ampliada não foram verificados nas
+  correções de PROB-0095/0096/0097
+- **Prioridade:** P2
+- **Área:** mobile
+- **Motivo:** a rodada de verificação de UI/UX de 2026-08-29 (Maestro em simulador iOS) validou as
+  correções de PROB-0092/0093/0094 e as duas regressões que ela mesma encontrou (PROB-0096 — faixa
+  de status bar; PROB-0097 — foco do onboarding) numa única combinação: iPhone 17 Pro, iOS 26.5,
+  tema escuro. A faixa de status bar de PROB-0096 é especialmente sensível a isso — no Android a
+  status bar pode ser translúcida ou opaca conforme a configuração do dispositivo, e o
+  comportamento de `insets.top` (react-native-safe-area-context) difere; fonte ampliada agrava
+  exatamente o tipo de corte por teclado corrigido em PROB-0097.
+- **Dependências:** acesso a emulador Android e a uma rodada manual (ou E2E) em tema claro e fonte
+  ampliada.
+- **Critério de aceite:** rodada de verificação equivalente executada em emulador Android e checagem
+  manual em tema claro e fonte ampliada, com achados nesta mesma trilha de documentação
+  (`PROBLEM_LEDGER.md`/`BACKLOG.md`).
+- **Risco se ficar pendente:** regressões de layout específicas de Android, tema claro ou fonte
+  ampliada — em particular na faixa de status bar (`mobile/app/(app)/_layout.tsx`) e no onboarding —
+  passam despercebidas até um usuário reportar.
+- **Status:** ABERTO

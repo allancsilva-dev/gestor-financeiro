@@ -2095,3 +2095,352 @@ esta evidência histórica não fecha o problema;
 - **Riscos residuais:** outros testes podem ter dependência de data não mapeada; não houve varredura
   sistemática.
 - **Proximo passo:** nenhum.
+
+---
+
+## PROB-0092 — Assistente inacessível em produção: dois gates independentes travando o mesmo recurso
+
+- **ID:** PROB-0092
+- **Titulo:** Dono do produto subiu nova versão do backend e instalou novo build do app, e o
+  Assistente continuou inacessível — corrigir um gate não bastava, havia dois
+- **Data:** 2026-08-29
+- **Origem:** usuário (dono do produto)
+- **Severidade:** BLOCKER
+- **Status:** FECHADO (2026-08-29, working tree não commitado)
+- **Area:** mobile, backend, infra
+- **Sintoma:** o item "Assistente" em Ajustes aparecia desabilitado (opacity 0.55, badge
+  "Em breve") em todo build publicado; quando acessado por deep link, qualquer chamada a
+  `/api/v1/assistant/**` respondia 404 e o app exibia "Não foi possível enviar".
+- **Causa raiz:** dois gates independentes, cada um suficiente para travar a feature sozinho:
+  1. **Mobile** — `mobile/app/(app)/ajustes.tsx:49` desabilitava o item quando
+     `process.env.EXPO_PUBLIC_ASSISTANT_TEXT_ENABLED !== 'true'`. Essa env var só era setada em
+     `scripts/e2e-assistant-ios.sh` (uso local de E2E); o workflow de release nunca a definia, e por
+     ser `EXPO_PUBLIC_*` ela é embutida no bundle em tempo de build — não há como religar sem novo
+     binário.
+  2. **Backend** — `AssistantController.java:21` tem
+     `@ConditionalOnProperty("assistant.text.enabled")` (default `false` em
+     `application.properties:133`), e `docker-compose.vps.yml`/`docker-compose.production.yml` não
+     repassavam nenhuma variável `ASSISTANT_*` ao container `api`. Toda rota `/api/v1/assistant/**`
+     saía do contexto Spring por completo (404 puro, sem corpo explicativo).
+- **Impacto tecnico:** a feature central do release (assistente financeiro) ficava 100%
+  inacessível para o usuário final em produção, apesar de código, testes e infraestrutura de fila
+  estarem prontos e verdes desde a Fase 5.
+- **Arquivos ou modulos relacionados:**
+  `mobile/app/(app)/ajustes.tsx`,
+  `mobile/app/(app)/more/assistente.tsx`,
+  `backend/src/main/java/com/gestor/financeiro/controller/AssistantController.java`,
+  `backend/src/main/resources/application.properties`,
+  `docker-compose.vps.yml`, `docker-compose.production.yml`,
+  `deploy/vps/.env.vps.example`, `deploy/vps/.env.vps.production.example`.
+- **Solucao proposta:** eliminar o gate fixado em build/topologia e substituí-lo por uma consulta de
+  runtime — ver ADR-0018.
+- **Solucao aplicada:**
+  - Novo `GET /api/v1/capacidades` (autenticado) —
+    `backend/src/main/java/com/gestor/financeiro/controller/CapacidadesController.java` +
+    `dto/CapacidadesResponse.java` — devolve `{assistenteTexto, assistenteAudio,
+    assistenteWhatsapp}` lendo as mesmas properties dos controllers condicionais.
+    Deliberadamente **sem** `@ConditionalOnProperty`.
+  - Mobile: `mobile/src/services/capacidadesService.ts` + `mobile/src/hooks/useCapacidades.ts`
+    (React Query, `staleTime` 5 min, fail-closed — erro/loading tratam tudo como desligado).
+    `ajustes.tsx` e `more/assistente.tsx` passaram a ler o hook; as duas env vars
+    `EXPO_PUBLIC_ASSISTANT_TEXT_ENABLED`/`EXPO_PUBLIC_ASSISTANT_WHATSAPP_ENABLED` foram eliminadas
+    do código do app. `more/assistente.tsx` ganhou `EstadoVazio` "Assistente indisponível" para
+    acesso por deep link com a capacidade desligada.
+  - `docker-compose.vps.yml`/`docker-compose.production.yml` passaram a repassar
+    `ASSISTANT_TEXT_ENABLED`/`ASSISTANT_AUDIO_ENABLED` (default `false`) ao container `api`.
+    `ASSISTANT_EXTERNAL_ENABLED` e chaves de IA ficaram **de fora** por decisão do dono do produto —
+    só parser determinístico habilitado, sem custo e sem risco de o
+    `AssistantExternalConfigurationGuard` derrubar o boot.
+  - `deploy/vps/.env.vps.example` e `.env.vps.production.example` documentam as vars novas e o
+    pré-requisito de banco em V65.
+  - `scripts/e2e-assistant-ios.sh` e `docs/runbooks/FASE5_FECHAMENTO_OPERACIONAL.md` atualizados
+    para o novo contrato.
+  - Bônus: `GlobalExceptionHandler` passou a tratar `ProviderFailure`
+    (CONFIGURATION/SAFETY_REFUSAL, antes escapava do `AiExtractionPipeline` como 500 genérico) como
+    503 `AI_UNAVAILABLE`/422 `AI_REFUSED`.
+- **Evidencias ou comandos usados:** testes novos `CapacidadesDesligadasTest` (3 casos) e
+  `CapacidadesLigadasTest` (1 caso); suíte backend completa 481 testes verdes; suíte mobile completa
+  437 testes verdes; `git status --short` confirma os arquivos novos/alterados listados acima.
+- **Riscos residuais:** `/api/v1/capacidades` não distingue "backend fora do ar" de "capacidade
+  desligada" — os dois caem no mesmo fail-closed do hook (ver ADR-0018, seção Consequências). Se o
+  dono do produto ligar `ASSISTANT_EXTERNAL_ENABLED` no futuro, o mesmo cuidado de runtime precisa
+  valer para as chaves de IA (não reintroduzir gate de build).
+- **Proximo passo:** nenhum enquanto o comportamento atual (parser determinístico apenas) for a
+  decisão de produto vigente.
+
+---
+
+## PROB-0093 — Não dava para editar o saldo de uma conta, e "Conta Principal" não existia como conceito
+
+- **ID:** PROB-0093
+- **Titulo:** Tela de carteiras do mobile era somente-leitura (listar/criar/abrir extrato); "Conta
+  Principal" era só o texto default de um campo, sem coluna, flag ou regra
+- **Data:** 2026-08-29
+- **Origem:** usuário (dono do produto)
+- **Severidade:** HIGH
+- **Status:** FECHADO (2026-08-29, working tree não commitado)
+- **Area:** backend, banco, mobile
+- **Sintoma:** não havia como corrigir o saldo de uma conta depois de criada — a tela `more/carteiras.tsx`
+  só permitia listar, criar e abrir extrato. "Conta Principal", nome que o onboarding sugeria por
+  padrão, não correspondia a nenhum dado persistido: era só o valor inicial de um `useState` de
+  texto em `mobile/app/onboarding.tsx:88`. O formulário de lançamento pré-selecionava
+  `carteiras[0]`, isto é, ordem de inserção no banco, não decisão do titular.
+- **Causa raiz:** `contaFinanceiraService.atualizar/ajustar/deletar` existiam no client mobile e não
+  eram chamados em lugar nenhum da UI. O domínio nunca modelou "conta principal" — não havia coluna,
+  índice nem regra de negócio para isso.
+- **Impacto tecnico:** usuário sem forma de corrigir saldo divergente sem recriar a conta (perdendo
+  histórico); nenhuma conta tinha status de "padrão" real, então formulários que precisavam de uma
+  conta pré-selecionada dependiam de ordem de inserção, um comportamento instável e não
+  documentado.
+- **Arquivos ou modulos relacionados:**
+  `backend/src/main/resources/db/migration/V66__carteira_principal.sql`,
+  `backend/src/main/java/com/gestor/financeiro/service/CarteiraService.java`,
+  `backend/src/main/java/com/gestor/financeiro/model/Carteira.java`,
+  `backend/src/main/java/com/gestor/financeiro/repository/CarteiraRepository.java`,
+  `backend/src/main/java/com/gestor/financeiro/dto/ContaFinanceiraRequest.java`,
+  `backend/src/main/java/com/gestor/financeiro/dto/ContaFinanceiraResponse.java`,
+  `backend/src/main/java/com/gestor/financeiro/controller/ContaFinanceiraController.java`,
+  `backend/src/main/java/com/gestor/financeiro/service/OnboardingService.java`,
+  `backend/src/main/java/com/gestor/financeiro/service/ExportService.java`,
+  `mobile/app/(app)/more/carteiras.tsx`, `mobile/app/onboarding.tsx`,
+  `mobile/src/components/NovaTransacaoModal.tsx`, `mobile/src/store/onboardingRascunho.ts`,
+  `frontend/src/pages/Onboarding.tsx`.
+- **Solucao proposta:** modelar "conta principal" como dado de domínio (não texto de UI), com
+  unicidade garantida pelo banco, e transformar a tela de carteiras em CRUD completo.
+- **Solucao aplicada:**
+  - Migration `V66__carteira_principal.sql`: coluna `principal BOOLEAN NOT NULL DEFAULT FALSE` em
+    `carteiras`; índice único **parcial** `ux_carteiras_principal_usuario ON carteiras (usuario_id)
+    WHERE principal` (unicidade é do banco, não da aplicação); backfill determinístico marcando a
+    conta ATIVO manual de menor id de cada titular.
+  - `CarteiraService.definirPrincipal(id, usuarioId)`: desmarca a atual, faz flush, só então marca
+    a nova — a ordem inversa viola o índice parcial. `criar`/`atualizar` chamam o método quando
+    `principal == true`; `deletar` da conta principal elege sucessora (a manual ATIVO mais antiga).
+  - Contrato: `ContaFinanceiraRequest.principal` é opcional e só `true` tem efeito — `null`/`false`
+    preservam o estado atual, porque desmarcar sem eleger outra deixaria o titular sem conta padrão.
+    `ContaFinanceiraResponse.principal` exposto. `ExportService` ganhou a coluna Principal no CSV de
+    carteiras (LGPD).
+  - Onboarding: a carteira nasce com `principal = true`; no mobile o nome deixou de vir
+    pré-preenchido como "Conta Principal" e entrou o campo **Banco** (já suportado pelo backend/DTO,
+    nunca coletado antes); o nome acompanha o banco enquanto estiver vazio.
+  - `more/carteiras.tsx`: formulário agora edita (título "Editar Conta"), com campos Nome, Banco,
+    Tipo, Saldo e toggle "Conta principal"; botões Editar/Excluir no card (ocultos em conta
+    gerenciada); selo "Principal"; principal listada no topo do grupo. O saldo vem pré-preenchido
+    com o saldo atual porque o PUT converte a **diferença** em `AJUSTE_MANUAL` no ledger — salvar
+    sem alterar precisa gerar diferença zero.
+  - `NovaTransacaoModal.tsx:178` passou a pré-selecionar a conta principal em vez de `carteiras[0]`.
+- **Evidencias ou comandos usados:** testes novos em `ContaFinanceiraControllerTest` cobrindo eleger
+  principal desmarcando a anterior, PUT sem o campo não desmarcando, criação nascendo principal e
+  exclusão elegendo sucessora; migration V66 validada contra PostgreSQL 16 real via
+  `scripts/verify-postgres-migrations.sh`; suíte backend 481 testes verdes; suíte mobile 437 testes
+  verdes.
+- **Riscos residuais:** titular sem nenhuma conta manual ATIVO fica sem principal após o backfill —
+  estado considerado válido (não erro), mas nunca testado em produção real com dados legados
+  divergentes do fixture de teste. `frontend/src/pages/Onboarding.tsx` foi tocado para manter o
+  contrato consistente, mas o web não ganhou a mesma tela de edição de carteira que o mobile — não
+  verificado neste ciclo (ver BACKLOG novo).
+- **Proximo passo:** confirmar em produção, após deploy, que o backfill da V66 marcou a conta
+  correta para os usuários reais existentes (não só nos fixtures de teste).
+
+---
+
+## PROB-0094 — Tela de Relatórios (mobile) com layout quebrado: régua de períodos ocupava metade da tela
+
+- **ID:** PROB-0094
+- **Titulo:** Regressão introduzida no commit `d44fc43` fazia dois `ScrollView` dividirem o espaço
+  livre ~50/50, e o estado vazio disparava com salário lançado no mês
+- **Data:** 2026-08-29
+- **Origem:** usuário (dono do produto)
+- **Severidade:** HIGH
+- **Status:** FECHADO (2026-08-29, working tree não commitado)
+- **Area:** mobile
+- **Sintoma:** na tela `mobile/app/(app)/analises.tsx`, a faixa de chips de período ocupava
+  visualmente metade da altura da tela, empurrando o conteúdo real para baixo. Um mês só com
+  entradas (ex.: salário, sem saída lançada) mostrava o estado vazio "Nada por aqui neste período".
+- **Causa raiz:** dois defeitos distintos na mesma tela:
+  1. **Layout.** A faixa de chips de período era um `<ScrollView horizontal>` **sem** prop `style`,
+     irmão direto do `ScrollView` de conteúdo, ambos dentro de uma `View flex:1`. O React Native
+     aplica `baseHorizontal = {flexGrow: 1, flexShrink: 1}` a todo `ScrollView` (verificado em
+     `react-native/Libraries/Components/ScrollView/ScrollView.js`, RN 0.81.5) — sem `style` que
+     fixe a altura, os dois `ScrollView` irmãos disputavam o espaço livre ~50/50. Regressão
+     introduzida no commit `d44fc43` ("refactor(mobile): migrate analytics screen to the pattern"),
+     que trocou um `View flexDirection:'row'` (que não cresce) por esse `ScrollView`. Era a
+     **única** tela do app com essa combinação — em `metas.tsx` e `OperacoesFiltro` o mesmo padrão
+     de chips vive dentro de um container sem espaço livre para disputar.
+  2. **Estado vazio.** `data.totalTransacoes` vinha de
+     `countSaidasByUsuarioIdAndPeriodo` (contava **só** saídas), então um mês só com entrada
+     (salário) sempre mostrava o estado vazio, mesmo com dado real no período.
+- **Impacto tecnico:** tela de Relatórios inutilizável em qualquer aparelho (chips consumindo
+  metade da viewport) e reportando "sem dados" para usuários com receita e sem despesa no mês —
+  dois defeitos que, juntos, tornavam a tela praticamente não confiável.
+- **Arquivos ou modulos relacionados:**
+  `mobile/app/(app)/analises.tsx`, `mobile/app/(app)/_layout.tsx`,
+  `backend/src/main/java/com/gestor/financeiro/repository/TransacaoRepository.java`,
+  `backend/src/main/java/com/gestor/financeiro/service/RelatorioService.java`.
+- **Solucao proposta:** reestruturar a tela para a "Receita de tela" canônica do `DESIGN.md`
+  (`ScrollView` raiz único) e corrigir a query de contagem do estado vazio.
+- **Solucao aplicada:**
+  - Tela reestruturada: `ScrollView` raiz único com `CabecalhoDeTela`, chips e intervalo **dentro**
+    dele — não mais como irmãos concorrendo por espaço livre.
+  - Nova query `countAtivasByUsuarioIdAndPeriodo` em `TransacaoRepository` (conta entradas e
+    saídas); o gatilho do estado vazio no app virou `totalEntradas === 0 && totalSaidas === 0`.
+  - Erro/vazio do relatório do período deixaram de derrubar Evolução mensal, Comparação mensal e
+    Alertas — cada bloco responde pelo próprio estado dentro do scroll (queries independentes).
+  - Comparação mensal: a heurística antiga (`periodo.includes('anterior'/'atual')` com fallback
+    posicional) inverteria o sinal do badge se o rótulo mudasse; passou a usar a ordem fixa que
+    `DashboardService` monta (`[0]` anterior, `[1]` atual) e exige tamanho 2.
+  - Novo card "Gastos por conta": `gastosPorConta` já era servido pelo backend e só o web
+    renderizava; o mobile recebia o payload e descartava.
+  - Pull-to-refresh (`RefreshControl`) refazendo as três queries, como a Home.
+  - Título da aba unificado de "Análises" para "Relatórios" (`(app)/_layout.tsx:117`). O rótulo
+    "Relatórios" em Ajustes **não** mudou — é tocado por texto no Maestro.
+- **Evidencias ou comandos usados:** teste novo `RelatorioServiceTest.mesSoComEntradaNaoParecePeriodoVazio`;
+  suíte backend 481 testes verdes; suíte mobile 437 testes verdes.
+- **Riscos residuais:** a causa raiz do layout foi confirmada lendo o código-fonte do RN
+  (`ScrollView.js`), não com um teste automatizado de layout — não há regressão automática contra
+  esse padrão específico se reaparecer em outra tela nova.
+- **Proximo passo:** nenhum.
+
+---
+
+## PROB-0095 — Smoke de UI no iOS (`scripts/e2e-mobile-ios.sh`) testava app errado e dava falso verde
+
+- **ID:** PROB-0095
+- **Titulo:** Quatro defeitos independentes no smoke de UI mascaravam regressões de layout há tempo
+  indeterminado — nenhum causado pelas correções de PROB-0092/0093/0094, todos pré-existentes
+- **Data:** 2026-08-29
+- **Origem:** revisão (rodada de verificação de UI/UX em simulador iOS, pedida pelo dono do produto
+  após as correções de PROB-0092/0093/0094 — "rodar teste unitário não prova layout")
+- **Severidade:** HIGH
+- **Status:** FECHADO (2026-08-29, working tree não commitado)
+- **Area:** mobile, infra
+- **Sintoma:** o smoke financeiro (`scripts/e2e-mobile-ios.sh`) precisou de 8 rodadas até o primeiro
+  verde legítimo desta sessão. Comparado ao verde histórico do mesmo script, o comportamento não
+  detectava regressões de UI reais introduzidas por commits anteriores.
+- **Causa raiz:** quatro defeitos independentes no script:
+  1. **App errado instalado.** `APP_PATH="$(find "$BUILD_DIR/Build/Products" -maxdepth 2 -type d
+     -name '*.app' -print -quit)"` buscava a partir da raiz de `Products/` e pegava a primeira
+     configuração encontrada. Este script e `scripts/e2e-assistant-ios.sh` compartilham o mesmo
+     `DerivedData` (`mobile/.e2e-derived-data`, ambos usam `BUILD_DIR`); um
+     `Release-iphonesimulator` deixado pelo runner do assistente sombreava o
+     `Debug-iphonesimulator` recém-compilado, e o smoke passava verde testando um app de horas
+     antes. Provado comparando os bundles Hermes com `strings`: o Release instalado não continha
+     `onboarding-account-bank`, `Gastos por conta` nem `assistenteTexto`, todos presentes no Debug
+     novo.
+  2. **Build Debug sem assinatura era inutilizável.** `-configuration Debug` +
+     `CODE_SIGNING_ALLOWED=NO`: Debug força `DEV=true` em `react-native-xcode.sh` (bundle com
+     LogBox) e a ausência de entitlements faz `expo-notifications` falhar ao ler o Keychain
+     (`getRegistrationInfoAsync` → "Keychain access failed: A required entitlement isn't present"),
+     disparando `console.error` e cobrindo a tela com o LogBox vermelho. O flow morria em 19s no
+     primeiro `tapOn: ".*Criar conta"`, atrás da tela vermelha — mesma causa raiz de PROB-0088, já
+     documentada para o runner do assistente e nunca aplicada a este script.
+  3. **Faltava `xcrun simctl keychain reset`.** `clearState` do Maestro não apaga o Keychain, e é
+     lá que a sessão mora (PROB-0089) — sessão de um flow anterior vazava para o próximo.
+  4. **Lista de invariantes travada em 4.** A asserção `(.resumo | length) == 4` com
+     `["COFRE_META","PASSIVO_FATURAS","SALDO_LEDGER","TRANSACAO_INCOMPLETA"]` quebrava porque o
+     backend passou a devolver 5 invariantes desde o commit `21b9a15`
+     (`CATEGORIA_VALOR_GASTO` em `ReconciliacaoGlobalService`).
+- **Impacto tecnico:** o smoke de UI não pegava regressão de layout/comportamento há tempo — ajuda
+  a explicar por que PROB-0092, PROB-0093 e PROB-0094 chegaram a produção sem serem detectados por
+  automação antes do dono do produto reportar. Qualquer "verde" anterior deste script não prova
+  nada sobre o app que de fato roda em produção.
+- **Arquivos ou modulos relacionados:** `scripts/e2e-mobile-ios.sh`,
+  `mobile/.e2e-derived-data` (`BUILD_DIR` compartilhado com `scripts/e2e-assistant-ios.sh`),
+  `mobile/.maestro/financial-critical.yaml`.
+- **Solucao proposta:** corrigir os quatro defeitos e adicionar guarda contra recorrência do item 1.
+- **Solucao aplicada:**
+  - `find` ancorado na configuração correta
+    (`"$BUILD_DIR/Build/Products/Release-iphonesimulator"`) + guarda que falha se `main.jsbundle`
+    for mais antigo que o diretório de artefatos do run.
+  - Build passou de `-configuration Debug` + `CODE_SIGNING_ALLOWED=NO` para `-configuration
+    Release` assinado pelo Xcode, igual ao runner do assistente (linha 199 do script).
+  - `xcrun simctl keychain reset` adicionado logo após o install.
+  - Lista de invariantes atualizada para os 5 correntes (`.resumo | length) == 5`).
+- **Evidencias ou comandos usados:** comparação de `strings` nos bundles Hermes (Release vs Debug)
+  confirmando qual app estava instalado; smoke final `OK: smoke financeiro concluído`, flow Maestro
+  1 teste / 0 falhas / 167s, reconciliação global 8 verificações / 0 divergências, conta final
+  `Conta Principal · saldo 825 · banco Nubank · principal=true`.
+- **Riscos residuais:** `scripts/e2e-mobile-ios.sh` e `scripts/e2e-assistant-ios.sh` continuam
+  escrevendo no mesmo `DerivedData` — ancorar cada script na sua configuração eliminou o sintoma
+  desta rodada, mas a causa estrutural (dois runners, um `BUILD_DIR`) permanece, pronta para
+  reaparecer na próxima variação de configuração/scheme/build parcial (ver BACKLOG-0118).
+- **Proximo passo:** resolver BACKLOG-0118 (DerivedData isolado por runner, ou runner único
+  parametrizado).
+
+---
+
+## PROB-0096 — Conteúdo do padrão de tela passava por baixo da barra de status ao rolar
+
+- **ID:** PROB-0096
+- **Titulo:** Regressão introduzida pela correção de PROB-0094 (adoção da "Receita de tela" do
+  DESIGN.md) fazia o conteúdo subir até y=0 e cobrir relógio/wifi/bateria
+- **Data:** 2026-08-29
+- **Origem:** revisão (mesma rodada de verificação de UI/UX em simulador iOS)
+- **Severidade:** MEDIUM
+- **Status:** FECHADO (2026-08-29, working tree não commitado)
+- **Area:** mobile
+- **Sintoma:** ao mover o cabeçalho para dentro do `ScrollView` de raiz (correção de PROB-0094), o
+  conteúdo da tela de Relatórios passou a subir até `y=0` ao rolar, ficando por cima do relógio,
+  wifi e bateria. Comprovado por screenshot: o título "Comparação mensal" e o badge de variação
+  sobrepunham o relógio.
+- **Causa raiz:** não era defeito específico da tela de Relatórios — é do padrão. Todas as 28 telas
+  de `app/(app)/**` seguem a mesma "Receita de tela" do `DESIGN.md` (`ScrollView` de raiz único,
+  cabeçalho dentro dele), e a Home já se comportava assim antes desta sessão; a correção de
+  PROB-0094 só tornou o sintoma visível numa segunda tela.
+- **Impacto tecnico:** sobreposição visual de texto sobre os indicadores de sistema (relógio, wifi,
+  bateria) ao rolar até o topo, presente potencialmente em qualquer tela padrão do app, não só na
+  tela onde foi observado pela primeira vez nesta rodada.
+- **Arquivos ou modulos relacionados:** `mobile/app/(app)/_layout.tsx`.
+- **Solucao proposta:** corrigir no layout compartilhado, não em cada tela individualmente, já que
+  o problema é do padrão.
+- **Solucao aplicada:** faixa da barra de status em `mobile/app/(app)/_layout.tsx` — `View`
+  absoluto, `top:0`, `height: insets.top`, `backgroundColor: colors.bg`, `pointerEvents="none"` (para
+  não roubar toque de nada embaixo), e o `Fragment` de retorno virou `View flex:1` para dar bloco de
+  contenção ao posicionamento absoluto. Modais não são afetados: `FolhaModal` usa o `Modal` nativo
+  do RN, que renderiza em janela separada e já trata o próprio inset.
+- **Evidencias ou comandos usados:** screenshot antes (título sobreposto ao relógio) e depois
+  (relógio sobre fundo sólido, conteúdo cortado limpo) da correção.
+- **Riscos residuais:** verificado apenas em iPhone 17 Pro / iOS 26.5 / tema escuro. No Android a
+  status bar pode ser translúcida ou opaca conforme a configuração, e o comportamento de
+  `insets.top` difere — não verificado (ver BACKLOG-0119).
+- **Proximo passo:** verificar em Android e em tema claro (BACKLOG-0119).
+
+---
+
+## PROB-0097 — Campo obrigatório "Saldo inicial" do onboarding ficava coberto pelo teclado
+
+- **ID:** PROB-0097
+- **Titulo:** Regressão introduzida pela adição do campo Banco ao passo 1 do onboarding (correção de
+  PROB-0093) empurrava Tipo e Saldo inicial para baixo da dobra
+- **Data:** 2026-08-29
+- **Origem:** revisão (mesma rodada de verificação de UI/UX em simulador iOS)
+- **Severidade:** MEDIUM
+- **Status:** FECHADO (2026-08-29, working tree não commitado)
+- **Area:** mobile
+- **Sintoma:** o campo "Banco", adicionado ao passo 1 do onboarding pela correção de PROB-0093,
+  empurrou "Tipo" e "Saldo inicial (R$)" para baixo da dobra. Com o teclado aberto após digitar o
+  nome, o campo Saldo — obrigatório — ficava coberto, exigindo fechar o teclado ou rolar
+  manualmente para preenchê-lo. Antes da adição do campo Banco, o passo cabia inteiro na tela.
+  Diagnóstico levou três rodadas de E2E por sintoma enganoso: o valor digitado ("100000") caía no
+  campo Nome (que virava "Conta Principal 100000"), porque o `tapOn` do Maestro não move foco para
+  um campo coberto pelo teclado.
+- **Causa raiz:** nenhum encadeamento de foco entre os campos do formulário; o React Native só rola
+  um `TextInput` para a área visível quando ele recebe foco, e sem `onSubmitEditing`/`ref`
+  encadeados o usuário precisava fechar o teclado manualmente para ver o campo seguinte.
+- **Impacto tecnico:** onboarding é o primeiro fluxo que qualquer novo usuário atravessa; um campo
+  obrigatório invisível sob o teclado, sem indicação de como revelá-lo, é fricção logo na primeira
+  tela do app.
+- **Arquivos ou modulos relacionados:** `mobile/app/onboarding.tsx`.
+- **Solucao proposta:** encadear o foco entre os campos do passo 1, aproveitando que o componente
+  `Field` já suportava `ref` para esse fim.
+- **Solucao aplicada:** `returnKeyType="next"` + `onSubmitEditing` levando Banco → Nome → Saldo, com
+  `ref` (`contaNomeRef`, `contaSaldoRef`) em `mobile/app/onboarding.tsx`. O encadeamento resolve as
+  duas partes do problema ao mesmo tempo: o usuário não precisa fechar o teclado nem rolar, e o
+  campo seguinte aparece sozinho porque recebeu foco.
+- **Evidencias ou comandos usados:** flow Maestro passou a percorrer os campos por `pressKey:
+  Enter`, como uma pessoa faz — é essa mudança no flow que prova a correção. `mobile/app/(app)/
+  more/carteiras.tsx` ganhou `testID="conta-form-nome"`, `testID="conta-form-banco"` e
+  `testID="conta-form-saldo"` na mesma sessão, porque o seletor Maestro por texto "Saldo" casava com
+  o rótulo do campo em vez do input.
+- **Riscos residuais:** verificado apenas em iPhone 17 Pro / iOS 26.5 / tema escuro; fonte ampliada
+  (que agrava exatamente este tipo de corte por teclado) não foi testada (ver BACKLOG-0119).
+- **Proximo passo:** nenhum além do BACKLOG-0119.

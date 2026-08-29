@@ -2,13 +2,51 @@
 
 Documentacao de alto nivel sobre como o sistema funciona. Mantido pelo `docs-reporter`.
 
-**Ultima atualizacao:** 2026-08-29 (`main` em `61c0025`, working tree nao commitado): rodada de
-fechamento operacional da Fase 5 executada de ponta a ponta em simulador iOS, com os seis flows do
-assistente verdes e prova financeira por flow (`artifacts/fase5/run-20/`). Nesta mesma rodada o
-assistente ganhou **parcelamento no cartao** (migration `V65`) e foram fechados PROB-0086 a
-PROB-0091. Contagens conferidas contra o codigo nesta data: backend com 31 controllers, 40
-entidades, 36 repositorios, 134 classes de service, 64 migrations (numeradas ate V65) e 470 testes;
-mobile com 31 rotas, 24 services, 11 flows Maestro e 434 testes. Secoes "Modulos principais", "Stack real", "Fluxo principal do
+**Ultima atualizacao:** 2026-08-29, terceira rodada do dia (working tree nao commitado, mesma sessao
+das correcoes de PROB-0092/0093/0094): dono do produto pediu verificacao de que as correcoes
+estavam "100% funcionais para o UI/UX" — teste unitario nao prova layout, entao a verificacao foi
+feita no simulador iOS (iPhone 17 Pro, iOS 26.5, tema escuro) com Maestro. Foram necessarias **8
+rodadas ate o primeiro verde legitimo**, e o motivo e o achado mais grave da rodada: PROB-0095, o
+smoke de UI (`scripts/e2e-mobile-ios.sh`) instalava o app **errado** (Release antigo sombreando o
+Debug novo no mesmo `DerivedData`) e, quando corrigido para instalar o app certo, um build Debug sem
+assinatura derrubava o flow com o LogBox vermelho do `expo-notifications` — ou seja, **este smoke
+nao pegava regressao de UI ha tempo**, o que ajuda a explicar por que PROB-0092/0093/0094 chegaram a
+producao. A propria rodada de verificacao revelou (e corrigiu, na mesma sessao) duas regressoes
+novas introduzidas pelas correcoes anteriores: PROB-0096 (conteudo do padrao de tela subindo por
+baixo da status bar ao rolar, regressao de aplicar a "Receita de tela" do `DESIGN.md` na correcao de
+PROB-0094) e PROB-0097 (campo obrigatorio "Saldo inicial" do onboarding coberto pelo teclado depois
+que PROB-0093 acrescentou o campo Banco ao passo 1). Verde final: smoke financeiro iOS (`OK: smoke
+financeiro concluido`, 1 teste Maestro / 0 falhas / 167s, reconciliacao global 8 verificacoes / 0
+divergencias) e Assistente iOS (`OK: Assistente iOS`, 6 flows + `importacao-mobile`, todos com prova
+financeira e 0 divergencias, rodando **sem** `EXPO_PUBLIC_ASSISTANT_TEXT_ENABLED` — prova em runtime
+do gate do ADR-0018). Backend 481 testes, mobile 437, web 47, todos verdes. Ver
+PROB-0095/0096/0097 e BACKLOG-0117/0118/0119 para o detalhamento completo. **Limite explicito desta
+rodada:** so iPhone 17 Pro / iOS 26.5 / tema escuro — Android, telas pequenas, tema claro e fonte
+ampliada nao foram testados (BACKLOG-0119). O web foi deliberadamente deixado fora desta rodada por
+decisao do dono do produto (ver BACKLOG-0115, que segue como estava).
+
+**Atualizacao anterior (mesmo dia, segunda rodada):** 2026-08-29, working tree nao commitado sobre o
+`main` do fechamento da Fase 5): dono do produto subiu novo backend e novo build do app e reportou
+tres problemas em producao, todos investigados e corrigidos na mesma sessao — PROB-0092
+(Assistente inacessivel por dois gates independentes: env var `EXPO_PUBLIC_*` fixada no build do
+app + `/api/v1/assistant/**` sem variavel de ambiente no container, ver ADR-0018), PROB-0093 (sem
+edicao de saldo de conta; "Conta Principal" nao existia como dado, so como texto default de
+onboarding, migration `V66`) e PROB-0094 (tela de Relatorios com dois `ScrollView` irmaos dividindo
+espaco livre ~50/50, regressao do commit `d44fc43`, mais estado vazio contando so saidas). Backend
+481 testes verdes, mobile 437 testes verdes, migration `V66` validada contra PostgreSQL 16 real via
+`scripts/verify-postgres-migrations.sh`. Contagens conferidas contra o codigo nesta rodada: backend
+com **32 controllers** (`+1`, `CapacidadesController`), **65 migrations** (`+1`, ate `V66`), 134
+classes de service; mobile com 31 rotas e **25 services** (`+1`, `capacidadesService`). Ver
+PROB-0092/0093/0094, BACKLOG-0115/0116 e ADR-0018 para o detalhamento completo.
+
+**Atualizacao anterior (mesmo dia, primeira rodada):** 2026-08-29 (`main` em `61c0025`, working tree
+nao commitado): rodada de fechamento operacional da Fase 5 executada de ponta a ponta em simulador
+iOS, com os seis flows do assistente verdes e prova financeira por flow
+(`artifacts/fase5/run-20/`). Nesta mesma rodada o assistente ganhou **parcelamento no cartao**
+(migration `V65`) e foram fechados PROB-0086 a PROB-0091. Contagens conferidas contra o codigo
+nesta data: backend com 31 controllers, 40 entidades, 36 repositorios, 134 classes de service, 64
+migrations (numeradas ate V65) e 470 testes; mobile com 31 rotas, 24 services, 11 flows Maestro e
+434 testes. Secoes "Modulos principais", "Stack real", "Fluxo principal do
 produto", "Integracoes", "Limitacoes conhecidas" e "Pontos frageis" foram reconferidas linha a linha
 nesta data — antes acumulavam afirmacoes de julho que ja nao descreviam o sistema (ver
 BACKLOG-0091, defasagem documental).
@@ -224,7 +262,10 @@ O sistema e **single-tenant** — nao ha multi-tenancy corporativa. Cada usuario
 4. Dashboard exibe resumo financeiro (saldo, entradas, saidas, graficos).
 5. Usuario cria categorias personalizadas.
 6. Usuario cria contas (credito, debito, dinheiro).
-7. Usuario cria carteiras (dinheiro, conta bancaria, poupanca).
+7. Usuario cria carteiras (dinheiro, conta bancaria, poupanca). Exatamente uma carteira por
+   titular pode ser marcada `principal` (imposto por indice unico parcial no banco desde a
+   migration `V66`, 2026-08-29) — nasce assim no onboarding, pode ser trocada em
+   `more/carteiras.tsx` e e a pre-selecao padrao do formulario de lancamento.
 8. Usuario registra transacoes (entrada/saida, com ou sem parcelamento) — pelo formulario, por
    importacao de extrato ou **conversando com o assistente** (texto ou audio, sempre com revisao).
    Transacao so movimenta o saldo de uma carteira (Ledger) se `carteiraId` for enviado no payload — sem carteira, a transacao e contabilizada em relatorios/categorias mas nao gera `MovimentoCarteira` (ver BUG-0011/BUG-0012). Exclusao de transacao e soft-delete (`ativa=false`) com estorno automatico do movimento no Ledger; todas as leituras agregadas (dashboard, relatorios, listagens, fatura) filtram `ativa=true` desde 2026-07-09 (BUG-0014).
@@ -524,6 +565,89 @@ O sistema e **single-tenant** — nao ha multi-tenancy corporativa. Cada usuario
       simulador (BACKLOG-0111) e `missingFields` ainda alterna vocabulario nome/id conforme o
       endpoint (BACKLOG-0112).
 
+31. **Gate de feature do app sai do build e vira runtime via `GET /api/v1/capacidades` (2026-08-29,
+    PROB-0092, ADR-0018):** o Assistente saiu inacessivel em producao apos um deploy de backend e
+    publicacao de app porque havia **dois** gates independentes resolvendo a mesma pergunta em
+    lugares diferentes — `EXPO_PUBLIC_ASSISTANT_TEXT_ENABLED` embutida no bundle do app (so setada
+    no runner de E2E, nunca no workflow de release) e `@ConditionalOnProperty` no backend sem a
+    variavel de ambiente correspondente nos `docker-compose.*.yml` de deploy. **Decisao:** a
+    pergunta "isso esta ligado?" deixou de ser respondida em dois lugares fixados (build do app,
+    topologia HTTP do backend) e passou a ter uma unica fonte consultavel em runtime — o endpoint
+    `CapacidadesController`, deliberadamente sem `@ConditionalOnProperty` (ele existe para dizer que
+    algo esta desligado, entao nao pode sumir junto). O mobile consome via `useCapacidades`
+    (React Query, `staleTime` 5 min, fail-closed: erro/loading = tudo desligado). As env vars
+    `EXPO_PUBLIC_ASSISTANT_TEXT_ENABLED`/`EXPO_PUBLIC_ASSISTANT_WHATSAPP_ENABLED` foram eliminadas
+    do codigo do app. `docker-compose.vps.yml`/`docker-compose.production.yml` passaram a repassar
+    `ASSISTANT_TEXT_ENABLED`/`ASSISTANT_AUDIO_ENABLED` (default `false`); `ASSISTANT_EXTERNAL_ENABLED`
+    e chaves de IA continuam de fora por decisao do dono do produto. Ver ADR-0018 para o registro
+    completo da decisao e a alternativa descartada (manter as `EXPO_PUBLIC_*`, so garantindo que o
+    workflow de release as defina).
+
+32. **"Conta principal" vira dado de dominio; tela de carteiras do mobile ganha edicao/exclusao
+    (2026-08-29, PROB-0093, migration `V66`):** ate aqui "Conta Principal" era so o texto default
+    de um campo do onboarding — sem coluna, flag ou regra — e o formulario de lancamento
+    pre-selecionava `carteiras[0]` (ordem de insercao, nao decisao do titular). Migration
+    `V66__carteira_principal.sql` acrescenta `carteiras.principal BOOLEAN NOT NULL DEFAULT FALSE`
+    com indice unico **parcial** `ux_carteiras_principal_usuario ON carteiras (usuario_id) WHERE
+    principal` (unicidade e do banco, nao da aplicacao) e backfill deterministico marcando a conta
+    ATIVO manual de menor id de cada titular. `CarteiraService.definirPrincipal` desmarca a atual,
+    faz flush, so entao marca a nova (a ordem inversa viola o indice). No contrato,
+    `ContaFinanceiraRequest.principal` e opcional e so `true` tem efeito — `null`/`false` preservam
+    o estado atual, porque desmarcar sem eleger outra deixaria o titular sem conta padrao.
+    `mobile/app/(app)/more/carteiras.tsx` deixou de ser somente-leitura: agora edita nome, banco,
+    tipo, saldo (o PUT converte a diferenca em `AJUSTE_MANUAL` no ledger) e o toggle "conta
+    principal", com exclusao elegendo sucessora automaticamente. O web (`frontend/src/pages/Carteira.tsx`)
+    nao recebeu a mesma tela — ver BACKLOG-0115.
+
+33. **Regressao de layout mobile por dois `ScrollView` irmaos sem `style` disputando espaco livre
+    (2026-08-29, PROB-0094):** `mobile/app/(app)/analises.tsx` tinha a faixa de chips de periodo
+    como `<ScrollView horizontal>` sem prop `style`, irma direta do `ScrollView` de conteudo, ambos
+    dentro de `View flex:1` — o RN aplica `flexGrow:1, flexShrink:1` a todo `ScrollView`
+    (`ScrollView.js`, RN 0.81.5), entao os dois dividiam o espaco livre ~50/50. Regressao do commit
+    `d44fc43`; era a unica tela do app com essa combinacao. Corrigida reestruturando a tela para a
+    "Receita de tela" do `DESIGN.md` (`ScrollView` raiz unico, chips e intervalo dentro dele). Na
+    mesma correcao: nova query `countAtivasByUsuarioIdAndPeriodo` substitui
+    `countSaidasByUsuarioIdAndPeriodo` no gatilho do estado vazio (um mes so com entrada nao
+    aparecia mais como "sem dados"); card "Gastos por conta" passou a renderizar no mobile
+    (payload ja existia, so o web usava); aba renomeada de "Analises" para "Relatorios".
+
+34. **Smoke de UI iOS (`scripts/e2e-mobile-ios.sh`) passou a compilar Release assinado, nao mais
+    Debug (2026-08-29, PROB-0095):** o script instalava o app **errado** — `find` varria
+    `Build/Products` a partir da raiz e pegava a primeira configuracao encontrada; como este script
+    e `scripts/e2e-assistant-ios.sh` compartilham o mesmo `DerivedData`
+    (`mobile/.e2e-derived-data`), um `Release-iphonesimulator` deixado pelo runner do assistente
+    sombreava o `Debug-iphonesimulator` recem-compilado, e o smoke testava um app de horas antes
+    sem avisar. Corrigido o `find` (achado ainda expunha um segundo defeito: Debug sem assinatura
+    e sem entitlements faz `expo-notifications` falhar lendo o Keychain, cobrindo a tela com o
+    LogBox vermelho), o script passou a buildar **Release assinado pelo Xcode**
+    (`-configuration Release`, sem `CODE_SIGNING_ALLOWED=NO`), igual ao runner do assistente. Por
+    isso o smoke de UI agora reflete o mesmo tipo de build que vai pra loja, nao um Debug que nunca
+    rodou em producao. Ver PROB-0095 para os quatro defeitos do script (app errado, Debug quebrado,
+    Keychain nao resetado entre flows, lista de invariantes travada em 4 quando o backend ja
+    devolvia 5). Risco estrutural remanescente: os dois scripts ainda compartilham `DerivedData`
+    (BACKLOG-0118).
+
+35. **Faixa de status bar centralizada em `mobile/app/(app)/_layout.tsx` (2026-08-29,
+    PROB-0096):** a "Receita de tela" do `DESIGN.md` (`ScrollView` raiz unico com cabecalho dentro
+    dele, adotada na correcao de PROB-0094) faz o conteudo subir ate `y=0` ao rolar, cobrindo
+    relogio/wifi/bateria — nao e defeito de uma tela, e do padrao, presente potencialmente desde
+    que a Home adotou a mesma receita. Correcao vive no layout, nao em cada tela: `View` absoluto
+    `top:0`, `height: insets.top`, `backgroundColor: colors.bg`, `pointerEvents="none"`. Modais
+    (`FolhaModal`) usam o `Modal` nativo do RN, que renderiza em janela separada e ja trata o
+    proprio inset — nao precisaram de ajuste. Verificado so em iOS/tema escuro; `insets.top` se
+    comporta diferente no Android conforme a status bar seja translucida ou opaca (BACKLOG-0119).
+
+36. **Encadeamento de foco no onboarding para no esconder campo obrigatorio sob o teclado
+    (2026-08-29, PROB-0097):** o campo Banco (adicionado ao passo 1 pela correcao de PROB-0093)
+    empurrou "Tipo" e "Saldo inicial (R$)" para baixo da dobra; com o teclado aberto, o Saldo
+    (obrigatorio) ficava coberto. `mobile/app/onboarding.tsx` ganhou `returnKeyType="next"` +
+    `onSubmitEditing` encadeando Banco → Nome → Saldo via `ref` (o componente `Field` ja suportava
+    `ref` para isso). O RN so rola um `TextInput` para a area visivel quando ele recebe foco, entao
+    o encadeamento resolve as duas coisas ao mesmo tempo. Testes novos no formulario de conta
+    (`mobile/app/(app)/more/carteiras.tsx`) ganharam `testID="conta-form-nome"`,
+    `testID="conta-form-banco"` e `testID="conta-form-saldo"` porque o seletor Maestro por texto
+    "Saldo" casava com o rotulo do campo em vez do input.
+
 ## Regra de produto: credito de fatura e saldo devedor rolado (IMPLEMENTADO, 2026-07-11)
 
 > Spec de produto para PROB-0050 / BACKLOG-0059 / BACKLOG-0054. Decisao de produto travada em 2026-07-11 e **implementada no mesmo dia** (BUG-0053). Pagamento parcial *dentro* da fatura aberta ja existia (BUG-0052); este bloco cobre o comportamento no **fechamento** e nos casos de **credito**, agora em producao no codigo.
@@ -597,6 +721,13 @@ valor é tratada como lançamento, mesmo citando "cartão" ou "fatura" (PROB-008
 Para rodar tudo isso localmente sem provider pago, o profile `local-e2e` publica providers
 determinísticos e um injetor de falha; ver `docs/runbooks/FASE5_FECHAMENTO_OPERACIONAL.md`.
 
+**Descoberta do canal (desde 2026-08-29, PROB-0092, ADR-0018):** nem o app nem a decisão de exibir
+o item "Assistente" dependem mais de nenhuma variável embutida no build. O cliente consulta `GET
+/api/v1/capacidades` (autenticado, sem `@ConditionalOnProperty` de propósito) e liga/desliga a UI
+em runtime a partir de `assistenteTexto`/`assistenteAudio`/`assistenteWhatsapp` — as mesmas
+properties que já controlam os controllers reais. Falha ou carregamento tratam tudo como desligado
+(fail-closed).
+
 ## Limitacoes conhecidas
 
 Lista reconferida contra o codigo em **2026-08-29**. Nove itens que ainda diziam "sem testes no
@@ -605,14 +736,16 @@ descreviam o sistema de julho e foram removidos ou reescritos — o estado real 
 
 ### Cobertura e automacao
 
-1. **Migrations versionadas (Flyway):** `V1__baseline_schema.sql` ate `V65__assistant_draft_cartao_parcelas.sql`, **64 arquivos** (a numeracao tem lacunas), com `ddl-auto=validate` em dev e prod. PROB-0006 resolvido.
-2. **Testes existem nas tres frentes:** backend **470** testes, mobile **434** (39 suites Jest), web **12** arquivos de teste Vitest — o web segue a frente menos coberta.
+1. **Migrations versionadas (Flyway):** `V1__baseline_schema.sql` ate `V66__carteira_principal.sql`, **65 arquivos** (a numeracao tem lacunas), com `ddl-auto=validate` em dev e prod. PROB-0006 resolvido. `V66` valida contra PostgreSQL 16 real via `scripts/verify-postgres-migrations.sh` (2026-08-29).
+2. **Testes existem nas tres frentes:** backend **481** testes, mobile **437** (39 suites Jest), web **12** arquivos de teste Vitest — o web segue a frente menos coberta.
 3. **E2E mobile existe:** 11 flows Maestro em `mobile/.maestro/`, incluindo os seis do assistente. Nao ha Detox. O gate `mobile-maestro.yml` roda no CI.
 4. **CI existe:** GitHub Actions (`ci.yml`, `mobile-maestro.yml`, `mobile-release.yml`). Deploy segue manual.
 5. **Integracao PostgreSQL depende de Docker local:** `mvn verify -Pintegration-test` e `scripts/verify-postgres-migrations.sh` exigem daemon Docker acessivel; em sandbox sem Docker esses gates nao rodam e isso ja mascarou rodadas anteriores como "verdes".
 6. **`importacao-mobile` sem cobertura E2E real:** o seletor de arquivos do iOS nao lista o fixture escrito em `Media/Downloads`, entao o flow fica SKIPPED (BACKLOG-0111).
 7. **Trinco visual cobre `app/**` mas nao `src/components/**`:** `ComposicaoMetricaModal`, `EditarTransacaoModal` e `NovaTransacaoModal` continuam com `pageSheet` a mao e podem regredir sem quebrar o build (BACKLOG-0099).
 8. **Acessibilidade nao verificada com leitor de tela real:** a arvore foi conferida por dump do Maestro, nunca com VoiceOver/TalkBack ligado; Reduce Motion e Android tambem seguem sem verificacao (BACKLOG-0078).
+8b. **Verificacao de UI/UX so cobre iPhone 17 Pro / iOS 26.5 / tema escuro (2026-08-29, PROB-0096/0097):** nenhuma rodada deste projeto ainda exercitou Android, telas pequenas, tema claro ou fonte ampliada — a faixa de status bar do item 35 (Principais decisoes tecnicas) e especialmente sensivel a isso, porque `insets.top` no Android varia com a status bar ser translucida ou opaca (BACKLOG-0119).
+8c. **`scripts/e2e-mobile-ios.sh` e `scripts/e2e-assistant-ios.sh` compartilham `DerivedData` (`mobile/.e2e-derived-data`):** a causa do app errado instalado pelo smoke de UI (PROB-0095) foi corrigida ancorando cada script na sua configuracao, mas dois runners escrevendo no mesmo `DerivedData` continua sendo uma armadilha estrutural para a proxima variacao de build (BACKLOG-0118).
 
 ### Seguranca e hardening
 
@@ -670,16 +803,27 @@ descreviam o sistema de julho e foram removidos ou reescritos — o estado real 
 
 ## Auditoria e estado atual
 
-### Estado em 2026-08-29 (rodada mais recente)
+### Estado em 2026-08-29 (rodada mais recente — verificacao de UI/UX pos PROB-0092/0093/0094)
 
-- **Backend:** 470 testes verdes (`./mvnw test`), incluindo `AssistantParcelamentoTest`.
-- **Mobile:** 434 testes verdes em 39 suites; `tsc --noEmit` limpo.
-- **E2E iOS:** `scripts/e2e-assistant-ios.sh` fechou com `OK: Assistente iOS` em
-  `artifacts/fase5/run-20/` — seis flows do assistente verdes, prova financeira por flow,
-  reconciliacao global sem divergencia, `409` para `Idempotency-Key` divergente e varredura de
-  segredos limpa. `importacao-mobile` ficou SKIPPED (BACKLOG-0111).
-- **Nao executado nesta rodada:** `mvn verify -Pintegration-test` (PostgreSQL), Android, leitor de
-  tela real, smoke em staging.
+- **Backend:** 481 testes verdes.
+- **Mobile:** 437 testes verdes; **Web:** 47 testes verdes.
+- **E2E iOS — smoke financeiro:** `scripts/e2e-mobile-ios.sh` fechou com `OK: smoke financeiro
+  concluido` apos a correcao de PROB-0095 (app errado + Debug quebrado + Keychain nao resetado +
+  lista de invariantes desatualizada) — flow Maestro 1 teste / 0 falhas / 167s, reconciliacao
+  global 8 verificacoes / 0 divergencias, conta final `Conta Principal · saldo 825 · banco Nubank ·
+  principal=true`.
+- **E2E iOS — Assistente:** `scripts/e2e-assistant-ios.sh` fechou com `OK: Assistente iOS` — seis
+  flows (assistant-text, ambiguity, retry, confirm-retry, parcelado, audio) + `importacao-mobile`,
+  todos com prova financeira e 0 divergencias, rodando **sem** `EXPO_PUBLIC_ASSISTANT_TEXT_ENABLED`
+  (prova em runtime do gate do ADR-0018).
+- **Verificado por screenshot na UI real:** selo verde "Principal" no card da conta, banco "Nubank"
+  exibido, botoes Editar/Excluir presentes na conta manual e ausentes em Cofre/Cartao ("Somente
+  leitura · gerenciada no modulo de origem"), edicao de saldo R$ 825,00 → R$ 900,00 → R$ 825,00
+  persistindo, card novo "Gastos por conta" em Relatorios, aba renomeada para "Relatorios", faixa
+  solida sob o relogio/wifi/bateria ao rolar (PROB-0096 corrigido).
+- **Nao executado nesta rodada:** `mvn verify -Pintegration-test` (PostgreSQL), Android, tema claro,
+  fonte ampliada, leitor de tela real, smoke em staging (ver item 8b/8c em "Limitacoes conhecidas",
+  BACKLOG-0119).
 - **Gates externos que seguem abertos:** billing/politica de dados dos fornecedores de IA,
   homologacao Meta/WhatsApp, backup off-host e restore drill (`PROB-0081`) e o deploy com smoke de
   producao. Enquanto isso, `assistant.*` e os providers externos permanecem desligados por padrao.
@@ -692,5 +836,6 @@ descreviam o sistema de julho e foram removidos ou reescritos — o estado real 
 - **Resultado original:** PASS_COM_RESSALVA — sistema funcional mas nao pronto para producao
 - **Achados originais:** 15 CRITICAL, 12 HIGH, 32 MEDIUM, 24 LOW (83 total)
 - **Relatorio:** `docs/REVIEW_REPORTS/2026-07-06_full-system_security-and-bug-audit.md`
-- **Registro acumulado desde entao:** 91 problemas (`PROB-0001`..`PROB-0091`), 112 entradas de
-  backlog (numeradas ate `BACKLOG-0113`) e 102 bugs corrigidos (`BUG-0001`..`BUG-0102`).
+- **Registro acumulado desde entao:** 97 problemas (`PROB-0001`..`PROB-0097`), entradas de backlog
+  numeradas ate `BACKLOG-0119` e bugs corrigidos numerados ate `BUG-0103` — contagem de itens
+  ABERTO/FECHADO nao reconferida linha a linha nesta atualizacao, so os IDs mais altos.

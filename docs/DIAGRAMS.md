@@ -2,7 +2,7 @@
 
 Registro de diagramas do sistema. Mantido pelo `docs-reporter`.
 
-**Ultima revisao documental:** 2026-08-25
+**Ultima revisao documental:** 2026-08-29
 
 > O `.drawio` continua sendo baseline visual anterior às migrations V32–V44. A arquitetura textual
 > corrente está em `SYSTEM_OVERVIEW.md`; atualizar ERD/topologia permanece trabalho próprio. As
@@ -221,6 +221,13 @@ Usuario (1)
 > `Transacao` (introduzidos em `V13__transacao_carteira.sql`). Atualizar na proxima revisao do
 > arquivo `.drawio`.
 
+> **Pendencia (ERD) — `carteiras.principal`, 2026-08-29 (PROB-0093, migration `V66`):** o ERD
+> tambem nao representa a coluna `Carteira.principal` (BOOLEAN, default FALSE) nem o indice unico
+> **parcial** `ux_carteiras_principal_usuario ON carteiras (usuario_id) WHERE principal`, que impoe
+> no banco a regra "no maximo uma conta principal por titular" (a aplicacao so decide qual;
+> unicidade nao depende dela). Atualizar `04 ERD` na proxima revisao do `.drawio` para mostrar esse
+> indice como restricao de dominio, nao so como coluna.
+
 > **Pendencia (ERD) — Fatura de cartao, 2026-07-09:** o ERD tambem nao representa `FaturaCartao`
 > (`conta_id`, `mes`, `ano`, `valorTotal`, `dataFechamento`, `dataVencimento`, `status`
 > ABERTA|FECHADA|VENCIDA|PAGA — introduzida na migration V17) nem `FaturaLancamento`
@@ -290,6 +297,15 @@ Usuario (1)
    lugar sem atualizar o diagrama, o contorno de rate limit corrigido em PROB-0066 pode voltar a existir
    silenciosamente. Pendente de materializacao em `.drawio`; ver BACKLOG-0080 para o gate de validacao
    real (`nginx -t`, redes, smoke em staging) que precede qualquer promocao para producao.
+8. **Sugerido em 2026-08-29 (PROB-0092, ADR-0018):** criar diagrama de sequencia para a descoberta
+   de capacidades em runtime, hoje so descrita em texto no `SYSTEM_OVERVIEW.md`: `App inicia/foca
+   tela → useCapacidades (React Query, staleTime 5min) → GET /api/v1/capacidades (autenticado, sem
+   @ConditionalOnProperty) → CapacidadesController le assistant.text/audio/whatsapp.enabled →
+   {assistenteTexto, assistenteAudio, assistenteWhatsapp} → UI liga/oculta o item "Assistente"`.
+   Objetivo: deixar visivel que essa consulta substituiu duas decisoes antes fixadas em lugares
+   diferentes (env var `EXPO_PUBLIC_*` no bundle do app; `@ConditionalOnProperty` mais topologia
+   Docker no backend) — se um novo canal for adicionado sem passar por `CapacidadesResponse`, o
+   mesmo defeito de PROB-0092 pode se repetir de outra forma.
 
 ---
 
