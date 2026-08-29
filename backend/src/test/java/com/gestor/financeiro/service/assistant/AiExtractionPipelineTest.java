@@ -13,7 +13,7 @@ class AiExtractionPipelineTest {
     private static final ProviderExtractionRequest REQUEST = new ProviderExtractionRequest(1L, null, "mercado 50", "");
     private static final TransactionDraftV1 DRAFT = new TransactionDraftV1("CREATE_TRANSACTION",
             com.gestor.financeiro.model.enums.TipoTransacao.SAIDA, new BigDecimal("50"), "Mercado",
-            LocalDate.of(2026, 8, 27), "Nubank", "Mercado", List.of());
+            LocalDate.of(2026, 8, 27), "Nubank", "Mercado", null, null, List.of());
 
     @Test
     void falhaTemporariaDoPrimarioUsaSecundario() {

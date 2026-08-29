@@ -7,9 +7,16 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 @Component
 public class FinancialQuestionClassifier {
+    /** Verbos que anunciam lançamento, não consulta. */
+    private static final Pattern LEDGER_CUE = Pattern.compile(
+            ".*\\b(comprei|paguei|gastei|gasto de|lancei|lancar|registrar|anota|anote)\\b.*");
+    private static final Pattern MONEY = Pattern.compile(
+            "(?<![\\p{L}\\d])(?:r\\$\\s*)?[0-9]+(?:[.,][0-9]{1,2})?(?![\\p{L}\\d])");
+
     private final Clock clock;
     public FinancialQuestionClassifier(Clock clock) { this.clock = clock; }
 
@@ -18,6 +25,11 @@ public class FinancialQuestionClassifier {
         String text = normalize(input);
         var intent = intent(text);
         if (intent == null) return Optional.empty();
+        // "comprei 300 no Cartao Nubank" cita cartão mas é lançamento: só vira consulta
+        // quando a frase pergunta algo. Sem isso o assistente nunca registraria a compra.
+        boolean asks = text.contains("?")
+                || has(text, "quanto", "qual", "quais", "quando", "quantos", "mostra", "resumo", "como esta");
+        if (!asks && (LEDGER_CUE.matcher(text).matches() || MONEY.matcher(text).find())) return Optional.empty();
         LocalDate today = LocalDate.now(clock);
         LocalDate from = text.contains("hoje") ? today : today.withDayOfMonth(1);
         LocalDate to = text.contains("hoje") ? today : today.withDayOfMonth(today.lengthOfMonth());

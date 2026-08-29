@@ -17,6 +17,8 @@ public record TransactionDraftV1(
         LocalDate data,
         String contaNome,
         String categoriaNome,
+        String cartaoNome,
+        Integer parcelas,
         List<String> missingFields) {
 
     public TransactionDraftV1 {

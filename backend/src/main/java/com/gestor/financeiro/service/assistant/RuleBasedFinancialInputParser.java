@@ -2,9 +2,11 @@ package com.gestor.financeiro.service.assistant;
 
 import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Categoria;
+import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.CategoriaRepository;
+import com.gestor.financeiro.repository.ContaRepository;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -25,15 +27,21 @@ public class RuleBasedFinancialInputParser implements FinancialInputParser {
     private static final Pattern VALUE = Pattern.compile("(?<![\\p{L}\\d])(?:r\\$\\s*)?([0-9]{1,3}(?:\\.[0-9]{3})*,[0-9]{1,2}|[0-9]+(?:[.,][0-9]{1,2})?)(?![\\p{L}\\d])", Pattern.CASE_INSENSITIVE);
     private static final Pattern ISO_DATE = Pattern.compile("\\b(\\d{4}-\\d{2}-\\d{2})\\b");
     private static final Pattern BR_DATE = Pattern.compile("\\b(\\d{1,2}/\\d{1,2}/\\d{4})\\b");
+    // "3x", "em 3 vezes", "3 parcelas": o trecho sai do texto antes de procurar o valor.
+    private static final Pattern INSTALLMENTS = Pattern.compile(
+            "\\b(?:em\\s+)?([0-9]{1,2})\\s*(?:x\\b|vezes\\b|parcelas?\\b)", Pattern.CASE_INSENSITIVE);
     private static final DateTimeFormatter BR = DateTimeFormatter.ofPattern("d/M/uuuu");
 
     private final CarteiraRepository carteiras;
     private final CategoriaRepository categorias;
+    private final ContaRepository contas;
     private final Clock clock;
 
-    public RuleBasedFinancialInputParser(CarteiraRepository carteiras, CategoriaRepository categorias, Clock clock) {
+    public RuleBasedFinancialInputParser(CarteiraRepository carteiras, CategoriaRepository categorias,
+                                        ContaRepository contas, Clock clock) {
         this.carteiras = carteiras;
         this.categorias = categorias;
+        this.contas = contas;
         this.clock = clock;
     }
 
@@ -42,12 +50,15 @@ public class RuleBasedFinancialInputParser implements FinancialInputParser {
         if (input == null || input.isBlank() || input.length() > 2_000) return FinancialParseResult.notFinancial();
         String text = normalize(input);
         TipoTransacao tipo = direction(text);
-        BigDecimal valor = amount(text);
+        Integer parcelas = installments(text);
+        BigDecimal valor = amount(parcelas == null ? text : INSTALLMENTS.matcher(text).replaceAll(" "));
         LocalDate data = date(text);
         List<Carteira> ownedWallets = carteiras.findByUsuarioId(usuarioId);
         List<Categoria> ownedCategories = categorias.findByUsuarioIdAndAtivoTrue(usuarioId);
         Match carteira = uniqueName(text, ownedWallets.stream().map(Carteira::getNome).toList());
         Match categoria = uniqueName(text, ownedCategories.stream().map(Categoria::getNome).toList());
+        List<Conta> ownedCards = contas.findByUsuarioIdAndAtivoTrue(usuarioId);
+        Match cartao = uniqueName(text, ownedCards.stream().map(Conta::getNome).toList());
 
         boolean cue = tipo != null || valor != null || text.matches(".*\\b(gastei|paguei|comprei|recebi|ganhei)\\b.*");
         if (!cue) return FinancialParseResult.notFinancial();
@@ -56,16 +67,30 @@ public class RuleBasedFinancialInputParser implements FinancialInputParser {
         if (tipo == null) missing.add("tipo");
         if (valor == null) missing.add("valor");
         if (data == null) missing.add("data");
-        if (carteira.name() == null) missing.add("contaNome");
+        // Cartão substitui a conta: a compra vira lançamento de fatura.
+        if (cartao.name() == null && carteira.name() == null) missing.add("contaNome");
+        if (parcelas != null && cartao.name() == null) missing.add("cartaoNome");
         if (categoria.name() == null) missing.add("categoriaNome");
         String descricao = description(text, ownedWallets, ownedCategories);
         if (descricao.isBlank()) missing.add("descricao");
 
         TransactionDraftV1 draft = new TransactionDraftV1("CREATE_TRANSACTION", tipo, valor,
-                descricao, data, carteira.name(), categoria.name(), missing);
+                descricao, data, cartao.name() == null ? carteira.name() : null, categoria.name(),
+                cartao.name(), parcelas, missing);
         if (missing.isEmpty()) return new FinancialParseResult(ParseOutcome.COMPLETE, draft, null);
         if (missing.size() == 1) return new FinancialParseResult(ParseOutcome.NEEDS_ONE_FIELD, draft, question(missing.get(0)));
         return new FinancialParseResult(ParseOutcome.NEEDS_FORM, draft, null);
+    }
+
+    private Integer installments(String text) {
+        Matcher matcher = INSTALLMENTS.matcher(text);
+        Integer found = null;
+        while (matcher.find()) {
+            int candidate = Integer.parseInt(matcher.group(1));
+            if (candidate < 2 || candidate > 48 || found != null) return null;
+            found = candidate;
+        }
+        return found;
     }
 
     private TipoTransacao direction(String text) {

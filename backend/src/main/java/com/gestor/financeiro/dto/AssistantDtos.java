@@ -2,6 +2,8 @@ package com.gestor.financeiro.dto;
 
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.service.assistant.ParseOutcome;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
@@ -16,13 +18,15 @@ public final class AssistantDtos {
     public record MessageRequest(Long conversationId, @NotBlank @Size(max = 2000) String text) { }
     public record DraftResponse(Long id, Long version, TipoTransacao tipo, BigDecimal valor,
                                 String descricao, LocalDate data, Long carteiraId, Long categoriaId,
+                                Long cartaoId, Integer parcelas,
                                 List<String> missingFields, LocalDateTime expiresAt) { }
     public record MessageResponse(Long conversationId, ParseOutcome outcome, String reply,
                                   DraftResponse draft) { }
     public record StoredMessageResponse(Long id, String role, String content, LocalDateTime createdAt) { }
     public record PatchDraftRequest(Long version, TipoTransacao tipo, BigDecimal valor,
                                     @Size(max = 500) String descricao, LocalDate data,
-                                    Long carteiraId, Long categoriaId) { }
+                                    Long carteiraId, Long categoriaId,
+                                    Long cartaoId, @Min(2) @Max(48) Integer parcelas) { }
     public record ConfirmDraftRequest(Long version) { }
     public record ConfirmationResponse(Long id, Long draftId, Long operationId, Long transactionId,
                                        LocalDateTime confirmedAt) { }

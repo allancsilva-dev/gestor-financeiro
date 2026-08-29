@@ -125,7 +125,7 @@ class AssistantConfirmationTest {
         Long carteiraId = carteira.getId(); Long categoriaId = categoria.getId();
         var message = service.receive(usuario.getId(), new MessageRequest(null, "gasolina 85 no Nubank hoje"));
         var patch = new PatchDraftRequest(message.draft().version(), message.draft().tipo(), new BigDecimal("90.00"),
-                "Gasolina", message.draft().data(), carteiraId, categoriaId);
+                "Gasolina", message.draft().data(), carteiraId, categoriaId, null, null);
 
         var first = service.patch(usuario.getId(), message.draft().id(), patch, "assistant:draft:replay-test");
         var replay = service.patch(usuario.getId(), message.draft().id(), patch, "assistant:draft:replay-test");
@@ -134,7 +134,7 @@ class AssistantConfirmationTest {
         Long usuarioId = usuario.getId();
         assertThatThrownBy(() -> service.patch(usuarioId, message.draft().id(),
                 new PatchDraftRequest(message.draft().version(), message.draft().tipo(), new BigDecimal("91.00"),
-                        "Gasolina", message.draft().data(), carteiraId, categoriaId),
+                        "Gasolina", message.draft().data(), carteiraId, categoriaId, null, null),
                 "assistant:draft:replay-test"))
                 .isInstanceOfSatisfying(AssistantException.class, error -> {
                     assertThat(error.code()).isEqualTo("DRAFT_CONFLICT");

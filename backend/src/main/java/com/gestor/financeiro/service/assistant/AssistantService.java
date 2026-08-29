@@ -35,6 +35,7 @@ public class AssistantService {
     private final UsuarioRepository usuarios;
     private final CarteiraRepository carteiras;
     private final CategoriaRepository categorias;
+    private final ContaRepository contas;
     private final RuleBasedFinancialInputParser parser;
     private final AiExtractionPipeline ai;
     private final FinancialQuestionClassifier questions;
@@ -49,14 +50,15 @@ public class AssistantService {
     public AssistantService(AssistantConversationRepository conversations, AssistantMessageRepository messages,
                             AssistantDraftRepository drafts, AssistantConfirmationRepository confirmations,
                             UsuarioRepository usuarios, CarteiraRepository carteiras,
-                            CategoriaRepository categorias, RuleBasedFinancialInputParser parser, AiExtractionPipeline ai,
+                            CategoriaRepository categorias, ContaRepository contas,
+                            RuleBasedFinancialInputParser parser, AiExtractionPipeline ai,
                             FinancialQuestionClassifier questions, FinancialReadTool financialReadTool,
                             FinancialAnswerFormatter answerFormatter,
                             OperacaoFinanceiraService operacoes, TransacaoService transacoes,
                             ObjectMapper objectMapper, AssistantMutationReplay mutationReplay, Clock clock) {
         this.conversations = conversations; this.messages = messages; this.drafts = drafts;
         this.confirmations = confirmations; this.usuarios = usuarios; this.carteiras = carteiras;
-        this.categorias = categorias; this.parser = parser; this.ai = ai; this.questions = questions;
+        this.categorias = categorias; this.contas = contas; this.parser = parser; this.ai = ai; this.questions = questions;
         this.financialReadTool = financialReadTool; this.answerFormatter = answerFormatter; this.operacoes = operacoes;
         this.transacoes = transacoes; this.objectMapper = objectMapper; this.mutationReplay = mutationReplay; this.clock = clock;
     }
@@ -157,6 +159,11 @@ public class AssistantService {
                 .orElseThrow(() -> new ResourceNotFoundException("Conta financeira não encontrada")));
         draft.setCategoria(request.categoriaId() == null ? null : categorias.findByIdAndUsuarioId(request.categoriaId(), usuarioId)
                 .orElseThrow(() -> new ResourceNotFoundException("Categoria não encontrada")));
+        draft.setConta(request.cartaoId() == null ? null : contas.findByIdAndUsuarioId(request.cartaoId(), usuarioId)
+                .orElseThrow(() -> new ResourceNotFoundException("Cartão não encontrado")));
+        if (request.parcelas() != null && draft.getConta() == null) throw new BusinessException("Parcelamento exige cartão");
+        draft.setParcelas(request.parcelas());
+        if (draft.getConta() != null) draft.setCarteira(null);
         DraftResponse response = response(drafts.saveAndFlush(draft), missing(draft));
         if (idempotencyKey != null) mutationReplay.store(usuarioId,
                 draft.getConversation() == null ? null : draft.getConversation().getId(),
@@ -203,8 +210,17 @@ public class AssistantService {
         Transacao transaction = new Transacao();
         transaction.setTipo(draft.getTipo()); transaction.setValorTotal(draft.getValor());
         transaction.setDescricao(draft.getDescricao()); transaction.setData(draft.getData());
-        transaction.setCarteira(draft.getCarteira()); transaction.setCategoria(draft.getCategoria());
-        transaction.setStatus(StatusPagamento.PAGO); transaction.setParcelado(false);
+        transaction.setCategoria(draft.getCategoria());
+        transaction.setStatus(StatusPagamento.PAGO);
+        if (draft.getConta() != null) {
+            // Compra no cartão: cronograma canônico é a fatura, sem carteira envolvida.
+            transaction.setConta(draft.getConta());
+            transaction.setParcelado(draft.getParcelas() != null && draft.getParcelas() > 1);
+            transaction.setTotalParcelas(draft.getParcelas());
+        } else {
+            transaction.setCarteira(draft.getCarteira());
+            transaction.setParcelado(false);
+        }
         transaction = transacoes.criar(transaction, usuarioId, "ASSISTANT:" + draftId + ":LEDGER", operation);
 
         AssistantConfirmation saved = new AssistantConfirmation();
@@ -314,6 +330,7 @@ public class AssistantService {
         AssistantDraft d = new AssistantDraft(); d.setUsuario(u); d.setConversation(c); d.setStatus(AssistantDraftStatus.PENDING);
         d.setTipo(value.tipo()); d.setValor(value.valor()); d.setDescricao(value.descricao()); d.setData(value.data());
         d.setCarteira(findWallet(u.getId(), value.contaNome())); d.setCategoria(findCategory(u.getId(), value.categoriaNome()));
+        d.setConta(findCard(u.getId(), value.cartaoNome())); d.setParcelas(value.parcelas());
         d.setProvider(provider); d.setModel(model); d.setPromptVersion(promptVersion); d.setSchemaVersion(SCHEMA_VERSION);
         d.setQuestionCount((short) (parsed.outcome() == ParseOutcome.NEEDS_ONE_FIELD ? 1 : 0));
         d.setInputHash(OperacaoFinanceiraService.hashPayload(input)); d.setCreatedAt(now); d.setExpiresAt(now.plusHours(24));
@@ -321,23 +338,31 @@ public class AssistantService {
     }
 
     private Carteira findWallet(Long userId, String name) { return name == null ? null : carteiras.findByUsuarioIdAndNomeIgnoreCase(userId, name).orElse(null); }
+    private Conta findCard(Long userId, String name) { return name == null ? null : contas.findByUsuarioIdAndNomeIgnoreCase(userId, name).orElse(null); }
     private Categoria findCategory(Long userId, String name) { return name == null ? null : categorias.findByUsuarioIdAndNomeIgnoreCase(userId, name).orElse(null); }
     private String trustedContext(Long userId) {
         String wallets = carteiras.findByUsuarioId(userId).stream().map(Carteira::getNome).sorted().reduce((a,b) -> a + ", " + b).orElse("");
         String cats = categorias.findByUsuarioIdAndAtivoTrue(userId).stream().map(Categoria::getNome).sorted().reduce((a,b) -> a + ", " + b).orElse("");
-        String value = "Contas permitidas: [" + wallets + "]\nCategorias permitidas: [" + cats + "]";
+        String cards = contas.findByUsuarioIdAndAtivoTrue(userId).stream().map(Conta::getNome).sorted().reduce((a,b) -> a + ", " + b).orElse("");
+        String value = "Contas permitidas: [" + wallets + "]\nCategorias permitidas: [" + cats + "]\nCartoes permitidos: [" + cards + "]";
         return value.substring(0, Math.min(value.length(), 8_000));
     }
     private FinancialParseResult classify(Long usuarioId, TransactionDraftV1 d) {
         List<String> missing = new ArrayList<>();
         if (d.tipo() == null) missing.add("tipo"); if (d.valor() == null || d.valor().signum() <= 0) missing.add("valor");
         if (d.descricao() == null || d.descricao().isBlank()) missing.add("descricao"); if (d.data() == null) missing.add("data");
-        if (d.contaNome() == null || d.contaNome().isBlank()
-                || carteiras.findByUsuarioIdAndNomeIgnoreCase(usuarioId, d.contaNome()).isEmpty()) missing.add("contaNome");
+        boolean card = d.cartaoNome() != null && !d.cartaoNome().isBlank()
+                && contas.findByUsuarioIdAndNomeIgnoreCase(usuarioId, d.cartaoNome()).isPresent();
+        // Cartão substitui a conta: a compra vive na fatura, não no saldo da carteira.
+        if (!card && (d.contaNome() == null || d.contaNome().isBlank()
+                || carteiras.findByUsuarioIdAndNomeIgnoreCase(usuarioId, d.contaNome()).isEmpty())) missing.add("contaNome");
         if (d.categoriaNome() == null || d.categoriaNome().isBlank()
                 || categorias.findByUsuarioIdAndNomeIgnoreCase(usuarioId, d.categoriaNome()).isEmpty()) missing.add("categoriaNome");
+        // Parcelar é privilégio do cartão, como no formulário manual.
+        if (d.parcelas() != null && !card) missing.add("cartaoNome");
+        Integer parcelas = d.parcelas() != null && d.parcelas() >= 2 && d.parcelas() <= 48 ? d.parcelas() : null;
         TransactionDraftV1 safe = new TransactionDraftV1("CREATE_TRANSACTION", d.tipo(), d.valor(), trim(d.descricao()), d.data(),
-                trim(d.contaNome()), trim(d.categoriaNome()), missing);
+                card ? null : trim(d.contaNome()), trim(d.categoriaNome()), card ? trim(d.cartaoNome()) : null, parcelas, missing);
         ParseOutcome outcome = missing.isEmpty() ? ParseOutcome.COMPLETE : missing.size() == 1 ? ParseOutcome.NEEDS_ONE_FIELD : ParseOutcome.NEEDS_FORM;
         return new FinancialParseResult(outcome, safe, missing.size() == 1 ? question(missing.get(0)) : null);
     }
@@ -409,21 +434,27 @@ public class AssistantService {
     private String question(String field) { return switch (field) {
         case "tipo" -> "Esse valor entrou ou saiu?"; case "valor" -> "Qual foi o valor?";
         case "data" -> "Em que dia aconteceu?"; case "contaNome" -> "Qual conta você usou?";
-        case "categoriaNome" -> "Qual categoria devo usar?"; default -> "Como você descreve esse lançamento?";
+        case "categoriaNome" -> "Qual categoria devo usar?"; case "cartaoNome" -> "Qual cartão você usou?";
+        default -> "Como você descreve esse lançamento?";
     }; }
     private List<String> missing(AssistantDraft d) {
         List<String> m = new ArrayList<>(); if (d.getTipo() == null) m.add("tipo"); if (d.getValor() == null) m.add("valor");
         if (d.getDescricao() == null || d.getDescricao().isBlank()) m.add("descricao"); if (d.getData() == null) m.add("data");
-        if (d.getCarteira() == null) m.add("carteiraId"); if (d.getCategoria() == null) m.add("categoriaId"); return m;
+        if (d.getCarteira() == null && d.getConta() == null) m.add("carteiraId");
+        if (d.getCategoria() == null) m.add("categoriaId");
+        if (d.getParcelas() != null && d.getConta() == null) m.add("cartaoId"); return m;
     }
 
     private DraftResponse response(AssistantDraft d, List<String> missing) {
         return new DraftResponse(d.getId(), d.getVersion(), d.getTipo(), d.getValor(), d.getDescricao(), d.getData(),
-                d.getCarteira() == null ? null : d.getCarteira().getId(), d.getCategoria() == null ? null : d.getCategoria().getId(), missing, d.getExpiresAt());
+                d.getCarteira() == null ? null : d.getCarteira().getId(), d.getCategoria() == null ? null : d.getCategoria().getId(),
+                d.getConta() == null ? null : d.getConta().getId(), d.getParcelas(), missing, d.getExpiresAt());
     }
     private ConfirmationResponse confirmation(AssistantConfirmation c) { return new ConfirmationResponse(c.getId(), c.getDraftId(), c.getOperacao().getId(), c.getTransacao().getId(), c.getCreatedAt()); }
     private String canonical(AssistantDraft d) {
-        try { return objectMapper.writeValueAsString(new TransactionDraftV1("CREATE_TRANSACTION", d.getTipo(), d.getValor(), d.getDescricao(), d.getData(), d.getCarteira().getNome(), d.getCategoria().getNome(), List.of())); }
+        try { return objectMapper.writeValueAsString(new TransactionDraftV1("CREATE_TRANSACTION", d.getTipo(), d.getValor(),
+                d.getDescricao(), d.getData(), d.getCarteira() == null ? null : d.getCarteira().getNome(), d.getCategoria().getNome(),
+                d.getConta() == null ? null : d.getConta().getNome(), d.getParcelas(), List.of())); }
         catch (JsonProcessingException e) { throw new IllegalStateException("Falha ao serializar snapshot", e); }
     }
     private String trim(String value) { return value == null ? null : value.trim(); }

@@ -36,6 +36,11 @@ public class AssistantDraft {
     private Carteira carteira;
     @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "categoria_id")
     private Categoria categoria;
+    /** Cartão da compra. Presente exclui carteira: o cronograma vive na fatura. */
+    @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "conta_id")
+    private Conta conta;
+    /** Nulo é à vista. Parcelar exige cartão, como no formulário manual. */
+    private Integer parcelas;
     @Column(nullable = false, length = 30)
     private String provider;
     @Column(nullable = false, length = 80)

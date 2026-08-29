@@ -2,9 +2,11 @@ package com.gestor.financeiro.service.assistant;
 
 import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Categoria;
+import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.CategoriaRepository;
+import com.gestor.financeiro.repository.ContaRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -28,7 +30,10 @@ class RuleBasedFinancialInputParserTest {
         mercado.setNome("Mercado");
         CarteiraRepository carteiras = proxy(CarteiraRepository.class, "findByUsuarioId", List.of(nubank));
         CategoriaRepository categorias = proxy(CategoriaRepository.class, "findByUsuarioIdAndAtivoTrue", List.of(gasolina, mercado));
-        parser = new RuleBasedFinancialInputParser(carteiras, categorias,
+        Conta cartao = new Conta();
+        cartao.setNome("Cartao Nubank");
+        ContaRepository contas = proxy(ContaRepository.class, "findByUsuarioIdAndAtivoTrue", List.of(cartao));
+        parser = new RuleBasedFinancialInputParser(carteiras, categorias, contas,
                 Clock.fixed(Instant.parse("2026-08-27T12:00:00Z"), ZoneOffset.UTC));
     }
 

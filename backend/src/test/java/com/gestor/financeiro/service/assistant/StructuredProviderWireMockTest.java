@@ -1,6 +1,7 @@
 package com.gestor.financeiro.service.assistant;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.AfterEach;
@@ -18,7 +19,8 @@ import static org.mockito.Mockito.mock;
 class StructuredProviderWireMockTest {
     private static final String DRAFT = """
             {"intent":"CREATE_TRANSACTION","tipo":"SAIDA","valor":50,"descricao":"Mercado",
-             "data":"2026-08-27","contaNome":"Nubank","categoriaNome":"Mercado","missingFields":[]}
+             "data":"2026-08-27","contaNome":"Nubank","categoriaNome":"Mercado",
+             "cartaoNome":null,"parcelas":null,"missingFields":[]}
             """;
 
     private WireMockServer server;
@@ -97,14 +99,19 @@ class StructuredProviderWireMockTest {
         server.verify(1, postRequestedFor(urlEqualTo("/v23.0/phone-id/messages")));
     }
 
+    /** Espelha o mapper da aplicação: sem JavaTimeModule o campo data não desserializa. */
+    private static ObjectMapper mapper() {
+        return new ObjectMapper().registerModule(new JavaTimeModule());
+    }
+
     private GeminiStructuredAiProvider gemini() {
-        return new GeminiStructuredAiProvider(new ObjectMapper(), RestClient.builder(), resilience(),
+        return new GeminiStructuredAiProvider(mapper(), RestClient.builder(), resilience(),
                 mock(AssistantUsageBudget.class), mock(AssistantInvocationAudit.class),
                 server.baseUrl(), "secret", "gemini-test", 2);
     }
 
     private OpenAiStructuredAiProvider openAi() {
-        return new OpenAiStructuredAiProvider(new ObjectMapper(), RestClient.builder(), resilience(),
+        return new OpenAiStructuredAiProvider(mapper(), RestClient.builder(), resilience(),
                 mock(AssistantUsageBudget.class), mock(AssistantInvocationAudit.class),
                 server.baseUrl(), "secret", "openai-test", 2);
     }
