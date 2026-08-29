@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
+import { Text, TextInput, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useTheme, radius, spacing, typography, numeric } from '../src/theme';
@@ -85,7 +85,15 @@ export default function OnboardingScreen() {
   const [erros, setErros] = useState<Erros>({});
   const rascunhoCarregado = useRef(false);
 
-  const [contaNome, setContaNome] = useState('Conta Principal');
+  // O nome não nasce mais "Conta Principal": principal virou uma propriedade da conta
+  // (migration V66), não um nome. O que identifica a conta para o titular é o banco.
+  const [contaBanco, setContaBanco] = useState('');
+  const [contaNome, setContaNome] = useState('');
+  // Saldo e o ultimo campo do passo e o teclado o cobre. O RN so rola um TextInput para a area
+  // visivel quando ele RECEBE FOCO — entao encadear "proximo" resolve as duas coisas de uma vez:
+  // a pessoa nao precisa fechar o teclado nem rolar, e o campo aparece sozinho.
+  const contaNomeRef = useRef<TextInput>(null);
+  const contaSaldoRef = useRef<TextInput>(null);
   const [contaTipo, setContaTipo] = useState<TipoContaInicial>('CONTA_BANCARIA');
   const [contaSaldo, setContaSaldo] = useState('');
 
@@ -116,6 +124,7 @@ export default function OnboardingScreen() {
       if (!ativo || !rascunho) { rascunhoCarregado.current = true; return; }
       if (rascunho.conta) {
         setContaNome(rascunho.conta.nome);
+        setContaBanco(rascunho.conta.banco ?? '');
         setContaTipo(rascunho.conta.tipo as TipoContaInicial);
         setContaSaldo(rascunho.conta.saldo);
       }
@@ -151,7 +160,7 @@ export default function OnboardingScreen() {
     if (!rascunhoCarregado.current) return;
     salvarRascunho({
       passo,
-      conta: { nome: contaNome, tipo: contaTipo, saldo: contaSaldo },
+      conta: { nome: contaNome, tipo: contaTipo, saldo: contaSaldo, banco: contaBanco },
       renda: comRenda ? { nome: rendaNome, valor: rendaValor, dia: rendaDia } : null,
       categorias: categoriasEscolhidas,
       cartao: comCartao
@@ -160,7 +169,7 @@ export default function OnboardingScreen() {
       meta: comMeta ? { nome: metaNome, valor: metaValor, data: metaData } : null,
     });
   }, [
-    passo, contaNome, contaTipo, contaSaldo,
+    passo, contaNome, contaBanco, contaTipo, contaSaldo,
     comRenda, rendaNome, rendaValor, rendaDia, categoriasEscolhidas,
     comCartao, cartaoNome, cartaoLimite, cartaoFechamento, cartaoVencimento,
     comMeta, metaNome, metaValor, metaData,
@@ -241,6 +250,7 @@ export default function OnboardingScreen() {
         nome: contaNome.trim(),
         subtipo: contaTipo === 'CONTA_BANCARIA' ? 'CORRENTE' : contaTipo,
         saldo: parseCurrencyBR(contaSaldo || '0'),
+        banco: contaBanco.trim() || undefined,
       },
     };
     if (comRenda) {
@@ -384,12 +394,32 @@ export default function OnboardingScreen() {
       {passo === 'conta' ? (
         <View>
           <Field
+            testID="onboarding-account-bank"
+            label="Banco"
+            value={contaBanco}
+            onChangeText={(t) => {
+              // O nome acompanha o banco enquanto a pessoa não escolheu um próprio: quem tem
+              // uma conta só quase sempre a chama pelo banco, e digitar duas vezes é atrito.
+              setContaNome((nome) => (nome === contaBanco ? t : nome));
+              setContaBanco(t);
+              limparErro('contaNome');
+            }}
+            placeholder="Ex: Nubank, Itaú, Caixa"
+            returnKeyType="next"
+            onSubmitEditing={() => contaNomeRef.current?.focus()}
+            submitBehavior="submit"
+          />
+          <Field
+            ref={contaNomeRef}
             testID="onboarding-account-name"
             label="Nome"
             value={contaNome}
             onChangeText={(t) => { setContaNome(t); limparErro('contaNome'); }}
-            placeholder="Ex: Conta Principal"
+            placeholder="Ex: Conta do dia a dia"
             error={erros.contaNome}
+            returnKeyType="next"
+            onSubmitEditing={() => contaSaldoRef.current?.focus()}
+            submitBehavior="submit"
           />
           <Text style={{ ...typography.meta, color: colors.textSecondary, marginBottom: spacing.sm, textTransform: 'uppercase', letterSpacing: 0.8 }}>
             Tipo
@@ -405,6 +435,7 @@ export default function OnboardingScreen() {
             ))}
           </View>
           <Field
+            ref={contaSaldoRef}
             testID="onboarding-account-balance"
             label="Saldo inicial (R$)"
             value={contaSaldo}
@@ -578,7 +609,11 @@ export default function OnboardingScreen() {
         <View style={{ gap: spacing.md }}>
           <ItemDaRevisao
             titulo="Conta principal"
-            detalhe={`${contaNome.trim()} · ${formatCurrency(parseCurrencyBR(contaSaldo || '0'))}`}
+            detalhe={[
+              contaBanco.trim() && contaBanco.trim() !== contaNome.trim() ? contaBanco.trim() : null,
+              contaNome.trim(),
+              formatCurrency(parseCurrencyBR(contaSaldo || '0')),
+            ].filter(Boolean).join(' · ')}
             onEditar={() => irPara('conta')}
           />
           <ItemDaRevisao

@@ -57,6 +57,15 @@ public class Carteira {
     @Column(nullable = false, length = 3)
     private String moeda = "BRL";
 
+    /**
+     * Conta padrão do titular. No máximo uma por usuário, garantida por índice único parcial
+     * (`ux_carteiras_principal_usuario`, V66) — a unicidade é do banco, não da aplicação.
+     * Quem muda isto é {@code CarteiraService.definirPrincipal}, que desmarca a atual antes de
+     * marcar a nova na mesma transação; escrever direto no setter fura o índice.
+     */
+    @Column(nullable = false)
+    private boolean principal = false;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usuario_id", nullable = false)
     private Usuario usuario;

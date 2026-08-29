@@ -173,9 +173,12 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
   });
   const cartoes = contasPage?.content ?? [];
 
-  // Sem carteira a transação não movimenta saldo — pré-seleciona a primeira
+  // Sem carteira a transação não movimenta saldo — pré-seleciona a conta principal do titular.
+  // Antes caía em `carteiras[0]`, que é ordem de listagem, não escolha de ninguém: quem tinha
+  // várias contas via a errada pré-marcada toda vez.
   useEffect(() => {
-    if (carteiraId == null && carteiras.length > 0) setCarteiraId(carteiras[0].id);
+    if (carteiraId != null || carteiras.length === 0) return;
+    setCarteiraId((carteiras.find(c => c.principal) ?? carteiras[0]).id);
   }, [carteiras, carteiraId]);
 
   useEffect(() => {

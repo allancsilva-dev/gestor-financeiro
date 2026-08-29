@@ -222,6 +222,8 @@ export interface ContaFinanceira {
   saldo: number;
   origemDados: 'MANUAL' | 'CSV' | 'OFX' | 'INTEGRACAO' | 'AJUSTE';
   estadoConciliacao: EstadoConciliacaoConta;
+  /** Conta padrão do titular. No máximo uma por usuário (índice parcial, migration V66). */
+  principal: boolean;
 }
 
 export interface ContaFinanceiraRequest {
@@ -232,6 +234,12 @@ export interface ContaFinanceiraRequest {
   moeda: string;
   banco?: string;
   saldoInicial: number;
+  /**
+   * Só `true` tem efeito: elege esta conta como principal e desmarca a anterior. `false` e
+   * ausente preservam o que está gravado — desmarcar sem eleger outra deixaria o titular
+   * sem conta padrão.
+   */
+  principal?: boolean;
 }
 
 export interface AjusteContaFinanceiraRequest { tipo: 'ENTRADA' | 'SAIDA'; valor: number; descricao?: string; }

@@ -20,12 +20,13 @@ public record ContaFinanceiraResponse(
         String banco,
         BigDecimal saldo,
         OrigemDadosConta origemDados,
-        EstadoConciliacaoConta estadoConciliacao
+        EstadoConciliacaoConta estadoConciliacao,
+        boolean principal
 ) {
     public static ContaFinanceiraResponse fromEntity(Carteira conta) {
         return new ContaFinanceiraResponse(
                 conta.getId(), conta.getNome(), conta.getNatureza(), conta.getSubtipo(),
                 conta.getLiquidez(), conta.getMoeda(), conta.getBanco(), conta.getSaldo(),
-                conta.getOrigemDados(), conta.getEstadoConciliacao());
+                conta.getOrigemDados(), conta.getEstadoConciliacao(), conta.isPrincipal());
     }
 }

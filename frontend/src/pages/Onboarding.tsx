@@ -37,7 +37,9 @@ export default function Onboarding() {
   const [passo, setPasso] = useState(0);
   const [loading, setLoading] = useState(false);
 
-  const [carteira, setCarteira] = useState({ nome: 'Conta Principal', tipo: 'CONTA_BANCARIA', saldo: '', banco: '' });
+  // Nome vazio de propósito: "principal" virou flag da conta (migration V66), não nome. Quem
+  // identifica a conta para o titular é o banco, que já é um campo aqui ao lado.
+  const [carteira, setCarteira] = useState({ nome: '', tipo: 'CONTA_BANCARIA', saldo: '', banco: '' });
   const [cartao, setCartao] = useState({
     nome: 'Cartão Principal', limiteTotal: '', diaFechamento: '5', diaVencimento: '12',
   });
@@ -236,7 +238,7 @@ export default function Onboarding() {
                   value={carteira.nome}
                   onChange={(e) => { const next = { ...carteira, nome: e.target.value }; setCarteira(next); carteiraValidation.revalidateField('nome', next); }}
                   className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-orange-500 transition-colors aria-invalid:border-red-500"
-                  placeholder="Ex: Conta Principal"
+                  placeholder="Ex: Conta do dia a dia"
                 />
                 <FieldError name="nome" error={carteiraValidation.errors.nome} />
               </div>

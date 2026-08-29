@@ -153,7 +153,7 @@ public class ExportService {
         List<Carteira> carteiras = carteiraRepository.findByUsuarioId(usuarioId);
 
         StringBuilder csv = new StringBuilder();
-        csv.append("ID,Nome,Natureza,Subtipo,Saldo,Banco\n");
+        csv.append("ID,Nome,Natureza,Subtipo,Saldo,Banco,Principal\n");
 
         for (Carteira c : carteiras) {
             csv.append(c.getId()).append(",");
@@ -161,7 +161,8 @@ public class ExportService {
             csv.append(c.getNatureza() != null ? c.getNatureza() : "").append(",");
             csv.append(c.getSubtipo() != null ? c.getSubtipo() : "").append(",");
             csv.append(c.getSaldo() != null ? c.getSaldo() : "0").append(",");
-            csv.append(c.getBanco() != null ? escapeCsv(c.getBanco()) : "").append("\n");
+            csv.append(c.getBanco() != null ? escapeCsv(c.getBanco()) : "").append(",");
+            csv.append(c.isPrincipal() ? "Sim" : "Não").append("\n");
         }
 
         return csv.toString();

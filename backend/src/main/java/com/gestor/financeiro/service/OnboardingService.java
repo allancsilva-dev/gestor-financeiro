@@ -91,6 +91,9 @@ public class OnboardingService {
         carteira.setSubtipo(request.subtipo());
         carteira.setSaldo(request.saldo() == null ? BigDecimal.ZERO : request.saldo());
         carteira.setBanco(request.banco());
+        // A conta do onboarding é a conta padrão do titular: é a única que existe quando ele
+        // lança pela primeira vez. `criar` faz a eleição depois do INSERT, respeitando o índice.
+        carteira.setPrincipal(true);
         carteiraService.criar(carteira, usuarioId);
     }
 

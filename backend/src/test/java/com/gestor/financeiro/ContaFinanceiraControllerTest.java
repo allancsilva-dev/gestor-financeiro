@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -137,6 +138,74 @@ class ContaFinanceiraControllerTest {
                 .andExpect(status().isForbidden());
         mockMvc.perform(get("/api/v1/contas-financeiras/{id}/reconciliacao", alheia.getId()))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithMockUser(username = "alice-conta@teste.com")
+    void elegerPrincipalDesmarcaAAnterior() throws Exception {
+        Carteira antiga = novaConta(alice, "Antiga", BigDecimal.ZERO);
+        antiga.setPrincipal(true);
+        carteiraRepository.saveAndFlush(antiga);
+
+        mockMvc.perform(put("/api/v1/contas-financeiras/{id}", conta.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "nome", "Principal", "natureza", "ATIVO", "subtipo", "DINHEIRO",
+                                "liquidez", "IMEDIATA", "moeda", "BRL", "saldoInicial", 0,
+                                "principal", true))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.principal").value(true));
+
+        // O indice parcial so admite uma marcada por titular: se a anterior nao fosse
+        // desmarcada antes do flush, isto aqui seria uma violacao de constraint, nao um assert.
+        assertThat(carteiraRepository.findById(antiga.getId()).orElseThrow().isPrincipal()).isFalse();
+        assertThat(carteiraRepository.findByUsuarioIdAndPrincipalTrue(alice.getId()).orElseThrow().getId())
+                .isEqualTo(conta.getId());
+    }
+
+    @Test
+    @WithMockUser(username = "alice-conta@teste.com")
+    void putSemCampoPrincipalNaoDesmarcaAContaPadrao() throws Exception {
+        conta.setPrincipal(true);
+        carteiraRepository.saveAndFlush(conta);
+
+        // Corrigir o nome nao pode custar a conta padrao: `principal` ausente significa
+        // "nao mexa", nao "desmarque".
+        mockMvc.perform(put("/api/v1/contas-financeiras/{id}", conta.getId())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "nome", "Nome corrigido", "natureza", "ATIVO", "subtipo", "DINHEIRO",
+                                "liquidez", "IMEDIATA", "moeda", "BRL", "saldoInicial", 0))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.principal").value(true));
+    }
+
+    @Test
+    @WithMockUser(username = "alice-conta@teste.com")
+    void criacaoJaNasceComoPrincipalQuandoPedido() throws Exception {
+        String payload = objectMapper.writeValueAsString(Map.of(
+                "nome", "Nova padrão", "natureza", "ATIVO", "subtipo", "CORRENTE",
+                "liquidez", "IMEDIATA", "moeda", "BRL", "saldoInicial", 0, "principal", true));
+        mockMvc.perform(post("/api/v1/contas-financeiras")
+                        .contentType(MediaType.APPLICATION_JSON).content(payload))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.principal").value(true));
+    }
+
+    @Test
+    @WithMockUser(username = "alice-conta@teste.com")
+    void exclusaoDaPrincipalElegeSucessora() throws Exception {
+        conta.setPrincipal(true);
+        carteiraRepository.saveAndFlush(conta);
+        Carteira sucessora = novaConta(alice, "Sucessora", BigDecimal.ZERO);
+
+        mockMvc.perform(delete("/api/v1/contas-financeiras/{id}", conta.getId()))
+                .andExpect(status().isNoContent());
+
+        // Sem sucessao o titular ficaria sem conta padrao e o formulario de lancamento
+        // voltaria a chutar a primeira da lista.
+        assertThat(carteiraRepository.findByUsuarioIdAndPrincipalTrue(alice.getId()).orElseThrow().getId())
+                .isEqualTo(sucessora.getId());
     }
 
     private Carteira novaConta(Usuario usuario, String nome, BigDecimal saldo) {

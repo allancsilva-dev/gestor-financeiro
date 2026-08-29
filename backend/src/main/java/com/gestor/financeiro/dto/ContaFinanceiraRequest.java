@@ -35,5 +35,13 @@ public record ContaFinanceiraRequest(
 
         @NotNull(message = "Campo obrigatório")
         @PositiveOrZero(message = "Saldo inicial deve ser zero ou positivo")
-        BigDecimal saldoInicial
+        BigDecimal saldoInicial,
+
+        /**
+         * Elege esta conta como principal. Opcional de propósito: {@code null} preserva o que
+         * está gravado, para um PUT que só corrige o nome não desmarcar a principal sem querer.
+         * {@code false} explícito também não desmarca — desmarcar sem eleger outra deixaria o
+         * titular sem conta padrão, então só {@code true} tem efeito.
+         */
+        Boolean principal
 ) {}

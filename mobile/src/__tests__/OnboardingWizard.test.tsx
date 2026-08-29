@@ -54,6 +54,9 @@ describe('onboarding em etapas', () => {
     (onboardingService.finalizar as jest.Mock).mockResolvedValue(usuarioCompleto);
     await renderizar();
 
+    // O banco preenche o nome enquanto ele estiver vazio: quem tem uma conta só a chama
+    // pelo banco. Nada de "Conta Principal" pré-digitado — principal virou flag, não nome.
+    fireEvent.changeText(screen.getByTestId('onboarding-account-bank'), 'Nubank');
     fireEvent.changeText(screen.getByTestId('onboarding-account-balance'), '100000');
     continuar();                       // conta -> renda
     pular();                           // renda
@@ -66,7 +69,7 @@ describe('onboarding em etapas', () => {
 
     await waitFor(() => expect(onboardingService.finalizar).toHaveBeenCalledTimes(1));
     expect(onboardingService.finalizar).toHaveBeenCalledWith({
-      carteira: { nome: 'Conta Principal', subtipo: 'CORRENTE', saldo: 1000 },
+      carteira: { nome: 'Nubank', subtipo: 'CORRENTE', saldo: 1000, banco: 'Nubank' },
     });
     await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/(app)/'));
     expect(rascunho.limparRascunho).toHaveBeenCalled();
@@ -102,7 +105,7 @@ describe('onboarding em etapas', () => {
     await waitFor(() => expect(onboardingService.finalizar).toHaveBeenCalledTimes(1));
 
     const payload = (onboardingService.finalizar as jest.Mock).mock.calls[0][0];
-    expect(payload.carteira).toEqual({ nome: 'Nubank', subtipo: 'CORRENTE', saldo: 250 });
+    expect(payload.carteira).toEqual({ nome: 'Nubank', subtipo: 'CORRENTE', saldo: 250, banco: undefined });
     expect(payload.renda).toEqual({ nome: 'Salário', valor: 4500, diaVencimento: 5 });
     expect(payload.cartao).toEqual({ nome: 'Roxinho', limiteTotal: 3000, diaFechamento: 20, diaVencimento: 27 });
     expect(payload.meta).toEqual({ nome: 'Reserva', valorTotal: 10000, dataLimite: undefined });
@@ -128,6 +131,7 @@ describe('onboarding em etapas', () => {
     });
     await renderizar();
 
+    fireEvent.changeText(screen.getByTestId('onboarding-account-name'), 'Conta do dia a dia');
     continuar(); pular(); pular(); pular(); pular();
     fireEvent.press(screen.getByTestId('onboarding-concluir'));
 
@@ -142,6 +146,7 @@ describe('onboarding em etapas', () => {
     });
     await renderizar();
 
+    fireEvent.changeText(screen.getByTestId('onboarding-account-name'), 'Conta do dia a dia');
     continuar(); pular(); pular(); pular(); pular();
     fireEvent.press(screen.getByTestId('onboarding-concluir'));
 

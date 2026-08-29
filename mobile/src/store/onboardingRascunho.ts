@@ -9,7 +9,7 @@ import Constants from 'expo-constants';
  */
 export interface OnboardingRascunho {
   passo?: string;
-  conta?: { nome: string; tipo: string; saldo: string };
+  conta?: { nome: string; tipo: string; saldo: string; banco?: string };
   renda?: { nome: string; valor: string; dia: string } | null;
   categorias?: string[];
   cartao?: { nome: string; limite: string; fechamento: string; vencimento: string } | null;

@@ -10,6 +10,7 @@ import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.model.MovimentoCarteira;
 import com.gestor.financeiro.model.enums.OrigemMovimentoCarteira;
+import com.gestor.financeiro.model.enums.SubtipoContaFinanceira;
 import com.gestor.financeiro.model.enums.TipoMovimentoCarteira;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.CarteiraRepository;
@@ -24,6 +25,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.EnumSet;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -35,6 +38,15 @@ public class CarteiraService {
     private final CategoriaRepository categoriaRepository;
     private final LedgerService ledgerService;
     private final MovimentoCarteiraRepository movimentoCarteiraRepository;
+
+    /**
+     * Quem pode ser conta principal. Mesmo conjunto de `SUBTIPOS_MANUAIS` do controller: cartao,
+     * cofre e custodia sao gerenciados por outro modulo e somente leitura, entao eleger um deles
+     * daria ao titular uma conta padrao que ele nao consegue editar.
+     */
+    private static final Set<SubtipoContaFinanceira> SUBTIPOS_ELEGIVEIS_A_PRINCIPAL =
+            EnumSet.of(SubtipoContaFinanceira.DINHEIRO, SubtipoContaFinanceira.CORRENTE,
+                    SubtipoContaFinanceira.POUPANCA, SubtipoContaFinanceira.PAGAMENTO);
     
     // Lista contas financeiras do usuário (todas — rota nova /contas-financeiras)
     public Page<Carteira> listarPorUsuario(Long usuarioId, Pageable pageable) {
@@ -85,7 +97,13 @@ public class CarteiraService {
         BigDecimal saldoInicial = carteira.getSaldo() == null ? BigDecimal.ZERO : carteira.getSaldo();
         carteira.setSaldo(BigDecimal.ZERO);
 
+        // Eleger no mesmo INSERT esbarraria no indice parcial se o titular ja tivesse principal.
+        // A conta nasce comum e a eleicao vem depois, quando ja da para desmarcar a anterior.
+        boolean elegerComoPrincipal = carteira.isPrincipal();
+        carteira.setPrincipal(false);
+
         Carteira salva = carteiraRepository.save(carteira);
+        if (elegerComoPrincipal) definirPrincipal(salva.getId(), usuarioId);
         if (saldoInicial.signum() != 0) {
             registrarAjusteManual(
                     salva,
@@ -116,6 +134,9 @@ public class CarteiraService {
         if (carteiraAtualizada.getMoeda() != null) carteira.setMoeda(carteiraAtualizada.getMoeda());
 
         Carteira salva = carteiraRepository.save(carteira);
+        if (carteiraAtualizada.isPrincipal() && !carteira.isPrincipal()) {
+            definirPrincipal(salva.getId(), usuarioId);
+        }
         if (novoSaldo != null) {
             BigDecimal diferenca = novoSaldo.subtract(saldoAtual);
             if (diferenca.signum() != 0) {
@@ -262,7 +283,46 @@ public class CarteiraService {
                             + "Considere arquivá-la ou renomeá-la para 'Inativa'.");
         }
 
+        boolean eraPrincipal = carteira.isPrincipal();
         carteiraRepository.delete(carteira);
+
+        // Sem sucessao o titular ficaria sem conta padrao e o formulario voltaria a chutar a
+        // primeira da lista. A proxima manual mais antiga assume; se nao houver, fica sem — e
+        // esse estado e valido, nao erro.
+        if (eraPrincipal) {
+            carteiraRepository.flush();
+            carteiraRepository.findCandidatasAPrincipal(usuarioId).stream().findFirst()
+                    .ifPresent(sucessora -> {
+                        sucessora.setPrincipal(true);
+                        carteiraRepository.save(sucessora);
+                    });
+        }
+    }
+
+    /**
+     * Elege a conta padrao do titular.
+     *
+     * A unicidade e do banco (indice parcial `ux_carteiras_principal_usuario`, V66), entao a
+     * ordem importa: desmarca a atual, forca o flush e so entao marca a nova. Inverter os dois
+     * passos viola o indice dentro da mesma transacao.
+     */
+    @Transactional
+    public Carteira definirPrincipal(Long id, Long usuarioId) {
+        Carteira nova = buscarPorIdDoUsuario(id, usuarioId);
+        if (!SUBTIPOS_ELEGIVEIS_A_PRINCIPAL.contains(nova.getSubtipo())) {
+            throw new BusinessException(
+                    "Conta gerenciada pelo módulo de origem não pode ser a conta principal");
+        }
+        if (nova.isPrincipal()) return nova;
+
+        carteiraRepository.findByUsuarioIdAndPrincipalTrue(usuarioId).ifPresent(atual -> {
+            atual.setPrincipal(false);
+            carteiraRepository.save(atual);
+        });
+        carteiraRepository.flush();
+
+        nova.setPrincipal(true);
+        return carteiraRepository.save(nova);
     }
 
     @Transactional

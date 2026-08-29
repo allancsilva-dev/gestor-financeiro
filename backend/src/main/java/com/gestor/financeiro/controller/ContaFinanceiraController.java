@@ -157,6 +157,9 @@ public class ContaFinanceiraController {
         carteira.setMoeda(request.moeda());
         carteira.setSaldo(request.saldoInicial());
         carteira.setBanco(request.banco());
+        // `null` e `false` significam "não mexa": desmarcar sem eleger outra deixaria o titular
+        // sem conta padrão. Trocar de principal é sempre marcar a nova, nunca desmarcar a velha.
+        carteira.setPrincipal(Boolean.TRUE.equals(request.principal()));
         switch (request.subtipo()) {
             case DINHEIRO, CORRENTE, PAGAMENTO, POUPANCA -> { }
             default -> throw new BusinessException("Subtipo não pode ser criado manualmente");

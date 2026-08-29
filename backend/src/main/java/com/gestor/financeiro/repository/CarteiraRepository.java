@@ -30,6 +30,22 @@ public interface CarteiraRepository extends JpaRepository<Carteira, Long> {
 
     Optional<Carteira> findByUsuarioIdAndNomeIgnoreCase(Long usuarioId, String nome);
 
+    /** A conta padrao do titular. O indice parcial `ux_carteiras_principal_usuario` garante <= 1. */
+    Optional<Carteira> findByUsuarioIdAndPrincipalTrue(Long usuarioId);
+
+    /**
+     * Candidatas a principal, da mais antiga para a mais nova. So subtipo manual: CARTAO, COFRE e
+     * CUSTODIA nascem de outro modulo e sao somente leitura, entao nao servem de conta padrao.
+     */
+    @Query("SELECT c FROM Carteira c WHERE c.usuario.id = :usuarioId "
+            + "AND c.natureza = com.gestor.financeiro.model.enums.NaturezaContaFinanceira.ATIVO "
+            + "AND c.subtipo IN (com.gestor.financeiro.model.enums.SubtipoContaFinanceira.DINHEIRO, "
+            + "com.gestor.financeiro.model.enums.SubtipoContaFinanceira.CORRENTE, "
+            + "com.gestor.financeiro.model.enums.SubtipoContaFinanceira.POUPANCA, "
+            + "com.gestor.financeiro.model.enums.SubtipoContaFinanceira.PAGAMENTO) "
+            + "ORDER BY c.id ASC")
+    List<Carteira> findCandidatasAPrincipal(@Param("usuarioId") Long usuarioId);
+
     /**
      * Saldo total de caixa legado: somente contas ATIVO, sem o passivo do
      * cartao (PR-F2-06) e sem COFRE de meta (PR-F2-11) — reservado nunca esteve
