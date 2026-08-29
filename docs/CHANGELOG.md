@@ -13,6 +13,25 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 implementado; flags externas permanecem desligadas até PostgreSQL/reconciliação, E2E em aparelho,
 contratos com socket, billing/política de dados e homologação Meta ficarem verdes.
 
+### Rodada de fechamento operacional local
+- Criado `scripts/e2e-assistant-ios.sh`: PostgreSQL descartável, profile `local-e2e`, descoberta
+  dinâmica de simulador bootado, build Debug, cinco flows isolados, fixture CSV, JUnit/screenshots,
+  prova SQL/API de unicidade, reconciliação e conflito `409`, além de varredura de segredos.
+- Providers fake de texto e áudio existem somente no profile explícito `local-e2e`; produção mantém
+  texto, áudio, WhatsApp e providers externos desligados por padrão. Falhas 503 de mensagem e
+  confirmação são injetadas depois do commit, provando replay real da mesma chave.
+- Mockito/Surefire/Failsafe agora usam javaagent e `/tmp`, fechando 380 erros causados pela tentativa
+  de criar agente no diretório temporário bloqueado. A suíte backend executou 462 testes: 457 verdes,
+  quatro WireMock skipped por socket e um erro GreenMail por socket; um teste de manutenção foi
+  corrigido pelo mesmo ajuste de tmp. A integração executou 44 testes, todos bloqueados porque o
+  daemon Docker permanece inacessível ao sandbox.
+- Mobile permaneceu verde: typecheck, lint, 39 suites e 433 testes. Sob Node 26 o Jest não encerrou
+  sozinho depois do resumo; a repetição diagnóstica encerrou verde. O projeto continua exigindo
+  Node 20.
+- O runner abortou corretamente no preflight Docker antes de tocar no simulador. Evidência local:
+  `artifacts/fase5/20260828T232102Z-78076`. Nenhum flow Maestro foi declarado verde nesta rodada;
+  status continua `CONCLUÍDA_COM_RESSALVAS_OPERACIONAIS`.
+
 ### Texto, ambiguidade e áudio no Maestro
 - A tela do Assistente e o botão de confirmação do formulário ganharam identificadores de teste
   estáveis, sem mudança visual ou criação de um segundo formulário financeiro.

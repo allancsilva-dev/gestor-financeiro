@@ -1644,7 +1644,9 @@ pelas parcelas não pagas, e a diferença sobre a parte já paga (fatura imutáv
 - **Sintoma:** Perda do host implica perda dos backups; politica de retencao e restore nao comprovados de ponta a ponta com anexos.
 - **Causa raiz:** Dois composes evoluiram separadamente; scripts existentes (`scripts/backup-db.sh`, `restore-db.sh`, `restore-drill-db.sh`) nao cobrem uploads nem envio externo.
 - **Solucao proposta:** Politica canonica: pg_dump -Fc + tar de uploads + manifesto/checksums, GPG assimetrico (privada off-host), rclone obrigatorio fail-closed, retencao 7d+4s, drill de restore com evidencia. Ver ADR-0006.
-- **Proximo passo:** PR-7 (apos PR-6).
+- **Proximo passo:** infraestrutura/SRE executar checklist off-host de
+  `docs/runbooks/FASE5_FECHAMENTO_OPERACIONAL.md`; exigir remote externo, chave GPG pública,
+  checksum remoto e restore limpo antes de qualquer promoção.
 
 ---
 

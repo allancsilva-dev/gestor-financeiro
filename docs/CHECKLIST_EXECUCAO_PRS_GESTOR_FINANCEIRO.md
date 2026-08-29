@@ -65,6 +65,15 @@ testes com zero falhas; apenas `EmailServiceTest` não iniciou o GreenMail por p
 sandbox. A suíte sem essa única classe ficou verde. PostgreSQL/IT, SMTP real, WireMock com socket e
 Maestro em aparelho continuam gates ambientais, não foram declarados como executados.
 
+**Nova rodada em 28/08/2026:** runner coeso do Assistente e profile `local-e2e` determinístico
+implementados. Backend executou 462 testes: 457 verdes, quatro WireMock skipped por proibição de
+socket, um erro GreenMail pelo mesmo bloqueio e um ajuste ambiental de Mockito/tmp fechado. O profile
+de integração executou 44 testes, todos com erro de inicialização por daemon Docker inacessível.
+Mobile: typecheck, lint e 433/433 verdes. `scripts/e2e-assistant-ios.sh` abortou no preflight Docker;
+portanto PostgreSQL, cinco flows Maestro, importação, provas financeiras E2E e reconciliação da stack
+continuam `PENDENTE`, sem promoção artificial para `PASS`. Evidência:
+`artifacts/fase5/20260828T232102Z-78076`.
+
 **Pendências antes de ativar em produção:** executar migrations e guardiões LGPD em PostgreSQL real;
 comprovar reconciliação global zero; rodar os flows Maestro em iOS/Android; validar contratos
 WireMock e SMTP em ambiente com socket; configurar billing, política de dados, chaves e teto de

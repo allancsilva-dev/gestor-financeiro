@@ -23,3 +23,11 @@ O canal usa diretamente a Meta Cloud API. Twilio, templates proativos e produç�
 ## Gate futuro de produção
 
 Reconsultar termos, tarifas, limites, versão suportada da Graph API e requisitos de consentimento diretamente na Meta. Registrar aprovação explícita do produto e segurança antes de alterar as flags. Nenhum valor ou condição comercial atual é premissa arquitetural.
+
+Checklist externo:
+
+- **Responsável:** administrador Meta Business.
+- **Credencial/aprovação:** Business verificado, app admin, display name, número e webhook aprovados.
+- **Procedimento:** executar smoke sandbox acima; conferir termos, tarifas, consentimento e versão da Graph API.
+- **Evidência:** IDs de aprovação, webhook verificado, request IDs e relatório sanitizado do smoke.
+- **Rollback:** manter ambas flags WhatsApp `false`, revogar token e remover assinatura do webhook.
