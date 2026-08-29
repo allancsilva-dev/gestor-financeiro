@@ -29,9 +29,18 @@ jest.mock('../services/assistantService', () => ({
 }));
 jest.mock('../components/NovaTransacaoModal', () => ({
   __esModule: true,
-  default: ({ visible, initialData }: { visible: boolean; initialData?: { descricao?: string } }) => {
+  default: ({ visible, initialData }: {
+    visible: boolean;
+    initialData?: { descricao?: string; cartaoId?: number; parcelas?: number };
+  }) => {
     const { Text: MockText } = require('react-native');
-    return visible ? <MockText>Revisão aberta: {initialData?.descricao}</MockText> : null;
+    return visible ? (
+      <MockText>
+        Revisão aberta: {initialData?.descricao}
+        {initialData?.cartaoId ? ` cartao:${initialData.cartaoId}` : ''}
+        {initialData?.parcelas ? ` parcelas:${initialData.parcelas}` : ''}
+      </MockText>
+    ) : null;
   },
 }));
 
@@ -123,5 +132,25 @@ describe('AssistenteScreen', () => {
     expect(await screen.findByText('ABCDEFGH2345')).toBeTruthy();
     expect(screen.getByText(/Uso único, válido por 10 minutos/)).toBeTruthy();
     delete process.env.EXPO_PUBLIC_ASSISTANT_WHATSAPP_ENABLED;
+  });
+
+  it('leva cartão e parcelas do rascunho para a revisão', async () => {
+    (assistantService.sendMessage as jest.Mock).mockResolvedValue({
+      conversationId: 9,
+      outcome: 'COMPLETE',
+      reply: 'Rascunho pronto. Revise os dados antes de confirmar.',
+      draft: {
+        id: 21, version: 0, tipo: 'SAIDA', valor: 300, descricao: 'Mercado', data: '2026-08-29',
+        carteiraId: null, categoriaId: 4, cartaoId: 7, parcelas: 3,
+        missingFields: [], expiresAt: '2026-08-30T12:00:00',
+      },
+    });
+
+    render(<AssistenteScreen />);
+    fireEvent.changeText(screen.getByLabelText(/Mensagem/i), 'comprei 300,00 no mercado hoje no Cartao Nubank em 3x');
+    await act(async () => fireEvent.press(screen.getByLabelText(/Enviar/i)));
+
+    expect(await screen.findByText(/cartao:7/)).toBeTruthy();
+    expect(screen.getByText(/parcelas:3/)).toBeTruthy();
   });
 });

@@ -26,6 +26,7 @@ export interface LancamentoInicial {
   categoriaId?: number;
   carteiraId?: number;
   cartaoId?: number;
+  parcelas?: number;
   data?: string;
   mode?: 'ASSISTANT_DRAFT';
   draftId?: number;
@@ -126,6 +127,11 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
       if (initialData.cartaoId != null) {
         setFormaPagamento('CARTAO');
         setCartaoId(initialData.cartaoId);
+        // O "3x" que a pessoa falou precisa aparecer na revisão, não sumir no caminho.
+        if (initialData.parcelas != null && initialData.parcelas >= 2) {
+          setParcelado(true);
+          setTotalParcelas(String(initialData.parcelas));
+        }
         prefsAplicadas.current = true;
         return;
       }
@@ -322,7 +328,7 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
         request.carteiraId = carteiraId ?? undefined;
       }
       if (initialData?.mode === 'ASSISTANT_DRAFT' && initialData.draftId != null && initialData.draftVersion != null) {
-        if (!request.carteiraId) throw new Error('Conta financeira obrigatória');
+        if (!request.carteiraId && !request.cartaoId) throw new Error('Conta financeira ou cartão obrigatório');
         const patch = {
           version: assistantSave.current?.version ?? initialData.draftVersion,
           tipo: request.tipo,
@@ -331,6 +337,8 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
           data: request.data,
           carteiraId: request.carteiraId,
           categoriaId: request.categoriaId,
+          cartaoId: request.cartaoId,
+          parcelas: request.parcelado ? request.totalParcelas : undefined,
         };
         const fingerprint = JSON.stringify({ ...patch, version: undefined });
         let pending = assistantSave.current;
@@ -558,7 +566,7 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
                     <Chip label="Parcelado" selected={parcelado} onPress={() => setParcelado(true)} />
                   </View>
                   {parcelado && (
-                    <Field label="Parcelas" value={totalParcelas} onChangeText={(t) => setTotalParcelas(t.replace(/\D/g, '').slice(0, 2))} keyboardType="number-pad" placeholder="Ex: 6" />
+                    <Field testID="transaction-installments" label="Parcelas" value={totalParcelas} onChangeText={(t) => setTotalParcelas(t.replace(/\D/g, '').slice(0, 2))} keyboardType="number-pad" placeholder="Ex: 6" />
                   )}
                 </>
               )}

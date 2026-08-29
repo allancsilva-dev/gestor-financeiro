@@ -139,6 +139,7 @@ export default function AssistenteScreen() {
   const initialData: LancamentoInicial | null = draft ? {
     descricao: draft.descricao ?? '', valor: draft.valor ?? 0, tipo: draft.tipo ?? 'SAIDA',
     categoriaId: draft.categoriaId ?? undefined, carteiraId: draft.carteiraId ?? undefined,
+    cartaoId: draft.cartaoId ?? undefined, parcelas: draft.parcelas ?? undefined,
     data: draft.data ?? undefined, mode: 'ASSISTANT_DRAFT', draftId: draft.id, draftVersion: draft.version,
   } : null;
 

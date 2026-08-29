@@ -12,6 +12,8 @@ export interface AssistantDraft {
   data: string | null;
   carteiraId: number | null;
   categoriaId: number | null;
+  cartaoId: number | null;
+  parcelas: number | null;
   missingFields: string[];
   expiresAt: string;
 }
@@ -35,8 +37,11 @@ export interface AssistantDraftPatch {
   valor: number;
   descricao: string;
   data: string;
-  carteiraId: number;
+  /** Compra no cartão vai sem carteira: o cronograma é da fatura. */
+  carteiraId?: number;
   categoriaId: number;
+  cartaoId?: number;
+  parcelas?: number;
 }
 
 export const assistantIdempotencyKey = (scope: string) =>
