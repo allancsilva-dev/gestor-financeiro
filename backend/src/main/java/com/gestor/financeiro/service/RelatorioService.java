@@ -64,7 +64,7 @@ public class RelatorioService {
         List<RelatorioContaDto> gastosPorConta = calcularGastosPorConta(usuarioId, inicio, fim, totalGastos);
 
         int totalTransacoes = (int) transacaoRepository
-                .countSaidasByUsuarioIdAndPeriodo(usuarioId, inicio, fim);
+                .countAtivasByUsuarioIdAndPeriodo(usuarioId, inicio, fim);
 
         return new RelatorioResponse(inicio, fim, totalEntradas, totalSaidas, saldo, totalTransacoes,
                 gastosPorCategoria, maioresDespesas, gastosPorConta);

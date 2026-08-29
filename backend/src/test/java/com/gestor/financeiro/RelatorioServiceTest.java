@@ -97,8 +97,22 @@ class RelatorioServiceTest {
         // 100+200+50+300+400 = 1050 (cancelada de 9999 excluida)
         assertEquals(0, new BigDecimal("1050.00").compareTo(r.totalSaidas()));
         assertEquals(0, new BigDecimal("-50.00").compareTo(r.saldo()));
-        // 5 saidas ativas; ENTRADA e cancelada fora
-        assertEquals(5, r.totalTransacoes());
+        // 5 saidas + 1 entrada ativas; so a cancelada fica fora. O campo se chama
+        // `totalTransacoes` e agora conta transacao mesmo: contando so SAIDA, um mes de
+        // salario sem gasto nenhum devolvia zero e a tela dizia "Nada por aqui neste periodo".
+        assertEquals(6, r.totalTransacoes());
+    }
+
+    @Test
+    void mesSoComEntradaNaoParecePeriodoVazio() {
+        transacaoRepository.deleteAll();
+        entrada("Salario", "3000.00");
+
+        RelatorioResponse r = gerar();
+
+        assertEquals(1, r.totalTransacoes());
+        assertEquals(0, new BigDecimal("3000.00").compareTo(r.totalEntradas()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(r.totalSaidas()));
     }
 
     @Test

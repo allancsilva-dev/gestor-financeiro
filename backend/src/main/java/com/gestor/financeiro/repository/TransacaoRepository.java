@@ -229,6 +229,21 @@ public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
             @Param("fim") LocalDate fim,
             Pageable pageable);
 
+    /**
+     * Movimentacoes do periodo, entradas e saidas.
+     *
+     * Substitui `countSaidasByUsuarioIdAndPeriodo` no relatorio: o campo se chama
+     * `totalTransacoes`, mas contava so SAIDA, entao um mes de salario sem gasto nenhum
+     * devolvia zero e a tela mostrava "Nada por aqui neste periodo" com dinheiro na conta.
+     */
+    @Query("SELECT COUNT(t) FROM Transacao t " +
+           "WHERE t.usuario.id = :usuarioId AND t.ativa = true " +
+           "AND t.data BETWEEN :inicio AND :fim")
+    long countAtivasByUsuarioIdAndPeriodo(
+            @Param("usuarioId") Long usuarioId,
+            @Param("inicio") LocalDate inicio,
+            @Param("fim") LocalDate fim);
+
     @Query("SELECT COUNT(t) FROM Transacao t " +
            "WHERE t.usuario.id = :usuarioId AND t.ativa = true AND t.tipo = 'SAIDA' " +
            "AND t.data BETWEEN :inicio AND :fim")
