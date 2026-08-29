@@ -412,6 +412,28 @@ BEGIN
 END $$;
 
 -- =============================================================================
+-- 2b. Backfill de cartoes legados criados sob o schema V1 (colunas nullable)
+-- =============================================================================
+-- V1 criou contas.dia_fechamento/dia_vencimento/limite_total/ativo como NULLABLE
+-- e V20 so validou "IS NULL OR BETWEEN 1 AND 31"; registros antigos podem chegar
+-- aqui com nulo. Os valores abaixo sao exatamente os defaults que o codigo ja
+-- aplicava para nulo -- nada e inventado e o comportamento fica preservado:
+--   dia_fechamento nulo -> ultimo dia do mes; 31 e equivalente exato porque
+--     FaturaDatas.diaValidoOuFimDoMes clampa o dia para lengthOfMonth;
+--   dia_vencimento nulo -> 10 (FaturaDatas.vencimento);
+--   limite_total / ativo -> DEFAULT declarado em V1 (0 / TRUE).
+-- Nenhuma metrica da secao 1 depende dessas colunas. E no-op em base que ja
+-- passou pelo guard 3b, entao um flyway repair de checksum e seguro.
+-- Depois da migration o usuario pode ajustar os dois dias pelo app.
+UPDATE contas
+   SET dia_fechamento = COALESCE(dia_fechamento, 31),
+       dia_vencimento = COALESCE(dia_vencimento, 10),
+       limite_total   = COALESCE(limite_total, 0),
+       ativo          = COALESCE(ativo, TRUE)
+ WHERE dia_fechamento IS NULL OR dia_vencimento IS NULL
+    OR limite_total IS NULL OR ativo IS NULL;
+
+-- =============================================================================
 -- 3. Guards antes do drop
 -- =============================================================================
 DO $$

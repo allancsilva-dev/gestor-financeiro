@@ -164,6 +164,33 @@ class ContractV41MigrationIT {
         assertRollbackV40();
     }
 
+    /**
+     * Cartao criado sob o schema V1 (colunas nullable) migra pelo backfill da secao 2b,
+     * sem exigir que alguem escolha valores no lugar do usuario: os defaults gravados sao
+     * exatamente os que o codigo ja aplicava para nulo (FaturaDatas) e os DEFAULT do V1.
+     */
+    @Test
+    void cartaoLegadoComCamposNulosRecebeBackfillEMigra() throws SQLException {
+        long cartao;
+        try (Connection connection = connection(); Statement st = connection.createStatement()) {
+            long usuario = insertUsuario(st, "cartao-legado-nulo@teste.com");
+            long passivo = insertCarteiraCartao(st, usuario, "Cartão Principal");
+            cartao = returning(st, "INSERT INTO contas(usuario_id,nome,tipo,valor_gasto,saldo_atual,limite_total," +
+                    "dia_fechamento,dia_vencimento,ativo,conta_financeira_id,version) VALUES (" +
+                    usuario + ",'Cartão Principal','CREDITO',0,0,NULL,NULL,NULL,NULL," + passivo + ",0) RETURNING id");
+        }
+
+        flyway(null).migrate();
+
+        try (Connection connection = connection(); Statement st = connection.createStatement()) {
+            assertEquals(1, scalar(st, "SELECT count(*) FROM flyway_schema_history WHERE version='41' AND success=true"));
+            assertEquals(31, scalar(st, "SELECT dia_fechamento FROM contas WHERE id=" + cartao));
+            assertEquals(10, scalar(st, "SELECT dia_vencimento FROM contas WHERE id=" + cartao));
+            assertEquals(0, scalar(st, "SELECT limite_total FROM contas WHERE id=" + cartao));
+            assertEquals(1, scalar(st, "SELECT count(*) FROM contas WHERE id=" + cartao + " AND ativo = true"));
+        }
+    }
+
     private void assertRollbackV40() throws SQLException {
         assertThrows(FlywayException.class, () -> flyway(null).migrate());
         try (Connection connection = connection(); Statement st = connection.createStatement()) {
