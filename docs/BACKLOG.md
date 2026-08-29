@@ -2017,3 +2017,62 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Risco se ficar pendente:** o aviso continua só na caixa in-app; quem não abre o app não é
   avisado.
 - **Status:** ABERTO
+
+---
+
+## BACKLOG-0111 — Flow `importacao-mobile` não fecha no simulador: seletor de arquivos não enxerga o fixture
+
+- **Titulo:** E2E de importação fica SKIPPED porque o CSV é escrito em `Media/Downloads`, fora dos
+  provedores que o seletor de arquivos do iOS lista
+- **Prioridade:** P2
+- **Área:** infraestrutura, mobile
+- **Motivo:** `scripts/e2e-assistant-ios.sh` grava o fixture em
+  `<device>/data/Media/Downloads`. O seletor nativo abre em "Recentes", que fica vazio, e o flow
+  falha ao procurar o arquivo pelo nome. O caminho existe em disco, mas não é um provedor visível ao
+  app Arquivos. O runner passou a registrar `importacao-mobile-skipped.txt` **apenas** para esse
+  sintoma; qualquer outra falha do flow continua derrubando o gate.
+- **Dependências:** decidir como expor o fixture — `LSSupportsOpeningDocumentsInPlace` no app,
+  escrita no container do provedor de arquivos, ou substituir a escolha manual por deep link/intent
+  de teste.
+- **Critério de aceite:** o flow roda ponta a ponta em simulador limpo, sem SKIPPED, provando
+  importação, revisão, lançamento e desfazer.
+- **Risco se ficar pendente:** o caminho de importação mobile continua sem cobertura E2E
+  automatizada; regressões nele só aparecem em teste manual.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0112 — `missingFields` do assistente fala dois vocabulários (nome vs id)
+
+- **Titulo:** A mesma lista de campos faltantes chega ao app ora como `contaNome`/`categoriaNome`/
+  `cartaoNome`, ora como `carteiraId`/`categoriaId`/`cartaoId`
+- **Prioridade:** P2
+- **Área:** backend, mobile, contrato
+- **Motivo:** `AssistantService.receive()` devolve `parsed.draft().missingFields()`, que usa o
+  vocabulário do schema (`*Nome`), enquanto `patch()` devolve `missing(draft)`, que usa ids. O app
+  consome os dois pelo mesmo campo do `DraftResponse`. A divergência é anterior ao parcelamento, que
+  apenas a tornou mais visível ao acrescentar `cartaoNome`/`cartaoId`.
+- **Dependências:** nenhuma.
+- **Critério de aceite:** um único vocabulário documentado no contrato do assistente, com teste
+  cobrindo mensagem e patch.
+- **Risco se ficar pendente:** qualquer lógica de UI que compare `missingFields` por igualdade de
+  string acerta num caminho e erra no outro.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0113 — Parcelamento pelo assistente só existe no cartão; conta segue sem parcela
+
+- **Titulo:** Decisão registrada: "em 3x" numa conta não parcela — cobra o cartão
+- **Prioridade:** P3
+- **Área:** backend, produto
+- **Motivo:** decisão do dono do produto (2026-08-29) ao implementar parcelamento no assistente:
+  manter a mesma regra do formulário manual, onde parcelar exige cartão. O rascunho guarda o pedido
+  de parcelas mesmo sem cartão e cobra `cartaoNome`; o `confirm` recusa rascunho incompleto. O
+  backend, porém, sabe parcelar fora do cartão (`TransacaoService.criarParcelas`), então a
+  capacidade existe e está deliberadamente não exposta.
+- **Dependências:** decisão de produto sobre parcelar lançamento em conta.
+- **Critério de aceite:** se a regra mudar, expor parcelamento em conta na revisão e no assistente,
+  com teste equivalente ao `AssistantParcelamentoTest`.
+- **Risco se ficar pendente:** nenhum — comportamento atual é intencional e coberto por teste.
+- **Status:** ABERTO (decisão consciente)

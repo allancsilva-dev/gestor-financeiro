@@ -4,6 +4,43 @@ Registro de bugs corrigidos. Mantido pelo `docs-reporter`.
 
 ---
 
+## BUG-0102 — App pedia permissão de notificação em simulador e travava qualquer automação de UI
+
+- **Data:** 2026-08-29
+- **Area:** mobile, notificações
+- **Origem:** execução do E2E local iOS da Fase 5; o diálogo do sistema cobria a tela e o Maestro
+  parava de achar elementos.
+- **Sintoma:** ao entrar na área logada em simulador, aparecia "O app Nexos Finanças deseja enviar
+  notificações", que não deveria existir ali — simulador não tem serviço de push.
+- **Causa raiz:** `src/notificacoes/push.ts` guardava a chamada com `Constants.isDevice ?? true`.
+  O campo `isDevice` foi removido do `expo-constants@18` (migrou para `expo-device`), então a
+  expressão resolvia sempre `true` e o app se tratava como aparelho real.
+- **Correção:** dependência `expo-device` adicionada e guarda trocada por `Device.isDevice`, que o
+  módulo nativo resolve como `false` em simulador. `pod install` passa a ser obrigatório junto.
+- **Testes:** `src/__tests__/push.test.ts` (6) com mock de `expo-device`; suíte mobile 434 verdes.
+- **Ver também:** PROB-0087.
+
+---
+
+## BUG-0101 — Assistente respondia fatura em vez de registrar compra no cartão
+
+- **Data:** 2026-08-29
+- **Area:** backend, assistente
+- **Origem:** implementação de parcelamento; a frase de teste nunca virava rascunho.
+- **Sintoma:** "comprei 300,00 no mercado hoje no Cartao Nubank em 3x" devolvia `NOT_FINANCIAL` com
+  uma resposta de consulta de faturas. Registrar compra no cartão pelo assistente era impossível.
+- **Causa raiz:** `FinancialQuestionClassifier` classificava por presença de termo — qualquer texto
+  com "cartao" ou "fatura" virava intent `INVOICES`. Como `AssistantService.receive()` consulta o
+  classificador antes do parser, a frase nunca chegava ao caminho de lançamento.
+- **Correção:** o classificador desiste do intent quando a frase não pergunta (sem "?", "quanto",
+  "qual", "quais", "quando", "quantos", "mostra", "resumo", "como esta") e há indício de lançamento
+  — verbo de gasto ou valor monetário.
+- **Testes:** `AssistantParcelamentoTest` (3), `FinancialQuestionClassifierTest` (4), suíte backend
+  470 verdes; E2E `artifacts/fase5/run-20/proof-assistant-parcelado.json`.
+- **Ver também:** PROB-0086.
+
+---
+
 ## BUG-0100 — Reenviar o mesmo arquivo derrubava a importação com violação de CHECK
 
 - **Data:** 2026-08-27

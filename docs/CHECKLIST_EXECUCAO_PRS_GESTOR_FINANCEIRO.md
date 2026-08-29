@@ -60,6 +60,28 @@ homologação e ativação; não representam escopo funcional de código ainda a
 | PR-F5-08 | Áudio síncrono limitado | `PASS_COM_RESSALVA` | Expo SDK 54/`expo-audio ~1.1.1`, M4A pré-gravado e transcript antes da revisão; 8 MB/60 s, executor isolado e timeout; arquivos limpos em `finally`; SHA-256 streaming e replay de 24 h evitam nova transcrição/parser; flow Maestro criado; instalação nativa e aparelho pendentes |
 | PR-F5-09 | WhatsApp homologado, produção desligada | `PASS_COM_RESSALVA` | texto e áudio Ogg/Opus no pipeline comum; vínculo forte com replay cifrado por chave, limpeza imediata no uso e expurgo a cada 15 min; número desconhecido silencioso; assinatura, janela temporal, ID externo único, evento cifrado e job somente com `eventId`; homologação Meta segue aberta |
 
+**Rodada de 29/08/2026 — E2E iOS verde e parcelamento entregue:** `scripts/e2e-assistant-ios.sh`
+executou de ponta a ponta em simulador (iPhone 17 Pro, iOS 26.5), fechando com
+`OK: Assistente iOS` em `artifacts/fase5/run-20/`. Seis flows do assistente verdes com prova
+financeira e reconciliação sem divergência: text (1 transação / 1 movimento), ambiguity (1/1),
+retry (2/2), confirm-retry (3/3), parcelado (4 transações / 3 movimentos / 3 lançamentos de fatura)
+e audio (5/3/6). `Idempotency-Key` divergente devolve `409`; varredura de segredos limpa. Backend
+470 testes verdes (com `AssistantParcelamentoTest`); mobile 434.
+
+| PR | Escopo | Status | Evidência |
+|---|---|---|---|
+| PR-F5-05 | API textual/providers/mobile | `PASS` | ressalva anterior fechada: flows de texto, ambiguidade e retry executados em simulador com providers fake do profile `local-e2e`, com prova SQL por flow |
+| PR-F5-08 | Áudio síncrono limitado | `PASS` | ressalva anterior fechada: flow de áudio executado no simulador; transcript determinístico vira compra parcelada no cartão e a revisão abre com cartão e 3 parcelas |
+| PR-F5-10 | Parcelamento pelo assistente (cartão) | `PASS` | `V65` acrescenta `conta_id`/`parcelas` ao rascunho; extração de "3x"/"em 3 vezes"/"3 parcelas"; `confirm` gera compra de cartão parcelada e a fatura recebe 3 lançamentos; revisão no app abre em "Parcelado"; `AssistantParcelamentoTest` e flow `assistant-parcelado.yaml` |
+
+Defeitos encontrados e fechados nesta rodada: PROB-0086 (classificador sequestrava lançamento que
+citasse cartão), PROB-0087 (`Constants.isDevice` inexistente fazia o app pedir push no simulador),
+PROB-0088 (runner sem entitlements e com bundle dev), PROB-0089 (Keychain sobrevivia entre flows),
+PROB-0090 (defeitos do próprio runner) e PROB-0091 (dois testes quebrados por causa alheia).
+
+Pendências desta rodada: `importacao-mobile` fica SKIPPED por limitação do seletor de arquivos do
+simulador (BACKLOG-0111) e `missingFields` ainda alterna vocabulário (BACKLOG-0112).
+
 **Gate local em 28/08/2026:** mobile verde em typecheck, lint e 433 testes. Backend executou 457
 testes com zero falhas; apenas `EmailServiceTest` não iniciou o GreenMail por proibição de socket do
 sandbox. A suíte sem essa única classe ficou verde. PostgreSQL/IT, SMTP real, WireMock com socket e

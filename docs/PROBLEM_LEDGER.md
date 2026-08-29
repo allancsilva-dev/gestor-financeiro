@@ -1923,3 +1923,175 @@ esta evidência histórica não fecha o problema;
 - **Proximo passo:** Observar em uso real (dono do produto) se o sintoma original (app travado após
   digital) volta a ocorrer. Nenhuma ação pendente de código para fechar este problema — os riscos
   residuais acima já estão rastreados como itens de backlog separados.
+
+---
+
+## PROB-0086 — Classificador de perguntas sequestrava lançamento que citasse cartão
+
+- **ID:** PROB-0086
+- **Titulo:** Frase de lançamento com a palavra "cartao" era tratada como consulta de fatura e nunca
+  virava rascunho — o assistente respondia a fatura em vez de registrar a compra
+- **Data:** 2026-08-29
+- **Origem:** implementação de parcelamento no assistente (E2E local iOS, Fase 5)
+- **Severidade:** HIGH
+- **Status:** FECHADO (2026-08-29)
+- **Area:** backend, assistente
+- **Sintoma:** "comprei 300,00 no mercado hoje no Cartao Nubank em 3x" devolvia
+  `outcome = NOT_FINANCIAL` com uma resposta de consulta de faturas. Nenhum rascunho era criado, e a
+  compra no cartão era impossível de registrar pelo assistente.
+- **Causa raiz:** `FinancialQuestionClassifier.intent()` classificava por presença de termo:
+  `has(text, "fatura", "cartao")` devolvia `INVOICES` para qualquer texto que contivesse "cartao",
+  sem exigir forma de pergunta. Como `AssistantService.receive()` consulta o classificador antes do
+  parser financeiro, a frase nunca chegava ao caminho de lançamento.
+- **Solucao aplicada:** o classificador só assume consulta quando a frase realmente pergunta. Após
+  casar um intent, ele desiste (`Optional.empty()`) se não houver marcador interrogativo ("?",
+  "quanto", "qual", "quais", "quando", "quantos", "mostra", "resumo", "como esta") e houver indício
+  de lançamento — verbo (`comprei|paguei|gastei|lancei|registrar|anota|...`) ou valor monetário.
+- **Evidencias:** `AssistantParcelamentoTest` (3 testes, inclui a frase acima chegando a
+  `COMPLETE`); `FinancialQuestionClassifierTest` seguiu verde (4 testes); suíte backend 470 verdes.
+  E2E `artifacts/fase5/run-20/proof-assistant-parcelado.json`.
+- **Riscos residuais:** a heurística é lexical. Uma pergunta sem pronome interrogativo e com valor
+  (ex.: "fatura do cartão 300") passa a ser tratada como lançamento. Nenhum caso assim apareceu nos
+  testes, mas o classificador continua sendo regra de palavra, não de intenção.
+- **Proximo passo:** nenhum. Rastreado como risco lexical conhecido.
+
+---
+
+## PROB-0087 — App pedia permissão de push no simulador porque a guarda de aparelho real não existia mais
+
+- **ID:** PROB-0087
+- **Titulo:** `Constants.isDevice` foi removido do expo-constants 18; a guarda caía no fallback
+  `?? true` e o app pedia notificação em simulador/emulador
+- **Data:** 2026-08-29
+- **Origem:** E2E local iOS (Fase 5) — o diálogo do sistema cobria a tela e derrubava os flows
+- **Severidade:** MEDIUM
+- **Status:** FECHADO (2026-08-29)
+- **Area:** mobile
+- **Sintoma:** ao entrar na área logada no simulador, o app abria "O app Nexos Finanças deseja
+  enviar notificações". No E2E o alerta ficava por cima da tela e o Maestro não encontrava mais
+  nenhum elemento.
+- **Causa raiz:** `src/notificacoes/push.ts` decidia por `Constants.isDevice ?? true`. O campo
+  `isDevice` não existe em `expo-constants@18` (migrou para `expo-device`), então a expressão era
+  sempre `true`: o app se considerava aparelho real em qualquer simulador e seguia para
+  `requestPermissionsAsync`.
+- **Solucao aplicada:** dependência `expo-device` instalada e guarda trocada para `Device.isDevice`,
+  que o módulo nativo resolve como `false` em `targetEnvironment(simulator)`.
+- **Evidencias:** `src/__tests__/push.test.ts` (6 testes) com mock de `expo-device`; mobile 434
+  testes verdes; E2E `artifacts/fase5/run-20` sem diálogo de notificação.
+- **Riscos residuais:** se `expo-device` não estiver linkado no build nativo, o JS cai no fallback
+  `true` da própria biblioteca e o sintoma volta. O `pod install` passa a ser obrigatório junto da
+  dependência.
+- **Proximo passo:** nenhum.
+
+---
+
+## PROB-0088 — Runner E2E iOS não conseguia fechar: app sem entitlements e bundle em modo dev
+
+- **ID:** PROB-0088
+- **Titulo:** `scripts/e2e-assistant-ios.sh` gerava app sem assinatura (Keychain indisponível) e
+  bundle JS de desenvolvimento (LogBox por cima da tela); nenhum flow chegava ao fim
+- **Data:** 2026-08-29
+- **Origem:** primeira execução real do fechamento operacional da Fase 5
+- **Severidade:** HIGH
+- **Status:** FECHADO (2026-08-29)
+- **Area:** infraestrutura, mobile
+- **Sintoma:** o app subia, mas (1) `expo-notifications` registrava
+  `Keychain access failed: A required entitlement isn't present` e (2) um redbox de `console.error`
+  cobria a tela de login. O flow `assistant-text` falhava em `Element not found: login-email`.
+- **Causa raiz:** duas decisões do runner:
+  1. `CODE_SIGNING_ALLOWED=NO` produzia binário sem entitlements — sem Keychain, e é ali que
+     `expo-secure-store` guarda a sessão (`src/store/auth.ts`).
+  2. `-configuration Debug` força `DEV=true` em `react-native-xcode.sh:48`; o
+     `EXTRA_PACKAGER_ARGS=--dev false` do runner chega depois de `--dev $DEV` na linha de comando e
+     não vence. O bundle embarcado saía em modo dev, com LogBox ativo.
+- **Solucao aplicada:** build passou a `-configuration Release` (que resolve `DEV=false` de verdade)
+  e a assinatura local padrão do Xcode voltou a valer (flag `CODE_SIGNING_ALLOWED=NO` removida);
+  `APP_PATH` passou a procurar em `Release-iphonesimulator`.
+- **Evidencias:** `artifacts/fase5/run-20/xcodebuild.log`; app com entitlements e tela de login
+  limpa; seis flows verdes.
+- **Riscos residuais:** o build Release é mais lento que Debug, então a rodada completa ficou mais
+  cara. O runner não valida explicitamente que o bundle não é dev — depende da configuração.
+- **Proximo passo:** nenhum.
+
+---
+
+## PROB-0089 — Sessão vazava entre flows E2E porque `clearState` do Maestro não limpa o Keychain
+
+- **ID:** PROB-0089
+- **Titulo:** Com a assinatura corrigida, o token sobrevivia à reinstalação e o flow seguinte abria
+  já logado, sem tela de login
+- **Data:** 2026-08-29
+- **Origem:** E2E local iOS (Fase 5)
+- **Severidade:** MEDIUM
+- **Status:** FECHADO (2026-08-29)
+- **Area:** infraestrutura
+- **Sintoma:** o segundo flow em diante falhava em `Element not found: login-email`, com o app já
+  autenticado.
+- **Causa raiz:** `launchApp: clearState: true` limpa dados do app, não o Keychain do simulador — e
+  é lá que a sessão fica (`expo-secure-store`). O Keychain sobrevive inclusive a reinstalações.
+- **Solucao aplicada:** `run_flow()` executa `xcrun simctl keychain <udid> reset` antes de cada
+  flow; o bloco de importação faz o mesmo.
+- **Evidencias:** `scripts/e2e-assistant-ios.sh`; seis flows consecutivos verdes em
+  `artifacts/fase5/run-20`.
+- **Riscos residuais:** o reset é do simulador inteiro, não só do app. Aceitável porque o runner
+  assume simulador dedicado ao E2E.
+- **Proximo passo:** nenhum.
+
+---
+
+## PROB-0090 — Defeitos do próprio runner: variável não inicializada, sucesso falso e falso positivo de segredo
+
+- **ID:** PROB-0090
+- **Titulo:** `prove_financial_state` abortava com `label: unbound variable`, o `cleanup` imprimia
+  `OK` mesmo em falha, e a varredura de segredos acusava telefone dentro de um número de duração
+- **Data:** 2026-08-29
+- **Origem:** E2E local iOS (Fase 5)
+- **Severidade:** HIGH
+- **Status:** FECHADO (2026-08-29)
+- **Area:** infraestrutura
+- **Sintoma:** três falhas distintas, cada uma bloqueando o fechamento:
+  1. `./scripts/e2e-assistant-ios.sh: line 178: label: unbound variable` na primeira prova
+     financeira, com o script encerrando logo depois;
+  2. mesmo assim a saída final dizia `OK: Assistente iOS`;
+  3. `FALHA: evidências contêm padrão sensível` apontando para uma linha de log do Maestro.
+- **Causa raiz:**
+  1. `local label="$1" expected="$2" file="...$label..."` — o Bash expande todas as palavras da
+     declaração antes de atribuir, então `$label` ainda não existia; com `set -u` isso aborta;
+  2. o `trap cleanup EXIT` decidia o texto só pelo código de saída, que nesse caminho chegava zero;
+  3. o padrão `551[0-9]{8,}` casava dentro de `0.05514192581176758`, uma duração impressa pelo
+     driver do Maestro.
+- **Solucao aplicada:** `file` passou a ser declarado em `local` separado; `cleanup` só declara `OK`
+  se `run.txt` existir (e promove código zero a 1 quando não existir); o padrão de telefone ganhou
+  `\b` nas bordas.
+- **Evidencias:** `artifacts/fase5/run-20/run.txt` e `sensitive-scan.txt`
+  ("OK: nenhum padrão sensível detectado.").
+- **Riscos residuais:** a varredura continua sendo por regex sobre logs — outros falsos positivos ou
+  negativos são possíveis.
+- **Proximo passo:** nenhum.
+
+---
+
+## PROB-0091 — Dois testes quebrados por causa alheia ao assistente (data do mês e mapper sem JavaTimeModule)
+
+- **ID:** PROB-0091
+- **Titulo:** `AporteAutomaticoServiceTest` falhava a partir do dia 29 e
+  `StructuredProviderWireMockTest` falhava sempre por desserialização de `LocalDate`
+- **Data:** 2026-08-29
+- **Origem:** execução da suíte backend completa durante a Fase 5
+- **Severidade:** MEDIUM
+- **Status:** FECHADO (2026-08-29)
+- **Area:** backend, testes
+- **Sintoma:** seis erros na suíte: quatro com `Business: Escolha um dia entre 1 e 28` e dois com
+  `ProviderFailure: Resposta fora do schema`.
+- **Causa raiz:** dois defeitos independentes e pré-existentes:
+  1. o teste de aporte usava `LocalDate.now(clock).getDayOfMonth()` como dia de cobrança, mas a
+     regra de negócio aceita 1..28 — a suíte quebrava sozinha nos dias 29, 30 e 31;
+  2. o teste WireMock construía os providers com `new ObjectMapper()` cru; sem `JavaTimeModule` o
+     campo `data` (`LocalDate`) do rascunho nunca desserializava. Em produção o mapper vem do
+     Spring, já com o módulo — por isso só o teste falhava.
+- **Solucao aplicada:** o dia do aporte passou por `Math.min(28, ...)`; o teste WireMock passou a
+  construir o mapper com `JavaTimeModule`, espelhando a aplicação.
+- **Evidencias:** suíte backend 470 testes, 0 falhas.
+- **Riscos residuais:** outros testes podem ter dependência de data não mapeada; não houve varredura
+  sistemática.
+- **Proximo passo:** nenhum.

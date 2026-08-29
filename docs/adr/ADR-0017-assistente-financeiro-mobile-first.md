@@ -64,3 +64,35 @@ Respostas podem degradar para parser/formulário quando fornecedores ou orçamen
 de recomendação apenas abrem tela ou rascunho. WhatsApp e texto ficam desligados em produção até
 gates explícitos; ativação do WhatsApp exige nova consulta de tarifa/termos Meta e homologação.
 O web não recebe implementação nesta fase.
+
+---
+
+## Adendo (2026-08-29) — parcelamento no rascunho, restrito ao cartão
+
+**Contexto.** O rascunho do assistente modelava apenas conta financeira, categoria, valor, descrição
+e data. Pedir "em 3x" era possível de falar, mas o pedido se perdia: a confirmação sempre gravava
+`parcelado = false`.
+
+**Decisão.** O rascunho passou a carregar `cartaoNome`/`cartaoId` e `parcelas`, e parcelar continua
+sendo privilégio do cartão — a mesma regra do formulário manual. O backend já sabe parcelar fora do
+cartão (`TransacaoService.criarParcelas`), mas essa capacidade permanece deliberadamente não exposta
+ao assistente para não criar duas verdades sobre o que "parcelado" significa no produto.
+
+**Invariantes que isso acrescenta.**
+
+- Cartão e conta são mutuamente exclusivos no rascunho: compra de cartão não tem carteira, e o
+  cronograma vive em `fatura_lancamentos`. A carteira não é movimentada.
+- O rascunho aceita registrar `parcelas` antes de conhecer o cartão. Isso é proposital: é o que
+  permite ao assistente cobrar "Qual cartão você usou?" em vez de silenciosamente lançar à vista
+  algo que a pessoa pediu parcelado. Quem recusa é o `confirm`, via rascunho incompleto.
+- Faixa aceita: 2 a 48 parcelas, validada no schema, no DTO de patch e por `CHECK` na migration
+  `V65`.
+
+**Consequência para os fornecedores.** O schema estrito enviado a Gemini/OpenAI ganhou `cartaoNome`
+e `parcelas` como campos obrigatórios (aceitando `null`), e o contexto confiável passou a listar os
+cartões do titular junto de contas e categorias. Fornecedor que devolva parcelas sem cartão produz
+rascunho incompleto, não lançamento errado.
+
+**Alternativa descartada.** Permitir parcelamento em conta pelo assistente encurtaria a
+implementação (sem modelar cartão no rascunho), mas criaria no assistente uma operação que a UI
+manual não oferece. Registrada em BACKLOG-0113 caso a regra de produto mude.

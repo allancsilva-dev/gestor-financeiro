@@ -7,6 +7,87 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR
 
 ---
 
+## [Fase 5 — Parcelamento no assistente e fechamento E2E iOS verde] - 2026-08-29
+
+**Status:** rodada de fechamento local executada de ponta a ponta em simulador iOS (iPhone 17 Pro,
+iOS 26.5), com seis flows do assistente verdes e prova financeira em cada um. Os checklists externos
+do runbook (Gemini/OpenAI, Meta/WhatsApp, backup off-host `PROB-0081`, deploy) seguem pendentes.
+
+### Adicionado — parcelamento pelo assistente (somente cartão)
+- `TransactionDraftV1` e `TransactionDraftSchema` ganharam `cartaoNome` e `parcelas`; migration
+  `V65__assistant_draft_cartao_parcelas.sql` acrescentou `conta_id` e `parcelas` a
+  `assistant_drafts`, com `CHECK` de 2..48. O rascunho aceita registrar "em 3x" antes de saber o
+  cartão — quem cobra o cartão é o `confirm`, que recusa rascunho incompleto.
+- `RuleBasedFinancialInputParser` extrai cartão por nome e parcelas em "3x", "em 3 vezes" e
+  "3 parcelas"; o trecho de parcelas sai do texto antes da busca do valor, senão "3" competiria com
+  o valor da compra.
+- `AssistantService`: cartão substitui a conta (a compra vive na fatura, sem tocar carteira);
+  `confirm` cria a transação com `parcelado`/`totalParcelas` e deixa `FaturaService` gerar o
+  cronograma; `patch`, `DraftResponse` e o snapshot canônico carregam os campos novos; o contexto
+  confiável enviado aos providers passou a listar "Cartoes permitidos".
+- Mobile: `AssistantDraft`, `AssistantDraftPatch` e `LancamentoInicial` levam cartão e parcelas até
+  `NovaTransacaoModal`, que abre a revisão já em "Parcelado" com o número de parcelas preenchido
+  (`testID="transaction-installments"`).
+- Decisão registrada: parcelar continua sendo privilégio do cartão, como no formulário manual
+  (BACKLOG-0113).
+
+### Corrigido
+- **PROB-0086:** `FinancialQuestionClassifier` tratava qualquer frase com "cartao" como consulta de
+  fatura; "comprei 300,00 no Cartao Nubank em 3x" nunca virava lançamento. Agora só assume consulta
+  quando a frase pergunta de fato.
+- **PROB-0087:** `Constants.isDevice` não existe em `expo-constants@18`, então `?? true` fazia o app
+  pedir push no simulador. Guarda migrada para `Device.isDevice` (`expo-device`).
+- **PROB-0088:** runner E2E gerava app sem entitlements (Keychain indisponível, e é lá que a sessão
+  fica) e bundle JS em modo dev (LogBox cobria a tela). Build passou a Release com a assinatura
+  local padrão do Xcode.
+- **PROB-0089:** `clearState` do Maestro não limpa o Keychain; a sessão vazava entre flows. Cada
+  flow agora roda `xcrun simctl keychain reset` antes de começar.
+- **PROB-0090:** `prove_financial_state` abortava com `label: unbound variable`, o `cleanup`
+  imprimia `OK` mesmo em falha, e a varredura de segredos casava telefone dentro de uma duração do
+  Maestro.
+- **PROB-0091:** dois testes pré-existentes quebrados por causa alheia ao assistente —
+  `AporteAutomaticoServiceTest` usava o dia de hoje contra a regra 1..28 (quebrava do dia 29 em
+  diante) e `StructuredProviderWireMockTest` montava `ObjectMapper` sem `JavaTimeModule`.
+
+### Alterado — runner e flows E2E
+- Fixture do runner passou a criar cartão ("Cartao Nubank") e três categorias (Mercado, Transporte,
+  Alimentacao); sem isso não havia como provar extração de categoria por palavra nem parcelamento.
+- Provider fake do profile `local-e2e` virou extrator determinístico de verdade: valor com centavos,
+  data (hoje/ontem/anteontem/dd-mm-aaaa), conta, cartão, parcelas, categoria por palavra dita
+  (supermercado → Mercado, gasolina/posto → Transporte, restaurante/almoço → Alimentacao) e
+  descrição. Frase sem valor continua virando rascunho incompleto, que é o gatilho da pergunta
+  única. Transcrição fake agora é "paguei 137,90 de gasolina no posto hoje pelo Cartao Nubank em 3x"
+  — a voz também exercita cartão e parcelamento.
+- Flows deixaram de usar frases-código e passaram a frases de gente: "paguei 137,90 no supermercado
+  hoje pela Conta Principal", "comprei no supermercado ontem" (→ "Qual foi o valor?" → "89,90"),
+  "e2e-confirm-retry paguei 76,50 no restaurante hoje". Marcadores do injetor de falha encurtaram
+  para `e2e-retry` e `e2e-confirm-retry`, cabendo dentro de frases naturais.
+- Novo flow `assistant-parcelado.yaml`: "comprei 899,90 de gasolina no posto ontem no Cartao Nubank
+  em 3x", abrindo "Mais detalhes" para provar que as parcelas chegaram do rascunho.
+- `prove_financial_state` passou a cobrar movimentos de carteira e lançamentos de fatura
+  separadamente — compra no cartão não move carteira, gera cronograma na fatura.
+- Ajustes de robustez dos flows: `scrollUntilVisible` antes de tocar em item de lista, regex
+  `.*texto.*` onde `ListRow` agrupa título e subtítulo num único elemento acessível, toque em área
+  neutra no lugar de `hideKeyboard` (não suportado por este app no iOS) e `centerElement` para não
+  parar com a linha atrás da tab bar.
+
+### Evidências (`artifacts/fase5/run-20/`)
+- Seis flows verdes com 0 divergências de reconciliação: text (1 transação / 1 movimento),
+  ambiguity (1/1), retry (2/2), confirm-retry (3/3), **parcelado (4 transações / 3 movimentos /
+  3 lançamentos de fatura)** e **audio (5 / 3 / 6)**.
+- `Idempotency-Key` repetida com payload diferente devolve `409`; varredura de segredos limpa.
+- Suíte backend: 470 testes verdes (inclui `AssistantParcelamentoTest`). Mobile: 434 testes verdes.
+
+### Ressalvas
+- `importacao-mobile` fica **SKIPPED**: o seletor de arquivos do iOS abre em "Recentes" e não
+  enxerga `Media/Downloads`, onde o fixture é escrito (BACKLOG-0111). O skip vale só para esse
+  sintoma; qualquer outra falha do flow derruba o gate.
+- `missingFields` ainda alterna entre vocabulário de nome e de id conforme o endpoint
+  (BACKLOG-0112).
+- Ambiente da execução usou Node 26, embora o runbook peça Node 20.
+
+---
+
 ## [Fase 5 — Automação mobile do Assistente] - 2026-08-28
 
 **Status consolidado:** `CONCLUÍDA_COM_RESSALVAS_OPERACIONAIS`. O escopo PR-F5-00..09 está
