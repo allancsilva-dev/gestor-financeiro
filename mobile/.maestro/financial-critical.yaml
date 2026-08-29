@@ -35,8 +35,20 @@ tags:
 
 # Onboarding em etapas: conta principal com 1.000 e o resto pulado
 - assertVisible: "Sua conta principal"
+# O nome nao vem mais pre-preenchido como "Conta Principal": principal virou flag da conta
+# (migration V66), nao nome. O banco preenche o nome enquanto ele estiver vazio; aqui o nome e
+# digitado depois, de proposito, para os flows seguintes continuarem casando ".*Conta Principal.*".
+# Percorre os campos pelo "proximo" do teclado, como uma pessoa faz. E tambem o que prova a
+# correcao: o Saldo e o ultimo campo e o teclado o cobria; o RN so rola um TextInput para a area
+# visivel quando ele RECEBE FOCO, entao o encadeamento resolve sem fechar o teclado nem rolar.
 - tapOn:
-    id: "onboarding-account-balance"
+    id: "onboarding-account-bank"
+- inputText: "Nubank"
+- pressKey: Enter
+- eraseText
+- inputText: "Conta Principal"
+- pressKey: Enter
+- takeScreenshot: "00-onboarding-conta"
 - inputText: "100000"
 - tapOn:
     id: "onboarding-continuar"
@@ -301,11 +313,47 @@ tags:
 # valor. Amarrar o valor ao cofre também evita casar com outro card qualquer.
 - assertVisible: ".*Cofre: Meta Smoke.*50,00.*"
 
+# Conta principal (V66) e banco no card. O rotulo do card e composto: nome, "conta principal"
+# quando marcada, subtipo, saldo e banco. So a conta principal casa este padrao, o que tambem
+# desambigua dos botoes "Editar/Excluir Conta Principal" no mesmo card.
+- assertVisible: ".*Conta Principal, conta principal,.*Nubank.*"
+
+# Editar saldo pela tela de Contas. Era impossivel: a tela so listava, criava e abria extrato —
+# `atualizar` existia no service e ninguem chamava. Ida e volta (825 -> 900 -> 825) de proposito:
+# prova os dois sentidos do AJUSTE_MANUAL e devolve o saldo que as metricas conferem depois.
+- tapOn: "Editar Conta Principal"
+- extendedWaitUntil:
+    visible: "Editar Conta"
+    timeout: 10000
+- assertVisible: "Banco"
+- takeScreenshot: "07-editar-conta"
+- tapOn:
+    id: "conta-form-saldo"
+- eraseText
+- inputText: "90000"
+- tapOn: "Salvar"
+- extendedWaitUntil:
+    visible: ".*Conta Principal.*900,00.*"
+    timeout: 15000
+- takeScreenshot: "07-conta-editada"
+- tapOn: "Editar Conta Principal"
+- extendedWaitUntil:
+    visible: "Editar Conta"
+    timeout: 10000
+- tapOn:
+    id: "conta-form-saldo"
+- eraseText
+- inputText: "82500"
+- tapOn: "Salvar"
+- extendedWaitUntil:
+    visible: ".*Conta Principal.*825,00.*"
+    timeout: 15000
+
 # Extrato confiavel da conta principal
 # O card da conta é composto: o rótulo do nó funde nome, subtipo, saldo e banco,
 # e o Maestro casa regex por igualdade total. Antes havia um rótulo curado, que
 # escondia saldo e subtipo do leitor de tela.
-- tapOn: ".*Conta Principal.*"
+- tapOn: ".*Conta Principal, conta principal,.*"
 - extendedWaitUntil:
     visible: "Saldo conferido"
     timeout: 15000
@@ -329,12 +377,16 @@ tags:
     direction: DOWN
 - assertVisible: "Alimentação"
 - assertVisible: ".*175,00"
+# Rolar ate o TITULO da secao nao basta: o card "Gastos por conta" entrou entre ela e o topo,
+# entao os itens ficam abaixo da dobra. Rolar ate cada item e imune a novos cards no meio.
 - scrollUntilVisible:
     element:
-      text: "Maiores despesas"
+      text: "Despesa smoke"
     direction: DOWN
-- assertVisible: "Despesa smoke"
-- assertVisible: "Compra cartão smoke"
+- scrollUntilVisible:
+    element:
+      text: "Compra cartão smoke"
+    direction: DOWN
 - takeScreenshot: "06-relatorios"
 
 # Guard rails de erros visiveis

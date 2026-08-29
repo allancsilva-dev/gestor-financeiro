@@ -160,7 +160,7 @@ done
 curl -fsS http://127.0.0.1:$BACKEND_PORT/actuator/health >"$ARTIFACT_DIR/backend-health.json" \
   || fail "backend não respondeu no prazo."
 
-printf '==> App iOS Debug com API local\n'
+printf '==> App iOS Release assinado com API local\n'
 if [ ! -d "$MOBILE_DIR/ios" ]; then
   NATIVE_CREATED=1
   (
@@ -182,6 +182,11 @@ if [ ! -e "$XCODE_UPDATES" ]; then
 elif ! rg -q 'unset[[:space:]]+SKIP_BUNDLING' "$XCODE_UPDATES"; then
   fail "$XCODE_UPDATES existe e não libera o bundle Debug; preserve o arquivo e ajuste-o manualmente."
 fi
+# Release assinado pelo Xcode, igual ao runner do assistente (PROB-0088). Debug forca DEV=true
+# em react-native-xcode.sh e o bundle sai com LogBox, que cobre a tela inteira no primeiro
+# console.error; e CODE_SIGNING_ALLOWED=NO deixa o app sem entitlements, entao expo-notifications
+# falha ao ler o Keychain e dispara justamente esse console.error. O flow morria em "Criar conta"
+# atras da tela vermelha.
 (
   cd "$MOBILE_DIR"
   EXPO_PUBLIC_API_BASE_URL="http://127.0.0.1:$BACKEND_PORT/api" \
@@ -191,13 +196,11 @@ fi
   xcodebuild \
     -workspace "$WORKSPACE" \
     -scheme "$SCHEME" \
-    -configuration Debug \
+    -configuration Release \
     -sdk iphonesimulator \
     -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" \
     -derivedDataPath "$BUILD_DIR" \
-    CODE_SIGNING_ALLOWED=NO \
     FORCE_BUNDLING=1 \
-    "EXTRA_PACKAGER_ARGS=--dev false" \
     EXPO_PUBLIC_API_BASE_URL="http://127.0.0.1:$BACKEND_PORT/api" \
     RCT_METRO_PORT=8082 \
     EX_DEV_CLIENT_NETWORK_INSPECTOR=0 \
@@ -206,16 +209,27 @@ fi
     build
 ) >"$ARTIFACT_DIR/xcodebuild.log" 2>&1
 
-APP_PATH="$(find "$BUILD_DIR/Build/Products" -maxdepth 2 -type d -name '*.app' -print -quit)"
-test -n "$APP_PATH" || fail "app Debug não encontrado no DerivedData temporário."
-test -f "$APP_PATH/main.jsbundle" || fail "bundle JavaScript não foi incorporado ao app Debug."
+# Products/ tem uma pasta por configuracao. Buscar a partir da raiz com `-print -quit` pegava a
+# PRIMEIRA que aparecesse — e como este script e o do assistente compartilham o mesmo
+# DerivedData, um Release antigo daquele sombreava o Debug recem-compilado daqui. O smoke
+# passava verde testando um app de horas atras. Ancorar na configuracao correta.
+APP_PATH="$(find "$BUILD_DIR/Build/Products/Release-iphonesimulator" -maxdepth 1 -type d -name '*.app' -print -quit 2>/dev/null)"
+test -n "$APP_PATH" || fail "app Release não encontrado no DerivedData temporário."
+# Cinto e suspensorio: bundle mais velho que o inicio deste run significa build que nao aconteceu.
+if [ "$APP_PATH/main.jsbundle" -ot "$ARTIFACT_DIR" ]; then
+  fail "bundle JS ($APP_PATH/main.jsbundle) é anterior a este run — build não recompilou."
+fi
+test -f "$APP_PATH/main.jsbundle" || fail "bundle JavaScript não foi incorporado ao app."
 APP_CONFIG="$APP_PATH/EXConstants.bundle/app.config"
 test -f "$APP_CONFIG" || fail "configuração Expo não foi incorporada ao app Debug."
 jq -e --arg api "http://127.0.0.1:$BACKEND_PORT/api" \
   '.extra.apiBaseUrl == $api and .extra.appEnv == "local-e2e"' "$APP_CONFIG" >/dev/null \
-  || fail "app Debug não contém a API local e o ambiente local-e2e esperados."
+  || fail "app não contém a API local e o ambiente local-e2e esperados."
 cp "$APP_CONFIG" "$ARTIFACT_DIR/app.config.json"
 xcrun simctl install "$SIMULATOR_UDID" "$APP_PATH"
+# `clearState` do Maestro nao apaga o Keychain, e e la que o app guarda a sessao (PROB-0089):
+# sem o reset o flow abriria ja logado e nunca acharia a tela de login.
+xcrun simctl keychain "$SIMULATOR_UDID" reset
 
 E2E_EMAIL="mobile-smoke-$RUN_ID@example.test"
 E2E_PASSWORD="Smoke12345"
@@ -265,8 +279,8 @@ jq -e '
   .status == "OK"
   and .divergencias == 0
   and (.detalhes | length) == 0
-  and (.resumo | length) == 4
-  and ([.resumo[].invariante] | sort) == (["COFRE_META","PASSIVO_FATURAS","SALDO_LEDGER","TRANSACAO_INCOMPLETA"] | sort)
+  and (.resumo | length) == 5
+  and ([.resumo[].invariante] | sort) == (["CATEGORIA_VALOR_GASTO","COFRE_META","PASSIVO_FATURAS","SALDO_LEDGER","TRANSACAO_INCOMPLETA"] | sort)
   and all(.resumo[]; .divergencias == 0)
 ' "$ARTIFACT_DIR/reconciliacao-global.json" >/dev/null || fail "reconciliação global divergente."
 
