@@ -84,7 +84,7 @@ class AporteAutomaticoServiceTest {
 
     private void ligarAporte() {
         aportes.configurar(usuario.getId(), meta.getId(), true,
-                (short) LocalDate.now(clock).getDayOfMonth(), conta.getId(), null);
+                (short) Math.min(28, LocalDate.now(clock).getDayOfMonth()), conta.getId(), null);
     }
 
     private BigDecimal reservado() {
@@ -133,7 +133,7 @@ class AporteAutomaticoServiceTest {
     void saldoInsuficienteViraAvisoENaoSaldoNegativo() {
         Carteira vazia = carteiras.save(TestDataFactory.carteira(usuario, "Sem saldo", BigDecimal.ZERO));
         aportes.configurar(usuario.getId(), meta.getId(), true,
-                (short) LocalDate.now(clock).getDayOfMonth(), vazia.getId(), null);
+                (short) Math.min(28, LocalDate.now(clock).getDayOfMonth()), vazia.getId(), null);
 
         assertEquals(0, aportes.executar(usuario.getId()));
 
