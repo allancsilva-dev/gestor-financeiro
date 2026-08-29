@@ -22,11 +22,15 @@ tags:
 # Mais > Importar extrato
 - tapOn:
     point: "89%,92%"
+# centerElement evita parar com a linha atras da tab bar, onde o toque nao navega.
 - scrollUntilVisible:
     element:
-      text: "Importar extrato"
+      text: ".*Importar extrato.*"
     direction: DOWN
-- tapOn: "Importar extrato"
+    centerElement: true
+- waitForAnimationToEnd
+- tapOn: ".*Importar extrato.*"
+- waitForAnimationToEnd
 - assertVisible: "CSV ou OFX. Você revisa antes de qualquer coisa entrar no extrato."
 - tapOn:
     id: "importacao-escolher-arquivo"

@@ -16,8 +16,8 @@ class LocalE2eAssistantFaultFilterTest {
 
     @Test
     void mensagemRetryPerdePrimeiraRespostaDepoisDoServicoERetornaReplay() throws Exception {
-        MockHttpServletResponse first = executeMessage("assistant:message:1", "e2e retry mercado 50 hoje", 41L);
-        MockHttpServletResponse replay = executeMessage("assistant:message:1", "e2e retry mercado 50 hoje", 41L);
+        MockHttpServletResponse first = executeMessage("assistant:message:1", "e2e-retry paguei 129,90 no supermercado hoje", 41L);
+        MockHttpServletResponse replay = executeMessage("assistant:message:1", "e2e-retry paguei 129,90 no supermercado hoje", 41L);
 
         assertThat(first.getStatus()).isEqualTo(503);
         assertThat(replay.getStatus()).isEqualTo(201);
@@ -26,7 +26,7 @@ class LocalE2eAssistantFaultFilterTest {
 
     @Test
     void confirmacaoArmadaPerdePrimeiraRespostaEEntregaReplay() throws Exception {
-        executeMessage("assistant:message:2", "e2e confirm retry mercado 50 hoje", 77L);
+        executeMessage("assistant:message:2", "e2e-confirm-retry paguei 76,50 no restaurante hoje", 77L);
 
         MockHttpServletResponse first = executeConfirm(77L);
         MockHttpServletResponse replay = executeConfirm(77L);

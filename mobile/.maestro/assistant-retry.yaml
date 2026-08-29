@@ -19,10 +19,17 @@ tags:
     timeout: 20000
 - tapOn:
     point: "89%,92%"
+- scrollUntilVisible:
+    element:
+      text: "Assistente"
+    direction: DOWN
+- waitForAnimationToEnd
 - tapOn: "Assistente"
 - tapOn:
     id: "assistant-message"
-- inputText: "e2e retry mercado 50 hoje"
+- inputText: "e2e-retry paguei 129,90 no supermercado hoje pela Conta Principal"
+- tapOn:
+    point: "50%,18%"
 - tapOn:
     id: "assistant-send"
 - extendedWaitUntil:
@@ -30,6 +37,8 @@ tags:
     timeout: 15000
 - assertVisible:
     id: "assistant-message"
+- tapOn:
+    point: "50%,18%"
 - tapOn:
     id: "assistant-send"
 - extendedWaitUntil:
@@ -41,4 +50,6 @@ tags:
     visible: "Transações"
     timeout: 20000
 # O fixture e a API verificam que a chave repetida gerou um único rascunho/confirmação.
-- assertVisible: "Mercado"
+- extendedWaitUntil:
+    visible: ".*Supermercado.*"
+    timeout: 15000

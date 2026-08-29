@@ -28,8 +28,8 @@ import java.util.regex.Pattern;
 @Profile("local-e2e")
 @Order(3)
 public class LocalE2eAssistantFaultFilter extends OncePerRequestFilter {
-    private static final String RETRY_MARKER = "e2e retry mercado 50 hoje";
-    private static final String CONFIRM_RETRY_MARKER = "e2e confirm retry mercado 50 hoje";
+    private static final String RETRY_MARKER = "e2e-retry";
+    private static final String CONFIRM_RETRY_MARKER = "e2e-confirm-retry";
     private static final Pattern CONFIRM_PATH = Pattern.compile("/api/v1/assistant/drafts/(\\d+)/confirm");
 
     private final ObjectMapper mapper;

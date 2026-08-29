@@ -19,10 +19,17 @@ tags:
     timeout: 20000
 - tapOn:
     point: "89%,92%"
+- scrollUntilVisible:
+    element:
+      text: "Assistente"
+    direction: DOWN
+- waitForAnimationToEnd
 - tapOn: "Assistente"
 - tapOn:
     id: "assistant-message"
-- inputText: "mercado ontem"
+- inputText: "comprei no supermercado ontem pela Conta Principal"
+- tapOn:
+    point: "50%,18%"
 - tapOn:
     id: "assistant-send"
 - extendedWaitUntil:
@@ -30,7 +37,9 @@ tags:
     timeout: 15000
 - tapOn:
     id: "assistant-message"
-- inputText: "nao sei"
+- inputText: "89,90"
+- tapOn:
+    point: "50%,18%"
 - tapOn:
     id: "assistant-send"
 - extendedWaitUntil:

@@ -1,11 +1,11 @@
 appId: com.gestorfinanceiro.mobile
-name: Assistente — áudio, transcript e confirmação
+name: Assistente — compra parcelada no cartão
 tags:
   - assistant
-  - audio
   - financial-critical
 ---
-# Executar em aparelho/simulador com microfone liberado e transcrição fake determinística.
+# Parcelar é privilégio do cartão: a revisão precisa chegar com o cartão escolhido e as
+# parcelas que a pessoa falou, sem ela redigitar nada.
 - launchApp:
     clearState: true
 - tapOn:
@@ -27,21 +27,19 @@ tags:
 - waitForAnimationToEnd
 - tapOn: "Assistente"
 - tapOn:
-    id: "assistant-audio"
-- waitForAnimationToEnd
-- assertVisible: "Parar gravação.*"
+    id: "assistant-message"
+- inputText: "comprei 899,90 de gasolina no posto ontem no Cartao Nubank em 3x"
 - tapOn:
-    id: "assistant-audio"
-# A revisão abre sobre a conversa, então o balão do transcript deixa de estar visível:
-# a prova de que a voz foi entendida são os campos do rascunho (valor, cartão, parcelas).
+    point: "50%,18%"
+- tapOn:
+    id: "assistant-send"
 - extendedWaitUntil:
     visible: "Revisar lançamento"
-    timeout: 45000
+    timeout: 15000
 - assertVisible: "Rascunho preparado pelo Assistente.*"
 - assertVisible:
     id: "transaction-value"
-    text: "137,90"
-- assertVisible: "Cartao Nubank"
+# O parcelamento vive em "Mais detalhes": abrir prova que veio preenchido do rascunho.
 - scrollUntilVisible:
     element:
       id: "more-details-toggle"
@@ -49,6 +47,7 @@ tags:
 - tapOn:
     id: "more-details-toggle"
 - waitForAnimationToEnd
+- assertVisible: "Parcelamento"
 - scrollUntilVisible:
     element:
       id: "transaction-installments"
@@ -65,3 +64,6 @@ tags:
 - extendedWaitUntil:
     visible: "Transações"
     timeout: 20000
+- extendedWaitUntil:
+    visible: ".*Gasolina.*"
+    timeout: 15000

@@ -19,11 +19,18 @@ tags:
     timeout: 20000
 - tapOn:
     point: "89%,92%"
+- scrollUntilVisible:
+    element:
+      text: "Assistente"
+    direction: DOWN
+- waitForAnimationToEnd
 - tapOn: "Assistente"
 - assertVisible: "Lançamentos por texto, sempre com revisão"
 - tapOn:
     id: "assistant-message"
-- inputText: "mercado 50 hoje"
+- inputText: "paguei 137,90 no supermercado hoje pela Conta Principal"
+- tapOn:
+    point: "50%,18%"
 - tapOn:
     id: "assistant-send"
 - extendedWaitUntil:
@@ -37,4 +44,6 @@ tags:
 - extendedWaitUntil:
     visible: "Transações"
     timeout: 20000
-- assertVisible: "Mercado"
+- extendedWaitUntil:
+    visible: ".*Supermercado.*"
+    timeout: 15000
