@@ -87,7 +87,9 @@ export default function AppLayout() {
     );
 
   return (
-    <>
+    // View de tela cheia, e nao Fragment: a faixa da barra de status abaixo e `position:
+    // absolute` e precisa de um bloco de contencao com altura conhecida para ancorar em y=0.
+    <View style={{ flex: 1 }}>
       <Tabs screenOptions={{
         headerShown: false,
         animation: reduceMotion ? 'none' : 'fade',
@@ -114,7 +116,7 @@ export default function AppLayout() {
         tabBarLabelStyle: { ...typography.tabLabel, marginTop: spacing.xs },
       }}>
         <Tabs.Screen name="(inicio)" options={{ title: 'Início', tabBarIcon: aba('home') }} />
-        <Tabs.Screen name="analises" options={{ title: 'Análises', tabBarIcon: aba('stats-chart') }} />
+        <Tabs.Screen name="analises" options={{ title: 'Relatórios', tabBarIcon: aba('stats-chart') }} />
         <Tabs.Screen name="nova" options={{ title: '', tabBarButton: () => (
           <TouchableOpacity
             onPress={() => setNovaTransacaoVisible(true)}
@@ -156,11 +158,29 @@ export default function AppLayout() {
         <Tabs.Screen name="more" options={{ href: null }} />
       </Tabs>
 
+      {/* Faixa da barra de status.
+          Toda tela de (app) segue a receita do DESIGN.md — ScrollView de raiz, cabecalho dentro
+          dele — entao o conteudo sobe ate y=0 ao rolar e passava por cima do relogio e da
+          bateria. Mora aqui, e nao em cada tela, porque o problema e do padrao, nao de uma tela:
+          resolver so onde alguem reparou deixaria as outras 27 com o mesmo encosto.
+          `pointerEvents="none"` para nao roubar toque de nada que fique embaixo. */}
+      <View
+        pointerEvents="none"
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: insets.top,
+          backgroundColor: colors.bg,
+        }}
+      />
+
       <NovaTransacaoModal
         visible={novaTransacaoVisible}
         onClose={() => setNovaTransacaoVisible(false)}
         onSaved={() => router.push('/transacoes')}
       />
-    </>
+    </View>
   );
 }
