@@ -565,6 +565,39 @@ Criar `vercel.json`:
 2. Cookie/localStorage está sendo salvo?
 3. CORS permite credentials?
 
+### **Problema: item "Assistente" aparece como "Em breve" no app**
+
+O gate do Assistente é do **servidor**, não do build. O app consulta
+`GET /api/v1/capacidades` e só oferece o que vier ligado — trocar a flag no servidor e
+reiniciar a API basta, sem publicar APK/IPA novo.
+
+**Verificar, nesta ordem:**
+
+1. `ASSISTANT_TEXT_ENABLED=true` no `.env` da VPS. O default é `false` (ADR-0017, fail-closed).
+2. Banco em **V65** ou superior. As tabelas `assistant_*` nascem na V57; abaixo dela ligar a
+   flag produz erro de SQL, não 404.
+   ```bash
+   docker compose -f docker-compose.vps.yml exec postgres \
+     psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+     -c "SELECT MAX(version::int) FROM flyway_schema_history WHERE success;"
+   ```
+3. A resposta do servidor, autenticado:
+   ```bash
+   curl -s -H "Authorization: Bearer $TOKEN" https://SEU_DOMINIO/api/v1/capacidades
+   # {"assistenteTexto":true,"assistenteAudio":false,"assistenteWhatsapp":false}
+   ```
+4. Se `assistenteTexto` for `false` com a variável setada, o container não recarregou:
+   `docker compose -f docker-compose.vps.yml up -d --force-recreate api`.
+
+**Sintoma correlato:** rotas `/api/v1/assistant/**` devolvendo **404** (não 403, não 500). Os
+controllers do assistente têm `@ConditionalOnProperty`: com a flag desligada o bean nem é
+criado, e o app mostra o erro genérico "Não foi possível enviar".
+
+> **Não ligue `ASSISTANT_EXTERNAL_ENABLED` sem billing confirmado, política de dados aceita,
+> teto de custo e as DUAS chaves (`GEMINI_API_KEY` e `OPENAI_API_KEY`).** No profile `vps` o
+> `AssistantExternalConfigurationGuard` derruba o boot da API. Desligado, o assistente roda com
+> o parser determinístico, sem custo e sem chave.
+
 ---
 
 ## 📱 Testes em Produção

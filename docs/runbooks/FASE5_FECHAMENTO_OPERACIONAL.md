@@ -32,8 +32,11 @@ Antes de rodar: Docker Desktop precisa estar de pé (`docker info`) e um iPhone 
   então a sessão do flow anterior sobreviveria e a tela de login nunca apareceria (PROB-0089).
 - **Fixture com cartão e três categorias.** Sem cartão não há como provar parcelamento; com uma
   categoria só, a extração por palavra não prova nada.
-- **`EXPO_PUBLIC_ASSISTANT_TEXT_ENABLED=true` no build.** Sem essa flag o item "Assistente" nasce
-  desabilitado em Ajustes e nenhum flow entra na tela.
+- **Nada de flag no build.** O gate saiu do bundle e virou runtime: o app consulta
+  `GET /api/v1/capacidades` e o profile `local-e2e` já traz `assistant.text.enabled=true`, então
+  o item "Assistente" acende sozinho em Ajustes. Antes isto dependia de
+  `EXPO_PUBLIC_ASSISTANT_TEXT_ENABLED=true` no `xcodebuild` — que ninguém setava no release, e por
+  isso todo build publicado saía com o Assistente travado em "Em breve".
 
 ### Flows e prova financeira
 
