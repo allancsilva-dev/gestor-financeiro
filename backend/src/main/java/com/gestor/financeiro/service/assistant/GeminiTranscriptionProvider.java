@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
+import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
@@ -22,6 +23,7 @@ import java.util.Map;
 
 @Component
 @Order(0)
+@Profile("!local-e2e")
 public class GeminiTranscriptionProvider implements TranscriptionProvider {
     private final RestClient client;
     private final ProviderResilienceExecutor resilience;

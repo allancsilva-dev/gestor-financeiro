@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -21,6 +22,7 @@ import java.time.Duration;
 
 @Component
 @Order(Ordered.LOWEST_PRECEDENCE)
+@Profile("!local-e2e")
 public class OpenAiTranscriptionProvider implements TranscriptionProvider {
     private final RestClient client;
     private final ProviderResilienceExecutor resilience;
