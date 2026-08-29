@@ -1,8 +1,17 @@
 package com.gestor.financeiro.service;
 
+import com.gestor.financeiro.repository.*;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowCallbackHandler;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import java.time.Clock;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.mock;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ExportServiceCsvSecurityTest {
@@ -36,5 +45,22 @@ class ExportServiceCsvSecurityTest {
             assertTrue(sql.contains("request_hash"), tabela + " deve exportar o hash do request");
             assertTrue(sql.contains("response_json"), tabela + " deve exportar a resposta idempotente retida");
         }
+    }
+
+    @Test
+    void erroSqlNaExportacaoDoAssistenteFalhaExplicitamente() {
+        JdbcTemplate failingJdbc = new JdbcTemplate() {
+            @Override
+            public void query(String sql, RowCallbackHandler handler, Object... args) {
+                throw new DataAccessResourceFailureException("falha SQL controlada");
+            }
+        };
+        ExportService service = new ExportService(Clock.systemUTC(), failingJdbc,
+                mock(TransacaoRepository.class), mock(CategoriaRepository.class), mock(ContaRepository.class),
+                mock(CarteiraRepository.class), mock(MetaRepository.class), mock(ContaFixaRepository.class),
+                mock(UsuarioRepository.class));
+
+        assertThrows(DataAccessResourceFailureException.class,
+                () -> ReflectionTestUtils.invokeMethod(service, "exportarAssistente", 1L));
     }
 }
