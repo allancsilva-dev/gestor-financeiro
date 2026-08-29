@@ -19,6 +19,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import com.gestor.financeiro.service.assistant.ProviderFailure;
 import com.gestor.financeiro.service.importacao.ImportParsingException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -81,6 +82,29 @@ public class GlobalExceptionHandler {
         var response = ResponseEntity.status(ex.status());
         if (ex.retryAfterSeconds() != null) response.header("Retry-After", ex.retryAfterSeconds().toString());
         return response.body(buildError(ex.code(), ex.getMessage(), null, request));
+    }
+
+    /**
+     * Falha do fornecedor de IA que escapou do pipeline.
+     *
+     * `AiExtractionPipeline` só engole o que permite failover; CONFIGURATION e SAFETY_REFUSAL
+     * sobem por desenho (ADR-0017: recusa de segurança e erro de configuração não fazem failover).
+     * Sem este handler elas caíam no `Exception` genérico e viravam 500 — um erro de chave em
+     * branco parecia bug do servidor. Nada da mensagem do fornecedor vaza para o cliente.
+     */
+    @ExceptionHandler(ProviderFailure.class)
+    public ResponseEntity<ApiError> handleProviderFailure(ProviderFailure ex, HttpServletRequest request) {
+        boolean configuracao = ex.kind() == ProviderFailure.Kind.CONFIGURATION;
+        log.error("Falha do fornecedor do assistente ({}): {}", ex.kind(), ex.getMessage());
+        ApiError apiError = buildError(
+                configuracao ? "AI_UNAVAILABLE" : "AI_REFUSED",
+                configuracao
+                        ? "Assistente indisponível no momento. Use o formulário para lançar."
+                        : "Não consegui interpretar essa mensagem. Use o formulário para lançar.",
+                null, request);
+        return ResponseEntity
+                .status(configuracao ? HttpStatus.SERVICE_UNAVAILABLE : HttpStatus.UNPROCESSABLE_ENTITY)
+                .body(apiError);
     }
 
     @ExceptionHandler(CardParcelDeprecatedException.class)
