@@ -2076,3 +2076,21 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   com teste equivalente ao `AssistantParcelamentoTest`.
 - **Risco se ficar pendente:** nenhum — comportamento atual é intencional e coberto por teste.
 - **Status:** ABERTO (decisão consciente)
+
+---
+
+## BACKLOG-0114 — Cartões preenchidos pelo backfill da V41 não pedem revisão do usuário
+
+- **Titulo:** Sinalizar no app cartão com fechamento/vencimento vindos de default
+- **Prioridade:** P3
+- **Área:** backend, mobile, frontend
+- **Motivo:** BUG-0103 fez a V41 preencher cartões legados com `dia_fechamento = 31` e
+  `dia_vencimento = 10`, que é exatamente o comportamento que o código já aplicava para nulo. Ainda
+  assim são valores de default, não escolha do usuário, e hoje nada avisa que convém conferir com a
+  fatura real do cartão.
+- **Dependências:** nenhuma; não existe mecanismo de "pendência de revisão" em cartão.
+- **Critério de aceite:** cartão marcado como pendente de revisão exibe aviso no app até o usuário
+  confirmar ou alterar os dois dias.
+- **Risco se ficar pendente:** baixo — competência e vencimento de fatura seguem iguais ao que o
+  sistema já calculava antes da migration.
+- **Status:** ABERTO

@@ -4,6 +4,33 @@ Registro de bugs corrigidos. Mantido pelo `docs-reporter`.
 
 ---
 
+## BUG-0103 — Migration V41 abortava com cartão legado sem dia de fechamento/vencimento
+
+- **Data:** 2026-08-29
+- **Area:** backend, migrations, cartões
+- **Origem:** deploy da VPS; a API não subia e o web ficava parado por depender dela.
+- **Sintoma:** Flyway falhava em `V41__contract_contas_financeiras_cartoes.sql` com
+  "V41 abortada: 1 cartao(oes) com campo canonico nulo"; Spring Boot não inicializava e o
+  healthcheck marcava a API unhealthy. Migration é transacional, nada ficou aplicado.
+- **Causa raiz:** `V1__baseline_schema.sql` criou `contas.dia_fechamento`, `dia_vencimento`,
+  `limite_total` e `ativo` como NULLABLE e `V20` só validou `IS NULL OR BETWEEN 1 AND 31`.
+  O cartão "Cartão Principal" foi criado nesse modelo antigo, com os dois dias nulos. A V41 exige
+  `SET NOT NULL` nessas colunas e tem um guard que aborta com nulo — **sem backfill entre os dois**.
+  O bug é da migration, não do dado; nada obrigava o usuário a ter preenchido esses campos.
+- **Correção:** nova seção `2b` na V41, antes do guard, preenchendo registros legados com os mesmos
+  defaults que o código já aplicava para nulo — `dia_fechamento = 31` (equivalente exato ao "último
+  dia do mês" de `FaturaDatas.diaValidoOuFimDoMes`, que clampa para `lengthOfMonth`),
+  `dia_vencimento = 10` (`FaturaDatas.vencimento`), `limite_total = 0` e `ativo = true` (DEFAULT do
+  V1). Comportamento anterior preservado; o usuário ajusta os dois dias pelo app depois.
+  Nenhum valor foi escolhido no lugar do usuário e nenhuma métrica da seção 1 usa essas colunas.
+- **Nota operacional:** editar a V41 muda o checksum. A VPS estava parada na V40, então não é
+  afetada. Base que **já passou** pela V41 (dev local) precisa de `flyway repair` — seguro, porque
+  ali o guard já provou que não havia nulos e o `UPDATE` novo seria no-op.
+- **Testes:** `ContractV41MigrationIT.cartaoLegadoComCamposNulosRecebeBackfillEMigra` (novo),
+  suíte `ContractV41MigrationIT` 9 verdes e `PostgresMigrationIT` 7 verdes.
+
+---
+
 ## BUG-0102 — App pedia permissão de notificação em simulador e travava qualquer automação de UI
 
 - **Data:** 2026-08-29
