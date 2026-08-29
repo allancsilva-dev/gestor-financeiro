@@ -3,6 +3,7 @@ package com.gestor.financeiro;
 import com.gestor.financeiro.exception.FinancialConflictException;
 import com.gestor.financeiro.service.job.BackgroundJob;
 import com.gestor.financeiro.service.job.BackgroundJobService;
+import com.gestor.financeiro.service.job.JobLane;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -166,6 +167,25 @@ class BackgroundJobIT {
         assertEquals(2, retomada.get(0).attempts());
         assertFalse(service.complete(primeiro.id(), "worker-morto"), "worker sem lease não pode concluir");
         assertTrue(service.complete(primeiro.id(), "worker-vivo"));
+    }
+
+    @Test
+    void saturacaoAssistantNaoInterfereNoWorkerFinanceiro() {
+        for (int i = 0; i < 100; i++) {
+            service.enqueue(JobLane.ASSISTANT, "assistant:saturation:" + i, "ASSISTANT_WHATSAPP_EVENT",
+                    "{\"eventId\":" + (i + 1) + "}", (short) 1, 100, disponivelAgora(), 3);
+        }
+        service.enqueue(JobLane.FINANCIAL, "financial:priority", "IMPORT_PARSE",
+                "{\"batchId\":1}", (short) 1, 0, disponivelAgora(), 3);
+
+        List<BackgroundJob> financial = service.claim(JobLane.FINANCIAL,
+                "worker-financial", 1, Duration.ofMinutes(1));
+
+        assertEquals(1, financial.size());
+        assertEquals("IMPORT_PARSE", financial.get(0).type());
+        assertEquals(100, jdbcTemplate.queryForObject(
+                "select count(*) from background_jobs where lane = 'ASSISTANT' and status = 'PENDING'",
+                Integer.class));
     }
 
     private static String getenvOrDefault(String key, String defaultValue) {
