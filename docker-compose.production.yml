@@ -34,6 +34,12 @@ services:
       SERVER_TOMCAT_THREADS_MAX: ${SERVER_TOMCAT_THREADS_MAX:-50}
       # Temporário de multipart em tmpfs com teto: upload nunca enche a camada do container.
       MULTIPART_LOCATION: /tmp/multipart
+      # Assistente (ADR-0017): canais nascem desligados. Só o texto/áudio determinístico é
+      # exposto aqui — ASSISTANT_EXTERNAL_ENABLED fica de fora de propósito, porque ligá-lo
+      # sem billing, política de dados, teto de custo e as DUAS chaves derruba o boot
+      # (AssistantExternalConfigurationGuard). Exige banco em V65 ou superior.
+      ASSISTANT_TEXT_ENABLED: ${ASSISTANT_TEXT_ENABLED:-false}
+      ASSISTANT_AUDIO_ENABLED: ${ASSISTANT_AUDIO_ENABLED:-false}
     # Anexos sobrevivem a recreate do container (ADR-0005 / PROB-0080)
     volumes:
       - backend_uploads:/app/uploads

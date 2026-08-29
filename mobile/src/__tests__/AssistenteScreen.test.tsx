@@ -22,6 +22,12 @@ jest.mock('expo-audio', () => ({
 jest.mock('expo-file-system', () => ({
   File: jest.fn().mockImplementation(() => ({ exists: true, delete: mockDeleteAudio })),
 }));
+// O gate do assistente saiu do build e virou runtime (`/v1/capacidades`). Mockar o hook em vez
+// de plantar um QueryClient só para isso mantém o teste falando da tela, não da infraestrutura.
+const mockCapacidades = { assistenteTexto: true, assistenteAudio: true, assistenteWhatsapp: false };
+jest.mock('../hooks/useCapacidades', () => ({
+  useCapacidades: () => mockCapacidades,
+}));
 jest.mock('../services/assistantService', () => ({
   __esModule: true,
   assistantIdempotencyKey: jest.fn(() => 'assistant:message:test-key'),
@@ -45,7 +51,11 @@ jest.mock('../components/NovaTransacaoModal', () => ({
 }));
 
 describe('AssistenteScreen', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCapacidades.assistenteTexto = true;
+    mockCapacidades.assistenteWhatsapp = false;
+  });
 
   it('explica que nada é lançado automaticamente', () => {
     render(<AssistenteScreen />);
@@ -125,13 +135,21 @@ describe('AssistenteScreen', () => {
   });
 
   it('mostra código de vínculo WhatsApp sem pedir telefone no app', async () => {
-    process.env.EXPO_PUBLIC_ASSISTANT_WHATSAPP_ENABLED = 'true';
+    mockCapacidades.assistenteWhatsapp = true;
     (assistantService.createWhatsappLink as jest.Mock).mockResolvedValue({ code: 'ABCDEFGH2345', expiresAt: '2026-08-27T20:30:00' });
     render(<AssistenteScreen />);
     await act(async () => fireEvent.press(screen.getByText('Conectar WhatsApp')));
     expect(await screen.findByText('ABCDEFGH2345')).toBeTruthy();
     expect(screen.getByText(/Uso único, válido por 10 minutos/)).toBeTruthy();
-    delete process.env.EXPO_PUBLIC_ASSISTANT_WHATSAPP_ENABLED;
+  });
+
+  it('não oferece o assistente quando o servidor diz que está desligado', () => {
+    // Deep link continua alcançando a rota; sem isto a pessoa só descobriria pelo 404
+    // travestido de "não foi possível enviar", depois de digitar a frase inteira.
+    mockCapacidades.assistenteTexto = false;
+    render(<AssistenteScreen />);
+    expect(screen.getByText('Assistente indisponível')).toBeTruthy();
+    expect(screen.queryByTestId('assistant-send')).toBeNull();
   });
 
   it('leva cartão e parcelas do rascunho para a revisão', async () => {

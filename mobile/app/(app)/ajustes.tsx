@@ -14,6 +14,7 @@ import { TemaPreferido } from '../../src/store/temaPreferido';
 import api from '../../src/services/api';
 import notificacaoService from '../../src/services/notificacaoService';
 import usuarioService from '../../src/services/usuarioService';
+import { useCapacidades } from '../../src/hooks/useCapacidades';
 import { getInitials } from '../../src/utils/format';
 import { mensagemDeErro } from '../../src/utils/erros';
 import CabecalhoDeTela from '../../src/components/ui/CabecalhoDeTela';
@@ -32,9 +33,11 @@ import Entrance from '../../src/components/ui/Entrance';
 
 // Ferramentas do app. Os rótulos "Categorias", "Carteira", "Contas" e "Relatórios"
 // são tocados por texto em .maestro/financial-critical.yaml — não renomear.
-const FERRAMENTAS: Array<{
+interface Ferramenta {
   label: string; sub: string; rota: string | null; icone: string; desabilitado?: boolean;
-}> = [
+}
+
+const FERRAMENTAS: Ferramenta[] = [
   { label: 'Visão financeira', sub: 'Métricas oficiais', rota: '/more/visao-financeira', icone: '🧭' },
   { label: 'Contas', sub: 'Saldos e dinheiro', rota: '/more/carteiras', icone: '🏦' },
   { label: 'Recorrências', sub: 'Entradas e saídas', rota: '/more/contas-fixas', icone: '📅' },
@@ -44,11 +47,17 @@ const FERRAMENTAS: Array<{
   { label: 'Categorias', sub: 'Organizar', rota: '/more/categorias', icone: '🏷' },
   { label: 'Categorizar sozinho', sub: 'Regras suas', rota: '/more/regras-categoria', icone: '🪄' },
   { label: 'Investimentos', sub: 'Posições', rota: '/more/investimentos', icone: '📦' },
-  {
-    label: 'Assistente', sub: 'Lançar conversando', rota: '/more/assistente', icone: '💬',
-    desabilitado: process.env.EXPO_PUBLIC_ASSISTANT_TEXT_ENABLED !== 'true',
-  },
+  { label: 'Assistente', sub: 'Lançar conversando', rota: '/more/assistente', icone: '💬' },
 ];
+
+/**
+ * Quem decide se o Assistente aparece é o servidor (`/v1/capacidades`), não o build.
+ * Enquanto a resposta não chega, `useCapacidades` devolve tudo desligado, então o tile nasce
+ * como "Em breve" e acende sozinho — sem publicar app novo a cada toggle do backend.
+ */
+const ferramentasCom = (assistenteLigado: boolean): Ferramenta[] =>
+  FERRAMENTAS.map(item =>
+    item.rota === '/more/assistente' ? { ...item, desabilitado: !assistenteLigado } : item);
 
 const TEMAS: Array<{ id: TemaPreferido; label: string }> = [
   { id: 'sistema', label: 'Sistema' },
@@ -63,6 +72,11 @@ export default function Ajustes() {
   const queryClient = useQueryClient();
   const { usuario, logout } = useAuth();
   const { preferencia, setPreferencia } = useTema();
+  const capacidades = useCapacidades();
+  const ferramentas = React.useMemo(
+    () => ferramentasCom(capacidades.assistenteTexto),
+    [capacidades.assistenteTexto],
+  );
 
   const [modalExcluirVisible, setModalExcluirVisible] = useState(false);
   const [senhaExcluir, setSenhaExcluir] = useState('');
@@ -249,7 +263,7 @@ export default function Ajustes() {
             flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md,
             paddingHorizontal: spacing.lg,
           }}>
-            {FERRAMENTAS.map(item => (
+            {ferramentas.map(item => (
               <TouchableOpacity
                 key={item.label}
                 onPress={() => item.rota && router.push(item.rota as never)}

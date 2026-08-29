@@ -6,9 +6,11 @@ import { File } from 'expo-file-system';
 import { useTheme, useTabBarSpace, radius, screenPadding, spacing, typography } from '../../../src/theme';
 import { mensagemDeErro } from '../../../src/utils/erros';
 import assistantService, { assistantIdempotencyKey, AssistantDraft } from '../../../src/services/assistantService';
+import { useCapacidades } from '../../../src/hooks/useCapacidades';
 import CabecalhoSubTela from '../../../src/components/ui/CabecalhoSubTela';
 import Botao from '../../../src/components/ui/Botao';
 import Field from '../../../src/components/ui/Field';
+import EstadoVazio from '../../../src/components/ui/EstadoVazio';
 import NovaTransacaoModal, { LancamentoInicial } from '../../../src/components/NovaTransacaoModal';
 
 type LocalMessage = { id: string; role: 'USER' | 'ASSISTANT'; text: string };
@@ -24,6 +26,7 @@ export default function AssistenteScreen() {
   const bottomSpace = useTabBarSpace();
   const router = useRouter();
   const scroll = useRef<ScrollView>(null);
+  const capacidades = useCapacidades();
   const [messages, setMessages] = useState<LocalMessage[]>([starter]);
   const [text, setText] = useState('');
   const [conversationId, setConversationId] = useState<number | null>(null);
@@ -143,6 +146,22 @@ export default function AssistenteScreen() {
     data: draft.data ?? undefined, mode: 'ASSISTANT_DRAFT', draftId: draft.id, draftVersion: draft.version,
   } : null;
 
+  // O tile em Ajustes já respeita a capacidade, mas a rota continua alcançável por deep link.
+  // Sem esta guarda o canal desligado só se revelaria como 404 travestido de "não foi possível
+  // enviar", depois da pessoa ter digitado a frase inteira.
+  if (!capacidades.assistenteTexto) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg }}>
+        <CabecalhoSubTela titulo="Assistente" />
+        <EstadoVazio
+          emoji="💬"
+          titulo="Assistente indisponível"
+          texto="Este recurso ainda não está ligado na sua conta. Continue lançando pelo formulário."
+        />
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: colors.bg }}
@@ -210,7 +229,7 @@ export default function AssistenteScreen() {
           <Text style={{ ...typography.meta, color: colors.textSecondary, marginTop: spacing.sm, textAlign: 'center' }}>
             O assistente prepara o rascunho. Nada é lançado sem sua confirmação.
           </Text>
-          {process.env.EXPO_PUBLIC_ASSISTANT_WHATSAPP_ENABLED === 'true' ? (
+          {capacidades.assistenteWhatsapp ? (
             <View style={{ marginTop: spacing.xxl, gap: spacing.sm }}>
               <Botao titulo="Conectar WhatsApp" icone="logo-whatsapp" variante="secundario" onPress={connectWhatsapp} desabilitado={sending} />
               {whatsappCode ? (

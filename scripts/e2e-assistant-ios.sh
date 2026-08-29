@@ -139,14 +139,16 @@ SCHEME="$(basename "$WORKSPACE" .xcworkspace)"
 XCODE_UPDATES="$MOBILE_DIR/ios/.xcode.env.updates"
 rg -q 'unset[[:space:]]+SKIP_BUNDLING' "$XCODE_UPDATES" 2>/dev/null \
   || printf 'unset SKIP_BUNDLING\n' >>"$XCODE_UPDATES"
+# Sem EXPO_PUBLIC_ASSISTANT_TEXT_ENABLED: o gate saiu do build e virou runtime. O app pergunta
+# /api/v1/capacidades, e o profile local-e2e ja traz assistant.text.enabled=true.
 (
   cd "$MOBILE_DIR"
-  EXPO_PUBLIC_API_BASE_URL="$API" EXPO_PUBLIC_ASSISTANT_TEXT_ENABLED=true APP_ENV=local-e2e \
+  EXPO_PUBLIC_API_BASE_URL="$API" APP_ENV=local-e2e \
   APP_RELEASE_SHA="$RUN_ID" FORCE_BUNDLING=1 \
   xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release -sdk iphonesimulator \
     -destination "platform=iOS Simulator,id=$SIMULATOR_UDID" -derivedDataPath "$BUILD_DIR" \
     FORCE_BUNDLING=1 \
-    EXPO_PUBLIC_API_BASE_URL="$API" EXPO_PUBLIC_ASSISTANT_TEXT_ENABLED=true \
+    EXPO_PUBLIC_API_BASE_URL="$API" \
     RCT_METRO_PORT=8082 EX_DEV_CLIENT_NETWORK_INSPECTOR=0 \
     APP_ENV=local-e2e APP_RELEASE_SHA="$RUN_ID" build
 ) >"$ARTIFACT_DIR/xcodebuild.log" 2>&1
