@@ -9,8 +9,10 @@ jest.mock('expo-notifications', () => ({
 
 jest.mock('expo-constants', () => ({
   __esModule: true,
-  default: { isDevice: true, expoConfig: { extra: { eas: { projectId: 'projeto-1' } } } },
+  default: { expoConfig: { extra: { eas: { projectId: 'projeto-1' } } } },
 }));
+
+jest.mock('expo-device', () => ({ __esModule: true, isDevice: true }));
 
 jest.mock('../services/notificacaoService', () => ({
   __esModule: true,

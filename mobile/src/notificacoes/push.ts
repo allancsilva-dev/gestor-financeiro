@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import notificacaoService from '../services/notificacaoService';
 
@@ -17,7 +18,7 @@ import notificacaoService from '../services/notificacaoService';
  */
 
 /** Emulador e simulador não têm serviço de push; tentar ali só gera erro barulhento. */
-const ehDispositivoReal = (): boolean => Constants.isDevice ?? true;
+const ehDispositivoReal = (): boolean => Device.isDevice;
 
 const projectId = (): string | undefined =>
   (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas?.projectId
