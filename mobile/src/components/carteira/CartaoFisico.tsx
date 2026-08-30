@@ -2,7 +2,7 @@ import React from 'react';
 import { Image, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { identidadeDoCartao } from '../../domain/emissores';
+import { estiloDoLogo, identidadeDoCartao } from '../../domain/emissores';
 import { tamanhoLogoNoTile } from '../../domain/logosEmissores';
 import ChipCartao from './ChipCartao';
 import BandeiraMarca from './BandeiraMarca';
@@ -57,7 +57,10 @@ export default function CartaoFisico({
   const ladoTileLogo = Math.round(32 * k);
   // Fica maior que o tile nas marcas cujo PNG tem margem transparente. O que
   // transborda, e o `overflow: 'hidden'` corta, é a margem — não o desenho.
-  const ladoLogo = tamanhoLogoNoTile(ladoTileLogo, id.logoPreenchimento);
+  // O tile fica no topo do cartão, então quem decide o contraste do logo é o
+  // `from` do gradiente.
+  const logoEstilo = estiloDoLogo(id.logoMedido, id.from);
+  const ladoLogo = tamanhoLogoNoTile(ladoTileLogo, id.logoPreenchimento, logoEstilo.alvo);
 
   return (
     <View
@@ -120,21 +123,25 @@ export default function CartaoFisico({
               width: ladoTileLogo,
               height: ladoTileLogo,
               borderRadius: Math.round(9 * k),
-              // Com logo real o tile é branco, não a cor da marca: os PNGs são
-              // coloridos sobre fundo transparente, e nenhuma cor de marca
-              // garante contraste para todos eles. Sem logo, mantém o tile
-              // colorido com o monograma, que já é calculado para AA.
-              backgroundColor: id.logo ? '#FFFFFF' : id.logoBg,
+              // Com logo real o tile quase nunca pinta nada: 99 dos 162 assets
+              // já são uma placa da marca (o squircle do Itaú, o círculo do
+              // Bradesco) e um fundo atrás deles vira moldura sobrando; os
+              // outros são marca solta, e quem garante o contraste dela é o
+              // tint. `apoio` é a exceção — placa que sumiria neste cartão —, e
+              // vem da cor do próprio cartão, não de um branco chapado. Sem
+              // logo, o tile fica colorido com o monograma, calculado para AA.
+              backgroundColor: id.logo !== null ? logoEstilo.apoio ?? 'transparent' : id.logoBg,
               alignItems: 'center',
               justifyContent: 'center',
               overflow: 'hidden',
             }}
           >
-            {id.logo ? (
+            {id.logo !== null ? (
               <Image
                 source={id.logo}
                 resizeMode="contain"
                 accessibilityIgnoresInvertColors
+                tintColor={logoEstilo.tint ?? undefined}
                 style={{ width: ladoLogo, height: ladoLogo }}
               />
             ) : (

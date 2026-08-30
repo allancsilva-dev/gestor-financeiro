@@ -7,7 +7,7 @@ import { ParcelaAgendada } from '../../types';
 import { formatCurrency } from '../../utils/format';
 import SkeletonBox from '../ui/SkeletonBox';
 import { emojiDaCategoria } from '../../domain/iconeCategoria';
-import { identidadeDoCartao } from '../../domain/emissores';
+import { estiloDoLogo, identidadeDoCartao } from '../../domain/emissores';
 import { tamanhoLogoNoTile } from '../../domain/logosEmissores';
 
 interface Props {
@@ -84,7 +84,15 @@ export default function ParcelasCarrossel({ itens, carregando, onVerTodas, onAbr
             // Mesmo fator do tile do cartão: os PNGs do pacote não têm margem
             // uniforme, então sem ele a marca com borda transparente sai com
             // ~metade do corpo das outras neste rodapé de 16x16.
-            const ladoLogoCartao = tamanhoLogoNoTile(LOGO_LADO, idCartao?.logoPreenchimento ?? 1);
+            // Aqui o logo pousa no card do tema, não no gradiente do cartão —
+            // então o contraste é medido contra `colors.card`, e no tema claro
+            // a decisão sai invertida em relação à do cartão.
+            const estiloLogoCartao = estiloDoLogo(idCartao?.logoMedido ?? null, colors.card);
+            const ladoLogoCartao = tamanhoLogoNoTile(
+              LOGO_LADO,
+              idCartao?.logoPreenchimento ?? 1,
+              estiloLogoCartao.alvo,
+            );
             const progresso = item.numeroParcela && item.totalParcelas
               ? `${item.numeroParcela}/${item.totalParcelas}`
               : null;
@@ -159,17 +167,21 @@ export default function ParcelasCarrossel({ itens, carregando, onVerTodas, onAbr
                     marginTop: spacing.sm + 2, paddingTop: spacing.sm + 2,
                     borderTopWidth: 1, borderTopColor: colors.border,
                   }}>
-                    {logoCartao ? (
+                    {logoCartao !== null ? (
                       // A moldura fixa segura o layout: a <Image> passa de 16
                       // quando o asset tem margem, e só a margem transborda.
                       <View style={{
                         width: LOGO_LADO, height: LOGO_LADO, borderRadius: 4,
                         alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+                        // Só a placa que sumiria neste card ganha fundo, e ele
+                        // sai da cor do próprio card.
+                        backgroundColor: estiloLogoCartao.apoio ?? undefined,
                       }}>
                         <Image
                           source={logoCartao}
                           resizeMode="contain"
                           accessibilityIgnoresInvertColors
+                          tintColor={estiloLogoCartao.tint ?? undefined}
                           style={{ width: ladoLogoCartao, height: ladoLogoCartao }}
                           {...iconeDecorativo}
                         />

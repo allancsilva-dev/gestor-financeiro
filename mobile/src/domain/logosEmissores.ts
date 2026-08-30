@@ -11,7 +11,7 @@
 // Nenhuma requisição de rede: os assets são locais, então o app funciona
 // offline e nada sobre qual banco o usuário tem sai do aparelho.
 import { logos } from 'logos-bancos-br/react-native';
-import { PREENCHIMENTO_LOGO } from './emissoresDataset.gen';
+import { LOGO_MEDIDO, PREENCHIMENTO_LOGO, type EntradaLogo } from './emissoresDataset.gen';
 
 /**
  * Asset do Metro para o logo do emissor, pronto para `<Image source>`.
@@ -42,26 +42,67 @@ export const preenchimentoDoIspb = (ispb: string | null | undefined): number => 
 };
 
 /**
- * Fração do tile que o conteúdo da marca deve ocupar, igual para todo emissor.
+ * Medidas de render do asset, ou `null` quando o emissor não tem logo.
  *
- * 0,95 é o teto prático, escolhido para a marca encher o tile: o anel que sobra
- * é de 0,9pt no tile de 36pt do cartão. Não dá para ir a 1 — o bbox dos assets
- * não é perfeitamente centrado, e o mais torto (`02038232`, 9% de assimetria
- * vertical) passa a ser cortado pelo `overflow: 'hidden'` do tile. Medido nos
- * 162: em 0,95 o pior caso ainda sobra 1,4% do lado do tile; em 1,0 falta 1,2%.
+ * Os 162 assets do pacote se dividem em dois desenhos diferentes, e tratá-los
+ * igual foi o que obrigava o cartão a pintar um tile branco atrás de todo logo:
  *
- * O anel não é decoração: com logo real o tile é branco justamente porque os
- * PNGs são coloridos sobre transparente, e é ele que separa a marca do
- * gradiente do cartão.
+ *   - 99 são PLACA: quadrado, squircle ou círculo opaco, com a cor da marca já
+ *     dentro do desenho (o quadrado amarelo do BB, o squircle azul do Itaú, o
+ *     círculo do Bradesco). Fundo atrás deles é ruído — vira um quadrado branco
+ *     com a placa da marca sobrando no meio. Vão full-bleed, sem nada atrás;
+ *   - 63 são MARCA SOLTA sobre transparente (o "nu" do Nubank, o wordmark do
+ *     C6). Essas dependem do fundo para existir.
+ *
+ * O que fazer com cada uma depende do fundo, que só o runtime conhece: veja
+ * `estiloDoLogo` em emissores.ts.
  */
-export const ALVO_LOGO_NO_TILE = 0.95;
+export const entradaLogoDoIspb = (ispb: string | null | undefined): EntradaLogo | null => {
+  if (!ispb) return null;
+  return LOGO_MEDIDO[ispb] ?? null;
+};
+
+/** Valores de `EntradaLogo[0]`, o tipo de desenho medido no asset. */
+export const TIPO_PLACA = 0;
+export const TIPO_MARCA = 1;
+
+/** `true` quando o asset traz a própria placa e dispensa fundo. */
+export const logoSolidoDoIspb = (ispb: string | null | undefined): boolean =>
+  entradaLogoDoIspb(ispb)?.[0] === TIPO_PLACA;
 
 /**
- * Lado da `<Image>` para o conteúdo da marca ocupar `ALVO_LOGO_NO_TILE` do tile.
+ * Fração do tile que o conteúdo do asset ocupa, por tipo de desenho.
+ *
+ * PLACA vai a 1: a arte É a placa, então ela encosta na borda do tile e o
+ * `borderRadius` + `overflow: 'hidden'` do tile arredondam o canto, como o
+ * ícone de app na home do celular. O bbox dos assets não é perfeitamente
+ * centrado, então a placa mais torta das 99 (`30723871`, 0,43% do lado) tem
+ * essa ponta comida pelo corte: 0,14pt num tile de 32pt, menos de meio pixel
+ * em 3x, e ainda por cima no canto que o `borderRadius` já arredonda.
+ *
+ * MARCA fica em 0,86: sem placa atrás, ela pousa direto no gradiente do cartão
+ * e precisa de respiro — encostar na borda faria a marca brigar com o wordmark
+ * ao lado. Aqui a folga não é só óptica: a marca solta é bem mais descentrada
+ * (`02038232`, 6,9% do lado), e o teto sem corte nenhum é 1/(1+2·0,069) =
+ * 0,8783 — 0,86 fica abaixo dele.
+ */
+export const ALVO_PLACA = 1;
+export const ALVO_MARCA = 0.86;
+
+/**
+ * Lado da `<Image>` para o conteúdo ocupar `alvo` do tile.
  *
  * Fica MAIOR que o tile quando o asset tem margem — é a margem transparente que
  * transborda, não o desenho. O container do tile precisa de `overflow: 'hidden'`
  * para essa sobra não invadir o layout ao redor.
+ *
+ * Arredonda para baixo, não para o inteiro mais próximo: para cima, o pixel a
+ * mais é multiplicado por 1/preenchimento e chega a empurrar o conteúdo 0,17pt
+ * para fora do tile em alguns assets. Para baixo, o desvio some no mesmo lugar
+ * — abaixo de meio pixel de conteúdo.
  */
-export const tamanhoLogoNoTile = (ladoDoTile: number, preenchimento: number): number =>
-  Math.round((ladoDoTile * ALVO_LOGO_NO_TILE) / preenchimento);
+export const tamanhoLogoNoTile = (
+  ladoDoTile: number,
+  preenchimento: number,
+  alvo: number,
+): number => Math.floor((ladoDoTile * alvo) / preenchimento);

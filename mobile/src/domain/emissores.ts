@@ -17,8 +17,10 @@
 //                   scripts/gerar-emissores-dataset.mjs, não escrita à mão.
 // Nenhum hex entra aqui "de memória" sem um destes rótulos.
 
-import { EMISSORES_DATASET } from './emissoresDataset.gen';
-import { logoDoIspb, preenchimentoDoIspb } from './logosEmissores';
+import { EMISSORES_DATASET, type EntradaLogo } from './emissoresDataset.gen';
+import {
+  ALVO_MARCA, ALVO_PLACA, entradaLogoDoIspb, logoDoIspb, preenchimentoDoIspb, TIPO_PLACA,
+} from './logosEmissores';
 
 export type FonteCor = 'oficial' | 'aproximacao' | 'informada' | 'derivada';
 
@@ -334,10 +336,12 @@ export const luminancia = (hex: string): number => {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 };
 
-export const contraste = (a: string, b: string): number => {
-  const la = luminancia(a), lb = luminancia(b);
-  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
-};
+/** Razão de contraste WCAG entre duas LUMINÂNCIAS já calculadas. */
+export const contrasteDeLuz = (a: number, b: number): number =>
+  (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+
+export const contraste = (a: string, b: string): number =>
+  contrasteDeLuz(luminancia(a), luminancia(b));
 
 export const TINTA_CLARA = '#FFFFFF';
 export const TINTA_ESCURA = '#101010';
@@ -351,6 +355,125 @@ export const tintaPara = (from: string, to: string): string => {
   const clara = Math.min(contraste(TINTA_CLARA, from), contraste(TINTA_CLARA, to));
   const escura = Math.min(contraste(TINTA_ESCURA, from), contraste(TINTA_ESCURA, to));
   return clara >= escura ? TINTA_CLARA : TINTA_ESCURA;
+};
+
+/**
+ * Mesmo matiz e saturação, luminosidade movida até `alvo:1` contra `fundo`.
+ *
+ * Vai para o lado que o fundo pede — a mesma escolha de `tintaPara`, então
+ * fundo escuro clareia e fundo claro escurece. Se nem o extremo do matiz
+ * alcança o alvo (marca muito saturada num fundo de luz parecida), devolve a
+ * tinta pura: legibilidade vence fidelidade de cor num tile de 32pt.
+ */
+export const ajustarParaContraste = (hex: string, fundo: string, alvo: number): string => {
+  if (contraste(hex, fundo) >= alvo) return hex;
+  const clarear = tintaPara(fundo, fundo) === TINTA_CLARA;
+  const extremo = clarear ? 1 : 0;
+  if (contraste(comLuz(hex, extremo), fundo) < alvo) return clarear ? TINTA_CLARA : TINTA_ESCURA;
+  // Busca binária na luz do HSL, como `limitarLuminancia`: o contraste é
+  // monótono na luz uma vez fixada a direção, então 24 passos fecham no menor
+  // desvio de cor que ainda passa.
+  let dentro = rgbParaHsl(...hexParaRgb(hex))[2];
+  let fora = extremo;
+  for (let i = 0; i < 24; i++) {
+    const meio = (dentro + fora) / 2;
+    if (contraste(comLuz(hex, meio), fundo) >= alvo) fora = meio;
+    else dentro = meio;
+  }
+  return comLuz(hex, fora);
+};
+
+// Contraste mínimo para a marca solta ir com as cores originais. 2.5:1 é
+// abaixo do AA de texto de propósito: logo não é texto, e o tile ainda tem o
+// wordmark do emissor escrito ao lado — o piso aqui é "a forma se distingue do
+// gradiente".
+export const CONTRASTE_MARCA_MIN = 2.5;
+// Alvo de quem precisa de tint. Bem acima do piso por dois motivos: a marca
+// nasce medida contra o `from` e ainda tem de aguentar o `to`, mais escuro; e
+// no limite ela sai apagada ao lado do wordmark branco do emissor. Comparado
+// nos cartões reais: em 3 o "C6" fica cinza-fumaça (#6F6F6F), em 4 ele lê como
+// prata (#848484) e o "nu" do Nubank continua roxo (#D8A3FB) em vez de lavar.
+export const CONTRASTE_TINT_ALVO = 4;
+// A placa não é tingida — tingir apagaria o desenho interno dela —, então o
+// piso dela é só "a borda da placa aparece". Abaixo disto ela precisa de um
+// tile de apoio: é o caso da placa preta (`bari`) num cartão preto e da placa
+// branca (`asa`) no card do tema claro.
+export const CONTRASTE_PLACA_MIN = 1.8;
+// Quanto o tile de apoio se separa do fundo em que está. Suave de propósito: é
+// só o degrau que revela a borda da placa, não uma moldura — e vem da COR DO
+// FUNDO, nunca de um branco chapado.
+export const CONTRASTE_APOIO = 1.35;
+
+export interface EstiloLogo {
+  /** Asset de placa própria: vai full-bleed no tile. */
+  solido: boolean;
+  /** Cor para tingir a marca solta, ou `null` para deixar as cores originais. */
+  tint: string | null;
+  /** Fundo do tile quando o desenho sumiria sem ele, ou `null` (o caso normal). */
+  apoio: string | null;
+  /** Fração do tile que o desenho ocupa: veja `ALVO_PLACA` e `ALVO_MARCA`. */
+  alvo: number;
+}
+
+const SEM_LOGO: EstiloLogo = { solido: false, tint: null, apoio: null, alvo: ALVO_MARCA };
+
+/**
+ * Como desenhar o logo do emissor sobre `fundo` — a decisão que substituiu o
+ * tile branco atrás de todo logo.
+ *
+ * Três saídas, e a maioria dos emissores cai nas duas primeiras:
+ *
+ *   - PLACA (`solido`): a arte já traz o próprio fundo, então vai crua e
+ *     full-bleed. Só quando a placa inteira se confunde com o fundo (preta em
+ *     cartão preto) ela ganha `apoio`, um tile tirado da cor do próprio fundo;
+ *   - MARCA que contrasta: cor original, nada atrás;
+ *   - MARCA que não contrasta: `tint` no próprio matiz dominante dela, clareado
+ *     ou escurecido até passar. O "nu" do Nubank vira lilás claro no cartão
+ *     roxo, o wordmark preto do C6 vira prata no cartão preto.
+ *
+ * O teste de contraste usa os dois percentis de luminância que o gerador mediu:
+ * `luzP40` tem 60% da área do desenho acima dele e responde por fundo escuro;
+ * `luzP60` tem 60% abaixo e responde por fundo claro. Assim "a maior parte do
+ * desenho contrasta" se decide com dois números, sem histograma e sem abrir
+ * imagem em runtime.
+ */
+export const estiloDoLogo = (entrada: EntradaLogo | null, fundo: string): EstiloLogo => {
+  if (!entrada) return SEM_LOGO;
+  const [tipo, luzP02, luzP40, luzP60, luzP98, cor] = entrada;
+  const luzFundo = luminancia(fundo);
+  // Um percentil só conta se estiver do lado certo do fundo: uma parte escura
+  // não "contrasta" com um fundo ainda mais escuro por acidente de fórmula.
+  const separa = (luzBaixa: number, luzAlta: number, piso: number) =>
+    (luzAlta > luzFundo && contrasteDeLuz(luzAlta, luzFundo) >= piso) ||
+    (luzBaixa < luzFundo && contrasteDeLuz(luzBaixa, luzFundo) >= piso);
+
+  if (tipo === TIPO_PLACA) {
+    // Extremos, não maioria: o quadrado amarelo do BB tem contraste 1,1 com o
+    // card branco, e é o glifo azul dentro dele que separa a placa do fundo —
+    // do mesmo jeito que o wordmark branco do `bari`, 3% do asset preto, é o
+    // que se lê quando ele cai num cartão preto.
+    if (separa(luzP02, luzP98, CONTRASTE_PLACA_MIN)) {
+      return { solido: true, tint: null, apoio: null, alvo: ALVO_PLACA };
+    }
+    // Placa que sumiria: ela encolhe para o apoio aparecer em volta. Em
+    // ALVO_PLACA a placa cobriria o tile inteiro e o apoio ficaria embaixo,
+    // sem servir para nada.
+    return {
+      solido: true,
+      tint: null,
+      apoio: ajustarParaContraste(fundo, fundo, CONTRASTE_APOIO),
+      alvo: ALVO_MARCA,
+    };
+  }
+  return {
+    solido: false,
+    tint: separa(luzP40, luzP60, CONTRASTE_MARCA_MIN)
+      ? null
+      // `cor` só é nula na placa, mas o fallback mantém o tipo honesto.
+      : ajustarParaContraste(cor ?? TINTA_CLARA, fundo, CONTRASTE_TINT_ALVO),
+    apoio: null,
+    alvo: ALVO_MARCA,
+  };
 };
 
 // Tetos do gradiente do cartão, em LUMINÂNCIA RELATIVA — não em
@@ -417,6 +540,18 @@ export interface IdentidadeCartao {
    * pacote não têm margem uniforme. Veja `tamanhoLogoNoTile`.
    */
   logoPreenchimento: number;
+  /**
+   * `true` quando o asset de `logo` já é uma placa opaca (o squircle do Itaú, o
+   * círculo do Bradesco). Vai full-bleed no tile, sem fundo atrás; `false`
+   * inclui o caso sem logo, em que o tile mostra o monograma.
+   */
+  logoSolido: boolean;
+  /**
+   * Medidas do asset, para `estiloDoLogo` decidir contra o fundo em que o logo
+   * será desenhado — o `from` do cartão numa tela, o card do tema em outra.
+   * `null` quando o emissor não tem logo.
+   */
+  logoMedido: EntradaLogo | null;
   emissor: Emissor | null;
   /** Variante de produto que definiu a cor ("PicPay Epic"), se houve. */
   variante: Variante | null;
@@ -459,6 +594,9 @@ export const identidadeDoCartao = (
 
   const logo = logoDoIspb(emissor?.ispb);
   const logoPreenchimento = preenchimentoDoIspb(emissor?.ispb);
+  // `logo` é um id de asset do Metro, e id 0 é um valor válido — comparar com
+  // null, não em contexto booleano.
+  const logoMedido = logo !== null ? entradaLogoDoIspb(emissor?.ispb) : null;
   const [from, to] = gradienteDe(base);
   // Tile sem cor propria usa a marca ja dentro do teto de luminancia: crua,
   // uma marca vibrante (vermelho Santander) nao aguenta glifo nenhum em AA.
@@ -472,6 +610,8 @@ export const identidadeDoCartao = (
     logoBg: logoBgFinal,
     logo,
     logoPreenchimento,
+    logoSolido: logoMedido?.[0] === TIPO_PLACA,
+    logoMedido,
     // Tinta do tile derivada por contraste: marca com fundo claro (laranja,
     // amarelo, verde) nao aguenta glifo branco e reprovaria AA.
     logoFg: emissor?.logoFg ?? tintaPara(logoBgFinal, logoBgFinal),
