@@ -8,6 +8,7 @@ import { formatCurrency } from '../../utils/format';
 import SkeletonBox from '../ui/SkeletonBox';
 import { emojiDaCategoria } from '../../domain/iconeCategoria';
 import { identidadeDoCartao } from '../../domain/emissores';
+import { tamanhoLogoNoTile } from '../../domain/logosEmissores';
 
 interface Props {
   itens: ParcelaAgendada[];
@@ -17,6 +18,9 @@ interface Props {
 }
 
 const CARTAO_LARGURA = 300;
+
+/** Lado do logo do emissor no rodapé da parcela. */
+const LOGO_LADO = 16;
 
 const BANDEIRA_LABEL: Record<string, string> = {
   VISA: 'Visa',
@@ -75,7 +79,12 @@ export default function ParcelasCarrossel({ itens, carregando, onVerTodas, onAbr
             // é o mesmo caminho da prévia do formulário. Sem `cor` aqui, uma
             // cor escolhida à mão pelo usuário não chega: o que se aproveita é
             // o logo da marca.
-            const logoCartao = item.cartao ? identidadeDoCartao({ nome: item.cartao.nome }).logo : null;
+            const idCartao = item.cartao ? identidadeDoCartao({ nome: item.cartao.nome }) : null;
+            const logoCartao = idCartao?.logo ?? null;
+            // Mesmo fator do tile do cartão: os PNGs do pacote não têm margem
+            // uniforme, então sem ele a marca com borda transparente sai com
+            // ~metade do corpo das outras neste rodapé de 16x16.
+            const ladoLogoCartao = tamanhoLogoNoTile(LOGO_LADO, idCartao?.logoPreenchimento ?? 1);
             const progresso = item.numeroParcela && item.totalParcelas
               ? `${item.numeroParcela}/${item.totalParcelas}`
               : null;
@@ -151,13 +160,20 @@ export default function ParcelasCarrossel({ itens, carregando, onVerTodas, onAbr
                     borderTopWidth: 1, borderTopColor: colors.border,
                   }}>
                     {logoCartao ? (
-                      <Image
-                        source={logoCartao}
-                        resizeMode="contain"
-                        accessibilityIgnoresInvertColors
-                        style={{ width: 16, height: 16, borderRadius: 4 }}
-                        {...iconeDecorativo}
-                      />
+                      // A moldura fixa segura o layout: a <Image> passa de 16
+                      // quando o asset tem margem, e só a margem transborda.
+                      <View style={{
+                        width: LOGO_LADO, height: LOGO_LADO, borderRadius: 4,
+                        alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+                      }}>
+                        <Image
+                          source={logoCartao}
+                          resizeMode="contain"
+                          accessibilityIgnoresInvertColors
+                          style={{ width: ladoLogoCartao, height: ladoLogoCartao }}
+                          {...iconeDecorativo}
+                        />
+                      </View>
                     ) : (
                       <Ionicons name="card" size={14} color={colors.warning} />
                     )}

@@ -3,6 +3,7 @@ import { Image, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { identidadeDoCartao } from '../../domain/emissores';
+import { tamanhoLogoNoTile } from '../../domain/logosEmissores';
 import ChipCartao from './ChipCartao';
 import BandeiraMarca from './BandeiraMarca';
 
@@ -53,6 +54,10 @@ export default function CartaoFisico({
   const k = largura / 287; // fator vindo da medida da referência
   const padding = Math.round(21 * k);
   const { tinta } = id;
+  const ladoTileLogo = Math.round(32 * k);
+  // Fica maior que o tile nas marcas cujo PNG tem margem transparente. O que
+  // transborda, e o `overflow: 'hidden'` corta, é a margem — não o desenho.
+  const ladoLogo = tamanhoLogoNoTile(ladoTileLogo, id.logoPreenchimento);
 
   return (
     <View
@@ -112,8 +117,8 @@ export default function CartaoFisico({
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <View
             style={{
-              width: Math.round(32 * k),
-              height: Math.round(32 * k),
+              width: ladoTileLogo,
+              height: ladoTileLogo,
               borderRadius: Math.round(9 * k),
               // Com logo real o tile é branco, não a cor da marca: os PNGs são
               // coloridos sobre fundo transparente, e nenhuma cor de marca
@@ -130,7 +135,7 @@ export default function CartaoFisico({
                 source={id.logo}
                 resizeMode="contain"
                 accessibilityIgnoresInvertColors
-                style={{ width: Math.round(26 * k), height: Math.round(26 * k) }}
+                style={{ width: ladoLogo, height: ladoLogo }}
               />
             ) : (
               <Text

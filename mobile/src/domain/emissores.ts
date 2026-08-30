@@ -18,7 +18,7 @@
 // Nenhum hex entra aqui "de memória" sem um destes rótulos.
 
 import { EMISSORES_DATASET } from './emissoresDataset.gen';
-import { logoDoIspb } from './logosEmissores';
+import { logoDoIspb, preenchimentoDoIspb } from './logosEmissores';
 
 export type FonteCor = 'oficial' | 'aproximacao' | 'informada' | 'derivada';
 
@@ -410,6 +410,13 @@ export interface IdentidadeCartao {
    * pacote. Quando existe, o tile do cartão troca o monograma pela imagem.
    */
   logo: number | null;
+  /**
+   * Quanto do PNG de `logo` é conteúdo opaco, em (0, 1]. `1` quando o asset é
+   * full-bleed ou quando não há logo. O render divide o tamanho da imagem por
+   * ele para a marca ocupar a mesma fração do tile em todo emissor — os PNGs do
+   * pacote não têm margem uniforme. Veja `tamanhoLogoNoTile`.
+   */
+  logoPreenchimento: number;
   emissor: Emissor | null;
   /** Variante de produto que definiu a cor ("PicPay Epic"), se houve. */
   variante: Variante | null;
@@ -451,6 +458,7 @@ export const identidadeDoCartao = (
     ?? comLuz(rgbParaHex(...hslParaRgb(hashMatiz(normalizarEmissor(nome) || nome), 0.55, 0.4)), 0.4);
 
   const logo = logoDoIspb(emissor?.ispb);
+  const logoPreenchimento = preenchimentoDoIspb(emissor?.ispb);
   const [from, to] = gradienteDe(base);
   // Tile sem cor propria usa a marca ja dentro do teto de luminancia: crua,
   // uma marca vibrante (vermelho Santander) nao aguenta glifo nenhum em AA.
@@ -463,6 +471,7 @@ export const identidadeDoCartao = (
     tinta: tintaPara(from, to),
     logoBg: logoBgFinal,
     logo,
+    logoPreenchimento,
     // Tinta do tile derivada por contraste: marca com fundo claro (laranja,
     // amarelo, verde) nao aguenta glifo branco e reprovaria AA.
     logoFg: emissor?.logoFg ?? tintaPara(logoBgFinal, logoBgFinal),
