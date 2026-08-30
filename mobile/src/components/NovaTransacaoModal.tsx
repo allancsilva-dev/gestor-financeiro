@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Modal, TouchableOpacity, ActivityIndicator, ScrollView, TextInput } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, ActivityIndicator, ScrollView, TextInput, Switch } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { transacaoService } from '../services/transacaoService';
+import { contaFixaService } from '../services/contaFixaService';
 import assistantService, { assistantIdempotencyKey } from '../services/assistantService';
 import { categoriaService } from '../services/categoriaService';
 import contaFinanceiraService from '../services/contaFinanceiraService';
@@ -9,6 +10,7 @@ import cartaoService from '../services/cartaoService';
 import { useModalTopInset, useTheme } from '../theme';
 import { parseDateBR, isValidDateBR, parseCurrencyBR, maskCurrencyInput, maskDateInput, todayBR, formatDateOnlyBR } from '../utils/format';
 import { TransacaoRequest, TipoTransacao, SugestaoCategoria } from '../types';
+import { rotuloProximaCobranca } from '../domain/recorrencia';
 import { getLancamentoPrefs, setLancamentoPrefs } from '../store/lancamentoPrefs';
 import { CATEGORIAS_INICIAIS } from '../domain/categoriasIniciais';
 import { CATEGORY_COLORS } from '../utils/format';
@@ -79,6 +81,8 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
   const [carteiraId, setCarteiraId] = useState<number | null>(null);
   const [cartaoId, setCartaoId] = useState<number | null>(null);
   const [parcelado, setParcelado] = useState(false);
+  // Assinatura (Netflix, aluguel): vira recorrência, não lançamento único
+  const [repeteTodoMes, setRepeteTodoMes] = useState(false);
   const [totalParcelas, setTotalParcelas] = useState('');
   const [observacoes, setObservacoes] = useState('');
   const [maisDetalhes, setMaisDetalhes] = useState(false);
@@ -286,7 +290,7 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
   };
 
   const resetForm = () => {
-    setDescricao(''); setValor(''); setData(''); setTipo(initialTipo); setFormaPagamento('CARTEIRA'); setCategoriaId(null); setCartaoId(null); setParcelado(false); setTotalParcelas(''); setObservacoes('');
+    setDescricao(''); setValor(''); setData(''); setTipo(initialTipo); setFormaPagamento('CARTEIRA'); setCategoriaId(null); setCartaoId(null); setParcelado(false); setTotalParcelas(''); setObservacoes(''); setRepeteTodoMes(false);
     setDescricaoError(null); setValorError(null); setDataError(null); setCategoriaError(null); setPagamentoError(null); setErroForm(null);
     setMaisDetalhes(false); setSugestao(null);
     setCriarCartaoAberto(false); setNovaCategoriaNome(''); setSetupError(null);
@@ -307,7 +311,7 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
     if (tipo === 'SAIDA' && formaPagamento === 'CARTAO' && !cartaoId) { setPagamentoError('Selecione um cartão.'); hasError = true; }
     if (tipo === 'SAIDA' && formaPagamento === 'CARTEIRA' && !carteiraId) { setPagamentoError('Selecione uma conta.'); hasError = true; }
     const parcelasNum = parseInt(totalParcelas, 10);
-    if (formaPagamento === 'CARTAO' && parcelado && (isNaN(parcelasNum) || parcelasNum < 2 || parcelasNum > 48)) {
+    if (formaPagamento === 'CARTAO' && parcelado && !repeteTodoMes && (isNaN(parcelasNum) || parcelasNum < 2 || parcelasNum > 48)) {
       setPagamentoError('Informe entre 2 e 48 parcelas.');
       hasError = true;
     }
@@ -325,8 +329,8 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
       };
       if (tipo === 'SAIDA' && formaPagamento === 'CARTAO') {
         request.cartaoId = cartaoId ?? undefined;
-        request.parcelado = parcelado;
-        request.totalParcelas = parcelado ? parcelasNum : undefined;
+        request.parcelado = parcelado && !repeteTodoMes;
+        request.totalParcelas = request.parcelado ? parcelasNum : undefined;
       } else {
         request.carteiraId = carteiraId ?? undefined;
       }
@@ -360,6 +364,20 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
           assistantSave.current = pending;
         }
         await assistantService.confirmDraft(initialData.draftId, pending.version, pending.confirmKey);
+      } else if (repeteTodoMes) {
+        // O que se repete todo mês é compromisso, não lançamento avulso: vira
+        // recorrência e o backend passa a lançar sozinho, mês a mês.
+        await contaFixaService.criar({
+          descricao: request.descricao,
+          valor: request.valor,
+          diaVencimento: new Date(request.data + 'T00:00:00').getDate(),
+          categoriaId: request.categoriaId,
+          tipo: request.tipo,
+          recorrente: true,
+          execucaoAutomatica: true,
+          observacoes: request.observacoes,
+          ...(request.cartaoId ? { cartaoId: request.cartaoId } : { carteiraId: request.carteiraId }),
+        });
       } else {
         await transacaoService.criar(request);
       }
@@ -561,7 +579,26 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
 
           {maisDetalhes && (
             <>
-              {tipo === 'SAIDA' && formaPagamento === 'CARTAO' && (
+              {tipo === 'SAIDA' && initialData?.mode !== 'ASSISTANT_DRAFT' && (
+                <View style={{ marginBottom: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Text style={{ color: colors.textPrimary, fontSize: 14 }}>Repete todo mês</Text>
+                    <Switch
+                      testID="transaction-recurring"
+                      value={repeteTodoMes}
+                      onValueChange={(v) => { setRepeteTodoMes(v); if (v) { setParcelado(false); setTotalParcelas(''); } }}
+                    />
+                  </View>
+                  {repeteTodoMes && isValidDateBR(data) && (
+                    <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 4 }}>
+                      Primeira cobrança em {rotuloProximaCobranca(
+                        new Date(parseDateBR(data) + 'T00:00:00').getDate(),
+                      )}
+                    </Text>
+                  )}
+                </View>
+              )}
+              {tipo === 'SAIDA' && formaPagamento === 'CARTAO' && !repeteTodoMes && (
                 <>
                   <Text style={{ color: colors.textSecondary, fontSize: 10, letterSpacing: 0.8, marginBottom: 6, textTransform: 'uppercase' }}>Parcelamento</Text>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>

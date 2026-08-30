@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, FlatList, ScrollView, Switch, Alert } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { contaFixaService } from '../../../src/services/contaFixaService';
+import cartaoService from '../../../src/services/cartaoService';
 import { categoriaService } from '../../../src/services/categoriaService';
 import contaFinanceiraService from '../../../src/services/contaFinanceiraService';
 import Badge from '../../../src/components/ui/Badge';
@@ -55,6 +56,12 @@ export default function ContasFixasScreen() {
   });
   const carteiras = carteirasData ?? [];
 
+  const { data: cartoesData } = useQuery({
+    queryKey: ['cartoes'],
+    queryFn: () => cartaoService.listarTodos(),
+  });
+  const cartoes = cartoesData ?? [];
+
   const pagarMutation = useMutation({
     mutationFn: ({ id, valor, carteiraId }: { id: number; valor: number; carteiraId: number }) =>
       contaFixaService.marcarComoPaga(id, valor, carteiraId),
@@ -95,6 +102,9 @@ export default function ContasFixasScreen() {
   const [tipoCriar, setTipoCriar] = useState<'ENTRADA' | 'SAIDA'>('SAIDA');
   const [automaticaCriar, setAutomaticaCriar] = useState(false);
   const [carteiraCriarId, setCarteiraCriarId] = useState<number | null>(null);
+  // Um destino, nunca dois: a cobrança sai do caixa ou do cartão (V67)
+  const [destinoCriar, setDestinoCriar] = useState<'CONTA' | 'CARTAO'>('CONTA');
+  const [cartaoCriarId, setCartaoCriarId] = useState<number | null>(null);
   const [descricaoError, setDescricaoError] = useState<string | null>(null);
   const [valorError, setValorError] = useState<string | null>(null);
   const [diaError, setDiaError] = useState<string | null>(null);
@@ -174,7 +184,7 @@ export default function ContasFixasScreen() {
               <Badge status={cf.status} />
             </View>
             <Text numberOfLines={1} style={{ ...typography.meta, color: colors.textSecondary, marginTop: spacing.xxs }}>
-              {cf.categoria?.nome ? `${cf.categoria.nome} · ` : ''}{cf.execucaoAutomatica ? 'Automática' : 'Manual'} · dia {cf.diaVencimento}
+              {cf.categoria?.nome ? `${cf.categoria.nome} · ` : ''}{cf.cartao ? `${cf.cartao.nome} · ` : ''}{cf.execucaoAutomatica ? 'Automática' : 'Manual'} · dia {cf.diaVencimento}
             </Text>
           </View>
         </View>
@@ -384,7 +394,9 @@ export default function ContasFixasScreen() {
             const dia = Number(diaCriar);
             if (!Number.isInteger(dia) || dia < 1 || dia > 31) { setDiaError('Dia deve ser um número entre 1 e 31.'); hasErr = true; }
             if (!categoriaCriarId) { setCategoriaError('Selecione uma categoria.'); hasErr = true; }
-            if (automaticaCriar && !carteiraCriarId) { setErroCriar('Selecione a conta da execução automática.'); hasErr = true; }
+            const usaCartao = tipoCriar === 'SAIDA' && destinoCriar === 'CARTAO';
+            if (automaticaCriar && usaCartao && !cartaoCriarId) { setErroCriar('Selecione o cartão da cobrança.'); hasErr = true; }
+            if (automaticaCriar && !usaCartao && !carteiraCriarId) { setErroCriar('Selecione a conta da execução automática.'); hasErr = true; }
             if (hasErr) return;
             criarMutation.mutate({
               descricao: descricaoCriar.trim(),
@@ -394,7 +406,9 @@ export default function ContasFixasScreen() {
               recorrente: recorrenteCriar,
               tipo: tipoCriar,
               execucaoAutomatica: automaticaCriar,
-              carteiraId: automaticaCriar ? carteiraCriarId! : undefined,
+              ...(usaCartao
+                ? { cartaoId: automaticaCriar ? cartaoCriarId! : undefined }
+                : { carteiraId: automaticaCriar ? carteiraCriarId! : undefined }),
             });
           },
         }}
@@ -402,7 +416,7 @@ export default function ContasFixasScreen() {
         <ScrollView contentContainerStyle={{ padding: screenPadding }} keyboardShouldPersistTaps="handled">
           <RotuloDeGrupo primeiro>Tipo</RotuloDeGrupo>
           <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg }}>
-            <Chip label="↑ Entrada" selected={tipoCriar === 'ENTRADA'} onPress={() => setTipoCriar('ENTRADA')} />
+            <Chip label="↑ Entrada" selected={tipoCriar === 'ENTRADA'} onPress={() => { setTipoCriar('ENTRADA'); setDestinoCriar('CONTA'); }} />
             <Chip label="↓ Saída" selected={tipoCriar === 'SAIDA'} onPress={() => setTipoCriar('SAIDA')} />
           </View>
           <Field label="Descrição" value={descricaoCriar} onChangeText={setDescricaoCriar} placeholder="Ex: Aluguel" error={descricaoError} autoFocus />
@@ -432,15 +446,51 @@ export default function ContasFixasScreen() {
           </View>
           {automaticaCriar && (
             <>
-              <Text style={{ ...typography.meta, color: colors.textSecondary, marginBottom: spacing.sm }}>
-                Escolha a conta que receberá ou pagará no vencimento.
-              </Text>
-              <FaixaDeContas
-                contas={carteiras}
-                selecionada={carteiraCriarId}
-                onSelecionar={setCarteiraCriarId}
-                vazio="Você ainda não tem contas. Crie uma em Mais → Contas."
-              />
+              {tipoCriar === 'SAIDA' && (
+                <>
+                  <RotuloDeGrupo>Cobrar em</RotuloDeGrupo>
+                  <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
+                    <Chip label="Conta" selected={destinoCriar === 'CONTA'} onPress={() => { setDestinoCriar('CONTA'); setCartaoCriarId(null); }} />
+                    <Chip label="Cartão" selected={destinoCriar === 'CARTAO'} onPress={() => { setDestinoCriar('CARTAO'); setCarteiraCriarId(null); }} />
+                  </View>
+                </>
+              )}
+              {tipoCriar === 'SAIDA' && destinoCriar === 'CARTAO' ? (
+                <>
+                  <Text style={{ ...typography.meta, color: colors.textSecondary, marginBottom: spacing.sm }}>
+                    A assinatura entra na fatura do cartão todo mês.
+                  </Text>
+                  {cartoes.length === 0 ? (
+                    <Text style={{ ...typography.meta, color: colors.textSecondary, marginBottom: spacing.sm }}>
+                      Você ainda não tem cartões. Crie um em Mais → Carteira.
+                    </Text>
+                  ) : (
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{ gap: spacing.sm }}
+                      style={{ marginBottom: spacing.sm }}
+                      keyboardShouldPersistTaps="handled"
+                    >
+                      {cartoes.map(c => (
+                        <Chip key={c.id} label={c.nome} selected={cartaoCriarId === c.id} onPress={() => setCartaoCriarId(c.id)} />
+                      ))}
+                    </ScrollView>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Text style={{ ...typography.meta, color: colors.textSecondary, marginBottom: spacing.sm }}>
+                    Escolha a conta que receberá ou pagará no vencimento.
+                  </Text>
+                  <FaixaDeContas
+                    contas={carteiras}
+                    selecionada={carteiraCriarId}
+                    onSelecionar={setCarteiraCriarId}
+                    vazio="Você ainda não tem contas. Crie uma em Mais → Contas."
+                  />
+                </>
+              )}
             </>
           )}
 

@@ -363,6 +363,8 @@ export interface ContaFixa {
   tipo: TipoTransacao;
   execucaoAutomatica: boolean;
   carteira?: { id: number; nome: string };
+  // Destino alternativo à carteira: assinatura cobrada no cartão (V67)
+  cartao?: { id: number; nome: string; bandeira?: string; ultimosDigitos?: string };
 }
 
 export interface ContaFixaRequest {
@@ -375,6 +377,7 @@ export interface ContaFixaRequest {
   tipo?: TipoTransacao;
   execucaoAutomatica?: boolean;
   carteiraId?: number;
+  cartaoId?: number; // exclusivo com carteiraId: a cobrança sai do caixa ou do cartão
 }
 
 export interface FalhaRecorrencia {

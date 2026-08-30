@@ -33,6 +33,9 @@ export const CHAVES_AFETADAS_POR_TRANSACAO: readonly (readonly unknown[])[] = [
   ['cartoes'],
   ['fatura'],
   ['categorias'],
+  // Salvar pelo botão Nova pode criar uma recorrência (assinatura) em vez de um
+  // lançamento avulso, e a primeira cobrança já entra na fatura (V67).
+  ['contas-fixas'],
 ];
 
 export function invalidarAposTransacao(
