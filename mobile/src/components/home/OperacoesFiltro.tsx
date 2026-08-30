@@ -6,6 +6,7 @@ import { CategoriaResumo } from '../../types';
 import {
   PERIODO_LABEL, PeriodoPreset, TipoFiltro,
 } from '../../hooks/useOperacoesFiltro';
+import { EMOJI_GENERICO, emojiDaCategoria } from '../../domain/iconeCategoria';
 
 interface Props {
   categorias: CategoriaResumo[];
@@ -42,7 +43,7 @@ const ChipCategoria = ({
         borderColor: colors.chipBorder,
       }}
     >
-      <Text style={{ fontSize: 15 }}>{icone ?? '🏷️'}</Text>
+      <Text style={{ fontSize: 15 }}>{icone ?? EMOJI_GENERICO}</Text>
       <Text style={{ ...typography.chip, color: ativo ? colors.brandText : colors.textSecondary }}>
         {label}
       </Text>
@@ -101,7 +102,7 @@ export default function OperacoesFiltro({
           <ChipCategoria
             key={c.id}
             label={c.nome}
-            icone={c.icone ?? undefined}
+            icone={emojiDaCategoria(c, EMOJI_GENERICO)}
             ativo={categoriaId === c.id}
             onPress={() => onCategoria(categoriaId === c.id ? null : c.id)}
           />

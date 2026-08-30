@@ -19,7 +19,7 @@ export default function CategoriaDropdown({ value, onChange, name, ...ariaProps 
     onChange({
       nome: categoria.nome,
       cor: categoria.cor,
-      icone: String(categoria.id).slice(0, 10)
+      icone: categoria.emoji
     });
     setIsOpen(false);
   };
@@ -29,7 +29,10 @@ export default function CategoriaDropdown({ value, onChange, name, ...ariaProps 
       onChange({
         nome: customNome,
         cor: '#6B7280',
-        icone: 'tag'
+        // Sem emoji conhecido: o mobile deriva um do nome da categoria
+        // (mobile/src/domain/iconeCategoria.ts). Gravar 'tag' fazia o app
+        // mostrar a palavra "tag" dentro do tile.
+        icone: ''
       });
       setCustomNome('');
       setShowCustomInput(false);

@@ -66,7 +66,12 @@ public class CategoriaService {
 
         categoria.setNome(categoriaAtualizada.getNome());
         categoria.setCor(categoriaAtualizada.getCor());
-        categoria.setIcone(categoriaAtualizada.getIcone());
+        // Ícone só é sobrescrito quando o request traz valor: `icone` é opcional
+        // no CategoriaUpdateRequest, e um PUT que o omitisse apagava o emoji já
+        // gravado — o cliente perdia o ícone sem ter pedido.
+        if (categoriaAtualizada.getIcone() != null) {
+            categoria.setIcone(categoriaAtualizada.getIcone());
+        }
         categoria.setValorEsperado(categoriaAtualizada.getValorEsperado());
         
         return categoriaRepository.save(categoria);

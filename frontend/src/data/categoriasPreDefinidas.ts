@@ -24,6 +24,13 @@ import {
 export interface CategoriaPreDefinida {
   id: string;
   nome: string;
+  /**
+   * Emoji gravado no campo `icone` da categoria. O ícone Lucide abaixo é só
+   * do web; o mobile desenha `icone` como TEXTO dentro de um tile, então
+   * gravar ali o slug do Lucide fazia a lista do app mostrar "moradia" no
+   * lugar do ícone. Ver mobile/src/domain/iconeCategoria.ts.
+   */
+  emoji: string;
   icon: LucideIcon;
   cor: string;
   corBg: string;
@@ -34,6 +41,7 @@ export const CATEGORIAS_PRE_DEFINIDAS: CategoriaPreDefinida[] = [
   { 
     id: 'moradia', 
     nome: 'Moradia', 
+    emoji: '🏠', 
     icon: Home, 
     cor: '#3B82F6',
     corBg: '#DBEAFE',
@@ -42,6 +50,7 @@ export const CATEGORIAS_PRE_DEFINIDAS: CategoriaPreDefinida[] = [
   { 
     id: 'alimentacao', 
     nome: 'Alimentação', 
+    emoji: '🍔', 
     icon: Utensils, 
     cor: '#EF4444',
     corBg: '#FEE2E2',
@@ -50,6 +59,7 @@ export const CATEGORIAS_PRE_DEFINIDAS: CategoriaPreDefinida[] = [
   { 
     id: 'mercado', 
     nome: 'Mercado', 
+    emoji: '🛒', 
     icon: ShoppingCart, 
     cor: '#10B981',
     corBg: '#D1FAE5',
@@ -58,6 +68,7 @@ export const CATEGORIAS_PRE_DEFINIDAS: CategoriaPreDefinida[] = [
   { 
     id: 'transporte', 
     nome: 'Transporte', 
+    emoji: '🚌', 
     icon: Car, 
     cor: '#8B5CF6',
     corBg: '#EDE9FE',
@@ -66,6 +77,7 @@ export const CATEGORIAS_PRE_DEFINIDAS: CategoriaPreDefinida[] = [
   { 
     id: 'contas', 
     nome: 'Contas da Casa', 
+    emoji: '🧾', 
     icon: Zap, 
     cor: '#F59E0B',
     corBg: '#FEF3C7',
@@ -74,6 +86,7 @@ export const CATEGORIAS_PRE_DEFINIDAS: CategoriaPreDefinida[] = [
   { 
     id: 'lazer', 
     nome: 'Lazer', 
+    emoji: '🎮', 
     icon: Film, 
     cor: '#A855F7',
     corBg: '#F3E8FF',
@@ -82,6 +95,7 @@ export const CATEGORIAS_PRE_DEFINIDAS: CategoriaPreDefinida[] = [
   { 
     id: 'saude', 
     nome: 'Saúde', 
+    emoji: '🏥', 
     icon: Heart, 
     cor: '#EF4444',
     corBg: '#FEE2E2',
@@ -90,6 +104,7 @@ export const CATEGORIAS_PRE_DEFINIDAS: CategoriaPreDefinida[] = [
   { 
     id: 'cuidados', 
     nome: 'Cuidados Pessoais', 
+    emoji: '💇', 
     icon: Scissors, 
     cor: '#EC4899',
     corBg: '#FCE7F3',
@@ -98,6 +113,7 @@ export const CATEGORIAS_PRE_DEFINIDAS: CategoriaPreDefinida[] = [
   { 
     id: 'educacao', 
     nome: 'Educação', 
+    emoji: '📚', 
     icon: BookOpen, 
     cor: '#6366F1',
     corBg: '#E0E7FF',
@@ -106,6 +122,7 @@ export const CATEGORIAS_PRE_DEFINIDAS: CategoriaPreDefinida[] = [
   { 
     id: 'assinaturas', 
     nome: 'Assinaturas', 
+    emoji: '🔁', 
     icon: Wifi, 
     cor: '#06B6D4',
     corBg: '#CFFAFE',
@@ -114,6 +131,7 @@ export const CATEGORIAS_PRE_DEFINIDAS: CategoriaPreDefinida[] = [
   { 
     id: 'vestuario', 
     nome: 'Vestuário', 
+    emoji: '👕', 
     icon: ShoppingBag, 
     cor: '#10B981',
     corBg: '#D1FAE5',
@@ -122,6 +140,7 @@ export const CATEGORIAS_PRE_DEFINIDAS: CategoriaPreDefinida[] = [
   { 
     id: 'investimentos', 
     nome: 'Investimentos', 
+    emoji: '📈', 
     icon: PiggyBank, 
     cor: '#059669',
     corBg: '#D1FAE5',
@@ -130,6 +149,7 @@ export const CATEGORIAS_PRE_DEFINIDAS: CategoriaPreDefinida[] = [
   { 
     id: 'animais', 
     nome: 'Pets', 
+    emoji: '🐾', 
     icon: Dog, 
     cor: '#F97316',
     corBg: '#FFEDD5',
@@ -138,6 +158,7 @@ export const CATEGORIAS_PRE_DEFINIDAS: CategoriaPreDefinida[] = [
   { 
     id: 'presentes', 
     nome: 'Presentes', 
+    emoji: '🎁', 
     icon: Gift, 
     cor: '#F43F5E',
     corBg: '#FFE4E6',
@@ -146,6 +167,7 @@ export const CATEGORIAS_PRE_DEFINIDAS: CategoriaPreDefinida[] = [
   { 
     id: 'viagem', 
     nome: 'Viagem', 
+    emoji: '✈️', 
     icon: Plane, 
     cor: '#3B82F6',
     corBg: '#DBEAFE',
@@ -154,6 +176,7 @@ export const CATEGORIAS_PRE_DEFINIDAS: CategoriaPreDefinida[] = [
   { 
     id: 'cafe', 
     nome: 'Cafés e Lanches', 
+    emoji: '☕', 
     icon: Coffee, 
     cor: '#92400E',
     corBg: '#FEF3C7',
@@ -162,6 +185,7 @@ export const CATEGORIAS_PRE_DEFINIDAS: CategoriaPreDefinida[] = [
   { 
     id: 'telefone', 
     nome: 'Telefone/Internet', 
+    emoji: '📱', 
     icon: Phone, 
     cor: '#06B6D4',
     corBg: '#CFFAFE',
@@ -170,6 +194,7 @@ export const CATEGORIAS_PRE_DEFINIDAS: CategoriaPreDefinida[] = [
   { 
     id: 'trabalho', 
     nome: 'Trabalho', 
+    emoji: '💼', 
     icon: Briefcase, 
     cor: '#6366F1',
     corBg: '#E0E7FF',
@@ -178,6 +203,7 @@ export const CATEGORIAS_PRE_DEFINIDAS: CategoriaPreDefinida[] = [
   { 
     id: 'dependentes', 
     nome: 'Dependentes', 
+    emoji: '🧸', 
     icon: Users, 
     cor: '#8B5CF6',
     corBg: '#EDE9FE',

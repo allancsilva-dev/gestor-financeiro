@@ -30,7 +30,7 @@ public final class TestDataFactory {
         categoria.setUsuario(usuario);
         categoria.setNome(nome);
         categoria.setCor("#FF5733");
-        categoria.setIcone("shopping-cart");
+        categoria.setIcone("\uD83C\uDFF7"); // 🏷️ — emoji, que é o que o campo guarda de verdade
         categoria.setValorEsperado(BigDecimal.ZERO);
         categoria.setValorGasto(BigDecimal.ZERO);
         categoria.setAtivo(true);

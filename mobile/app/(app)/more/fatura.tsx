@@ -14,6 +14,7 @@ import contaFinanceiraService from '../../../src/services/contaFinanceiraService
 import { ContaFinanceira, FaturaLancamento, FaturaResponse } from '../../../src/types';
 import { formatCurrency, formatDate, maskCurrencyInput, parseCurrencyBR } from '../../../src/utils/format';
 import { ehCompetenciaCorrente, rotuloDeCompetencia } from '../../../src/domain/periodo';
+import { emojiDaCategoria } from '../../../src/domain/iconeCategoria';
 
 /**
  * Detalhe de uma fatura: lançamentos e pagamento. Saiu de more/faturas.tsx,
@@ -255,7 +256,7 @@ export default function FaturaDetalheScreen() {
                     }}
                   >
                     <IconTile size={34} cor={l.categoriaCor ?? colors.brand}>
-                      {l.categoriaIcone || '💳'}
+                      {emojiDaCategoria({ icone: l.categoriaIcone, nome: l.categoriaNome }, '💳')}
                     </IconTile>
                     <View style={{ flex: 1 }}>
                       {/* Descrição sozinha na primeira linha: badges longos como

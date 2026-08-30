@@ -19,6 +19,7 @@ import Chip from '../../../src/components/ui/Chip';
 import Card from '../../../src/components/ui/Card';
 import EstadoVazio from '../../../src/components/ui/EstadoVazio';
 import EditarTransacaoModal from '../../../src/components/EditarTransacaoModal';
+import { emojiDaCategoria } from '../../../src/domain/iconeCategoria';
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -182,8 +183,9 @@ export default function Transacoes() {
         )}
         renderItem={({ item: t }) => (
           <ListRow
-            icon={t.categoria?.icone || (t.tipo === 'ENTRADA' ? '↑' : '↓')}
+            icon={emojiDaCategoria(t.categoria, t.tipo === 'ENTRADA' ? '↑' : '↓')}
             iconTone={t.tipo === 'ENTRADA' ? 'success' : 'danger'}
+            iconCor={t.categoria?.cor}
             title={t.descricao}
             subtitle={`${formatDate(t.data)} · ${t.categoria?.nome ?? 'Sem categoria'}${t.parcelado && t.totalParcelas ? ` · ${t.totalParcelas}x` : ''}`}
             value={`${t.tipo === 'ENTRADA' ? '+' : '−'} ${formatCurrency(Number(t.valorTotal ?? 0))}`}

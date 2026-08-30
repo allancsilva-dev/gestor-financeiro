@@ -19,6 +19,7 @@ import EstadoVazio from '../../../src/components/ui/EstadoVazio';
 import NavegadorDeMes from '../../../src/components/ui/NavegadorDeMes';
 import ProgressBar from '../../../src/components/ui/ProgressBar';
 import SkeletonBox from '../../../src/components/ui/SkeletonBox';
+import { emojiDaCategoria } from '../../../src/domain/iconeCategoria';
 
 /**
  * O que fazer com o que sobra ou falta no fim do mês. O rótulo fala do dinheiro, não da regra:
@@ -173,7 +174,7 @@ export default function OrcamentoScreen() {
                 }}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                <Text style={{ ...typography.cardTitle, width: 28 }}>{cat.icone || '📌'}</Text>
+                <Text style={{ ...typography.cardTitle, width: 28 }}>{emojiDaCategoria(cat, '📌')}</Text>
                 <Text numberOfLines={1} style={{ flex: 1, ...typography.body, color: colors.textPrimary }}>{cat.nome}</Text>
                 <TextInput
                   accessibilityLabel={`Limite para ${cat.nome}`}

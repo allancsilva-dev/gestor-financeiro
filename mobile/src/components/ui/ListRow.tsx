@@ -7,6 +7,12 @@ import IconTile, { TileTone } from './IconTile';
 interface ListRowProps {
   icon?: React.ReactNode;
   iconTone?: TileTone;
+  /**
+   * Cor da entidade dona da linha (categoria, meta). Vence o `iconTone` —
+   * DESIGN.md:76-77 manda a entidade com cor própria passar `cor` ao tile, e
+   * a linha era o único lugar que engolia esse dado.
+   */
+  iconCor?: string | null;
   title: string;
   subtitle?: string;
   value?: string;
@@ -31,6 +37,7 @@ interface ListRowProps {
 export default function ListRow({
   icon,
   iconTone = 'brand',
+  iconCor,
   title,
   subtitle,
   value,
@@ -58,7 +65,7 @@ export default function ListRow({
     >
       {icon != null && (
         <View {...iconeDecorativo}>
-          <IconTile tone={iconTone}>{icon}</IconTile>
+          <IconTile tone={iconTone} cor={iconCor}>{icon}</IconTile>
         </View>
       )}
       <View style={{ flex: 1, minWidth: 0 }}>

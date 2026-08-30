@@ -13,6 +13,7 @@ import { formatCurrency, formatPercent } from '../../utils/format';
 import Badge from '../ui/Badge';
 import SuperficieComBrilho from '../ui/SuperficieComBrilho';
 import AnelProgresso from './AnelProgresso';
+import { EMOJI_GENERICO, emojiDaCategoria } from '../../domain/iconeCategoria';
 
 interface Props {
   meta: Meta;
@@ -80,7 +81,7 @@ export default function CardMeta({ meta, onAbrir, onDepositar, onEditar, onExclu
             <AnelProgresso
               progresso={progresso}
               paleta={paleta}
-              emoji={meta.icone || '🏷️'}
+              emoji={emojiDaCategoria(meta, EMOJI_GENERICO)}
               tamanho={ANEL}
               espessura={e(5)}
               id={meta.id}

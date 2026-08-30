@@ -23,6 +23,8 @@ import EstadoVazio from '../../src/components/ui/EstadoVazio';
 import Botao from '../../src/components/ui/Botao';
 import FolhaModal from '../../src/components/ui/FolhaModal';
 import RotuloDeGrupo from '../../src/components/ui/RotuloDeGrupo';
+import SeletorDeEmoji from '../../src/components/ui/SeletorDeEmoji';
+import { EMOJI_GENERICO, emojiDaCategoria, emojiSugerido } from '../../src/domain/iconeCategoria';
 import { e } from '../../src/theme/escala';
 
 /**
@@ -71,6 +73,9 @@ export default function Metas() {
   const [erroCarteiraDestino, setErroCarteiraDestino] = useState<string | null>(null);
 
   const [nomeCriar, setNomeCriar] = useState('');
+  // `null` = acompanha o nome digitado; depois do primeiro toque na grade a
+  // escolha do usuário manda. Mesma regra da tela de categorias.
+  const [iconeCriar, setIconeCriar] = useState<string | null>(null);
   // Escolha obrigatória na criação; imutável depois (PR-F3-11)
   const [modalidadeCriar, setModalidadeCriar] = useState<ModalidadeMeta | null>(null);
   const [modalidadeError, setModalidadeError] = useState<string | null>(null);
@@ -119,6 +124,7 @@ export default function Metas() {
     setModalidadeCriar(null);
     setModalidadeError(null);
     setNomeCriar('');
+    setIconeCriar(null);
     setValorTotalCriar('');
     setValorMensalCriar('');
     setDataLimiteCriar('');
@@ -144,6 +150,7 @@ export default function Metas() {
     setEditandoMeta(meta);
     setModalidadeCriar(meta.modalidade ?? 'COFRE_REAL');
     setNomeCriar(meta.nome);
+    setIconeCriar(emojiDaCategoria(meta, EMOJI_GENERICO));
     setValorTotalCriar(maskCurrencyInput(Number(meta.valorTotal ?? 0).toFixed(2)));
     setValorMensalCriar(meta.valorMensal ? maskCurrencyInput(Number(meta.valorMensal).toFixed(2)) : '');
     setDataLimiteCriar(meta.dataPrevista ? formatDate(meta.dataPrevista) : '');
@@ -242,6 +249,7 @@ export default function Metas() {
       dataLimite: dataLimiteCriar ? parseDateBR(dataLimiteCriar) : undefined,
       descricao: descricaoCriar || undefined,
       modalidade: modalidadeCriar ?? undefined,
+      icone: iconeCriar ?? emojiSugerido(nomeCriar) ?? EMOJI_GENERICO,
     };
   };
 
@@ -432,7 +440,7 @@ export default function Metas() {
           <ScrollView contentContainerStyle={{ padding: spacing.lg }} keyboardShouldPersistTaps="handled">
             <Card radius={radius.xl}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.md }}>
-                <IconTile tone={metaSelecionada.ativa ? 'brand' : 'success'} size={44}>{metaSelecionada.icone || '🎯'}</IconTile>
+                <IconTile tone={metaSelecionada.ativa ? 'brand' : 'success'} size={44}>{emojiDaCategoria(metaSelecionada, '🎯')}</IconTile>
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={{ ...typography.section, color: colors.textPrimary }} numberOfLines={2}>{metaSelecionada.nome}</Text>
                   <Text style={{ ...typography.meta, color: colors.textSecondary, marginTop: spacing.xxs }}>
@@ -643,6 +651,14 @@ export default function Metas() {
               </View>
             )}
             <Field testID="goal-name" label="Nome" value={nomeCriar} onChangeText={setNomeCriar} placeholder="Ex: Reserva de emergência" error={nomeError} returnKeyType="next" submitBehavior="submit" onSubmitEditing={() => refValorTotal.current?.focus()} />
+
+            <RotuloDeGrupo>Ícone</RotuloDeGrupo>
+            <SeletorDeEmoji
+              testID="goal-icon"
+              rotulo="Ícone da meta"
+              valor={iconeCriar ?? emojiSugerido(nomeCriar) ?? EMOJI_GENERICO}
+              onChange={setIconeCriar}
+            />
             <Field ref={refValorTotal} testID="goal-total" label="Valor total" value={valorTotalCriar} onChangeText={(t) => setValorTotalCriar(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" error={valorTotalError} returnKeyType="next" submitBehavior="submit" onSubmitEditing={() => refValorMensal.current?.focus()} />
             <Field ref={refValorMensal} label="Valor mensal (opcional)" value={valorMensalCriar} onChangeText={(t) => setValorMensalCriar(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" error={valorMensalError} returnKeyType="next" submitBehavior="submit" onSubmitEditing={() => refDataLimite.current?.focus()} />
             <Field ref={refDataLimite} label="Data limite" value={dataLimiteCriar} onChangeText={(t) => setDataLimiteCriar(maskDateInput(t))} placeholder="DD/MM/AAAA" keyboardType="number-pad" error={dataLimiteError} returnKeyType="next" submitBehavior="submit" onSubmitEditing={() => refDescricao.current?.focus()} />

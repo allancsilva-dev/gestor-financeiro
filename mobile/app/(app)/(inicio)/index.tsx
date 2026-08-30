@@ -22,6 +22,7 @@ import NovaTransacaoModal, { LancamentoInicial } from '../../../src/components/N
 import { formatCurrency, formatDateLongBR, getInitials } from '../../../src/utils/format';
 import { isSaldoOculto, setSaldoOculto } from '../../../src/store/saldoVisivel';
 import { dismissHomeChecklist, isHomeChecklistDismissed } from '../../../src/store/homeChecklist';
+import { emojiDaCategoria } from '../../../src/domain/iconeCategoria';
 
 // Home da referência (mobile/.design/referencia-home.png): cabeçalho com
 // saudação e sino, card de saldo com breakdown e três colunas, carrossel de
@@ -237,8 +238,9 @@ export default function Home() {
                 key={t.id}
                 height={56}
                 divider={i < arr.length - 1}
-                icon={t.categoria?.icone || (t.tipo === 'ENTRADA' ? '↑' : '↓')}
+                icon={emojiDaCategoria(t.categoria, t.tipo === 'ENTRADA' ? '↑' : '↓')}
                 iconTone={t.tipo === 'ENTRADA' ? 'success' : 'danger'}
+            iconCor={t.categoria?.cor}
                 title={t.descricao}
                 subtitle={t.categoria?.nome ?? undefined}
                 trailing={

@@ -18,6 +18,7 @@ import SkeletonBox from '../../src/components/ui/SkeletonBox';
 import relatorioService from '../../src/services/relatorioService';
 import { PERIODOS, Periodo, intervaloDoPeriodo } from '../../src/domain/periodo';
 import { formatCurrency, formatDate, formatPercent } from '../../src/utils/format';
+import { EMOJI_GENERICO, emojiDaCategoria } from '../../src/domain/iconeCategoria';
 
 /** Altura útil das colunas do gráfico de evolução — geometria, não escala. */
 const ALTURA_BARRA = 96;
@@ -276,7 +277,7 @@ export default function RelatorioScreen() {
                   <View style={{ gap: spacing.md }}>
                     {data.gastosPorCategoria.map((c, i) => (
                       <View key={c.categoriaId ?? `${c.nome}-${i}`} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-                        <IconTile size={36} cor={c.cor}>{c.icone || '🏷️'}</IconTile>
+                        <IconTile size={36} cor={c.cor}>{emojiDaCategoria(c, EMOJI_GENERICO)}</IconTile>
                         <View style={{ flex: 1, minWidth: 0 }}>
                           <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm }}>
                             <Text numberOfLines={1} style={{ ...typography.rowTitle, color: colors.textPrimary, flex: 1 }}>

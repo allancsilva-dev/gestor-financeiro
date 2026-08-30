@@ -7,6 +7,7 @@ import FieldError from '../components/FieldError';
 import { fieldA11y } from '../validation/fieldA11y';
 import { useZodForm } from '../hooks/useZodForm';
 import { categoriaSchema } from '../validation/schemas';
+import { EMOJIS_CATEGORIA, EMOJI_CATEGORIA_PADRAO } from '../data/emojisCategoria';
 
 export default function Categorias() {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
@@ -20,7 +21,7 @@ export default function Categorias() {
   const [formData, setFormData] = useState({
     nome: '',
     cor: '#FF5733',
-    icone: 'cart',
+    icone: EMOJI_CATEGORIA_PADRAO,
     valorEsperado: ''
   });
   const validation = useZodForm(categoriaSchema);
@@ -67,7 +68,7 @@ export default function Categorias() {
       await categoriaService.criar(categoriaParaEnviar);
       toast.success('Categoria criada com sucesso!');
       
-      setFormData({ nome: '', cor: '#FF5733', icone: 'cart', valorEsperado: '' });
+      setFormData({ nome: '', cor: '#FF5733', icone: EMOJI_CATEGORIA_PADRAO, valorEsperado: '' });
       validation.resetValidation();
       setMostrarForm(false);
       carregarCategorias();
@@ -156,14 +157,30 @@ export default function Categorias() {
 
                   <div>
                     <label className="block text-sm font-medium mb-1 text-gray-700">Ícone</label>
-                    <input
-                      type="text"
-                      {...fieldA11y('icone', validation.errors.icone)}
-                      value={formData.icone}
-                      onChange={(e) => { const next = { ...formData, icone: e.target.value }; setFormData(next); validation.revalidateField('icone', next); }}
-                      className="w-full border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent aria-invalid:border-red-500"
-                      placeholder="shopping-cart"
-                    />
+                    {/* Grade de emoji, não campo livre: o valor salvo aqui é
+                        desenhado como texto no app mobile, então "shopping-cart"
+                        aparecia escrito dentro do tile da lista. */}
+                    <div
+                      role="radiogroup"
+                      aria-label="Ícone da categoria"
+                      aria-invalid={validation.errors.icone ? true : undefined}
+                      aria-describedby={validation.errors.icone ? 'icone-error' : undefined}
+                      className="flex flex-wrap gap-1 border border-gray-300 rounded-lg p-2 max-h-40 overflow-y-auto aria-invalid:border-red-500"
+                    >
+                      {EMOJIS_CATEGORIA.map((emoji) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          role="radio"
+                          aria-checked={formData.icone === emoji}
+                          aria-label={`Ícone ${emoji}`}
+                          onClick={() => { const next = { ...formData, icone: emoji }; setFormData(next); validation.revalidateField('icone', next); }}
+                          className={`w-10 h-10 text-xl rounded-lg leading-none focus:ring-2 focus:ring-blue-500 ${formData.icone === emoji ? 'bg-blue-100 ring-2 ring-blue-500' : 'hover:bg-gray-100'}`}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
                     <FieldError name="icone" error={validation.errors.icone} />
                   </div>
                 </div>
@@ -224,10 +241,10 @@ export default function Categorias() {
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div
-                              className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold shadow-sm"
+                              className="w-10 h-10 rounded-full flex items-center justify-center text-lg shadow-sm"
                               style={{ backgroundColor: cat.cor || '#666' }}
                             >
-                              {cat.icone?.charAt(0).toUpperCase() || '?'}
+                              {cat.icone || EMOJI_CATEGORIA_PADRAO}
                             </div>
                             <span className="font-medium text-gray-800">{cat.nome}</span>
                           </div>

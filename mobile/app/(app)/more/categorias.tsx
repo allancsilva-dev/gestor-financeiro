@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { categoriaService } from '../../../src/services/categoriaService';
 import { CATEGORY_COLORS, NOME_DA_COR, formatCurrency } from '../../../src/utils/format';
 import { camposDeErro, mensagemDeErro } from '../../../src/utils/erros';
-import { CategoriaRequest } from '../../../src/types';
+import { Categoria, CategoriaRequest } from '../../../src/types';
 import {
   useTheme, useTabBarSpace, numeric, radius, screenPadding, spacing, typography,
 } from '../../../src/theme';
@@ -15,19 +15,26 @@ import Fab from '../../../src/components/ui/Fab';
 import Field from '../../../src/components/ui/Field';
 import FolhaModal from '../../../src/components/ui/FolhaModal';
 import RotuloDeGrupo from '../../../src/components/ui/RotuloDeGrupo';
+import SeletorDeEmoji from '../../../src/components/ui/SeletorDeEmoji';
 import SkeletonBox from '../../../src/components/ui/SkeletonBox';
+import IconTile from '../../../src/components/ui/IconTile';
+import { EMOJI_GENERICO, emojiDaCategoria, emojiSugerido } from '../../../src/domain/iconeCategoria';
 
-type CampoDaCategoria = 'nome' | 'cor';
+type CampoDaCategoria = 'nome' | 'cor' | 'icone';
 
-const MAPA_DE_CAMPOS: Record<string, CampoDaCategoria> = { nome: 'nome', cor: 'cor' };
+const MAPA_DE_CAMPOS: Record<string, CampoDaCategoria> = { nome: 'nome', cor: 'cor', icone: 'icone' };
 
 export default function CategoriasScreen() {
   const colors = useTheme();
   const tabBarSpace = useTabBarSpace();
   const queryClient = useQueryClient();
   const [modalVisible, setModalVisible] = useState(false);
+  const [editandoId, setEditandoId] = useState<number | null>(null);
   const [nome, setNome] = useState('');
   const [corSelecionada, setCorSelecionada] = useState(CATEGORY_COLORS[0]);
+  // `null` = o usuário ainda não tocou na grade, então o ícone acompanha o
+  // nome digitado. Depois do primeiro toque a escolha dele manda.
+  const [icone, setIcone] = useState<string | null>(null);
   const [erros, setErros] = useState<Partial<Record<CampoDaCategoria, string>>>({});
   const [erroGeral, setErroGeral] = useState<string | null>(null);
 
@@ -36,23 +43,59 @@ export default function CategoriasScreen() {
     queryFn: () => categoriaService.listar(),
   });
 
+  // Ícone que o formulário vai salvar: escolha do usuário > sugestão pelo nome
+  // > genérico. A mesma ordem que as listas usam para exibir.
+  const iconeEfetivo = icone ?? emojiSugerido(nome) ?? EMOJI_GENERICO;
+
   const fecharFormulario = () => {
     setModalVisible(false);
+    setEditandoId(null);
     setNome('');
     setCorSelecionada(CATEGORY_COLORS[0]);
+    setIcone(null);
     setErros({});
     setErroGeral(null);
   };
 
-  const criarMutation = useMutation({
-    mutationFn: (req: CategoriaRequest) => categoriaService.criar(req),
+  const abrirCriacao = () => {
+    setEditandoId(null);
+    setNome('');
+    setCorSelecionada(CATEGORY_COLORS[0]);
+    setIcone(null);
+    setErros({});
+    setErroGeral(null);
+    setModalVisible(true);
+  };
+
+  const abrirEdicao = (cat: Categoria) => {
+    setEditandoId(cat.id);
+    setNome(cat.nome);
+    setCorSelecionada(
+      cat.cor && CATEGORY_COLORS.includes(cat.cor) ? cat.cor : CATEGORY_COLORS[0],
+    );
+    // Categoria legada pode ter slug do web gravado no lugar do emoji; nesse
+    // caso a grade abre na sugestão pelo nome, não no lixo.
+    setIcone(emojiDaCategoria(cat, EMOJI_GENERICO));
+    setErros({});
+    setErroGeral(null);
+    setModalVisible(true);
+  };
+
+  const salvarMutation = useMutation({
+    mutationFn: (req: CategoriaRequest) =>
+      editandoId == null
+        ? categoriaService.criar(req)
+        : categoriaService.atualizar(editandoId, req),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['categorias'] });
       fecharFormulario();
     },
     onError: (err: unknown) => {
       setErros(camposDeErro(err, MAPA_DE_CAMPOS));
-      setErroGeral(mensagemDeErro(err, 'Erro ao criar categoria.'));
+      setErroGeral(mensagemDeErro(
+        err,
+        editandoId == null ? 'Erro ao criar categoria.' : 'Erro ao salvar categoria.',
+      ));
     },
   });
 
@@ -62,7 +105,7 @@ export default function CategoriasScreen() {
     if (!nome.trim()) local.nome = 'Nome obrigatório.';
     if (!CATEGORY_COLORS.includes(corSelecionada)) local.cor = 'Selecione uma cor.';
     if (Object.keys(local).length > 0) { setErros(local); return; }
-    criarMutation.mutate({ nome: nome.trim(), cor: corSelecionada });
+    salvarMutation.mutate({ nome: nome.trim(), cor: corSelecionada, icone: iconeEfetivo });
   };
 
   return (
@@ -89,40 +132,42 @@ export default function CategoriasScreen() {
           contentContainerStyle={{ paddingBottom: tabBarSpace }}
           keyExtractor={item => item.id.toString()}
           renderItem={({ item: cat }) => (
-            <View style={{
-              minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-              paddingHorizontal: screenPadding,
-              borderBottomWidth: 1, borderBottomColor: colors.border,
-            }}>
-              <View style={{
-                width: 12, height: 12, borderRadius: radius.pill,
-                backgroundColor: cat.cor ?? colors.textMuted,
-              }} />
+            <TouchableOpacity
+              onPress={() => abrirEdicao(cat)}
+              accessibilityRole="button"
+              accessibilityHint="Abre a edição da categoria"
+              style={{
+                minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+                paddingHorizontal: screenPadding,
+                borderBottomWidth: 1, borderBottomColor: colors.border,
+              }}
+            >
+              <IconTile size={36} cor={cat.cor}>{emojiDaCategoria(cat, EMOJI_GENERICO)}</IconTile>
               <Text numberOfLines={1} style={{ ...typography.body, color: colors.textPrimary, flex: 1 }}>{cat.nome}</Text>
               <Text style={{ ...typography.meta, ...numeric, color: colors.textSecondary }}>
                 {formatCurrency(Number(cat.valorGasto ?? 0))}
               </Text>
               {!cat.ativo && <Badge tone="info">Inativo</Badge>}
-            </View>
+            </TouchableOpacity>
           )}
           ListEmptyComponent={() => (
             <EstadoVazio
               emoji="🏷️"
               titulo="Nenhuma categoria encontrada"
               texto="Categorias organizam seus gastos e alimentam os relatórios."
-              acao={{ rotulo: 'Criar categoria', onPress: () => setModalVisible(true) }}
+              acao={{ rotulo: 'Criar categoria', onPress: abrirCriacao }}
             />
           )}
         />
       )}
 
-      <Fab onPress={() => setModalVisible(true)} accessibilityLabel="Nova categoria" />
+      <Fab onPress={abrirCriacao} accessibilityLabel="Nova categoria" />
 
       <FolhaModal
         visible={modalVisible}
-        titulo="Nova Categoria"
+        titulo={editandoId == null ? 'Nova Categoria' : 'Editar Categoria'}
         onFechar={fecharFormulario}
-        acao={{ rotulo: 'Salvar', onPress: salvar, carregando: criarMutation.status === 'pending' }}
+        acao={{ rotulo: 'Salvar', onPress: salvar, carregando: salvarMutation.status === 'pending' }}
       >
         <ScrollView contentContainerStyle={{ padding: screenPadding }} keyboardShouldPersistTaps="handled">
           <Field
@@ -132,6 +177,14 @@ export default function CategoriasScreen() {
             onChangeText={setNome}
             placeholder="Ex: Alimentação"
             error={erros.nome}
+          />
+
+          <RotuloDeGrupo>Ícone</RotuloDeGrupo>
+          <SeletorDeEmoji
+            testID="category-icon"
+            rotulo="Ícone da categoria"
+            valor={iconeEfetivo}
+            onChange={setIcone}
           />
 
           <RotuloDeGrupo>Cor</RotuloDeGrupo>
