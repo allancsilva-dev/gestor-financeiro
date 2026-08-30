@@ -284,24 +284,33 @@ jq -e '
   and all(.resumo[]; .divergencias == 0)
 ' "$ARTIFACT_DIR/reconciliacao-global.json" >/dev/null || fail "reconciliação global divergente."
 
+# Passivo do cartao: 75 (compra) + 60 (assinatura Netflix, V67) - 25 (pago) = 110.
+# A Conta Principal segue em 825: assinatura de cartao entra na fatura e nao toca
+# o caixa — e essa igualdade e a prova disso no fluxo real.
 jq -e '
   any(.content[]; .nome == "Conta Principal" and .natureza == "ATIVO" and .saldo == 825)
   and any(.content[]; .nome == "Cofre: Meta Smoke" and .subtipo == "COFRE" and .saldo == 50)
-  and any(.content[]; .subtipo == "CARTAO" and .natureza == "PASSIVO" and .saldo == 50)
+  and any(.content[]; .subtipo == "CARTAO" and .natureza == "PASSIVO" and .saldo == 110)
 ' "$ARTIFACT_DIR/contas-financeiras.json" >/dev/null || fail "saldos de conta, cofre ou passivo incoerentes."
 
-jq -e 'any(.content[]; .nome == "Cartão Principal" and .saldoDevedor == 50 and .limiteTotal == 5000)' \
+jq -e 'any(.content[]; .nome == "Cartão Principal" and .saldoDevedor == 110 and .limiteTotal == 5000)' \
   "$ARTIFACT_DIR/cartoes.json" >/dev/null || fail "saldo do cartão incoerente."
 jq -e 'any(.content[]; .nome == "Meta Smoke" and .valorTotal == 1000 and .valorReservado == 50 and .cofreId != null)' \
   "$ARTIFACT_DIR/metas.json" >/dev/null || fail "progresso/cofre da meta incoerente."
-jq -e '.valorTotal == 75 and .valorPago == 25 and ((.valorTotal - .valorPago) == 50) and any(.lancamentos[]; .descricao == "Compra cartão smoke" and .valor == 75)' \
+# Fatura: 75 + 60 = 135, com 25 pagos. A assinatura precisa aparecer como
+# lancamento proprio — e o que separa recorrencia real de intencao registrada.
+jq -e '.valorTotal == 135 and .valorPago == 25 and ((.valorTotal - .valorPago) == 110)
+  and any(.lancamentos[]; .descricao == "Compra cartão smoke" and .valor == 75)
+  and any(.lancamentos[]; .descricao == "Netflix" and .valor == 60)' \
   "$ARTIFACT_DIR/fatura-atual.json" >/dev/null || fail "fatura ou lançamento incoerente."
+# Disponivel e reservado nao mudam (o cartao nao move caixa); dividas e resultado
+# absorvem os 60 da assinatura, e o patrimonio cai na mesma medida.
 jq -e '
   .disponivelAgora == 875
   and .reservado == 50
-  and .dividas == 50
-  and .resultadoMensal == -175
-  and .patrimonioLiquido == 825
+  and .dividas == 110
+  and .resultadoMensal == -235
+  and .patrimonioLiquido == 765
 ' "$ARTIFACT_DIR/metricas.json" >/dev/null || fail "métricas principais incoerentes."
 
 if rg -n 'HTTP[^[:digit:]]*5[0-9]{2}|status[=: ]+5[0-9]{2}|Internal Server Error' "$ARTIFACT_DIR/backend.log" \
@@ -315,5 +324,5 @@ fi
   jq -r '"Reconciliação: \(.status); verificações=\(.verificacoes); divergências=\(.divergencias)"' "$ARTIFACT_DIR/reconciliacao-global.json"
   jq -r '"Métricas: disponível=\(.disponivelAgora); reservado=\(.reservado); dívidas=\(.dividas); resultado=\(.resultadoMensal); patrimônio=\(.patrimonioLiquido)"' "$ARTIFACT_DIR/metricas.json"
   jq -r '"Fatura: total=\(.valorTotal); pago=\(.valorPago); restante=\(.valorTotal - .valorPago)"' "$ARTIFACT_DIR/fatura-atual.json"
-  printf 'Saldos esperados: Conta Principal=825; Cofre=50; Passivo=50\n'
+  printf 'Saldos esperados: Conta Principal=825; Cofre=50; Passivo=110\n'
 } >"$ARTIFACT_DIR/reconciliation-report.txt"

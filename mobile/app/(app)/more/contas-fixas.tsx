@@ -25,6 +25,7 @@ import RotuloDeGrupo from '../../../src/components/ui/RotuloDeGrupo';
 import SkeletonBox from '../../../src/components/ui/SkeletonBox';
 import Fab from '../../../src/components/ui/Fab';
 import type { ContaFinanceira } from '../../../src/types';
+import { emojiDaCategoria } from '../../../src/domain/iconeCategoria';
 
 export default function ContasFixasScreen() {
   const colors = useTheme();
@@ -63,7 +64,7 @@ export default function ContasFixasScreen() {
   const cartoes = cartoesData ?? [];
 
   const pagarMutation = useMutation({
-    mutationFn: ({ id, valor, carteiraId }: { id: number; valor: number; carteiraId: number }) =>
+    mutationFn: ({ id, valor, carteiraId }: { id: number; valor: number; carteiraId?: number }) =>
       contaFixaService.marcarComoPaga(id, valor, carteiraId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['contas-fixas'] });
@@ -135,6 +136,7 @@ export default function ContasFixasScreen() {
   const limparCriar = () => {
     setDescricaoCriar(''); setValorCriar(''); setDiaCriar(''); setCategoriaCriarId(null); setRecorrenteCriar(true);
     setTipoCriar('SAIDA'); setAutomaticaCriar(false); setCarteiraCriarId(null); setEditando(null);
+    setDestinoCriar('CONTA'); setCartaoCriarId(null);
     setDescricaoError(null); setValorError(null); setDiaError(null); setCategoriaError(null); setErroCriar(null);
   };
 
@@ -160,6 +162,9 @@ export default function ContasFixasScreen() {
     setTipoCriar(cf.tipo ?? 'SAIDA');
     setAutomaticaCriar(Boolean(cf.execucaoAutomatica));
     setCarteiraCriarId(cf.carteira?.id ?? null);
+    // Sem restaurar o destino, salvar a edição de uma assinatura apagaria o cartão
+    setDestinoCriar(cf.cartao ? 'CARTAO' : 'CONTA');
+    setCartaoCriarId(cf.cartao?.id ?? null);
     setModalCriarVisible(true);
   };
 
@@ -176,14 +181,16 @@ export default function ContasFixasScreen() {
       <Card radius={radius.xl} style={{ marginBottom: spacing.md }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
           <IconTile tone={cf.tipo === 'ENTRADA' ? 'success' : cf.status === 'ATRASADO' ? 'danger' : cf.status === 'PAGO' ? 'success' : 'brand'} size={44}>
-            {cf.categoria?.icone || '📌'}
+            {emojiDaCategoria(cf.categoria, '📌')}
           </IconTile>
           <View style={{ flex: 1, minWidth: 0 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.sm }}>
               <Text numberOfLines={1} style={{ ...typography.cardTitle, color: colors.textPrimary, flex: 1 }}>{cf.nome}</Text>
               <Badge status={cf.status} />
             </View>
-            <Text numberOfLines={1} style={{ ...typography.meta, color: colors.textSecondary, marginTop: spacing.xxs }}>
+            {/* Duas linhas: com o cartão no meio, uma linha só cortava o dia do
+                vencimento — justamente o dado que diz quando a cobrança cai. */}
+            <Text numberOfLines={2} style={{ ...typography.meta, color: colors.textSecondary, marginTop: spacing.xxs }}>
               {cf.categoria?.nome ? `${cf.categoria.nome} · ` : ''}{cf.cartao ? `${cf.cartao.nome} · ` : ''}{cf.execucaoAutomatica ? 'Automática' : 'Manual'} · dia {cf.diaVencimento}
             </Text>
           </View>
@@ -346,15 +353,17 @@ export default function ContasFixasScreen() {
             setErroPagar(null); setErroCarteira(null);
             const v = parseCurrencyBR(valorPago);
             if (isNaN(v) || v <= 0) { setErroPagar('Valor deve ser positivo.'); return; }
-            if (!carteiraPagamentoId) { setErroCarteira('Selecione de onde sai o pagamento.'); return; }
-            pagarMutation.mutate({ id: selecionada!.id, valor: v, carteiraId: carteiraPagamentoId });
+            // Assinatura de cartão entra na fatura: não há conta de onde sair
+            const noCartao = Boolean(selecionada?.cartao);
+            if (!noCartao && !carteiraPagamentoId) { setErroCarteira('Selecione de onde sai o pagamento.'); return; }
+            pagarMutation.mutate({ id: selecionada!.id, valor: v, carteiraId: noCartao ? undefined : carteiraPagamentoId! });
           },
         }}
       >
         <ScrollView contentContainerStyle={{ padding: screenPadding }} keyboardShouldPersistTaps="handled">
           {selecionada && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.lg }}>
-              <IconTile size={44}>{selecionada.categoria?.icone || '📌'}</IconTile>
+              <IconTile size={44} cor={selecionada.categoria?.cor}>{emojiDaCategoria(selecionada.categoria, '📌')}</IconTile>
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text numberOfLines={1} style={{ ...typography.cardTitle, color: colors.textPrimary }}>{selecionada.nome}</Text>
                 <Text style={{ ...typography.meta, ...numeric, color: colors.textSecondary, marginTop: spacing.xxs }}>
@@ -365,6 +374,12 @@ export default function ContasFixasScreen() {
           )}
           <Field label="Valor pago" value={valorPago} onChangeText={(t) => setValorPago(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" error={erroPagar} autoFocus />
 
+          {selecionada?.cartao ? (
+            <Text style={{ ...typography.meta, color: colors.textSecondary, marginTop: spacing.sm }}>
+              Entra na fatura do {selecionada.cartao.nome}.
+            </Text>
+          ) : (
+          <>
           <RotuloDeGrupo>{selecionada?.tipo === 'ENTRADA' ? 'Receber em' : 'Pagar com'}</RotuloDeGrupo>
           <FaixaDeContas
             contas={carteiras}
@@ -374,6 +389,8 @@ export default function ContasFixasScreen() {
           />
           {erroCarteira && (
             <Text accessibilityRole="alert" style={{ ...typography.meta, color: colors.danger, marginTop: spacing.sm }}>{erroCarteira}</Text>
+          )}
+          </>
           )}
         </ScrollView>
       </FolhaModal>
@@ -432,7 +449,7 @@ export default function ContasFixasScreen() {
             keyboardShouldPersistTaps="handled"
           >
             {categorias.map(cat => (
-              <Chip key={cat.id} label={`${cat.icone ? cat.icone + ' ' : ''}${cat.nome}`} selected={categoriaCriarId === cat.id} onPress={() => setCategoriaCriarId(cat.id)} />
+              <Chip key={cat.id} label={`${emojiDaCategoria(cat, '📌')} ${cat.nome}`} selected={categoriaCriarId === cat.id} onPress={() => setCategoriaCriarId(cat.id)} />
             ))}
           </ScrollView>
           {categoriaError && (

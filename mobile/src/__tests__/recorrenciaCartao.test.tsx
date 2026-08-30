@@ -2,6 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import NovaTransacaoModal from '../components/NovaTransacaoModal';
+import ContasFixasScreen from '../../app/(app)/more/contas-fixas';
 import { contaFixaService } from '../services/contaFixaService';
 import { transacaoService } from '../services/transacaoService';
 import { proximaCobranca, rotuloProximaCobranca } from '../domain/recorrencia';
@@ -13,8 +14,22 @@ jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 59, bottom: 34, left: 0, right: 0 }),
 }));
 
+jest.mock('expo-router', () => ({
+  useRouter: () => ({ push: jest.fn(), back: jest.fn() }),
+}));
+
 jest.mock('../services/contaFixaService', () => ({
-  contaFixaService: { criar: jest.fn().mockResolvedValue({ id: 1 }) },
+  contaFixaService: {
+    criar: jest.fn().mockResolvedValue({ id: 1 }),
+    atualizar: jest.fn().mockResolvedValue({ id: 1 }),
+    listar: jest.fn().mockResolvedValue({ content: [] }),
+    listarFalhasPendentes: jest.fn().mockResolvedValue([]),
+    listarSugestoes: jest.fn().mockResolvedValue([]),
+    confirmarSugestao: jest.fn(),
+    descartarSugestao: jest.fn(),
+    marcarComoPaga: jest.fn(),
+    pularMes: jest.fn(),
+  },
 }));
 
 jest.mock('../services/transacaoService', () => ({
@@ -37,7 +52,10 @@ jest.mock('../services/contaFinanceiraService', () => ({
     listarParaCaixa: jest.fn().mockResolvedValue([
       { id: 3, nome: 'Conta corrente', saldo: 1000, principal: true },
     ]),
+    listarTodas: jest.fn().mockResolvedValue([]),
   },
+  contaPodeMovimentarCaixa: () => true,
+  contaGerenciada: () => false,
 }));
 
 jest.mock('../services/cartaoService', () => ({
@@ -146,5 +164,37 @@ describe('proximaCobranca', () => {
 
   it('cobra hoje quando o dia é hoje', () => {
     expect(proximaCobranca(10, new Date(2026, 7, 10))).toEqual(new Date(2026, 7, 10));
+  });
+});
+
+describe('edição de assinatura na tela de Recorrências', () => {
+  it('preserva o cartão ao abrir a edição e salvar sem mexer no destino', async () => {
+    const { contaFixaService: svc } = require('../services/contaFixaService');
+    svc.listar.mockResolvedValue({
+      content: [{
+        id: 5, nome: 'Netflix', valorPlanejado: 60, diaVencimento: 15, status: 'PENDENTE',
+        recorrente: true, ativo: true, tipo: 'SAIDA', execucaoAutomatica: true,
+        categoria: { id: 7, nome: 'Lazer', icone: '🎬' },
+        cartao: { id: 9, nome: 'Cartão Nubank' },
+      }],
+    });
+    svc.atualizar.mockResolvedValue({ id: 5 });
+
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <ContasFixasScreen />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByText('Netflix')).toBeTruthy());
+    fireEvent.press(screen.getByText('Editar'));
+    await waitFor(() => expect(screen.getByText('Editar recorrência')).toBeTruthy());
+    fireEvent.press(screen.getByText('Salvar'));
+
+    await waitFor(() => expect(svc.atualizar).toHaveBeenCalledTimes(1));
+    // Sem restaurar o destino, o PUT sairia sem cartaoId e a assinatura perderia o cartão
+    expect(svc.atualizar).toHaveBeenCalledWith(5, expect.objectContaining({ cartaoId: 9 }));
+    expect(svc.atualizar.mock.calls[0][1].carteiraId).toBeUndefined();
   });
 });

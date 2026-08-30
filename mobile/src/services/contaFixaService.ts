@@ -13,8 +13,8 @@ export const contaFixaService = {
   atualizar: (id: number, data: ContaFixaRequest) =>
     api.put<ContaFixa>(`/v1/contas-fixas/${id}`, data).then(r => r.data),
 
-  // pagamento debita a carteira informada (obrigatória no backend)
-  marcarComoPaga: (id: number, valor: number, carteiraId: number) =>
+  // Debita a carteira informada; assinatura de cartão não tem carteira e entra na fatura
+  marcarComoPaga: (id: number, valor: number, carteiraId?: number) =>
     api.put<ContaFixa>(`/v1/contas-fixas/${id}/realizar`, { valor, carteiraId }).then(r => r.data),
 
   listarFalhasPendentes: () =>

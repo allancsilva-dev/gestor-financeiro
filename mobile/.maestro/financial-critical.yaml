@@ -389,6 +389,77 @@ tags:
     direction: DOWN
 - takeScreenshot: "06-relatorios"
 
+# Assinatura no cartao (V67): o que se repete todo mes vira recorrencia, nao
+# lancamento avulso. Fica no fim de proposito: a primeira cobranca entra na
+# fatura e mudaria os totais que as asercoes acima conferem.
+- tapOn:
+    point: "10%,92%"
+- extendedWaitUntil:
+    visible: "Nova transação"
+    timeout: 15000
+- tapOn: "Nova transação"
+- tapOn:
+    id: "transaction-value"
+- inputText: "6000"
+- pressKey: Enter
+- inputText: "Netflix"
+- pressKey: Enter
+- eraseText
+- inputText: ${E2E_DATE_INPUT}
+- tapOn:
+    point: "50%,4%"
+- tapOn: "Categoria"
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      text: ".*Alimentação"
+    direction: DOWN
+- waitForAnimationToEnd
+- tapOn: ".*Alimentação"
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element:
+      text: "Cartão"
+    direction: DOWN
+- tapOn: "Cartão"
+- assertVisible: "Cartão Principal"
+- scrollUntilVisible:
+    element:
+      id: "more-details-toggle"
+    direction: DOWN
+- tapOn:
+    id: "more-details-toggle"
+- waitForAnimationToEnd
+# Antes do switch, o cartao oferece parcelamento
+- assertVisible: "Parcelado"
+- takeScreenshot: "08-antes-da-assinatura"
+- tapOn:
+    id: "transaction-recurring"
+- waitForAnimationToEnd
+# Assinatura e parcelamento sao excludentes: um esconde o outro
+- assertNotVisible: "Parcelado"
+- assertVisible: ".*Primeira cobrança em.*"
+- takeScreenshot: "09-assinatura-marcada"
+- tapOn: "Salvar"
+- extendedWaitUntil:
+    notVisible:
+      id: "transaction-value"
+    timeout: 15000
+
+# A assinatura vira compromisso recorrente, visivel com o cartao que a cobra
+- tapOn:
+    point: "89%,92%"
+- scrollUntilVisible:
+    element:
+      text: "Recorrências"
+    direction: DOWN
+- tapOn: "Recorrências"
+- extendedWaitUntil:
+    visible: ".*Netflix.*"
+    timeout: 15000
+- assertVisible: ".*Cartão Principal.*"
+- takeScreenshot: "10-assinatura-recorrencia"
+
 # Guard rails de erros visiveis
 - assertNotVisible: ".*Erro ao.*"
 # As telas migradas escrevem "Não deu para carregar/gerar ..." no lugar de
