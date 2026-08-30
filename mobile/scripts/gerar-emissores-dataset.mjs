@@ -136,13 +136,29 @@ const corDoSvg = (relSvg) => {
   return melhor;
 };
 
-// ── preenchimento do logo, medido no PNG ────────────────────────────────
-// Os PNGs do pacote não têm margem uniforme: 104 dos 162 são full-bleed e o
-// resto vem com borda transparente (o menor tem só 41% de conteúdo). Renderizar
-// todos no mesmo tamanho faz a marca com margem aparecer com ~metade do corpo
-// das outras. O fator abaixo é o lado do bbox opaco dividido pelo lado do PNG;
-// o render divide o tamanho da imagem por ele para o CONTEÚDO ficar do mesmo
-// tamanho em toda marca.
+// ── medidas do PNG do logo ──────────────────────────────────────────────
+// O render precisa de três fatos sobre cada asset, e nenhum está no manifesto:
+//
+//   1. PREENCHIMENTO — os PNGs não têm margem uniforme: 104 dos 162 são
+//      full-bleed e o resto vem com borda transparente (o menor tem só 41% de
+//      conteúdo). Renderizar todos no mesmo tamanho faz a marca com margem
+//      aparecer com ~metade do corpo das outras. O fator é o lado do bbox
+//      opaco dividido pelo lado do PNG; o render divide o tamanho da imagem
+//      por ele para o CONTEÚDO ficar do mesmo tamanho em toda marca.
+//
+//   2. PLACA vs MARCA — 99 dos 162 assets JÁ são uma placa opaca (o quadrado
+//      do BB, o squircle do Itaú, o círculo do Bradesco). Esses vão para a
+//      tela full-bleed, sem nada atrás: o fundo é parte do desenho. Os outros
+//      63 são marca solta sobre transparente (o "nu" do Nubank, o wordmark do
+//      C6). Separar os dois é o que permite tirar o fundo branco que o cartão
+//      pintava atrás de TODO logo — e que num asset de placa virava um
+//      quadrado branco com a placa da marca dentro.
+//
+//   3. LUZ E COR DA MARCA — só para a marca solta. Quem sabe o fundo é o
+//      runtime (o gradiente do cartão, ou o card do tema no carrossel), então
+//      o gerador publica o material do cálculo — dois percentis de luminância
+//      e a cor do matiz dominante — e o domínio decide entre cor original e
+//      tint. Ver `MARCA_LOGO` no arquivo gerado.
 //
 // Por que decodificar o PNG aqui, e não derivar do SVG:
 //   - o pacote publica 162 PNGs e só 123 SVGs — 39 assets não teriam medida;
@@ -157,10 +173,10 @@ const corDoSvg = (relSvg) => {
 // qualquer outro formato — se o pacote mudar o pipeline de imagem, a geração
 // falha em vez de emitir número errado em silêncio.
 
-/** Percorre os chunks do PNG devolvendo IHDR, tRNS e os IDAT concatenados. */
+/** Percorre os chunks do PNG devolvendo IHDR, PLTE, tRNS e os IDAT concatenados. */
 const chunksPng = (buf) => {
   let off = 8; // pula a assinatura
-  let ihdr = null, trns = null;
+  let ihdr = null, plte = null, trns = null;
   const idat = [];
   while (off + 8 <= buf.length) {
     const tamanho = buf.readUInt32BE(off);
@@ -168,23 +184,76 @@ const chunksPng = (buf) => {
     const dados = buf.subarray(off + 8, off + 8 + tamanho);
     if (tipo === 'IHDR') {
       ihdr = { largura: buf.readUInt32BE(off + 8), altura: buf.readUInt32BE(off + 12), bits: dados[8], tipoCor: dados[9], entrelacado: dados[12] };
-    } else if (tipo === 'tRNS') trns = Buffer.from(dados);
+    } else if (tipo === 'PLTE') plte = Buffer.from(dados);
+    else if (tipo === 'tRNS') trns = Buffer.from(dados);
     else if (tipo === 'IDAT') idat.push(dados);
     else if (tipo === 'IEND') break;
     off += 12 + tamanho; // tamanho + tipo(4) + dados + crc(4)
   }
-  return { ihdr, trns, idat: Buffer.concat(idat) };
+  return { ihdr, plte, trns, idat: Buffer.concat(idat) };
 };
 
-/**
- * Lado do bbox do conteúdo opaco / lado do PNG, em (0, 1].
- * É o MAIOR lado do bbox: com `resizeMode="contain"` num box quadrado, é a
- * dimensão maior que limita a escala — usar a menor deixaria um wordmark largo
- * vazar na horizontal.
- */
-const preenchimentoDoPng = (arquivo) => {
+// Limiar de "o pixel existe". Acima de zero para ignorar poeira de
+// antialiasing. Medido: o resultado é idêntico com 1, 8 e 16 — as bordas
+// destes assets são duras.
+const LIMIAR_ALFA = 8;
+// Para medir COR só valem pixels francamente opacos: a borda antialiasada
+// mistura o desenho com o vazio e puxaria a luminância para o fundo.
+const LIMIAR_ALFA_COR = 128;
+// Placa = bbox quase todo opaco E sem furo por onde o cartão vaze por dentro
+// do desenho. Medido nos 162: os dois grupos ficam longe do limiar — placa de
+// 0,78 para cima (o círculo puro dá π/4 ≈ 0,785), marca solta de 0,63 para
+// baixo. O teste de furo é o que separa placa de moldura vazada.
+const DENSIDADE_PLACA_MIN = 0.72;
+const FUROS_PLACA_MAX = 0.02;
+// Fração da área que precisa contrastar com o fundo para a MARCA SOLTA ir sem
+// tint. Define quais percentis o dataset publica: com 0,6, o percentil 40 (60%
+// da área está acima dele) e o 60 (60% está abaixo) respondem exatamente "60%
+// da marca contrasta?" — um número por direção, sem guardar histograma.
+const FRACAO_LEGIVEL_MIN = 0.6;
+// O mesmo para a PLACA, que não pode ser tingida: nela basta uma PARTE do
+// desenho se separar do fundo — o quadrado amarelo do BB some no card branco,
+// mas o glifo azul dentro dele não. A fração é pequena porque é assim que
+// marca funciona: o wordmark branco do `bari` ocupa 3% do asset preto e é o
+// que se lê quando ele cai num cartão preto, e o "A" branco do asaas, 8%, é o
+// que se lê num cartão azul. Daí os percentis 2 e 98 — detalhe fino conta,
+// poeira de antialiasing não.
+const FRACAO_LEGIVEL_PLACA = 0.02;
+// Uma "placa" sem variação interna nenhuma não é placa para efeito de render:
+// é uma silhueta. O BRB é o caso — um desenho preto chapado, sem detalhe que
+// se separe do fundo —, e como silhueta ele pode ser tingido, que é o único
+// jeito de ele aparecer num cartão escuro. Abaixo desta razão de contraste
+// entre os extremos do desenho, o asset entra como marca solta.
+const CONTRASTE_VARIACAO_PLACA_MIN = 1.2;
+// Abaixo disto o pixel é cinza/branco/preto e não indica matiz de marca nenhum.
+const SATURACAO_MIN_COR = 0.15;
+
+/** Luminância relativa WCAG de um RGB 0-255. Mesma fórmula de emissores.ts. */
+const luminanciaRgb = (r, g, b) => {
+  const [lr, lg, lb] = [r, g, b].map((v) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  });
+  return 0.2126 * lr + 0.7152 * lg + 0.0722 * lb;
+};
+
+/** Matiz HSL em graus [0, 360). */
+const matizRgb = (r, g, b) => {
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+  if (d === 0) return 0;
+  const h = max === r ? (g - b) / d + (g < b ? 6 : 0)
+    : max === g ? (b - r) / d + 2
+      : (r - g) / d + 4;
+  return h * 60;
+};
+
+const hexDeRgb = (r, g, b) =>
+  '#' + [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, '0').toUpperCase()).join('');
+
+/** Pixels do PNG indexado, já desfiltrados: um índice de paleta por pixel. */
+const indicesDoPng = (arquivo) => {
   const buf = fs.readFileSync(arquivo);
-  const { ihdr, trns, idat } = chunksPng(buf);
+  const { ihdr, plte, trns, idat } = chunksPng(buf);
   if (!ihdr) throw new Error(`PNG sem IHDR: ${arquivo}`);
   if (ihdr.bits !== 8 || ihdr.tipoCor !== 3 || ihdr.entrelacado !== 0) {
     throw new Error(
@@ -192,16 +261,15 @@ const preenchimentoDoPng = (arquivo) => {
       `— bits=${ihdr.bits} tipoCor=${ihdr.tipoCor} entrelacado=${ihdr.entrelacado}`,
     );
   }
+  if (!plte) throw new Error(`PNG indexado sem PLTE: ${arquivo}`);
   const { largura: w, altura: h } = ihdr;
-  // Sem tRNS a paleta é toda opaca: o conteúdo ocupa o PNG inteiro.
-  if (!trns) return 1;
-
   const bruto = zlib.inflateSync(idat);
   // Cor indexada de 8 bits => 1 byte por pixel, então o filtro anda de 1 em 1.
   const passo = 1, linhaBytes = w * passo;
   const linha = Buffer.alloc(linhaBytes);
   const anterior = Buffer.alloc(linhaBytes);
-  let x0 = w, y0 = h, x1 = -1, y1 = -1, p = 0;
+  const indices = Buffer.alloc(w * h);
+  let p = 0;
 
   for (let y = 0; y < h; y++) {
     const filtro = bruto[p++];
@@ -224,50 +292,167 @@ const preenchimentoDoPng = (arquivo) => {
       linha[i] = v & 0xff;
     }
     linha.copy(anterior);
+    linha.copy(indices, y * w);
+  }
+  // tRNS pode ser mais curto que a paleta; os índices restantes são opacos.
+  const alfa = (indice) => (!trns ? 255 : indice < trns.length ? trns[indice] : 255);
+  const rgb = (indice) => [plte[indice * 3], plte[indice * 3 + 1], plte[indice * 3 + 2]];
+  return { largura: w, altura: h, indices, alfa, rgb };
+};
+
+/**
+ * Mede um asset: `{ preenchimento, solido, marca }`.
+ *
+ * `preenchimento` é o MAIOR lado do bbox opaco / lado do PNG: com
+ * `resizeMode="contain"` num box quadrado, é a dimensão maior que limita a
+ * escala — usar a menor deixaria um wordmark largo vazar na horizontal.
+ *
+ * `solido` separa placa de marca solta; `luzP40`/`luzP60` e `cor` são o
+ * material com que o domínio decide, em runtime e já sabendo o fundo, entre cor
+ * original, tint e tile de apoio. `cor` é `null` na placa, que nunca é tingida.
+ */
+const medirPng = (arquivo) => {
+  const { largura: w, altura: h, indices, alfa, rgb } = indicesDoPng(arquivo);
+
+  let x0 = w, y0 = h, x1 = -1, y1 = -1, opacos = 0;
+  for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const indice = linha[x];
-      // tRNS pode ser mais curto que a paleta; os índices restantes são opacos.
-      const alfa = indice < trns.length ? trns[indice] : 255;
-      // Limiar acima de zero para ignorar poeira de antialiasing. Medido: o
-      // resultado é idêntico com 1, 8 e 16 — as bordas destes assets são duras.
-      if (alfa >= LIMIAR_ALFA) {
-        if (x < x0) x0 = x;
-        if (x > x1) x1 = x;
-        if (y < y0) y0 = y;
-        if (y > y1) y1 = y;
-      }
+      if (alfa(indices[y * w + x]) < LIMIAR_ALFA) continue;
+      opacos++;
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
     }
   }
   if (x1 < 0) throw new Error(`PNG totalmente transparente: ${arquivo}`);
-  return Math.max(x1 - x0 + 1, y1 - y0 + 1) / w;
-};
+  const larguraBbox = x1 - x0 + 1, alturaBbox = y1 - y0 + 1;
+  const areaBbox = larguraBbox * alturaBbox;
+  const preenchimento = Math.max(larguraBbox, alturaBbox) / w;
 
-const LIMIAR_ALFA = 8;
+  // Furo = transparente DENTRO do desenho. Inunda o transparente a partir da
+  // borda da imagem: o que não for alcançado está cercado por opaco. Sem isso,
+  // uma moldura vazada (anel, letra oca grande) passaria por placa e o
+  // gradiente do cartão apareceria por dentro dela.
+  const visto = new Uint8Array(w * h);
+  const pilha = [];
+  for (let x = 0; x < w; x++) pilha.push(x, x + (h - 1) * w);
+  for (let y = 0; y < h; y++) pilha.push(y * w, y * w + w - 1);
+  while (pilha.length) {
+    const i = pilha.pop();
+    if (visto[i] || alfa(indices[i]) >= LIMIAR_ALFA) continue;
+    visto[i] = 1;
+    const x = i % w, y = (i - x) / w;
+    if (x > 0) pilha.push(i - 1);
+    if (x < w - 1) pilha.push(i + 1);
+    if (y > 0) pilha.push(i - w);
+    if (y < h - 1) pilha.push(i + w);
+  }
+  let furos = 0;
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      const i = y * w + x;
+      if (alfa(indices[i]) < LIMIAR_ALFA && !visto[i]) furos++;
+    }
+  }
+
+  const denso = opacos / areaBbox >= DENSIDADE_PLACA_MIN && furos / areaBbox < FUROS_PLACA_MAX;
+
+  // Pesa por índice de paleta: são no máximo 256 cores, então a distribuição
+  // sai exata sem guardar um valor por pixel.
+  const peso = new Map();
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      const indice = indices[y * w + x];
+      if (alfa(indice) < LIMIAR_ALFA_COR) continue;
+      peso.set(indice, (peso.get(indice) ?? 0) + 1);
+    }
+  }
+  const total = [...peso.values()].reduce((a, b) => a + b, 0);
+  if (total === 0) throw new Error(`asset sem pixel opaco acima do limiar de cor: ${arquivo}`);
+
+  const porLuz = [...peso]
+    .map(([indice, n]) => [luminanciaRgb(...rgb(indice)), n])
+    .sort((a, b) => a[0] - b[0]);
+  const percentil = (fracao) => {
+    const alvo = total * fracao;
+    let acumulado = 0;
+    for (const [luz, n] of porLuz) {
+      acumulado += n;
+      if (acumulado >= alvo) return luz;
+    }
+    return porLuz[porLuz.length - 1][0];
+  };
+
+  const luzes = {
+    luzP02: percentil(FRACAO_LEGIVEL_PLACA),
+    luzP40: percentil(1 - FRACAO_LEGIVEL_MIN),
+    luzP60: percentil(FRACAO_LEGIVEL_MIN),
+    luzP98: percentil(1 - FRACAO_LEGIVEL_PLACA),
+  };
+
+  const contrasteInterno =
+    (Math.max(luzes.luzP98, luzes.luzP02) + 0.05) / (Math.min(luzes.luzP98, luzes.luzP02) + 0.05);
+  const solido = denso && contrasteInterno >= CONTRASTE_VARIACAO_PLACA_MIN;
+
+  // Placa não é tingida — o desenho traz o próprio fundo —, então ela não
+  // precisa de cor, só das luzes que dizem se some no fundo.
+  if (solido) return { preenchimento, solido, cor: null, ...luzes };
+
+  // Cor do tint: média do matiz dominante, ponderada por área. Sem nenhum
+  // pixel cromático (wordmark preto do C6), a média dos neutros — o domínio
+  // clareia depois, e o resultado é um cinza claro, não um matiz inventado.
+  const faixas = new Map();
+  for (const [indice, n] of peso) {
+    const [r, g, b] = rgb(indice);
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    const saturacao = max === 0 ? 0 : (max - min) / max;
+    const chave = saturacao < SATURACAO_MIN_COR ? 'neutro' : Math.floor(matizRgb(r, g, b) / 30) % 12;
+    const faixa = faixas.get(chave) ?? { n: 0, r: 0, g: 0, b: 0 };
+    faixa.n += n; faixa.r += r * n; faixa.g += g * n; faixa.b += b * n;
+    faixas.set(chave, faixa);
+  }
+  const cromaticas = [...faixas].filter(([chave]) => chave !== 'neutro');
+  const [, dominante] = (cromaticas.length ? cromaticas : [...faixas])
+    .sort((a, b) => b[1].n - a[1].n)[0];
+
+  return {
+    preenchimento,
+    solido,
+    cor: hexDeRgb(dominante.r / dominante.n, dominante.g / dominante.n, dominante.b / dominante.n),
+    ...luzes,
+  };
+};
 
 // As chaves vêm do MESMO entry que o app importa (`logos-bancos-br/react-native`),
 // não de bancos.json: é esse mapa que `logoDoIspb` consulta, e ele indexa tanto
 // por ISPB quanto por código COMPE. Lê como texto porque o entry é ESM com
 // require() de PNG — importá-lo aqui não roda fora do Metro.
 const fonteRn = fs.readFileSync(path.join(raizPacote, 'react-native.js'), 'utf8');
-const preenchimentoPorArquivo = new Map();
+const medidaPorArquivo = new Map();
 const preenchimentos = [];
+const logosMedidos = [];
 for (const [, chave, arquivo] of fonteRn.matchAll(
   /'(\d{4,8})': require\('\.\/logos\/png\/(\d{8})\.png'\)/g,
 )) {
-  if (!preenchimentoPorArquivo.has(arquivo)) {
-    preenchimentoPorArquivo.set(
+  if (!medidaPorArquivo.has(arquivo)) {
+    medidaPorArquivo.set(
       arquivo,
-      preenchimentoDoPng(path.join(raizPacote, 'logos', 'png', `${arquivo}.png`)),
+      medirPng(path.join(raizPacote, 'logos', 'png', `${arquivo}.png`)),
     );
   }
-  const fator = preenchimentoPorArquivo.get(arquivo);
+  const medida = medidaPorArquivo.get(arquivo);
   // 1 é o padrão do runtime (asset full-bleed): não vale uma linha no arquivo.
-  if (fator < 1) preenchimentos.push([chave, fator]);
+  if (medida.preenchimento < 1) preenchimentos.push([chave, medida.preenchimento]);
+  logosMedidos.push([chave, medida]);
 }
-if (preenchimentoPorArquivo.size === 0) {
+if (medidaPorArquivo.size === 0) {
   throw new Error('nenhum logo lido de react-native.js — o formato do entry mudou');
 }
 preenchimentos.sort(([a], [b]) => a.localeCompare(b));
+logosMedidos.sort(([a], [b]) => a.localeCompare(b));
+const placas = [...medidaPorArquivo.values()].filter((m) => m.solido).length;
+const marcasSoltas = medidaPorArquivo.size - placas;
 
 // ── índice ──────────────────────────────────────────────────────────────
 /** @type {Map<string, Map<string, {ispb: string, cor: string|null}>>} */
@@ -321,6 +506,15 @@ const linhasPreenchimento = preenchimentos.map(
   ([chave, fator]) => `  ${JSON.stringify(chave)}: ${Number(fator.toFixed(4))},`,
 );
 
+// Luminância é fração em (0, 1) e entra numa razão de contraste; 4 casas
+// mantêm o erro de arredondamento duas ordens abaixo do limiar de decisão.
+const luz = (v) => Number(v.toFixed(4));
+const linhasLogo = logosMedidos.map(
+  ([chave, m]) =>
+    `  ${JSON.stringify(chave)}: [${m.solido ? 0 : 1}, ${luz(m.luzP02)}, ${luz(m.luzP40)}, ` +
+    `${luz(m.luzP60)}, ${luz(m.luzP98)}, ${m.cor ? `'${m.cor}'` : 'null'}],`,
+);
+
 const conteudo = `/* eslint-disable */
 // ARQUIVO GERADO por scripts/gerar-emissores-dataset.mjs — NÃO EDITAR À MÃO.
 //
@@ -355,11 +549,56 @@ ${linhas.join('\n')}
  * \`preenchimentoDoIspb\` em src/domain/logosEmissores.ts, que já aplica esse padrão.
  *
  * Medido decodificando o alfa dos PNGs (limiar ${LIMIAR_ALFA}/255), não estimado.
- * Assets: ${preenchimentoPorArquivo.size} · com margem: ${preenchimentos.length} chaves
- * · menor fator: ${Math.min(...preenchimentoPorArquivo.values()).toFixed(4)}
+ * Assets: ${medidaPorArquivo.size} · com margem: ${preenchimentos.length} chaves
+ * · menor fator: ${Math.min(...[...medidaPorArquivo.values()].map((m) => m.preenchimento)).toFixed(4)}
  */
 export const PREENCHIMENTO_LOGO: Readonly<Record<string, number>> = {
 ${linhasPreenchimento.join('\n')}
+};
+
+/**
+ * Como um asset de logo se comporta: tipo, quatro percentis de luminância e a
+ * cor do tint.
+ *
+ * \`tipo\` 0 = placa própria, 1 = marca solta. \`cor\` só existe na marca solta —
+ * placa nunca é tingida.
+ */
+export type EntradaLogo = readonly [
+  tipo: 0 | 1,
+  luzP02: number,
+  luzP40: number,
+  luzP60: number,
+  luzP98: number,
+  cor: string | null,
+];
+
+/**
+ * Medidas de render de cada asset de logo, por chave de \`logos-bancos-br/react-native\`
+ * (ISPB e código COMPE, as mesmas chaves do mapa de assets).
+ *
+ * Existe porque os ${medidaPorArquivo.size} assets não são o mesmo tipo de desenho, e tratá-los
+ * igual obrigava o cartão a pintar um tile branco atrás de todo logo:
+ *
+ *   - ${placas} são PLACA (tipo 0): quadrado, squircle ou círculo opaco com a cor da
+ *     marca já dentro (o quadrado do BB, o squircle do Itaú, o círculo do
+ *     Bradesco). Vão full-bleed, sem fundo — só ganham um tile de apoio quando
+ *     a própria placa some no fundo (placa preta em cartão preto);
+ *   - ${marcasSoltas} são MARCA SOLTA (tipo 1) sobre transparente (o "nu" do Nubank, o
+ *     wordmark do C6): ou vão na cor original, ou tingidas no matiz dominante.
+ *
+ * Os dois percentis de luminância WCAG respondem "${Math.round(FRACAO_LEGIVEL_MIN * 100)}% do desenho contrasta
+ * com este fundo?" sem histograma: p40 tem ${Math.round(FRACAO_LEGIVEL_MIN * 100)}% da área ACIMA dele (serve
+ * para fundo escuro) e p60 tem ${Math.round(FRACAO_LEGIVEL_MIN * 100)}% ABAIXO (fundo claro). Quem sabe o
+ * fundo é o runtime — o gradiente do cartão numa tela, o card do tema em outra
+ * —, então a decisão fica no domínio e aqui só o material medido.
+ *
+ * Medido nos PNGs: placa = densidade do bbox ≥ ${DENSIDADE_PLACA_MIN} e furos internos < ${FUROS_PLACA_MAX};
+ * cor e luz só de pixels com alfa ≥ ${LIMIAR_ALFA_COR}/255. Use \`entradaLogoDoIspb\` e
+ * \`estiloDoLogo\` em src/domain/logosEmissores.ts e emissores.ts, que já aplicam
+ * esse padrão.
+ */
+export const LOGO_MEDIDO: Readonly<Record<string, EntradaLogo>> = {
+${linhasLogo.join('\n')}
 };
 `;
 
@@ -367,5 +606,6 @@ fs.writeFileSync(saida, conteudo);
 console.log(
   `gerado: ${entradas.length} chaves, ${descartadas} descartadas por ambiguidade, ` +
   `${registros.length} instituições com logo; ` +
-  `preenchimento: ${preenchimentos.length} chaves com margem em ${preenchimentoPorArquivo.size} assets`,
+  `preenchimento: ${preenchimentos.length} chaves com margem em ${medidaPorArquivo.size} assets; ` +
+  `logo: ${placas} placas full-bleed e ${marcasSoltas} marcas soltas em ${logosMedidos.length} chaves`,
 );
