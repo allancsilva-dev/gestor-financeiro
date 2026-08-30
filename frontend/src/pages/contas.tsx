@@ -26,6 +26,12 @@ export default function Contas() {
     diaVencimento: '',
     cor: '#8B10AE'
   });
+  // O roxo acima é só o valor inicial do seletor. Enquanto isto for `true` a
+  // cor NÃO é enviada, e o app deriva a identidade visual do nome do cartão
+  // ("PicPay" fica verde, "Nubank" roxo). Antes, todo cartão criado aqui ia
+  // com #8B10AE gravado, e cor do usuário vence o catálogo — o cartão ficava
+  // roxo para sempre, com qualquer nome.
+  const [corDoEmissor, setCorDoEmissor] = useState(true);
   const validation = useZodForm(contaSchema);
 
   useEffect(() => {
@@ -59,6 +65,7 @@ export default function Contas() {
         diaVencimento: conta.diaVencimento?.toString() || '',
         cor: conta.cor || '#8B10AE'
       });
+      setCorDoEmissor(!conta.cor);
     } else {
       // Modo criação
       resetarFormulario();
@@ -76,6 +83,7 @@ export default function Contas() {
       diaVencimento: '',
       cor: '#8B10AE'
     });
+    setCorDoEmissor(true);
     validation.resetValidation();
   };
 
@@ -93,7 +101,7 @@ export default function Contas() {
       limiteTotal: contaParaEnviar.limiteTotal,
       diaFechamento: contaParaEnviar.diaFechamento,
       diaVencimento: contaParaEnviar.diaVencimento,
-      cor: contaParaEnviar.cor,
+      cor: corDoEmissor ? undefined : contaParaEnviar.cor,
     };
 
     try {
@@ -174,12 +182,22 @@ export default function Contas() {
 
                 <div>
                   <label className="block text-sm font-medium mb-1 text-gray-700">Cor</label>
+                  <label className="flex items-center gap-2 mb-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={corDoEmissor}
+                      onChange={(e) => setCorDoEmissor(e.target.checked)}
+                      className="rounded border-gray-300"
+                    />
+                    Usar a cor do emissor (pelo nome do cartão)
+                  </label>
                   <input
                     type="color"
                     {...fieldA11y('cor', validation.errors.cor)}
                     value={formData.cor}
+                    disabled={corDoEmissor}
                     onChange={(e) => { const next = { ...formData, cor: e.target.value }; setFormData(next); validation.revalidateField('cor', next); }}
-                    className="w-full h-10 border border-gray-300 rounded-lg cursor-pointer"
+                    className="w-full h-10 border border-gray-300 rounded-lg cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                   />
                 </div>
 

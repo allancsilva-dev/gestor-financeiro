@@ -1,11 +1,13 @@
 import React from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { iconeDecorativo } from '../../utils/acessibilidade';
 import { useTheme, radius, spacing, typography, numeric } from '../../theme';
 import { ParcelaAgendada } from '../../types';
 import { formatCurrency } from '../../utils/format';
 import SkeletonBox from '../ui/SkeletonBox';
+import { emojiDaCategoria } from '../../domain/iconeCategoria';
+import { identidadeDoCartao } from '../../domain/emissores';
 
 interface Props {
   itens: ParcelaAgendada[];
@@ -69,6 +71,11 @@ export default function ParcelasCarrossel({ itens, carregando, onVerTodas, onAbr
         >
           {itens.map(item => {
             const bandeira = item.cartao?.bandeira ? BANDEIRA_LABEL[item.cartao.bandeira] ?? 'Cartão' : null;
+            // `CartaoResumo` só traz o nome, então a identidade sai do nome —
+            // é o mesmo caminho da prévia do formulário. Sem `cor` aqui, uma
+            // cor escolhida à mão pelo usuário não chega: o que se aproveita é
+            // o logo da marca.
+            const logoCartao = item.cartao ? identidadeDoCartao({ nome: item.cartao.nome }).logo : null;
             const progresso = item.numeroParcela && item.totalParcelas
               ? `${item.numeroParcela}/${item.totalParcelas}`
               : null;
@@ -108,7 +115,7 @@ export default function ParcelasCarrossel({ itens, carregando, onVerTodas, onAbr
                     backgroundColor: colors.brandBg,
                     alignItems: 'center', justifyContent: 'center',
                   }}>
-                    <Text style={{ fontSize: 18 }}>{item.categoria?.icone ?? '🧾'}</Text>
+                    <Text style={{ fontSize: 18 }}>{emojiDaCategoria(item.categoria, '🧾')}</Text>
                   </View>
 
                   <View style={{ flex: 1 }}>
@@ -143,7 +150,17 @@ export default function ParcelasCarrossel({ itens, carregando, onVerTodas, onAbr
                     marginTop: spacing.sm + 2, paddingTop: spacing.sm + 2,
                     borderTopWidth: 1, borderTopColor: colors.border,
                   }}>
-                    <Ionicons name="card" size={14} color={colors.warning} />
+                    {logoCartao ? (
+                      <Image
+                        source={logoCartao}
+                        resizeMode="contain"
+                        accessibilityIgnoresInvertColors
+                        style={{ width: 16, height: 16, borderRadius: 4 }}
+                        {...iconeDecorativo}
+                      />
+                    ) : (
+                      <Ionicons name="card" size={14} color={colors.warning} />
+                    )}
                     <Text style={{ ...typography.meta, ...numeric, lineHeight: 14, color: colors.textSecondary }}>
                       {bandeira ? `${bandeira} ` : ''}•••• {item.cartao.ultimosDigitos}
                     </Text>

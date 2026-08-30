@@ -19,7 +19,10 @@
     "collectCoverageFrom": [
       "src/**/*.{ts,tsx}",
       "!src/types/**"
-    ]
+    ],
+    "moduleNameMapper": {
+      "^logos-bancos-br/react-native$": "<rootDir>/src/__mocks__/logosBancosBrReactNative.js"
+    }
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -45,6 +48,7 @@
     "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.9",
     "expo-system-ui": "~6.0.9",
+    "logos-bancos-br": "0.7.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",

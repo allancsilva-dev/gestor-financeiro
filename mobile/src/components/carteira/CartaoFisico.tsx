@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, View } from 'react-native';
+import { Image, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { identidadeDoCartao } from '../../domain/emissores';
@@ -115,21 +115,35 @@ export default function CartaoFisico({
               width: Math.round(32 * k),
               height: Math.round(32 * k),
               borderRadius: Math.round(9 * k),
-              backgroundColor: id.logoBg,
+              // Com logo real o tile é branco, não a cor da marca: os PNGs são
+              // coloridos sobre fundo transparente, e nenhuma cor de marca
+              // garante contraste para todos eles. Sem logo, mantém o tile
+              // colorido com o monograma, que já é calculado para AA.
+              backgroundColor: id.logo ? '#FFFFFF' : id.logoBg,
               alignItems: 'center',
               justifyContent: 'center',
+              overflow: 'hidden',
             }}
           >
-            <Text
-              style={{
-                color: id.logoFg,
-                fontSize: Math.round(15 * k),
-                fontWeight: '800',
-                letterSpacing: -0.3,
-              }}
-            >
-              {id.glifo}
-            </Text>
+            {id.logo ? (
+              <Image
+                source={id.logo}
+                resizeMode="contain"
+                accessibilityIgnoresInvertColors
+                style={{ width: Math.round(26 * k), height: Math.round(26 * k) }}
+              />
+            ) : (
+              <Text
+                style={{
+                  color: id.logoFg,
+                  fontSize: Math.round(15 * k),
+                  fontWeight: '800',
+                  letterSpacing: -0.3,
+                }}
+              >
+                {id.glifo}
+              </Text>
+            )}
           </View>
           <Text
             numberOfLines={1}

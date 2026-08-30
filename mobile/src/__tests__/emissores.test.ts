@@ -8,6 +8,8 @@ import {
   gradienteDe,
   TINTA_CLARA,
   TINTA_ESCURA,
+  VARIANTES,
+  tintaPara,
 } from '../domain/emissores';
 
 describe('normalizarEmissor', () => {
@@ -205,5 +207,80 @@ describe('cartão do onboarding: identidade vem do que é digitado', () => {
     expect(id.emissor?.base).toBe('#FF6200');
     expect([TINTA_CLARA, TINTA_ESCURA]).toContain(id.tinta);
     expect(contraste(id.tinta, id.from)).toBeGreaterThanOrEqual(4.5);
+  });
+});
+
+describe('logo real do emissor', () => {
+  it('PicPay resolve o logo publicado para o ISPB da marca', () => {
+    // 22896431 = PICPAY INSTITUIÇÃO DE PAGAMENTO S.A.
+    const id = identidadeDoCartao({ nome: 'PicPay' });
+    expect(id.emissor?.slug).toBe('picpay');
+    expect(id.emissor?.ispb).toBe('22896431');
+    expect(id.logo).not.toBeNull();
+  });
+
+  it('emissor fora do catálogo curado resolve pelo índice gerado', () => {
+    const id = identidadeDoCartao({ nome: 'Crefisa' });
+    expect(id.emissor?.slug).toBe('dataset:crefisa');
+    expect(id.logo).not.toBeNull();
+  });
+
+  it('emissor sem logo publicado fica sem imagem, e o monograma continua', () => {
+    const id = identidadeDoCartao({ nome: 'Cartão do Zé' });
+    expect(id.emissor).toBeNull();
+    expect(id.logo).toBeNull();
+    expect(id.glifo.length).toBeGreaterThan(0);
+  });
+
+  it('o catálogo curado tem precedência sobre o índice gerado', () => {
+    // 'inter' existe nos dois; o curado é que blinda "Banco Internacional".
+    expect(identidadeDoCartao({ nome: 'Inter' }).emissor?.slug).toBe('inter');
+    expect(resolverEmissor({ nome: 'Banco Internacional' })).toBeNull();
+  });
+
+  it('todo emissor curado com ispb aponta para um logo existente', () => {
+    for (const e of EMISSORES) {
+      if (!e.ispb) continue;
+      expect({ slug: e.slug, logo: identidadeDoCartao({ banco: e.rotulo, nome: e.rotulo }).logo })
+        .not.toEqual({ slug: e.slug, logo: null });
+    }
+  });
+});
+
+describe('variante de produto', () => {
+  it('PicPay Epic é preto e PicPay comum não', () => {
+    const epic = identidadeDoCartao({ nome: 'PicPay Epic' });
+    const comum = identidadeDoCartao({ nome: 'PicPay' });
+    expect(epic.variante?.aliases).toContain('epic');
+    expect(comum.variante).toBeNull();
+    expect(epic.from).not.toBe(comum.from);
+    // Os dois continuam sendo PicPay: mesma marca, mesmo logo.
+    expect(epic.emissor?.slug).toBe('picpay');
+    expect(epic.logo).toBe(comum.logo);
+  });
+
+  it('variante do emissor vence a genérica de faixa', () => {
+    const id = identidadeDoCartao({ nome: 'C6 Carbon Black' });
+    expect(id.variante?.aliases).toContain('carbon');
+  });
+
+  it('faixa genérica vale para emissor sem variante própria', () => {
+    const id = identidadeDoCartao({ nome: 'Bradesco Infinite' });
+    expect(id.emissor?.slug).toBe('bradesco');
+    expect(id.variante?.aliases).toContain('infinite');
+  });
+
+  it('cor escolhida pelo usuário ainda vence a variante', () => {
+    const id = identidadeDoCartao({ nome: 'PicPay Epic', cor: '#123456' });
+    expect(id.corDoUsuario).toBe(true);
+    expect(id.from).toBe(gradienteDe('#123456')[0]);
+  });
+
+  it('toda variante mantém a tinta em contraste AA nas duas pontas', () => {
+    for (const v of VARIANTES) {
+      const [from, to] = gradienteDe(v.base);
+      const tinta = tintaPara(from, to);
+      expect(Math.min(contraste(tinta, from), contraste(tinta, to))).toBeGreaterThanOrEqual(4.5);
+    }
   });
 });

@@ -10,10 +10,17 @@
 // O campo `fonte` diz de onde veio a cor:
 //   'oficial'     — hex publicado pela marca ou por referência de marca;
 //   'aproximacao' — a cor dominante da marca é fato público (Inter é laranja),
-//                   o hex exato não foi confirmado. É editável pelo usuário.
-// Nenhum hex entra aqui "de memória" sem um destes dois rótulos.
+//                   o hex exato não foi confirmado. É editável pelo usuário;
+//   'informada'   — cor passada pelo dono do produto, sem fonte pública
+//                   confirmada (o PicPay Epic ser preto veio daí);
+//   'derivada'    — extraída do SVG oficial da marca pelo gerador em
+//                   scripts/gerar-emissores-dataset.mjs, não escrita à mão.
+// Nenhum hex entra aqui "de memória" sem um destes rótulos.
 
-export type FonteCor = 'oficial' | 'aproximacao';
+import { EMISSORES_DATASET } from './emissoresDataset.gen';
+import { logoDoIspb } from './logosEmissores';
+
+export type FonteCor = 'oficial' | 'aproximacao' | 'informada' | 'derivada';
 
 export interface Emissor {
   slug: string;
@@ -30,73 +37,85 @@ export interface Emissor {
   logoFg?: string;
   /** Monograma do tile — 1 a 2 caracteres, como a marca se escreve. */
   glifo: string;
+  /**
+   * ISPB de 8 dígitos da instituição, que é a chave do logo no pacote
+   * `logos-bancos-br`. `null` quando o pacote não publica logo da marca — aí
+   * o tile continua no monograma.
+   */
+  ispb: string | null;
   fonte: FonteCor;
 }
 
 export const EMISSORES: Emissor[] = [
   // ── cores confirmadas em fonte de marca ──────────────────────────────
   { slug: 'nubank', rotulo: 'NUBANK', aliases: ['nubank', 'nu', 'roxinho', 'nuconta', 'ultravioleta', 'nubankultravioleta'],
-    base: '#820AD1', glifo: 'nu', fonte: 'oficial' },
+    base: '#820AD1', glifo: 'nu', ispb: '18236120', fonte: 'oficial' },
   { slug: 'itau', rotulo: 'ITAÚ', aliases: ['itau', 'itauunibanco', 'itaupersonnalite', 'personnalite', 'iti', 'itaucard'],
-    base: '#FF6200', glifo: 'i', fonte: 'oficial' },
+    base: '#FF6200', glifo: 'i', ispb: '60701190', fonte: 'oficial' },
   { slug: 'bradesco', rotulo: 'BRADESCO', aliases: ['bradesco', 'bradescard', 'next', 'bradesconext'],
-    base: '#CC092F', glifo: 'b', fonte: 'oficial' },
+    base: '#CC092F', glifo: 'b', ispb: '60746948', fonte: 'oficial' },
   { slug: 'santander', rotulo: 'SANTANDER', aliases: ['santander', 'santanderbrasil', 'sx'],
-    base: '#EA1D25', glifo: 'S', fonte: 'oficial' },
+    base: '#EA1D25', glifo: 'S', ispb: '90400888', fonte: 'oficial' },
   { slug: 'bb', rotulo: 'BANCO DO BRASIL', aliases: ['bb', 'bancodobrasil', 'brasil', 'ourocard'],
-    base: '#0061AA', logoBg: '#FEED08', logoFg: '#0061AA', glifo: 'BB', fonte: 'oficial' },
+    base: '#0061AA', logoBg: '#FEED08', logoFg: '#0061AA', glifo: 'BB', ispb: '00000000', fonte: 'oficial' },
   { slug: 'caixa', rotulo: 'CAIXA', aliases: ['caixa', 'caixaeconomica', 'caixaeconomicafederal', 'cef'],
-    base: '#015CA9', glifo: 'X', fonte: 'oficial' },
+    base: '#015CA9', glifo: 'X', ispb: '00360305', fonte: 'oficial' },
   { slug: 'picpay', rotulo: 'PICPAY', aliases: ['picpay'],
-    base: '#11C76F', glifo: 'P', fonte: 'oficial' },
+    base: '#11C76F', glifo: 'P', ispb: '22896431', fonte: 'oficial' },
   { slug: 'c6', rotulo: 'C6 BANK', aliases: ['c6', 'c6bank', 'c6carbon', 'carbon'],
-    base: '#242424', glifo: 'C6', fonte: 'oficial' },
+    base: '#242424', glifo: 'C6', ispb: '31872495', fonte: 'oficial' },
 
   // ── matiz de marca é fato público; hex exato não confirmado ──────────
   { slug: 'inter', rotulo: 'INTER', aliases: ['inter', 'bancointer', 'intermedium'],
-    base: '#FF7A00', glifo: 'i', fonte: 'aproximacao' },
+    base: '#FF7A00', glifo: 'i', ispb: '00416968', fonte: 'aproximacao' },
   { slug: 'xp', rotulo: 'XP', aliases: ['xp', 'xpinvestimentos', 'rico'],
-    base: '#1A1A1A', logoBg: '#FFC709', logoFg: '#1A1A1A', glifo: 'XP', fonte: 'aproximacao' },
+    base: '#1A1A1A', logoBg: '#FFC709', logoFg: '#1A1A1A', glifo: 'XP', ispb: '33264668', fonte: 'aproximacao' },
   { slug: 'btg', rotulo: 'BTG PACTUAL', aliases: ['btg', 'btgpactual'],
-    base: '#001E62', glifo: 'B', fonte: 'aproximacao' },
+    base: '#001E62', glifo: 'B', ispb: '30306294', fonte: 'aproximacao' },
   { slug: 'mercadopago', rotulo: 'MERCADO PAGO', aliases: ['mercadopago', 'mercadolivre', 'meli', 'mp'],
-    base: '#00B1EA', logoBg: '#FFE600', logoFg: '#00589E', glifo: 'mp', fonte: 'aproximacao' },
+    base: '#00B1EA', logoBg: '#FFE600', logoFg: '#00589E', glifo: 'mp', ispb: '10573521', fonte: 'aproximacao' },
   { slug: 'neon', rotulo: 'NEON', aliases: ['neon', 'banconeon'],
-    base: '#00A3FF', glifo: 'N', fonte: 'aproximacao' },
+    base: '#00A3FF', glifo: 'N', ispb: '20855875', fonte: 'aproximacao' },
   { slug: 'original', rotulo: 'ORIGINAL', aliases: ['original', 'bancooriginal'],
-    base: '#00A868', glifo: 'O', fonte: 'aproximacao' },
+    base: '#00A868', glifo: 'O', ispb: null, fonte: 'aproximacao' },
   { slug: 'will', rotulo: 'WILL BANK', aliases: ['will', 'willbank'],
-    base: '#FFC800', glifo: 'w', fonte: 'aproximacao' },
+    base: '#FFC800', glifo: 'w', ispb: null, fonte: 'aproximacao' },
   { slug: 'pan', rotulo: 'BANCO PAN', aliases: ['pan', 'bancopan', 'panamericano'],
-    base: '#0068B3', glifo: 'P', fonte: 'aproximacao' },
+    base: '#0068B3', glifo: 'P', ispb: '59285411', fonte: 'aproximacao' },
   { slug: 'bmg', rotulo: 'BMG', aliases: ['bmg', 'bancobmg'],
-    base: '#FF6B00', glifo: 'B', fonte: 'aproximacao' },
+    base: '#FF6B00', glifo: 'B', ispb: '61186680', fonte: 'aproximacao' },
   { slug: 'safra', rotulo: 'SAFRA', aliases: ['safra', 'bancosafra', 'jsafra'],
-    base: '#003057', logoBg: '#B99A5B', logoFg: '#003057', glifo: 'S', fonte: 'aproximacao' },
+    base: '#003057', logoBg: '#B99A5B', logoFg: '#003057', glifo: 'S', ispb: '58160789', fonte: 'aproximacao' },
   { slug: 'sicredi', rotulo: 'SICREDI', aliases: ['sicredi'],
-    base: '#3FA110', glifo: 'S', fonte: 'aproximacao' },
+    base: '#3FA110', glifo: 'S', ispb: '01181521', fonte: 'aproximacao' },
   { slug: 'sicoob', rotulo: 'SICOOB', aliases: ['sicoob'],
-    base: '#003641', logoBg: '#7DB61C', logoFg: '#003641', glifo: 'S', fonte: 'aproximacao' },
+    base: '#003641', logoBg: '#7DB61C', logoFg: '#003641', glifo: 'S', ispb: '02038232', fonte: 'aproximacao' },
   { slug: 'banrisul', rotulo: 'BANRISUL', aliases: ['banrisul'],
-    base: '#0072BC', glifo: 'B', fonte: 'aproximacao' },
+    base: '#0072BC', glifo: 'B', ispb: '92702067', fonte: 'aproximacao' },
   { slug: 'brb', rotulo: 'BRB', aliases: ['brb', 'bancodebrasilia'],
-    base: '#005CA9', glifo: 'BRB', fonte: 'aproximacao' },
+    base: '#005CA9', glifo: 'BRB', ispb: '00000208', fonte: 'aproximacao' },
   { slug: 'agibank', rotulo: 'AGIBANK', aliases: ['agibank', 'agi'],
-    base: '#FF6600', glifo: 'A', fonte: 'aproximacao' },
+    base: '#FF6600', glifo: 'A', ispb: '10664513', fonte: 'aproximacao' },
+  // PagBank é o nome que o usuário digita; PagSeguro é a razão social, e é ela
+  // que está no dataset — sem este apelido, "PagBank" não resolvia nada. O hex
+  // é uma das quatro cores do SVG oficial que o pacote publica; qual delas
+  // domina a marca é escolha minha, não medição, por isso 'aproximacao'.
+  { slug: 'pagbank', rotulo: 'PAGBANK', aliases: ['pagbank', 'pagseguro', 'pagsegurointernet', 'pagseguropagbank'],
+    base: '#FFE72D', glifo: 'pb', ispb: '08561701', fonte: 'aproximacao' },
   { slug: 'digio', rotulo: 'DIGIO', aliases: ['digio'],
-    base: '#0F62FE', glifo: 'd', fonte: 'aproximacao' },
+    base: '#0F62FE', glifo: 'd', ispb: '27098060', fonte: 'aproximacao' },
   { slug: 'porto', rotulo: 'PORTO', aliases: ['porto', 'portoseguro', 'portobank'],
-    base: '#0057A6', glifo: 'P', fonte: 'aproximacao' },
+    base: '#0057A6', glifo: 'P', ispb: null, fonte: 'aproximacao' },
   { slug: 'magalu', rotulo: 'MAGALU', aliases: ['magalu', 'magazineluiza', 'luizacred'],
-    base: '#0086FF', glifo: 'M', fonte: 'aproximacao' },
+    base: '#0086FF', glifo: 'M', ispb: '13884775', fonte: 'aproximacao' },
   { slug: 'riachuelo', rotulo: 'RIACHUELO', aliases: ['riachuelo', 'midway'],
-    base: '#E60012', glifo: 'R', fonte: 'aproximacao' },
+    base: '#E60012', glifo: 'R', ispb: '09464032', fonte: 'aproximacao' },
   { slug: 'renner', rotulo: 'RENNER', aliases: ['renner', 'realize', 'realizecfi'],
-    base: '#E30613', glifo: 'R', fonte: 'aproximacao' },
+    base: '#E30613', glifo: 'R', ispb: '27351731', fonte: 'aproximacao' },
   { slug: 'carrefour', rotulo: 'CARREFOUR', aliases: ['carrefour', 'atacadao'],
-    base: '#004E9F', glifo: 'C', fonte: 'aproximacao' },
+    base: '#004E9F', glifo: 'C', ispb: '08357240', fonte: 'aproximacao' },
   { slug: 'ame', rotulo: 'AME', aliases: ['ame', 'amedigital', 'americanas'],
-    base: '#E6007E', glifo: 'a', fonte: 'aproximacao' },
+    base: '#E6007E', glifo: 'a', ispb: null, fonte: 'aproximacao' },
 ];
 
 // ── resolução ──────────────────────────────────────────────────────────
@@ -127,6 +146,28 @@ export const tokensDoEmissor = (valor: string | null | undefined): string[] =>
     .filter(Boolean);
 
 /**
+ * Emissor sintetizado a partir do índice gerado. Não tem rótulo de marca nem
+ * monograma curado: o rótulo é a própria chave, e o glifo sai das iniciais
+ * como em qualquer emissor desconhecido. O que ele traz de valioso é o ISPB
+ * (logo) e a cor extraída do SVG da marca.
+ */
+const doDataset = (chave: string): Emissor | null => {
+  if (!chave) return null;
+  const entrada = EMISSORES_DATASET[chave];
+  if (!entrada) return null;
+  const [ispb, cor] = entrada;
+  return {
+    slug: `dataset:${chave}`,
+    rotulo: chave.toUpperCase(),
+    aliases: [chave],
+    base: cor ?? '#3A3A3A',
+    glifo: chave.slice(0, 2).toUpperCase(),
+    ispb,
+    fonte: 'derivada',
+  };
+};
+
+/**
  * Resolve o emissor pelo campo banco e, se não achar, pelo nome do cartão —
  * muita gente cadastra "Nubank Ultravioleta" só no nome.
  *
@@ -152,7 +193,85 @@ export const resolverEmissor = (
       if (PORALIAS.has(token)) return PORALIAS.get(token)!;
     }
   }
+
+  // Terceira passada: o índice gerado a partir do pacote de logos, que cobre
+  // ~470 instituições que não valem uma entrada escrita à mão ("Crefisa",
+  // "Banestes", "Unicred"). Vem DEPOIS do catálogo curado de propósito: é o
+  // catálogo que protege os falsos positivos conhecidos, e a cor de lá tem
+  // procedência melhor que a derivada do SVG.
+  for (const candidato of candidatos) {
+    const chave = normalizarEmissor(candidato);
+    const achado = doDataset(chave);
+    if (achado) return achado;
+  }
+  for (const candidato of candidatos) {
+    for (const token of tokensDoEmissor(candidato)) {
+      const achado = doDataset(token);
+      if (achado) return achado;
+    }
+  }
   return null;
+};
+
+
+// ── variantes de produto ───────────────────────────────────────────────
+//
+// O emissor dá a cor da marca; o PRODUTO pode ter outra. "PicPay Epic" é
+// preto, e antes disso vinha verde igual ao PicPay comum — a queixa que
+// originou esta camada. A variante entra entre a cor do usuário e a do
+// emissor: cor do usuário > variante > emissor > hash do nome.
+//
+// O casamento é por token do nome, sempre por IGUALDADE com um alias, nunca
+// por `includes` — a mesma regra do catálogo de emissores, pelo mesmo motivo.
+
+export interface Variante {
+  /** Slug do emissor dono da variante; `null` vale para qualquer emissor. */
+  emissor: string | null;
+  /** Tokens normalizados do nome do cartão que ativam a variante. */
+  aliases: string[];
+  base: string;
+  fonte: FonteCor;
+}
+
+export const VARIANTES: Variante[] = [
+  // ── produto específico de um emissor ─────────────────────────────────
+  // Preto informado pelo dono do produto; não há hex publicado confirmado.
+  { emissor: 'picpay', aliases: ['epic'], base: '#0B0B0B', fonte: 'informada' },
+  { emissor: 'nubank', aliases: ['ultravioleta'], base: '#1A1A1A', fonte: 'aproximacao' },
+  { emissor: 'itau', aliases: ['personnalite'], base: '#0F0F0F', fonte: 'aproximacao' },
+  { emissor: 'c6', aliases: ['carbon'], base: '#101010', fonte: 'aproximacao' },
+
+  // ── faixa de produto, válida para qualquer emissor ───────────────────
+  { emissor: null, aliases: ['black'], base: '#0A0A0A', fonte: 'aproximacao' },
+  { emissor: null, aliases: ['infinite'], base: '#14141B', fonte: 'aproximacao' },
+  { emissor: null, aliases: ['signature'], base: '#1C1B22', fonte: 'aproximacao' },
+  { emissor: null, aliases: ['platinum'], base: '#2A2E35', fonte: 'aproximacao' },
+  { emissor: null, aliases: ['gold'], base: '#6B5115', fonte: 'aproximacao' },
+];
+
+/**
+ * Variante do cartão, se houver. A específica do emissor vence a genérica:
+ * "C6 Carbon Black" resolve pela `carbon` do C6, não pela `black` de todo
+ * mundo.
+ */
+export const resolverVariante = (
+  emissor: Emissor | null,
+  entrada: { banco?: string | null; nome?: string | null } | null | undefined,
+): Variante | null => {
+  if (!entrada) return null;
+  const tokens = new Set([
+    ...tokensDoEmissor(entrada.nome),
+    ...tokensDoEmissor(entrada.banco),
+  ]);
+  if (tokens.size === 0) return null;
+
+  let generica: Variante | null = null;
+  for (const v of VARIANTES) {
+    if (!v.aliases.some(a => tokens.has(a))) continue;
+    if (v.emissor && v.emissor === emissor?.slug) return v;
+    if (v.emissor === null && generica === null) generica = v;
+  }
+  return generica;
 };
 
 // ── cor ────────────────────────────────────────────────────────────────
@@ -286,7 +405,14 @@ export interface IdentidadeCartao {
   tinta: string;
   logoBg: string;
   logoFg: string;
+  /**
+   * Asset do logo real da marca, ou `null` quando o emissor não tem logo no
+   * pacote. Quando existe, o tile do cartão troca o monograma pela imagem.
+   */
+  logo: number | null;
   emissor: Emissor | null;
+  /** Variante de produto que definiu a cor ("PicPay Epic"), se houve. */
+  variante: Variante | null;
   /** true quando a cor veio de `cartao.cor`, não do catálogo. */
   corDoUsuario: boolean;
 }
@@ -311,15 +437,20 @@ export const identidadeDoCartao = (
   cartao: { nome?: string | null; banco?: string | null; cor?: string | null } | null | undefined,
 ): IdentidadeCartao => {
   const emissor = resolverEmissor(cartao);
+  const variante = resolverVariante(emissor, cartao);
   const nome = cartao?.nome?.trim() || emissor?.rotulo || 'Cartão';
   const corUsuario = cartao?.cor && HEX_VALIDO.test(cartao.cor) ? cartao.cor : null;
 
   const base = corUsuario
+    // A variante de produto vence a cor do emissor: "PicPay Epic" é preto,
+    // não verde.
+    ?? variante?.base
     ?? emissor?.base
     // Fallback determinístico: matiz do hash, croma e luz fixos, para o cartão
     // de um emissor desconhecido sair harmônico em vez de cinza.
     ?? comLuz(rgbParaHex(...hslParaRgb(hashMatiz(normalizarEmissor(nome) || nome), 0.55, 0.4)), 0.4);
 
+  const logo = logoDoIspb(emissor?.ispb);
   const [from, to] = gradienteDe(base);
   // Tile sem cor propria usa a marca ja dentro do teto de luminancia: crua,
   // uma marca vibrante (vermelho Santander) nao aguenta glifo nenhum em AA.
@@ -331,10 +462,12 @@ export const identidadeDoCartao = (
     to,
     tinta: tintaPara(from, to),
     logoBg: logoBgFinal,
+    logo,
     // Tinta do tile derivada por contraste: marca com fundo claro (laranja,
     // amarelo, verde) nao aguenta glifo branco e reprovaria AA.
     logoFg: emissor?.logoFg ?? tintaPara(logoBgFinal, logoBgFinal),
     emissor,
+    variante,
     corDoUsuario: corUsuario !== null,
   };
 };
