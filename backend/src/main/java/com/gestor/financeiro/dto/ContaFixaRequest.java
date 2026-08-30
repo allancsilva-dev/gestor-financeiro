@@ -41,6 +41,9 @@ public class ContaFixaRequest {
 
     private Long carteiraId;
 
+    /** Destino alternativo a carteiraId: assinatura cobrada no cartao (V67). */
+    private Long cartaoId;
+
     public String getDescricao() {
         return descricao;
     }
@@ -99,10 +102,24 @@ public class ContaFixaRequest {
     public void setExecucaoAutomatica(Boolean execucaoAutomatica) { this.execucaoAutomatica = execucaoAutomatica; }
     public Long getCarteiraId() { return carteiraId; }
     public void setCarteiraId(Long carteiraId) { this.carteiraId = carteiraId; }
+    public Long getCartaoId() { return cartaoId; }
+    public void setCartaoId(Long cartaoId) { this.cartaoId = cartaoId; }
 
-    @AssertTrue(message = "Carteira é obrigatória para execução automática")
-    public boolean isCarteiraAutomaticaInformada() {
-        return !Boolean.TRUE.equals(execucaoAutomatica) || carteiraId != null;
+    // Um destino, nunca dois: a cobranca sai do caixa ou do cartao (V67).
+    @AssertTrue(message = "Informe apenas um destino: conta ou cartão")
+    public boolean isDestinoUnico() {
+        return carteiraId == null || cartaoId == null;
+    }
+
+    @AssertTrue(message = "Destino é obrigatório para execução automática")
+    public boolean isDestinoAutomaticoInformado() {
+        return !Boolean.TRUE.equals(execucaoAutomatica) || carteiraId != null || cartaoId != null;
+    }
+
+    // Cartao cobra; nao se recebe salario no cartao.
+    @AssertTrue(message = "Cartão só aceita recorrência de saída")
+    public boolean isCartaoSomenteSaida() {
+        return cartaoId == null || getTipo() == TipoTransacao.SAIDA;
     }
 
     public void setObservacoes(String observacoes) {

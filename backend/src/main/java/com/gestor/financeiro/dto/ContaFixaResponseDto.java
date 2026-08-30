@@ -20,9 +20,12 @@ public record ContaFixaResponseDto(
     CategoriaResumoDto categoria,
     TipoTransacao tipo,
     Boolean execucaoAutomatica,
-    CarteiraResumo carteira
+    CarteiraResumo carteira,
+    CartaoResumo cartao
 ) {
     public record CarteiraResumo(Long id, String nome) {}
+    /** Metadado de exibicao do cartao; nunca PAN. */
+    public record CartaoResumo(Long id, String nome, String bandeira, String ultimosDigitos) {}
     public static ContaFixaResponseDto fromEntity(ContaFixa contaFixa) {
         return new ContaFixaResponseDto(
             contaFixa.getId(),
@@ -38,7 +41,12 @@ public record ContaFixaResponseDto(
             CategoriaResumoDto.fromEntity(contaFixa.getCategoria()),
             contaFixa.getTipo(),
             contaFixa.getExecucaoAutomatica(),
-            contaFixa.getCarteira() == null ? null : new CarteiraResumo(contaFixa.getCarteira().getId(), contaFixa.getCarteira().getNome())
+            contaFixa.getCarteira() == null ? null : new CarteiraResumo(contaFixa.getCarteira().getId(), contaFixa.getCarteira().getNome()),
+            contaFixa.getConta() == null ? null : new CartaoResumo(
+                contaFixa.getConta().getId(),
+                contaFixa.getConta().getNome(),
+                contaFixa.getConta().getBandeira(),
+                contaFixa.getConta().getUltimosDigitos())
         );
     }
 }

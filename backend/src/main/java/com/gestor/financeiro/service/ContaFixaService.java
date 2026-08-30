@@ -7,6 +7,7 @@ import com.gestor.financeiro.exception.ResourceNotFoundException;
 import com.gestor.financeiro.exception.UnauthorizedAccessException;
 import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Categoria;
+import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.ContaFixa;
 import com.gestor.financeiro.model.ExecucaoRecorrencia;
 import com.gestor.financeiro.model.Transacao;
@@ -17,8 +18,10 @@ import com.gestor.financeiro.model.enums.StatusExecucaoRecorrencia;
 import com.gestor.financeiro.repository.CategoriaRepository;
 import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.ContaFixaRepository;
+import com.gestor.financeiro.repository.ContaRepository;
 import com.gestor.financeiro.repository.ExecucaoRecorrenciaRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -40,6 +43,7 @@ public class ContaFixaService {
     private final TransacaoService transacaoService;
     private final CarteiraRepository carteiraRepository;
     private final ExecucaoRecorrenciaRepository execucaoRepository;
+    private final ContaRepository contaRepository;
 
     
     // Lista contas fixas ativas do usuário
@@ -73,12 +77,25 @@ public class ContaFixaService {
             contaFixa.setTipo(TipoTransacao.SAIDA);
         }
         if (contaFixa.getExecucaoAutomatica() == null) contaFixa.setExecucaoAutomatica(false);
-        resolverCarteira(contaFixa, usuarioId);
+        resolverDestino(contaFixa, usuarioId);
         
         // Calcula próximo vencimento
         calcularProximoVencimento(contaFixa);
         
-        return contaFixaRepository.save(contaFixa);
+        ContaFixa salva = contaFixaRepository.save(contaFixa);
+
+        // Primeira ocorrencia vencida hoje nao pode esperar o scheduler da madrugada:
+        // quem cadastra uma assinatura que ja venceu espera ve-la no mes corrente.
+        //
+        // Roda na mesma transacao do cadastro de proposito: ou a recorrencia existe com a
+        // primeira cobranca feita, ou nao existe. Capturar aqui seria enganoso — a
+        // transacao ja estaria marcada rollback-only e o cadastro morreria no commit.
+        // Saldo insuficiente nao passa por aqui: vira FALHA_SALDO sem lancar.
+        if (Boolean.TRUE.equals(salva.getExecucaoAutomatica())
+                && !salva.getDataProximoVencimento().isAfter(LocalDate.now(clock))) {
+            return realizarAutomatica(salva.getId());
+        }
+        return salva;
     }
     
     // Calcula data do próximo vencimento
@@ -118,6 +135,12 @@ public class ContaFixaService {
         if (!automatico && YearMonth.from(vencimento).isAfter(YearMonth.now(clock))) {
             throw new BusinessException("A próxima ocorrência ainda não está disponível");
         }
+        // Os ids chegam ao scheduler antes do lock: sem revalidar aqui, uma segunda
+        // instancia executaria a ocorrencia que a primeira ja avancou. No caixa o saldo
+        // freia; no cartao nada freiaria.
+        if (automatico && vencimento.isAfter(LocalDate.now(clock))) {
+            return conta;
+        }
         ExecucaoRecorrencia execucao = execucaoRepository
                 .findByContaFixaIdAndDataVencimento(id, vencimento).orElse(null);
         if (execucao != null && (execucao.getStatus() == StatusExecucaoRecorrencia.REALIZADA
@@ -125,22 +148,35 @@ public class ContaFixaService {
             throw new BusinessException("Esta recorrência já foi realizada ou pulada");
         }
 
-        Long carteiraEfetiva = carteiraId != null ? carteiraId
-                : conta.getCarteira() == null ? null : conta.getCarteira().getId();
-        if (carteiraEfetiva == null) throw new BusinessException("Informe a carteira");
-        Carteira carteira = carteiraRepository.findByIdAndUsuarioIdForUpdate(carteiraEfetiva, usuarioId)
-                .orElseThrow(() -> new ResourceNotFoundException("Carteira não encontrada"));
-
+        // Assinatura de cartao nunca debita caixa: o carteiraId do corpo da requisicao
+        // e ignorado quando a recorrencia tem cartao (R5).
+        Conta cartao = conta.getConta();
+        Carteira carteira = null;
         BigDecimal valorEfetivo = valor == null ? conta.getValorPlanejado() : valor;
-        if (conta.getTipo() == TipoTransacao.SAIDA && carteira.getSaldo().compareTo(valorEfetivo) < 0) {
-            if (automatico) registrarFalhaSaldo(conta, execucao, vencimento);
-            if (!automatico) throw new BusinessException("Saldo insuficiente");
-            return conta;
+
+        if (cartao == null) {
+            Long carteiraEfetiva = carteiraId != null ? carteiraId
+                    : conta.getCarteira() == null ? null : conta.getCarteira().getId();
+            if (carteiraEfetiva == null) throw new BusinessException("Informe a carteira");
+            carteira = carteiraRepository.findByIdAndUsuarioIdForUpdate(carteiraEfetiva, usuarioId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Carteira não encontrada"));
+
+            if (conta.getTipo() == TipoTransacao.SAIDA && carteira.getSaldo().compareTo(valorEfetivo) < 0) {
+                if (automatico) registrarFalhaSaldo(conta, execucao, vencimento);
+                if (!automatico) throw new BusinessException("Saldo insuficiente");
+                return conta;
+            }
+        } else if (!Boolean.TRUE.equals(cartao.getAtivo())) {
+            // Cartao removido nao recebe cobranca nova; a recorrencia fica parada, visivel.
+            throw new BusinessException("Cartão da recorrência está inativo");
         }
 
         String chave = "RECORRENCIA:" + conta.getId() + ":" + vencimento;
         Transacao transacao = new Transacao();
-        transacao.setDescricao((conta.getTipo() == TipoTransacao.ENTRADA ? "Recebimento: " : "Pagamento: ") + conta.getNome());
+        // Na fatura, "Pagamento: X" se confunde com pagamento de fatura; a assinatura
+        // aparece pelo proprio nome.
+        transacao.setDescricao(cartao != null ? conta.getNome()
+                : (conta.getTipo() == TipoTransacao.ENTRADA ? "Recebimento: " : "Pagamento: ") + conta.getNome());
         transacao.setData(automatico ? vencimento : LocalDate.now(clock));
         transacao.setTipo(conta.getTipo());
         transacao.setValorTotal(valorEfetivo);
@@ -149,6 +185,7 @@ public class ContaFixaService {
         transacao.setContaFixa(conta);
         transacao.setObservacoes(automatico ? "Execução automática de recorrência" : "Execução manual de recorrência");
         transacao.setCarteira(carteira);
+        transacao.setConta(cartao);
         Transacao salva = transacaoService.criar(transacao, usuarioId, chave);
 
         if (execucao == null) {
@@ -158,7 +195,7 @@ public class ContaFixaService {
         execucao.setTentadoEm(LocalDateTime.now(clock));
         execucao.setMensagemFalha(null);
         execucao.setTransacao(salva);
-        execucaoRepository.save(execucao);
+        gravarExecucao(execucao);
 
         conta.setValorReal(valorEfetivo);
         avancarOcorrencia(conta);
@@ -170,7 +207,8 @@ public class ContaFixaService {
         ContaFixa conta = contaFixaRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Recorrência não encontrada"));
         return realizar(id, conta.getValorPlanejado(),
-                conta.getCarteira() == null ? null : conta.getCarteira().getId(),
+                conta.getConta() != null || conta.getCarteira() == null
+                        ? null : conta.getCarteira().getId(),
                 conta.getUsuario().getId(), true);
     }
 
@@ -180,6 +218,19 @@ public class ContaFixaService {
         execucao.setTentadoEm(LocalDateTime.now(clock));
         execucao.setMensagemFalha("Saldo insuficiente na carteira selecionada");
         execucaoRepository.save(execucao);
+    }
+
+    /**
+     * A unicidade (conta_fixa_id, data_vencimento) e a barreira final contra ocorrencia
+     * duplicada. Numa corrida ela estoura no flush; traduzimos para o mesmo 400 do
+     * caminho sequencial em vez de devolver 500.
+     */
+    private void gravarExecucao(ExecucaoRecorrencia execucao) {
+        try {
+            execucaoRepository.saveAndFlush(execucao);
+        } catch (DataIntegrityViolationException e) {
+            throw new BusinessException("Esta recorrência já foi realizada ou pulada");
+        }
     }
 
     private ExecucaoRecorrencia novaExecucao(ContaFixa conta, LocalDate vencimento) {
@@ -221,7 +272,7 @@ public class ContaFixaService {
         ExecucaoRecorrencia execucao = novaExecucao(conta, vencimento);
         execucao.setStatus(StatusExecucaoRecorrencia.PULADA);
         execucao.setTentadoEm(LocalDateTime.now(clock));
-        execucaoRepository.save(execucao);
+        gravarExecucao(execucao);
         avancarOcorrencia(conta);
 
         return contaFixaRepository.save(conta);
@@ -253,6 +304,7 @@ public class ContaFixaService {
         conta.setTipo(contaAtualizada.getTipo() == null ? TipoTransacao.SAIDA : contaAtualizada.getTipo());
         conta.setExecucaoAutomatica(Boolean.TRUE.equals(contaAtualizada.getExecucaoAutomatica()));
         conta.setCarteira(contaAtualizada.getCarteira());
+        conta.setConta(contaAtualizada.getConta());
         
         if (contaAtualizada.getCategoria() != null && contaAtualizada.getCategoria().getId() != null) {
             Categoria categoria = categoriaRepository.findByIdAndUsuarioId(
@@ -262,7 +314,7 @@ public class ContaFixaService {
         }
         
         conta.setObservacoes(contaAtualizada.getObservacoes());
-        resolverCarteira(conta, usuarioId);
+        resolverDestino(conta, usuarioId);
         
         // Recalcula próximo vencimento
         calcularProximoVencimento(conta);
@@ -309,12 +361,31 @@ public class ContaFixaService {
                 usuarioId, StatusExecucaoRecorrencia.FALHA_SALDO);
     }
 
-    private void resolverCarteira(ContaFixa conta, Long usuarioId) {
+    /**
+     * Um destino, nunca dois: a cobranca sai do caixa (carteira) ou do cartao (V67).
+     * Valida em 400 o que os CHECKs da V67 so pegariam como 500.
+     */
+    private void resolverDestino(ContaFixa conta, Long usuarioId) {
         Long carteiraId = conta.getCarteira() == null ? null : conta.getCarteira().getId();
-        if (Boolean.TRUE.equals(conta.getExecucaoAutomatica()) && carteiraId == null)
-            throw new BusinessException("Carteira é obrigatória para execução automática");
+        Long cartaoId = conta.getConta() == null ? null : conta.getConta().getId();
+
+        if (carteiraId != null && cartaoId != null)
+            throw new BusinessException("Informe apenas um destino: conta ou cartão");
+        if (Boolean.TRUE.equals(conta.getExecucaoAutomatica()) && carteiraId == null && cartaoId == null)
+            throw new BusinessException("Destino é obrigatório para execução automática");
+        if (cartaoId != null && conta.getTipo() != TipoTransacao.SAIDA)
+            throw new BusinessException("Cartão só aceita recorrência de saída");
+
         if (carteiraId != null) conta.setCarteira(carteiraRepository.findByIdAndUsuarioId(carteiraId, usuarioId)
                 .orElseThrow(() -> new ResourceNotFoundException("Carteira não encontrada")));
         else conta.setCarteira(null);
+
+        if (cartaoId != null) {
+            Conta cartao = contaRepository.findByIdAndUsuarioId(cartaoId, usuarioId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Cartão não encontrado"));
+            if (!Boolean.TRUE.equals(cartao.getAtivo()))
+                throw new BusinessException("Cartão está inativo");
+            conta.setConta(cartao);
+        } else conta.setConta(null);
     }
 }

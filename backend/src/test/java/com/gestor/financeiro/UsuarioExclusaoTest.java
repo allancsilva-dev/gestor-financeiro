@@ -4,7 +4,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.model.RefreshToken;
 import com.gestor.financeiro.model.Usuario;
+import com.gestor.financeiro.model.Conta;
+import com.gestor.financeiro.model.ContaFixa;
+import com.gestor.financeiro.model.enums.StatusPagamento;
+import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.AnexoRepository;
+import com.gestor.financeiro.repository.ContaFixaRepository;
+import com.gestor.financeiro.service.CartaoService;
 import com.gestor.financeiro.repository.CategoriaRepository;
 import com.gestor.financeiro.repository.RefreshTokenRepository;
 import com.gestor.financeiro.repository.TransacaoRepository;
@@ -58,6 +64,12 @@ class UsuarioExclusaoTest {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private ContaFixaRepository contaFixaRepository;
+
+    @Autowired
+    private CartaoService cartaoService;
 
     private Usuario alice;
     private Usuario bob;
@@ -113,5 +125,40 @@ class UsuarioExclusaoTest {
         assertThat(usuarioRepository.count()).isEqualTo(1);
         assertThat(transacaoRepository.count()).isEqualTo(1);
         assertThat(refreshTokenRepository.count()).isEqualTo(1);
+    }
+
+    /**
+     * V67 ligou contas_fixas a contas (cartao). O manifesto apaga contas_fixas antes
+     * de contas; sem essa ordem a FK barraria a exclusao do titular.
+     */
+    @Test
+    @WithMockUser(username = "alice@teste.com")
+    void excluirConta_comAssinaturaDeCartao_naoEsbarraNaFk() throws Exception {
+        Conta novo = new Conta();
+        novo.setNome("Cartao");
+        novo.setDiaFechamento(10);
+        novo.setDiaVencimento(20);
+        Conta cartao = cartaoService.criar(novo, alice.getId());
+
+        ContaFixa netflix = new ContaFixa();
+        netflix.setUsuario(alice);
+        netflix.setNome("Netflix");
+        netflix.setValorPlanejado(new BigDecimal("60.00"));
+        netflix.setDiaVencimento(15);
+        netflix.setStatus(StatusPagamento.PENDENTE);
+        netflix.setTipo(TipoTransacao.SAIDA);
+        netflix.setExecucaoAutomatica(true);
+        netflix.setRecorrente(true);
+        netflix.setAtivo(true);
+        netflix.setConta(cartao);
+        contaFixaRepository.saveAndFlush(netflix);
+
+        mockMvc.perform(delete("/api/v1/usuarios/me")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of("senha", "Senha1234"))))
+            .andExpect(status().isNoContent());
+
+        assertThat(usuarioRepository.findByEmail("alice@teste.com")).isEmpty();
+        assertThat(contaFixaRepository.findByUsuarioId(alice.getId())).isEmpty();
     }
 }

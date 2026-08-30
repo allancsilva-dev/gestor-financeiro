@@ -14,6 +14,7 @@ import com.gestor.financeiro.dto.CarteiraCartaoResponse;
 import com.gestor.financeiro.dto.FaturaResumoDto;
 import com.gestor.financeiro.model.FaturaCartao;
 import com.gestor.financeiro.repository.CarteiraRepository;
+import com.gestor.financeiro.repository.ContaFixaRepository;
 import com.gestor.financeiro.repository.ContaRepository;
 import com.gestor.financeiro.repository.FaturaCartaoRepository;
 import com.gestor.financeiro.repository.FaturaLancamentoRepository;
@@ -45,6 +46,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class CartaoService {
     private final ContaRepository contaRepository;
+    private final ContaFixaRepository contaFixaRepository;
     private final UsuarioRepository usuarioRepository;
     private final CarteiraRepository carteiraRepository;
     private final FaturaCartaoRepository faturaCartaoRepository;
@@ -263,10 +265,17 @@ public class CartaoService {
                 com.gestor.financeiro.model.enums.FaturaStatus.ABERTA.name());
     }
 
+    /**
+     * Desativa o cartao e, junto, as recorrencias que cobravam nele: continuar lancando
+     * assinatura na fatura de um cartao que o titular removeu seria cobranca invisivel.
+     *
+     * @return quantas recorrencias foram desativadas junto
+     */
     @Transactional
-    public void deletarCartao(Long id, Long usuarioId) {
+    public int deletarCartao(Long id, Long usuarioId) {
         Conta cartao = buscarCartaoDoUsuario(id, usuarioId);
         cartao.setAtivo(false);
         contaRepository.save(cartao);
+        return contaFixaRepository.desativarPorConta(cartao.getId());
     }
 }

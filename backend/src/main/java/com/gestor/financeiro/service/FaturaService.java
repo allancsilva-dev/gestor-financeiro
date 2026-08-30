@@ -234,6 +234,18 @@ public class FaturaService {
 
     @Transactional
     public void registrarCompraCartao(Transacao transacao, Long usuarioId) {
+        registrarCompraCartao(transacao, usuarioId, null);
+    }
+
+    /**
+     * Compra de cartao nao movimenta caixa, entao a chave de idempotencia do chamador
+     * nao chegava ao ledger (TransacaoService.registrarMovimentoCriacao retorna cedo sem
+     * carteira). Quando informada, a chave passa a identificar a operacao agrupadora, com
+     * payload estavel por ocorrencia — nao derivado do id da transacao, que muda a cada
+     * tentativa.
+     */
+    @Transactional
+    public void registrarCompraCartao(Transacao transacao, Long usuarioId, String idempotencyKey) {
         if (!isCompraCartao(transacao)) {
             return;
         }
@@ -260,8 +272,12 @@ public class FaturaService {
                 com.gestor.financeiro.model.enums.PoliticaOperacao.COMPETENCIA,
                 com.gestor.financeiro.model.enums.OrigemOperacaoFinanceira.MANUAL,
                 transacao.getData().atStartOfDay(),
-                null,
-                "compra-cartao|transacao=" + transacao.getId(),
+                idempotencyKey,
+                idempotencyKey != null
+                        ? "compra-cartao|chave=" + idempotencyKey
+                                + "|cartao=" + transacao.getConta().getId()
+                                + "|valor=" + transacao.getValorTotal().toPlainString()
+                        : "compra-cartao|transacao=" + transacao.getId(),
                 transacao.getDescricao(),
                 null));
 

@@ -4,6 +4,8 @@ import com.gestor.financeiro.model.enums.StatusPagamento;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import jakarta.persistence.*;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
@@ -27,6 +29,14 @@ public class ContaFixa {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "carteira_id")
     private Carteira carteira;
+
+    // Destino alternativo a carteira: assinatura cobrada no cartao (V67).
+    // Exclusoes de Lombok porque @Data percorreria o proxy lazy em toString/equals.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "conta_id")
+    @ToString.Exclude
+    @EqualsAndHashCode.Exclude
+    private Conta conta;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)

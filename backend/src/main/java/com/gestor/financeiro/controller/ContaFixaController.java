@@ -7,6 +7,7 @@ import com.gestor.financeiro.dto.ValorRequest;
 import com.gestor.financeiro.dto.ExecucaoRecorrenciaDto;
 import com.gestor.financeiro.model.Carteira;
 import com.gestor.financeiro.model.Categoria;
+import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.ContaFixa;
 import com.gestor.financeiro.security.AuthenticatedUserService;
 import com.gestor.financeiro.service.ContaFixaService;
@@ -129,6 +130,11 @@ public class ContaFixaController {
             Carteira carteira = new Carteira();
             carteira.setId(request.getCarteiraId());
             contaFixa.setCarteira(carteira);
+        }
+        if (request.getCartaoId() != null) {
+            Conta cartao = new Conta();
+            cartao.setId(request.getCartaoId());
+            contaFixa.setConta(cartao);
         }
 
         Categoria categoria = new Categoria();

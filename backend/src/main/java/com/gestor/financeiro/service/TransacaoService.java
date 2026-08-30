@@ -221,7 +221,9 @@ public class TransacaoService {
 
         registrarMovimentoCriacao(salva, usuarioId, ledgerIdempotencyKey, operacao);
         if (compraCartao) {
-            faturaService.registrarCompraCartao(salva, usuarioId);
+            // Compra de cartao nao passa pelo ledger de caixa; a chave viaja pela
+            // operacao agrupadora para nao se perder (ADR-0009).
+            faturaService.registrarCompraCartao(salva, usuarioId, ledgerIdempotencyKey);
         }
 
         return salva;
