@@ -2,8 +2,33 @@
 
 Documentacao de alto nivel sobre como o sistema funciona. Mantido pelo `docs-reporter`.
 
-**Ultima atualizacao:** 2026-08-29, terceira rodada do dia (working tree nao commitado, mesma sessao
-das correcoes de PROB-0092/0093/0094): dono do produto pediu verificacao de que as correcoes
+**Ultima atualizacao:** 2026-08-29, quarta rodada do dia (working tree nao commitado): dono do
+produto tentou cadastrar a assinatura da Netflix (R$60/mes no cartao de credito) e nao encontrou
+como — PROB-0098. Diagnostico: o motor de recorrencia (`ContaFixa`/`ExecucaoRecorrencia`/
+`RecorrenciaScheduler`) so sabia debitar caixa (`carteira_id`); no cartao so existia parcelamento.
+Migration `V67__recorrencia_cartao.sql` (expand puro, ADR-0015) da a `ContaFixa` dois destinos
+mutuamente exclusivos — `carteira_id` (caixa) ou `conta_id` (cartao) —, seguindo o padrao "um
+destino, nunca dois" da V55; o ramo cartao reaproveita `TransacaoService.criar` →
+`FaturaService.registrarCompraCartao` sem duplicar regra de fatura (ADR-0001). Cinco defeitos
+pre-existentes no motor de recorrencia foram corrigidos na mesma sessao para o cartao poder usar o
+motor com seguranca — ver item 29 abaixo e BUG-0098 a BUG-0102: (1) `Idempotency-Key` descartada em
+qualquer compra de cartao; (2) execucao automatica nao revalidava vencimento sob lock (dupla
+execucao com duas instancias); (3) `carteiraId` do corpo desviava cobranca de cartao para o caixa;
+(4) corrida no unique de `execucoes_recorrencia` devolvia 500 em vez de 422; (5) exclusao de cartao
+nao desativava assinaturas vinculadas. Backend 501 testes (0 falhas, +10 `ContaFixaCartaoTest`, +1
+`UsuarioExclusaoTest`), mobile 447 testes/40 suites (0 falhas), `scripts/verify-postgres-
+migrations.sh` exit 0 (v67 em PostgreSQL 16 real). Runtime (backend 8081, banco limpo): assinatura
+criada com `cartao` no response, cobranca lancada na fatura correta sem parcelas, reexecucao 422 sem
+duplicar, `carteiraId` no corpo ignorado para cartao, DELETE do cartao (204) desativou as
+assinaturas, restart preservou as contagens (recuperarAoIniciar nao duplicou). Mobile:
+`NovaTransacaoModal` ganhou switch "Repete todo mes" (SAIDA, fora do assistente),
+`app/(app)/more/contas-fixas.tsx` ganhou seletor "Cobrar em" (Conta/Cartao), novo
+`mobile/src/domain/recorrencia.ts` espelha o calculo de proximo vencimento so para exibicao. Web
+fora de escopo por decisao mobile-first ja registrada (BACKLOG-0115). Ver PROB-0098,
+BUG-0098/0099/0100/0101/0102 e BACKLOG-0120 a BACKLOG-0126 para o detalhamento completo.
+
+**Atualizacao anterior (mesmo dia, terceira rodada):** 2026-08-29 (working tree nao commitado, mesma
+sessao das correcoes de PROB-0092/0093/0094): dono do produto pediu verificacao de que as correcoes
 estavam "100% funcionais para o UI/UX" — teste unitario nao prova layout, entao a verificacao foi
 feita no simulador iOS (iPhone 17 Pro, iOS 26.5, tema escuro) com Maestro. Foram necessarias **8
 rodadas ate o primeiro verde legitimo**, e o motivo e o achado mais grave da rodada: PROB-0095, o
@@ -180,7 +205,7 @@ Contagens conferidas em 2026-08-29.
 | `security/` | Contexto de autenticacao | AuthenticatedUserService |
 | `service/` | Regras de negocio | **134 classes**: 50 na raiz + 84 em sete subpacotes (`assistant/`, `importacao/`, `job/`, `meta/`, `notificacao/`, `orcamento/`, `recorrencia/`) |
 | `util/` | Utilitarios | PaginationUtils |
-| `db/migration/` | Schema versionado | **64 migrations**, numeradas ate `V65` (a serie tem lacunas de numeracao) |
+| `db/migration/` | Schema versionado | **66 migrations**, numeradas ate `V67` (a serie tem lacunas de numeracao) |
 
 ### Frontend web (`frontend/src/`)
 
@@ -205,7 +230,7 @@ assistente no SPA (decisao registrada no ADR-0017). Ultimo commit tocando `front
 | `src/notificacoes/` | Registro de push; guarda por `Device.isDevice` (PROB-0087) |
 | `src/context/` | AuthContext, TemaContext (desde 2026-08-21 — escolha de tema pelo usuario) |
 | `src/services/` | **24 arquivos**, incluindo `api.ts` (axios + interceptors) e os services de dominio (`assistantService`, `importacaoService`, `notificacaoService`, `usuarioService`) |
-| `src/__tests__/` | **39 arquivos de teste**, 434 casos (Jest + Testing Library) |
+| `src/__tests__/` | **40 arquivos de teste**, 447 casos (Jest + Testing Library) — inclui `recorrenciaCartao.test.tsx` (novo, 2026-08-29) |
 | `.maestro/` | 11 flows E2E: seis do assistente (`assistant-*`), `financial-critical`, `smoke-auth`, `privacy-consent`, `recovery-navigation`, `importacao-mobile` |
 | `src/theme/` | Tema dark/light — desde 2026-08-21 o esquema efetivo (`useEsquema()`/`useTheme()` em `theme/index.ts`) le `TemaContext` quando presente (escolha do usuario em Ajustes, persistida em `src/store/temaPreferido.ts` via SecureStore) e cai em `useColorScheme()` do SO quando nao ha provider ou a preferencia e `sistema` — antes so seguia o SO, sem opt-out |
 | `src/domain/periodo.ts` | Desde 2026-08-21 — `iso`, competencia, aritmetica de mes e intervalo de periodo em hora local, centralizados (antes reescrito inline em 6+ telas); testado em `src/__tests__/periodo.test.ts` |
@@ -313,7 +338,7 @@ O sistema e **single-tenant** — nao ha multi-tenancy corporativa. Cada usuario
 16. **Invariante centralizado de limite de cartao:** `Conta.valorGasto == soma dos lancamentos em faturas nao pagas menos pagamentos ja feitos` (inclui compras, ajustes, estornos e pagamentos parciais). Helpers privados `criarLancamento`/`removerLancamentoDeFaturaAberta`/`ajustarLimiteUtilizado` em `FaturaService` sao o unico ponto que ajusta `valorGasto` para compras de cartao; `TransacaoService` deixou de chamar `contaService.adicionarGasto`/`removerGasto` para transacoes que sao compra de cartao (mantido apenas para contas que nao sao cartao de credito). `pagarFatura` libera limite pelo valor pago.
 17. **Mobile ganhou edicao/exclusao de transacao (`EditarTransacaoModal`):** desde 2026-07-09 (PROB-0045/BUG-0027), tocar numa linha de `mobile/app/(app)/transacoes.tsx` abre um sheet que edita apenas os campos que o backend de fato aplica em `PUT /api/v1/transacoes/{id}` (valor, descricao, data, observacoes); tipo/categoria/forma de pagamento sao exibidos como contexto fixo, nao editavel, pois o backend os ignora. Compra de cartao exibe aviso de que a edicao/exclusao ressincroniza faturas via `FaturaService.ressincronizarCompraCartao`/`cancelarCompraCartao` (PROB-0044).
 18. **Badge de status/tipo de lancamento na fatura em mobile e web:** desde 2026-07-11 (BUG-0052), `mobile/app/(app)/more/faturas.tsx` e `frontend/src/pages/Faturas.tsx` exibem chip de tipo para `ESTORNO`/`AJUSTE` e removem o prefixo textual `"Ajuste: "`/`"Estorno: "` da descricao exibida.
-19. **Recorrências são ocorrências mensais idempotentes:** desde 2026-07-14 (BUG-0066), `ContaFixa` representa entrada ou saída e pode ser manual ou automática. `execucoes_recorrencia` registra vencimento/status/tentativa/falha/transação com unicidade `(conta_fixa_id, data_vencimento)`; a carteira e a recorrência são bloqueadas antes do lançamento e o ledger recebe a chave `RECORRENCIA:{id}:{data}`. O scheduler roda às 00:05 em `America/Sao_Paulo` e também no `ApplicationReadyEvent` para recuperar ocorrências perdidas. Saída sem saldo permanece `FALHA_SALDO`, não cria transação e não permite saldo negativo.
+19. **Recorrências são ocorrências mensais idempotentes:** desde 2026-07-14 (BUG-0066), `ContaFixa` representa entrada ou saída e pode ser manual ou automática. `execucoes_recorrencia` registra vencimento/status/tentativa/falha/transação com unicidade `(conta_fixa_id, data_vencimento)`; a carteira e a recorrência são bloqueadas antes do lançamento e o ledger recebe a chave `RECORRENCIA:{id}:{data}`. O scheduler roda às 00:05 em `America/Sao_Paulo` e também no `ApplicationReadyEvent` para recuperar ocorrências perdidas. Saída sem saldo permanece `FALHA_SALDO`, não cria transação e não permite saldo negativo. **Desde 2026-08-29 (PROB-0098):** o destino da cobrança deixou de ser exclusivamente a carteira (caixa) — `ContaFixa` agora aceita `carteira_id` **ou** `conta_id` (cartão), mutuamente exclusivos; ver item 29 abaixo para o detalhamento completo (migration `V67`, correções de idempotência/lock/exclusão de cartão).
 20. **Dados mobile protegidos sem apagar a sessão:** tokens e usuário continuam no SecureStore, enquanto `AppLockGate` bloqueia cold start e retornos após 60 segundos em segundo plano. O desbloqueio aceita biometria/credencial do aparelho ou validação online da senha; a senha nunca é persistida. O estado `inactive/background` cobre imediatamente a interface para impedir captura dos valores pelo seletor de apps. **Desde 2026-08-22 (PROB-0085/BUG-0097):** tanto o desbloqueio por biometria quanto por senha chamam `refreshAccessToken()` contra o servidor antes de liberar a UI — antes, o desbloqueio era puramente local (só validava a biometria/senha e abria o cadeado), então uma sessão morta havia dias no servidor ficava "desbloqueada" sem que o app percebesse. Falha de rede ainda libera a UI normalmente (tolerância offline mantida); sessão recusada pelo servidor aciona o encerramento de sessão (ver item na seção "Fluxo de autenticacao"). Biometria continua sem proteger o token em repouso no `SecureStore` (`requireAuthentication` não usado) — risco residual registrado em BACKLOG-0104.
 19. **Rollover de credito/saldo devedor de fatura e lazy na leitura, sem endpoint de fechamento nem scheduler:** desde 2026-07-11 (BUG-0053), decisao do dono do produto foi nao criar um passo explicito de "fechar fatura" — o status `FECHADA` continua derivado (BUG-0020) e o rollover (`FaturaService.liquidarFaturaAnterior`) e disparado ao materializar a proxima fatura de competencia (`buscarAtual`/`buscarPorMes`/`criarOuBuscarFatura`), liquidando recursivamente faturas anteriores ja fechadas. Ver secao "Regra de produto: credito de fatura e saldo devedor rolado".
 20. **Resolucao de IP do cliente via `forward-headers-strategy=native` (Tomcat `RemoteIpValve`), nao `framework`:** desde 2026-07-14 (PROB-0066/BUG-0059), o Spring deixou de confiar diretamente em todo o `X-Forwarded-For` recebido — o Tomcat resolve o IP real a partir de uma lista fechada de proxies internos confiaveis (`internal-proxies`, loopback + faixas privadas Docker). A env var `SERVER_FORWARD_HEADERS_STRATEGY` nos `docker-compose.*.yml` sobrepoe o valor do profile — os dois precisam estar alinhados. Decisao acoplada a uma premissa de infraestrutura: o proxy mais externo (nginx standalone ou Nginx Proxy Manager) precisa sempre normalizar/anexar o `X-Forwarded-For` com o IP real de conexao, nunca repassar cegamente o header do cliente.
@@ -736,8 +761,8 @@ descreviam o sistema de julho e foram removidos ou reescritos — o estado real 
 
 ### Cobertura e automacao
 
-1. **Migrations versionadas (Flyway):** `V1__baseline_schema.sql` ate `V66__carteira_principal.sql`, **65 arquivos** (a numeracao tem lacunas), com `ddl-auto=validate` em dev e prod. PROB-0006 resolvido. `V66` valida contra PostgreSQL 16 real via `scripts/verify-postgres-migrations.sh` (2026-08-29).
-2. **Testes existem nas tres frentes:** backend **481** testes, mobile **437** (39 suites Jest), web **12** arquivos de teste Vitest — o web segue a frente menos coberta.
+1. **Migrations versionadas (Flyway):** `V1__baseline_schema.sql` ate `V67__recorrencia_cartao.sql`, **66 arquivos** (a numeracao tem lacunas), com `ddl-auto=validate` em dev e prod. PROB-0006 resolvido. `V67` valida contra PostgreSQL 16 real via `scripts/verify-postgres-migrations.sh` (2026-08-29).
+2. **Testes existem nas tres frentes:** backend **501** testes, mobile **447** (40 suites Jest), web **12** arquivos de teste Vitest — o web segue a frente menos coberta.
 3. **E2E mobile existe:** 11 flows Maestro em `mobile/.maestro/`, incluindo os seis do assistente. Nao ha Detox. O gate `mobile-maestro.yml` roda no CI.
 4. **CI existe:** GitHub Actions (`ci.yml`, `mobile-maestro.yml`, `mobile-release.yml`). Deploy segue manual.
 5. **Integracao PostgreSQL depende de Docker local:** `mvn verify -Pintegration-test` e `scripts/verify-postgres-migrations.sh` exigem daemon Docker acessivel; em sandbox sem Docker esses gates nao rodam e isso ja mascarou rodadas anteriores como "verdes".
@@ -763,6 +788,9 @@ descreviam o sistema de julho e foram removidos ou reescritos — o estado real 
 17. **Edicao de compra parcelada recalcula o cronograma inteiro:** parcelas em faturas pagas ficam imutaveis e a diferenca entra como `AJUSTE` na proxima fatura aberta.
 18. **Idempotencia do rollover sem teste contra o unique index:** o schema de teste (H2) nao cria `ux_fatura_rollover_origem_tipo`, entao so o guard de codigo e exercitado; concorrencia real de duas threads nao tem cobertura.
 19. **Ledger so movimenta com `carteiraId` explicito:** e decisao de design, mas obriga todo cliente a enviar a carteira; transacoes antigas sem carteira nao ganharam movimento retroativo (BACKLOG-0045).
+19b. **Recorrencia de cartao so sabe periodicidade mensal (2026-08-29, PROB-0098):** `ContaFixa.plusMonths(1)` e hard-coded; assinaturas anuais/semanais/quinzenais nao tem caminho de cadastro (BACKLOG-0120).
+19c. **`CarteiraService.deletar` nao verifica `contas_fixas` (2026-08-29, achado colateral de PROB-0098):** mesma classe de furo que `CartaoService.deletarCartao` tinha antes de BUG-0102 — uma carteira sem `movimentos_carteira`, mas referenciada por uma recorrencia, pode estourar FK `RESTRICT` como 500 em vez de um 422 informativo (BACKLOG-0122).
+19d. **Estouro de limite de cartao nao notifica o usuario (2026-08-29, PROB-0098):** decisao do dono do produto foi lancar e avisar, nunca bloquear; o "lancar" existe (nao ha validacao de limite alguma hoje — `Conta.limiteTotal` e informativo), o "avisar" ainda nao foi implementado (BACKLOG-0125).
 
 ### Assistente
 
@@ -778,6 +806,7 @@ descreviam o sistema de julho e foram removidos ou reescritos — o estado real 
 26. **Push sem `extra.eas.projectId` e sem credenciais APNs/FCM:** o registro desiste em silencio; aviso so chega na caixa in-app (BACKLOG-0110).
 27. **Sem cache de API (Redis):** nem para respostas frequentes, nem para refresh token — banco lento afeta toda autenticacao.
 28. **Node 20 e o exigido pelo projeto:** a rodada de 2026-08-29 correu em Node 26 sem falha observada, mas o runbook continua pedindo 20.
+29. **`ContaFixa` ganhou dois destinos de cobranca mutuamente exclusivos — caixa (`carteira_id`) ou cartao (`conta_id`) — na migration `V67` (2026-08-29, PROB-0098):** ate entao o motor de recorrencia so sabia debitar caixa; uma assinatura cobrada no cartao (ex.: Netflix) nao tinha caminho de cadastro, so parcelamento. `V67__recorrencia_cartao.sql` (expand puro, ADR-0015) segue o padrao "um destino, nunca dois" ja usado na V55: adiciona `contas_fixas.conta_id`, troca `ck_contas_fixas_automatica_carteira` por `ck_contas_fixas_destino_automatico` e adiciona `ck_contas_fixas_destino_unico`/`ck_contas_fixas_cartao_saida`; cada `CHECK` tem validacao equivalente em `ContaFixaService.resolverDestino` devolvendo 4xx antes de chegar ao banco (exclusividade, ownership do cartao 404, cartao inativo 422, ENTRADA+cartao 400). O ramo cartao cria `Transacao` com `conta` setada e `carteira=null`; como `TransacaoService.criar` ja chamava `FaturaService.registrarCompraCartao`, nenhuma regra de fatura foi reescrita ou duplicada (ADR-0001). **Mudanca de semantica de idempotencia (BUG-0098):** `TransacaoService.registrarMovimentoCriacao` descartava `ledgerIdempotencyKey` silenciosamente sempre que `carteira == null` — ou seja, em qualquer compra de cartao, nao so recorrencia; `FaturaService.registrarCompraCartao` ganhou sobrecarga `(Transacao, Long, String idempotencyKey)` que propaga a chave para `CriarOperacaoCommand` quando presente (a versao de 2 argumentos delega com `null`, nenhum chamador existente muda de comportamento). Decisoes do dono do produto: assinatura de cartao e automatica por padrao; criacao exposta no botao "Nova" e na tela Recorrencias; estouro de limite lanca e avisa, nunca bloqueia (nao ha validacao de limite alguma hoje — `Conta.limiteTotal` e informativo — entao o "avisar" fica pendente, ver BACKLOG-0125). Quatro outros defeitos pre-existentes do motor de recorrencia foram corrigidos na mesma sessao para o cartao poder usar o motor com seguranca: execucao automatica nao revalidava vencimento sob lock (BUG-0099, risco de dupla execucao com duas instancias, vale para os dois destinos); `carteiraId` do corpo da requisicao de `realizar` desviava cobranca de cartao para o caixa (BUG-0100); corrida no unique de `execucoes_recorrencia` devolvia 500 em vez de 422 (BUG-0101); exclusao de cartao (soft delete) nao desativava assinaturas vinculadas (BUG-0102, novo `ContaFixaRepository.desativarPorConta`). Evidencia: backend 501 testes/0 falhas (10 novos em `ContaFixaCartaoTest`, +1 em `UsuarioExclusaoTest` para a FK nova na exclusao LGPD), mobile 447 testes/40 suites/0 falhas, `scripts/verify-postgres-migrations.sh` exit 0 contra PostgreSQL 16 real. Riscos residuais e pendencias em BACKLOG-0120 a BACKLOG-0126 (frequencia so mensal, refactor de `@Data`, `CarteiraService.deletar` com o mesmo tipo de furo de FK para `contas_fixas`, flag morta `Transacao.recorrente`, sugestao de recorrencia detectada nao herda cartao, notificacao de estouro de limite, paridade web). Ver PROB-0098 para o relato completo do sintoma/causa/correcao.
 
 ## Pontos frageis atuais
 

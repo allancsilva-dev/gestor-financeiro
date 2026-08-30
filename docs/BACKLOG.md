@@ -2222,3 +2222,149 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   ampliada — em particular na faixa de status bar (`mobile/app/(app)/_layout.tsx`) e no onboarding —
   passam despercebidas até um usuário reportar.
 - **Status:** ABERTO
+
+---
+
+## BACKLOG-0120 — Frequência de recorrência é hard-coded mensal
+
+- **Titulo:** `ContaFixa` só sabe `plusMonths(1)` — não há recorrência semanal/quinzenal/anual
+- **Prioridade:** P2
+- **Área:** backend
+- **Motivo:** descoberto/reconfirmado durante a entrega da recorrência de cartão (PROB-0098,
+  2026-08-29); toda a lógica de próximo vencimento (`calcularProximoVencimento` no backend e o
+  espelho mobile `mobile/src/domain/recorrencia.ts`) assume mensal. Uma assinatura anual (ex.: Amazon
+  Prime) ou semanal não tem como ser modelada corretamente hoje.
+- **Dependências:** decisão de produto sobre quais frequências suportar (semanal, quinzenal, anual) e
+  se o campo fica em `ContaFixa` (nova coluna `frequencia`) ou vira um cadastro separado.
+- **Critério de aceite:** `ContaFixa` aceita ao menos uma frequência diferente de mensal, com teste
+  cobrindo o cálculo de próximo vencimento e paridade mobile.
+- **Risco se ficar pendente:** qualquer assinatura com cobrança não-mensal continua sem caminho de
+  cadastro (mesmo sintoma de origem do PROB-0098, só que para outra periodicidade).
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0121 — `@Data` (Lombok) nas entidades JPA é superfície de risco ampla
+
+- **Titulo:** Trocar `@Data` por anotações explícitas nas entidades — risco amplo, merece PR próprio
+- **Prioridade:** P3
+- **Área:** backend
+- **Motivo:** `ContaFixa.conta` precisou de `@ToString.Exclude`/`@EqualsAndHashCode.Exclude` manuais
+  nesta entrega (PROB-0098) porque a entidade usa `@Data` com relações LAZY — `@Data` gera
+  `equals`/`hashCode`/`toString` sobre todos os campos por padrão, incluindo relações lazy, o que
+  pode disparar `LazyInitializationException` ou N+1 acidental em qualquer entidade nova que ganhe
+  uma relação. Decisão desta sessão foi tratar caso a caso (exclude pontual), não ampliar a correção
+  para um refactor geral.
+- **Dependências:** nenhuma técnica; é decisão de escopo/tempo (PR isolado, toca todas as entidades
+  JPA do projeto).
+- **Critério de aceite:** entidades JPA com anotações explícitas (`@Getter`/`@Setter`/
+  `@EqualsAndHashCode(of = ...)`/`@ToString(exclude = ...)`) em vez de `@Data` genérico, sem
+  regressão de comportamento.
+- **Risco se ficar pendente:** repetição do mesmo tipo de correção pontual toda vez que uma entidade
+  ganhar uma relação nova — risco cumulativo de alguém esquecer o exclude e reintroduzir o problema.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0122 — `CarteiraService.deletar` não verifica `contas_fixas` (FK RESTRICT pode devolver 500)
+
+- **Titulo:** Exclusão de carteira sem `movimentos_carteira`, mas referenciada por uma recorrência,
+  ainda pode estourar FK `RESTRICT` como 500
+- **Prioridade:** P2
+- **Área:** backend
+- **Motivo:** pré-existente, não introduzido pela entrega da recorrência de cartão (PROB-0098) —
+  identificado como efeito colateral ao adicionar `conta_id` a `contas_fixas`.
+  `CarteiraService.deletar` bloqueia exclusão quando há `MovimentoCarteira` associado (PROB-0067/0068,
+  2026-07-14), mas não verifica se a carteira é referenciada por uma `ContaFixa` (destino caixa). Uma
+  carteira sem movimentos, mas usada como destino de uma recorrência, cai direto no
+  `DataIntegrityViolationException` de FK, sem tradução para erro de negócio.
+- **Dependências:** nenhuma — mesmo padrão de correção já aplicado a `CartaoService.deletarCartao`
+  nesta entrega (BUG-0102) pode ser espelhado aqui, ou a exclusão pode simplesmente bloquear com 422
+  informativo (decisão de produto a confirmar: desativar a recorrência ou impedir a exclusão).
+- **Critério de aceite:** exclusão de carteira referenciada por recorrência ativa devolve 422 com
+  mensagem clara, nunca 500.
+- **Risco se ficar pendente:** usuário tentando excluir uma carteira "vazia" (sem movimentos), mas
+  usada por uma assinatura, recebe um 500 genérico sem explicação.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0123 — Remover a flag morta `Transacao.recorrente`
+
+- **Titulo:** Campo `recorrente` de `Transacao` não é mais lido nem escrito por nenhum fluxo ativo
+- **Prioridade:** P3
+- **Área:** backend
+- **Motivo:** identificado durante a entrega da recorrência de cartão (PROB-0098) como código morto
+  remanescente; mexe em contrato público (DTO/serialização), por isso não foi removido nesta sessão.
+- **Dependências:** confirmar que nenhum cliente (mobile/web) lê o campo antes de removê-lo do
+  contrato.
+- **Critério de aceite:** campo removido de `Transacao`/DTOs (e de migration de coluna, se aplicável),
+  sem quebrar nenhum client existente.
+- **Risco se ficar pendente:** confusão futura sobre qual campo de fato indica recorrência (o real é
+  a relação com `ContaFixa`/`ExecucaoRecorrencia`, não este flag).
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0124 — Sugestão de recorrência detectada não herda o cartão da transação de origem
+
+- **Titulo:** `RecorrenciaCandidataService` não carrega `transacao.conta`; confirmar sugestão
+  detectada de uma compra de cartão cria `ContaFixa` sem destino de cartão
+- **Prioridade:** P2
+- **Área:** backend
+- **Motivo:** com a recorrência de cartão entregue (PROB-0098), a detecção automática de padrões de
+  recorrência (`DeteccaoRecorrenciaService`/`RecorrenciaCandidataService`) ficou desalinhada — mesmo
+  quando o padrão detectado é de uma transação no cartão, confirmar a sugestão hoje cria (ou tenta
+  criar, falhando a validação de destino obrigatório) uma `ContaFixa` sem destino de cartão, porque o
+  serviço de detecção não carrega `transacao.conta`.
+- **Dependências:** `DeteccaoRecorrenciaService` passar a carregar/expor `transacao.conta` na
+  sugestão candidata.
+- **Critério de aceite:** confirmar uma sugestão de recorrência detectada a partir de uma transação
+  de cartão cria a `ContaFixa` já com o cartão correto, sem exigir que o usuário reconfigure
+  manualmente.
+- **Risco se ficar pendente:** a funcionalidade de detecção automática de recorrência fica
+  inconsistente com a nova capacidade de recorrência de cartão — o caminho manual funciona, o caminho
+  de sugestão automática não.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0125 — Notificação de limite de cartão estourado por recorrência
+
+- **Titulo:** Decisão do dono do produto foi "lançar e avisar, nunca bloquear" no estouro de limite —
+  o "lançar" foi implementado, o "avisar" não
+- **Prioridade:** P1
+- **Área:** backend, mobile
+- **Motivo:** durante a entrega da recorrência de cartão (PROB-0098) confirmou-se que não existe
+  nenhuma validação de limite hoje (`Conta.limiteTotal` é informativo), então nenhuma notificação foi
+  implementada por não haver o evento de estouro para disparar. A decisão do dono do produto foi
+  explícita: nunca bloquear o lançamento, mas o usuário precisa ser avisado quando uma cobrança de
+  cartão (recorrente ou não) ultrapassa o limite.
+- **Dependências:** novo `TipoNotificacao` para estouro de limite; decisão de quando calcular o
+  estouro (na criação da `Transacao`/`FaturaLancamento` de compra de cartão, comparando
+  `Conta.valorGasto` contra `Conta.limiteTotal`).
+- **Critério de aceite:** usuário recebe notificação (in-app, mesmo canal de `NotificacaoService` já
+  existente) quando uma compra de cartão — recorrente ou avulsa — leva `Conta.valorGasto` acima de
+  `Conta.limiteTotal`.
+- **Risco se ficar pendente:** usuário só descobre o estouro de limite quando o cartão físico é
+  recusado ou ao abrir a fatura — a decisão de produto de "avisar" fica só metade implementada
+  (lançar sim, avisar não).
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0126 — Paridade web para recorrência de cartão
+
+- **Titulo:** `frontend/src/pages/*` não expõe cadastro de recorrência com destino cartão
+- **Prioridade:** P3
+- **Área:** frontend
+- **Motivo:** decisão mobile-first já registrada (CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md:16-19,
+  BACKLOG-0115) — a entrega da recorrência de cartão (PROB-0098, 2026-08-29) foi deliberadamente
+  mobile+backend apenas; o web já estava sem paridade de edição de conta/carteira principal antes
+  desta entrega.
+- **Dependências:** BACKLOG-0115 (paridade geral do web com o mobile).
+- **Critério de aceite:** quando o web voltar a receber trabalho, o cadastro de recorrência
+  (`ContaFixa`) no SPA passa a expor o seletor de destino (carteira/cartão), igual ao mobile.
+- **Risco se ficar pendente:** usuários do SPA continuam sem acesso à funcionalidade de assinatura no
+  cartão — risco baixo hoje porque o produto é mobile-first por decisão do dono.
+- **Status:** ABERTO

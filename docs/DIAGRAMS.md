@@ -2,7 +2,8 @@
 
 Registro de diagramas do sistema. Mantido pelo `docs-reporter`.
 
-**Ultima revisao documental:** 2026-08-29
+**Ultima revisao documental:** 2026-08-29 (ERD textual do item 4 atualizado com o novo destino
+`Conta` de `ContaFixa` — migration V67, PROB-0098; `.drawio` ainda nao reflete)
 
 > O `.drawio` continua sendo baseline visual anterior às migrations V32–V44. A arquitetura textual
 > corrente está em `SYSTEM_OVERVIEW.md`; atualizar ERD/topologia permanece trabalho próprio. As
@@ -193,7 +194,10 @@ Usuario (1)
   │
   ├── (1:N) ContaFixa
   │     └── id, nome, valorPlanejado, valorReal, diaVencimento, status, recorrente
-  │         └── (N:1) Categoria (opcional)
+  │         ├── (N:1) Categoria (opcional)
+  │         ├── (N:1) Carteira (opcional — destino caixa) ┐
+  │         └── (N:1) Conta (opcional — destino cartao)   ┘ mutuamente exclusivos desde a
+  │             migration V67 (2026-08-29, PROB-0098; CHECK ck_contas_fixas_destino_unico)
   │
   ├── (1:N) Meta
   │     └── id, nome, valorTotal, valorReservado, valorMensal, dataPrevista, ativa
@@ -306,6 +310,17 @@ Usuario (1)
    diferentes (env var `EXPO_PUBLIC_*` no bundle do app; `@ConditionalOnProperty` mais topologia
    Docker no backend) — se um novo canal for adicionado sem passar por `CapacidadesResponse`, o
    mesmo defeito de PROB-0092 pode se repetir de outra forma.
+9. **Sugerido em 2026-08-29 (PROB-0098, migration V67):** criar diagrama de fluxo textual/`.drawio`
+   para os dois destinos de cobranca de `ContaFixa`: `ContaFixaService.resolverDestino` → decide
+   entre `carteira_id` (caixa) e `conta_id` (cartao), mutuamente exclusivos (`CHECK
+   ck_contas_fixas_destino_unico`) → destino caixa: `LedgerService` movimenta `MovimentoCarteira`
+   direto (fluxo ja existente desde BUG-0066) → destino cartao: cria `Transacao` (`conta` setada,
+   `carteira=null`) → `TransacaoService.criar` → `FaturaService.registrarCompraCartao` (fluxo de
+   fatura ja existente, reaproveitado sem duplicacao, ADR-0001). Objetivo: tornar visivel que a
+   bifurcacao acontece uma unica vez, na resolucao do destino, e que o restante do pipeline de
+   cartao (fatura, limite, estorno) e o mesmo usado por compra avulsa — nenhuma logica de fatura foi
+   duplicada para o caso de recorrencia. Relacionado ao item 4 (ERD), ja atualizado textualmente
+   nesta revisao.
 
 ---
 
