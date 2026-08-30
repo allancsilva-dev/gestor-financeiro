@@ -180,7 +180,15 @@ export default function ContasFixasScreen() {
     return (
       <Card radius={radius.xl} style={{ marginBottom: spacing.md }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-          <IconTile tone={cf.tipo === 'ENTRADA' ? 'success' : cf.status === 'ATRASADO' ? 'danger' : cf.status === 'PAGO' ? 'success' : 'brand'} size={44}>
+          {/* A cor da categoria vence o tom semântico (contrato do IconTile), como
+              no detalhe desta tela e no resto do app. O status não se perde: quem
+              o comunica no card é o <Badge status> da linha ao lado. O `tone`
+              segue valendo para categoria sem cor, ou sem categoria. */}
+          <IconTile
+            cor={cf.categoria?.cor}
+            tone={cf.tipo === 'ENTRADA' ? 'success' : cf.status === 'ATRASADO' ? 'danger' : cf.status === 'PAGO' ? 'success' : 'brand'}
+            size={44}
+          >
             {emojiDaCategoria(cf.categoria, '📌')}
           </IconTile>
           <View style={{ flex: 1, minWidth: 0 }}>
