@@ -2444,3 +2444,82 @@ esta evidência histórica não fecha o problema;
 - **Riscos residuais:** verificado apenas em iPhone 17 Pro / iOS 26.5 / tema escuro; fonte ampliada
   (que agrava exatamente este tipo de corte por teclado) não foi testada (ver BACKLOG-0119).
 - **Proximo passo:** nenhum além do BACKLOG-0119.
+
+---
+
+## PROB-0098 — Assinatura no cartão de crédito (ex.: Netflix) não tinha caminho de cadastro — recorrência só sabia debitar caixa
+
+- **ID:** PROB-0098
+- **Titulo:** Motor de recorrência (`ContaFixa`) só suportava destino de caixa (`carteira_id`); no cartão só existia parcelamento, nunca recorrência
+- **Data:** 2026-08-29
+- **Origem:** usuario (dono do produto tentou cadastrar a assinatura da Netflix, R$60/mês no cartão, e não encontrou como)
+- **Severidade:** HIGH
+- **Status:** FECHADO (2026-08-29, migration `V67` + implementação backend/mobile, working tree não commitado)
+- **Area:** backend, mobile, banco
+- **Sintoma:** dono do produto tentou cadastrar a assinatura da Netflix (R$60/mês, cobrada no cartão
+  de crédito) e não encontrou nenhum caminho no app para isso.
+- **Causa raiz:** confirmada — o motor de recorrência maduro (`ContaFixa` + `ExecucaoRecorrencia` +
+  `RecorrenciaScheduler`) só sabia debitar caixa: `ContaFixa` tinha `carteira_id` e nunca `conta_id`.
+  No cartão só existia parcelamento (`Transacao`/`FaturaLancamento`/`Parcela`); uma cobrança
+  recorrente e não parcelada no cartão não tinha caminho de cadastro nenhum.
+- **Impacto tecnico:** qualquer assinatura cobrada no cartão (Netflix, Spotify, etc.) exigia
+  lançamento manual todo mês, sem alerta de falha, sem histórico de execuções e sem integração com o
+  motor de recorrência já existente para o caixa.
+- **Arquivos ou modulos relacionados:**
+  `backend/src/main/java/com/gestor/financeiro/model/ContaFixa.java`,
+  `backend/src/main/java/com/gestor/financeiro/service/ContaFixaService.java`,
+  `backend/src/main/java/com/gestor/financeiro/service/FaturaService.java`,
+  `backend/src/main/java/com/gestor/financeiro/service/TransacaoService.java`,
+  `backend/src/main/java/com/gestor/financeiro/service/CartaoService.java`,
+  `backend/src/main/java/com/gestor/financeiro/repository/ContaFixaRepository.java`,
+  `backend/src/main/java/com/gestor/financeiro/dto/ContaFixaRequest.java`,
+  `backend/src/main/java/com/gestor/financeiro/dto/ContaFixaResponseDto.java`,
+  `backend/src/main/java/com/gestor/financeiro/controller/ContaFixaController.java`,
+  `backend/src/main/resources/db/migration/V67__recorrencia_cartao.sql`,
+  `mobile/src/components/NovaTransacaoModal.tsx`, `mobile/app/(app)/more/contas-fixas.tsx`,
+  `mobile/src/domain/recorrencia.ts`, `mobile/src/hooks/useInvalidarAposTransacao.ts`,
+  `mobile/src/types/index.ts`.
+- **Solucao proposta:** dar a `ContaFixa` dois destinos de cobrança mutuamente exclusivos —
+  `carteira_id` (caixa) ou `conta_id` (cartão) —, seguindo o padrão "um destino, nunca dois" já usado
+  na V55; no ramo cartão, criar `Transacao` com `conta` setada e `carteira=null`, reaproveitando que
+  `TransacaoService.criar` já chama `FaturaService.registrarCompraCartao` (sem reescrever nem
+  duplicar regra de fatura, ADR-0001). Decisões do dono do produto: assinatura de cartão é automática
+  por padrão; criação exposta no botão "Nova" e na tela Recorrências; estouro de limite lança e
+  avisa, nunca bloqueia.
+- **Solucao aplicada:** migration `V67__recorrencia_cartao.sql` (expand puro, aditivo, ADR-0015)
+  adiciona `contas_fixas.conta_id`, troca `ck_contas_fixas_automatica_carteira` por
+  `ck_contas_fixas_destino_automatico`, adiciona `ck_contas_fixas_destino_unico` e
+  `ck_contas_fixas_cartao_saida`, índice parcial `idx_contas_fixas_conta`.
+  `ContaFixaService.resolverDestino` (renomeado de `resolverCarteira`) valida exclusividade,
+  ownership do cartão (404), cartão inativo (422) e ENTRADA+cartão (400) — cada `CHECK` do banco tem
+  validação equivalente no service devolvendo 4xx antes de chegar ao banco. `ContaFixaRequest` ganhou
+  `cartaoId` + três `@AssertTrue`; `ContaFixaResponseDto.CartaoResumo(id, nome, bandeira,
+  ultimosDigitos)` expõe metadado de exibição, nunca PAN. Primeira ocorrência executa na hora quando
+  `execucaoAutomatica` e `dataProximoVencimento <= hoje` (falha não invalida o cadastro). No mobile,
+  `NovaTransacaoModal` ganhou o switch "Repete todo mês" (SAIDA, fora do modo assistente) e
+  `app/(app)/more/contas-fixas.tsx` ganhou o seletor "Cobrar em" (Conta/Cartão). Cinco defeitos
+  pré-existentes no motor de recorrência foram corrigidos na mesma sessão para o cartão poder usar o
+  motor com segurança — ver BUG-0098 a BUG-0102.
+- **Evidencias ou comandos usados:** backend 501 testes, 0 falhas (491 após a feature + 10 do novo
+  `ContaFixaCartaoTest`; mais 1 caso novo em `UsuarioExclusaoTest` para a FK nova na exclusão LGPD);
+  mobile 447 testes, 40 suítes, 0 falhas; lint `--max-warnings=0` limpo; `tsc --noEmit` limpo;
+  `scripts/verify-postgres-migrations.sh` exit 0, "now at version v67" em PostgreSQL 16 real. Runtime
+  (backend 8081, banco limpo): assinatura Spotify criada com `cartao` no response; cobrança entrou na
+  fatura de setembro (compra dia 29 > fechamento dia 10) com descrição "Spotify", R$60, sem parcelas;
+  conta corrente permaneceu 2500,00 (único movimento de caixa é o saldo inicial do onboarding);
+  passivo do cartão subiu 60 → 120 acompanhando as cobranças; reexecução da mesma ocorrência devolveu
+  422 sem duplicar; `realizar` com `carteiraId` no corpo numa assinatura de cartão não tocou o caixa;
+  DELETE do cartão (204) desativou as duas assinaturas; restart do backend (dispara
+  `recuperarAoIniciar`) manteve 3 lançamentos/3 transações/3 execuções; validações devolveram
+  400/400/422/404 (dois destinos, ENTRADA no cartão, cartão inativo, cartão inexistente) — nenhum
+  500, os `CHECK`s do banco nunca dispararam.
+- **Riscos residuais:** frequência de recorrência é hard-coded mensal (`plusMonths(1)`); não há
+  validação/notificação de estouro de limite do cartão (decisão do dono do produto foi "lançar e
+  avisar", mas o "avisar" ainda não foi implementado — não havia validação de limite alguma
+  pré-existente); `CarteiraService.deletar` não checa `contas_fixas` (pode devolver 500 de FK
+  `RESTRICT` numa carteira sem movimentos mas referenciada por recorrência — pré-existente, não
+  introduzido por esta entrega); sugestão de recorrência detectada (`RecorrenciaCandidataService`)
+  ainda não herda o cartão da transação de origem; web (`frontend/`) não tem paridade (decisão
+  mobile-first já registrada). Ver BACKLOG-0120 a BACKLOG-0126.
+- **Proximo passo:** priorizar os itens de BACKLOG-0120 a BACKLOG-0126 conforme demanda de produto;
+  nenhuma ação bloqueante pendente para esta entrega em si.
