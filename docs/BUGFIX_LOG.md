@@ -2260,5 +2260,159 @@ Registro de bugs corrigidos. Mantido pelo `docs-reporter`.
 
 ---
 
+---
+
+## BUG-0098 — Chave de idempotência (`Idempotency-Key`) era descartada silenciosamente em qualquer compra de cartão
+
+- **Problema relacionado:** PROB-0098
+- **Data:** 2026-08-29
+- **Area:** backend
+- **Sintoma:** pré-existente ao trabalho desta sessão — qualquer chamador que enviasse
+  `ledgerIdempotencyKey` para uma compra de cartão tinha a chave ignorada; o efeito ficava mascarado
+  porque `FaturaService.registrarCompraCartao` já criava a operação de ledger com `requestPayload =
+  "compra-cartao|transacao={id}"`, único por transação nova. Encontrado durante a implementação da
+  recorrência de cartão (PROB-0098/migration `V67`), quando a execução automática
+  (`ContaFixaService`/`RecorrenciaScheduler`) passou a depender de idempotência real para não
+  duplicar cobrança em reexecução.
+- **Causa raiz:** confirmada — `TransacaoService.registrarMovimentoCriacao` retorna cedo quando
+  `carteira == null` (compra de cartão nunca tem `carteira`), então o `ledgerIdempotencyKey` de
+  qualquer chamador nunca chegava a ser usado nesse caminho.
+- **Correcao aplicada:** nova sobrecarga genérica `FaturaService.registrarCompraCartao(Transacao,
+  Long, String idempotencyKey)` — a versão de 2 argumentos passou a delegar para ela com `null`, sem
+  alterar nenhum chamador existente. Quando a chave é não-nula, ela é propagada para
+  `CriarOperacaoCommand.idempotencyKey` com `requestPayload` estável por ocorrência;
+  `TransacaoService.criar` propaga a chave recebida. Muda a semântica de idempotência da compra de
+  cartão (registrado em `SYSTEM_OVERVIEW.md`).
+- **Arquivos alterados:** `backend/src/main/java/com/gestor/financeiro/service/FaturaService.java`,
+  `backend/src/main/java/com/gestor/financeiro/service/TransacaoService.java`.
+- **Testes/validacoes executadas:** suíte backend completa (501 testes, 0 falhas) e o novo
+  `ContaFixaCartaoTest` (10 casos) exercitam o caminho de execução automática de cartão.
+- **Resultado:** PASS
+- **Ressalvas:** a cobertura de teste direta é pela via da recorrência de cartão; uma compra de
+  cartão avulsa com `Idempotency-Key` enviada explicitamente pelo cliente não tem teste automatizado
+  dedicado a este achado especificamente, nem evidência de runtime isolada fora do fluxo de
+  recorrência.
+- **Commit:** pendente
+
+---
+
+## BUG-0099 — Execução automática de recorrência não revalidava o vencimento sob lock; duas instâncias podiam executar a mesma ocorrência duas vezes
+
+- **Problema relacionado:** PROB-0098
+- **Data:** 2026-08-29
+- **Area:** backend
+- **Sintoma:** pré-existente, encontrado durante a implementação da recorrência de cartão.
+  `realizar(..., automatico=true)` pulava a guarda de vencimento que o caminho manual tinha; o
+  `RecorrenciaScheduler.recuperarAoIniciar` lê os ids das ocorrências pendentes antes de tomar o lock
+  e dispara a cada boot da aplicação. Com duas instâncias do backend, a segunda podia executar uma
+  ocorrência que a primeira já havia avançado.
+- **Causa raiz:** confirmada — ausência de revalidação de `vencimento <= hoje` depois do lock
+  pessimista no caminho automático. No caixa o sintoma era freado por outros guards indiretos (saldo
+  insuficiente); no cartão, nada frearia (nenhuma validação de limite existe hoje), então uma segunda
+  execução criaria uma segunda `Transacao`/lançamento de fatura para a mesma cobrança.
+- **Impacto tecnico:** risco de cobrança duplicada em ambiente com múltiplas instâncias do backend,
+  tanto para recorrência de caixa quanto de cartão.
+- **Correcao aplicada:** revalidação de `vencimento <= hoje` depois do lock, retornando sem efeito
+  (no-op) se a ocorrência já foi avançada por outra execução concorrente. A correção vale para os
+  dois destinos (caixa e cartão), fechando o furo também no caminho de caixa que já existia antes
+  desta entrega.
+- **Arquivos alterados:**
+  `backend/src/main/java/com/gestor/financeiro/service/ContaFixaService.java`.
+- **Testes/validacoes executadas:** `ContaFixaCartaoTest` (10 casos novos) e suíte backend completa
+  (501 testes, 0 falhas). Verificação em runtime: restart do backend local (porta 8081, dispara
+  `recuperarAoIniciar`) manteve exatamente 3 lançamentos/3 transações/3 execuções — sem duplicação —
+  confirmando que a revalidação sob lock segura a segunda tentativa.
+- **Resultado:** PASS
+- **Ressalvas:** verificado com restart único de uma instância local (não há ambiente com duas
+  instâncias reais rodando em paralelo nesta sessão); a prova de concorrência genuína com dois
+  processos simultâneos não foi executada, apenas a reexecução após restart do mesmo processo.
+- **Commit:** pendente
+
+---
+
+## BUG-0100 — `carteiraId` do corpo da requisição de `realizar` desviava a cobrança de uma recorrência de cartão para o caixa
+
+- **Problema relacionado:** PROB-0098
+- **Data:** 2026-08-29
+- **Area:** backend
+- **Sintoma:** encontrado durante a implementação da recorrência de cartão. `realizar` montava
+  `carteiraEfetiva = carteiraId != null ? carteiraId : ...` usando o valor vindo do corpo da
+  requisição (`ValorRequest`); numa recorrência configurada para cartão, um `carteiraId` presente no
+  corpo faria a assinatura debitar o caixa em vez do cartão.
+- **Causa raiz:** confirmada — `realizar` não considerava que a `ContaFixa` já tinha um destino fixo
+  (cartão); o valor do corpo da requisição sempre tinha prioridade sobre o destino cadastrado.
+- **Impacto tecnico:** uma assinatura de cartão poderia ser cobrada indevidamente do caixa se o
+  cliente (mobile/web/qualquer chamador da API) enviasse `carteiraId` no corpo do `realizar`.
+- **Correcao aplicada:** quando a `ContaFixa` tem cartão associado, o `carteiraId` do corpo passa a
+  ser ignorado — o destino é sempre o definido no cadastro da recorrência.
+- **Arquivos alterados:**
+  `backend/src/main/java/com/gestor/financeiro/service/ContaFixaService.java`.
+- **Testes/validacoes executadas:** `ContaFixaCartaoTest` (10 casos) e suíte backend completa (501
+  testes, 0 falhas). Runtime: `realizar` com `carteiraId` no corpo numa assinatura de cartão não
+  tocou o caixa (conta corrente permaneceu 2500,00).
+- **Resultado:** PASS
+- **Ressalvas:** nenhuma.
+- **Commit:** pendente
+
+---
+
+## BUG-0101 — Corrida no unique `(conta_fixa_id, data_vencimento)` de `execucoes_recorrencia` devolvia HTTP 500
+
+- **Problema relacionado:** PROB-0098
+- **Data:** 2026-08-29
+- **Area:** backend
+- **Sintoma:** pré-existente, encontrado durante a implementação da recorrência de cartão. Quando
+  duas requisições concorrentes tentavam realizar a mesma ocorrência, a segunda estourava o
+  `UNIQUE(conta_fixa_id, data_vencimento)` como `DataIntegrityViolationException`, propagada como
+  HTTP 500 em vez de um erro de negócio tratável pelo cliente.
+- **Causa raiz:** confirmada — ausência de tradução da exceção de integridade do banco para uma
+  exceção de negócio mapeada no `GlobalExceptionHandler`.
+- **Impacto tecnico:** cliente (mobile/web) recebia 500 genérico em vez de um 422 com mensagem
+  acionável, numa corrida que se tornou mais provável com a recorrência automática de cartão.
+- **Correcao aplicada:** `saveAndFlush` encapsulado, traduzindo `DataIntegrityViolationException`
+  para `BusinessException` — o mesmo HTTP 422 "Esta recorrência já foi realizada ou pulada" do
+  caminho sequencial.
+- **Arquivos alterados:**
+  `backend/src/main/java/com/gestor/financeiro/service/ContaFixaService.java`.
+- **Testes/validacoes executadas:** `ContaFixaCartaoTest` (10 casos) e suíte backend completa (501
+  testes, 0 falhas). Runtime: reexecução da mesma ocorrência devolveu 422 "Esta recorrência já foi
+  realizada ou pulada" sem duplicar (fatura seguiu com 1 lançamento) — confirmado em vez do 500
+  anterior.
+- **Resultado:** PASS
+- **Ressalvas:** o cenário de corrida real (duas threads/requisições simultâneas de fato) não foi
+  reproduzido com concorrência genuína nesta sessão — a validação em runtime foi por reexecução
+  sequencial da mesma ocorrência já realizada, não por dois requests paralelos de verdade.
+- **Commit:** pendente
+
+---
+
+## BUG-0102 — Exclusão de cartão (soft delete) deixava assinaturas vinculadas cobrando invisivelmente
+
+- **Problema relacionado:** PROB-0098
+- **Data:** 2026-08-29
+- **Area:** backend
+- **Sintoma:** encontrado durante a implementação da recorrência de cartão. `CartaoService.deletarCartao`
+  é soft delete (`ativo=false`) e não tinha nenhum conhecimento de `contas_fixas` — excluir um cartão
+  que tinha uma assinatura vinculada não desativava a recorrência, que continuaria sendo executada
+  pelo scheduler contra um cartão inativo.
+- **Causa raiz:** confirmada — ausência de qualquer verificação/ação sobre `contas_fixas` no fluxo de
+  exclusão de cartão.
+- **Impacto tecnico:** assinatura continuaria sendo cobrada (ou falharia contra a validação de cartão
+  inativo, sem aviso) depois de o usuário achar que tinha excluído o cartão e, com ele, a cobrança.
+- **Correcao aplicada:** `CartaoService.deletarCartao` passou a desativar, na mesma transação, todas
+  as recorrências vinculadas ao cartão excluído, e a retornar quantas foram desativadas — novo
+  `ContaFixaRepository.desativarPorConta` (`@Modifying(clearAutomatically = true, flushAutomatically
+  = true)`). O endpoint `DELETE` continua devolvendo 204 (contrato inalterado); o app mobile não
+  expõe exclusão de cartão hoje, então não houve necessidade de UI nova.
+- **Arquivos alterados:** `backend/src/main/java/com/gestor/financeiro/service/CartaoService.java`,
+  `backend/src/main/java/com/gestor/financeiro/repository/ContaFixaRepository.java`.
+- **Testes/validacoes executadas:** `ContaFixaCartaoTest` (10 casos) e suíte backend completa (501
+  testes, 0 falhas). Runtime: `DELETE` do cartão (204) desativou as duas assinaturas vinculadas.
+- **Resultado:** PASS
+- **Ressalvas:** nenhuma.
+- **Commit:** pendente
+
+---
+
 > Este arquivo e mantido pelo `docs-reporter`. Bugs corrigidos devem ser registrados com o proximo ID
 > sequencial (BUG-0002, BUG-0003, ...). Para historico de versoes, consulte `docs/CHANGELOG.md`.
