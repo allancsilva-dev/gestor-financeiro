@@ -8,6 +8,7 @@ import com.gestor.financeiro.model.enums.StatusPagamento;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.model.ContaFixa;
 import com.gestor.financeiro.repository.*;
+import com.gestor.financeiro.util.FaturaDatas;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -42,7 +43,11 @@ public class ProjecaoService {
             BigDecimal totalEntradas = somarRecorrenciasNoMes(usuarioId, ym, TipoTransacao.ENTRADA);
             BigDecimal totalContasFixas = somarRecorrenciasNoMes(usuarioId, ym, TipoTransacao.SAIDA);
             BigDecimal totalParcelas = somarParcelasNoMes(usuarioId, inicioMes, fimMes);
-            BigDecimal totalFaturas = somarFaturasEmAberto(usuarioId, inicioMes, fimMes);
+            // Faturas ja materializadas + cobrancas de assinatura que ainda vao entrar
+            // numa fatura que vence neste mes. As duas parcelas sao a mesma linha para o
+            // usuario: dinheiro de cartao que sai do caixa neste mes.
+            BigDecimal totalFaturas = somarFaturasEmAberto(usuarioId, inicioMes, fimMes)
+                    .add(somarAssinaturasDeCartaoNoMes(usuarioId, ym));
             BigDecimal totalSaidas = totalContasFixas.add(totalParcelas).add(totalFaturas);
             BigDecimal saldoFinal = saldoAnterior.add(totalEntradas).subtract(totalSaidas);
 
@@ -87,10 +92,60 @@ public class ProjecaoService {
     }
 
     private boolean ocorreNoMes(ContaFixa conta, YearMonth mes) {
-        if (conta.getDataProximoVencimento() == null) return false;
+        return ocorrenciaNoMes(conta, mes) != null;
+    }
+
+    /**
+     * Data da ocorrencia da recorrencia dentro do mes, ou null se nao ocorre. Mesma
+     * regra de sempre — o ramo de caixa so precisa do sim/nao —, mas o ramo de cartao
+     * precisa da data para descobrir em que fatura a cobranca cai.
+     */
+    private LocalDate ocorrenciaNoMes(ContaFixa conta, YearMonth mes) {
+        if (conta.getDataProximoVencimento() == null) return null;
         YearMonth primeiro = YearMonth.from(conta.getDataProximoVencimento());
-        if (Boolean.TRUE.equals(conta.getRecorrente())) return !mes.isBefore(primeiro);
-        return mes.equals(primeiro);
+        if (Boolean.TRUE.equals(conta.getRecorrente())) {
+            if (mes.isBefore(primeiro)) return null;
+        } else if (!mes.equals(primeiro)) {
+            return null;
+        }
+        int dia = conta.getDiaVencimento() != null
+                ? conta.getDiaVencimento()
+                : conta.getDataProximoVencimento().getDayOfMonth();
+        return mes.atDay(Math.min(dia, mes.lengthOfMonth()));
+    }
+
+    /**
+     * Cobrancas futuras de assinatura de cartao, projetadas no mes em que a fatura que
+     * as contem vence — que e quando o dinheiro sai do caixa (ADR-0010).
+     *
+     * Sem isto a assinatura sumiria da projecao: a fatura so e materializada quando a
+     * cobranca acontece, entao nos meses adiante nao ha fatura nenhuma para somar.
+     *
+     * Ocorrencia anterior a dataProximoVencimento ja foi cobrada e portanto ja esta numa
+     * fatura materializada, contada por somarFaturasEmAberto — pular aqui e o que impede
+     * a dobra. A janela de 2 meses para tras cobre o empurrao maximo de fechamento
+     * (+1 mes) e vencimento (+1 mes).
+     */
+    private BigDecimal somarAssinaturasDeCartaoNoMes(Long usuarioId, YearMonth mes) {
+        BigDecimal total = BigDecimal.ZERO;
+        for (ContaFixa conta : contaFixaRepository.findByUsuarioIdAndAtivoTrue(usuarioId)) {
+            if (conta.getConta() == null) continue;
+            if ((conta.getTipo() == null ? TipoTransacao.SAIDA : conta.getTipo()) != TipoTransacao.SAIDA) continue;
+            if (conta.getStatus() == StatusPagamento.PAGO || conta.getStatus() == StatusPagamento.CANCELADO) continue;
+
+            for (int mesesAtras = 2; mesesAtras >= 0; mesesAtras--) {
+                LocalDate ocorrencia = ocorrenciaNoMes(conta, mes.minusMonths(mesesAtras));
+                if (ocorrencia == null) continue;
+                if (ocorrencia.isBefore(conta.getDataProximoVencimento())) continue;
+
+                YearMonth competencia = FaturaDatas.competencia(conta.getConta(), ocorrencia);
+                LocalDate vencimentoFatura = FaturaDatas.vencimento(conta.getConta(), competencia);
+                if (YearMonth.from(vencimentoFatura).equals(mes)) {
+                    total = total.add(conta.getValorPlanejado());
+                }
+            }
+        }
+        return total;
     }
 
     private BigDecimal somarParcelasNoMes(Long usuarioId, LocalDate inicio, LocalDate fim) {
