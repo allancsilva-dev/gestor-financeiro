@@ -2,6 +2,7 @@ package com.gestor.financeiro;
 
 import com.gestor.financeiro.dto.ProjecaoMensalDto;
 import com.gestor.financeiro.dto.ProjecaoResponse;
+import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.ContaFixa;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.StatusPagamento;
@@ -9,6 +10,7 @@ import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.CarteiraRepository;
 import com.gestor.financeiro.repository.ContaFixaRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
+import com.gestor.financeiro.service.CartaoService;
 import com.gestor.financeiro.service.ProjecaoService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,6 +38,9 @@ class ProjecaoServiceTest {
 
     @Autowired
     private ContaFixaRepository contaFixaRepository;
+
+    @Autowired
+    private CartaoService cartaoService;
 
     @Autowired
     private UsuarioRepository usuarioRepository;
@@ -93,6 +98,41 @@ class ProjecaoServiceTest {
         assertEquals(0, new BigDecimal("3500.00").compareTo(r.meses().get(0).saldoFinal()));
         assertEquals(0, new BigDecimal("6000.00").compareTo(r.meses().get(1).saldoFinal()));
         assertEquals(0, new BigDecimal("8500.00").compareTo(r.meses().get(2).saldoFinal()));
+    }
+
+    /**
+     * Assinatura de cartao (destino conta_id, V67) nao e saida de caixa: ela vira
+     * FaturaLancamento e so sai do caixa no pagamento da fatura, que a projecao ja
+     * conta em totalFaturas. Somar em totalContasFixas contaria o mesmo dinheiro duas
+     * vezes e deixaria o saldo projetado pessimista.
+     */
+    @Test
+    void assinaturaDeCartaoNaoSomaComoSaidaDeCaixaNaProjecao() {
+        LocalDate venceEsteMes = LocalDate.now().withDayOfMonth(15);
+
+        Conta cartao = cartaoService.criar(cartaoNovo(), usuario.getId());
+        ContaFixa netflix = contaFixa("Netflix", "60.00", venceEsteMes, StatusPagamento.PENDENTE);
+        netflix.setConta(cartao);
+        contaFixaRepository.save(netflix);
+
+        // recorrencia de caixa continua somando: e o contraste que prova o filtro
+        contaFixaRepository.save(contaFixa("Aluguel", "800.00", venceEsteMes, StatusPagamento.PENDENTE));
+
+        ProjecaoResponse r = projecaoService.projetar(usuario.getId(), 3);
+
+        ProjecaoMensalDto mes0 = r.meses().get(0);
+        assertEquals(0, new BigDecimal("800.00").compareTo(mes0.totalContasFixas()),
+                "so a recorrencia de caixa soma; a assinatura de cartao vira fatura");
+        // 1000 - 800: os 60 do cartao nao saem do caixa neste mes
+        assertEquals(0, new BigDecimal("200.00").compareTo(mes0.saldoFinal()));
+    }
+
+    private Conta cartaoNovo() {
+        Conta cartao = new Conta();
+        cartao.setNome("Cartao");
+        cartao.setDiaFechamento(10);
+        cartao.setDiaVencimento(20);
+        return cartao;
     }
 
     private ContaFixa contaFixa(String nome, String valor, LocalDate vencimento, StatusPagamento status) {

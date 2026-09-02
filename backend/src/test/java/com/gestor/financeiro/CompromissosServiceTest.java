@@ -194,6 +194,47 @@ class CompromissosServiceTest {
         assertEquals(0, BigDecimal.ZERO.compareTo(resposta.totalComprometido()));
     }
 
+    /**
+     * Assinatura de cartao cobrada nao pode aparecer duas vezes: a ocorrencia paga saiu
+     * de PREVISTO (avancarOcorrencia moveu o vencimento) e virou FaturaLancamento, que
+     * entra no total pela FATURA. O que sobra em PREVISTO e a ocorrencia seguinte, ainda
+     * nao cobrada e ainda fora de qualquer fatura — nao e o mesmo dinheiro.
+     */
+    @Test
+    void assinaturaDeCartaoCobradaContaUmaVezSoNoTotalComprometido() {
+        Conta cartao = new Conta();
+        cartao.setNome("Cartao");
+        cartao.setDiaFechamento(28);
+        cartao.setDiaVencimento(10);
+        cartao = cartaoService.criar(cartao, usuario.getId());
+
+        ContaFixa netflix = novaContaFixa(usuario, "Netflix", "60.00",
+                TipoTransacao.SAIDA, hoje, StatusPagamento.PENDENTE);
+        netflix.setConta(cartao);
+        netflix = contaFixaRepository.save(netflix);
+
+        // cobra a ocorrencia de hoje: vira lancamento de fatura e avanca o vencimento
+        contaFixaService.realizar(netflix.getId(), null, null, usuario.getId(), false);
+
+        CompromissosService.Compromissos resposta =
+                compromissosService.listar(usuario.getId(), hoje.plusMonths(2));
+
+        // A cobranca aparece uma vez so, pela fatura, e e o unico valor do total
+        assertEquals(0, new BigDecimal("60.00").compareTo(resposta.totalComprometido()));
+        List<CompromissosService.CompromissoItem> comprometidos = resposta.itens().stream()
+                .filter(i -> CompromissosService.GRUPO_COMPROMETIDO.equals(i.grupo())).toList();
+        assertEquals(1, comprometidos.size());
+        assertEquals("FATURA", comprometidos.get(0).tipo());
+
+        // O previsto que sobra e a PROXIMA ocorrencia, com vencimento depois do de hoje
+        List<CompromissosService.CompromissoItem> previstos = resposta.itens().stream()
+                .filter(i -> CompromissosService.GRUPO_PREVISTO.equals(i.grupo())).toList();
+        assertEquals(1, previstos.size());
+        assertEquals("Netflix", previstos.get(0).descricao());
+        assertTrue(previstos.get(0).vencimento().isAfter(hoje),
+                "a ocorrencia ja cobrada precisa ter saido de PREVISTO");
+    }
+
     private ContaFixa contaFixa(String nome, String valor, TipoTransacao tipo,
                                 LocalDate vencimento, StatusPagamento status) {
         return contaFixaRepository.save(

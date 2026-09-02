@@ -64,17 +64,6 @@ public interface ContaFixaRepository extends JpaRepository<ContaFixa, Long> {
                                         @Param("novoStatus") StatusPagamento novoStatus,
                                         @Param("data") LocalDate data);
 
-    // Projecao: soma planejada das contas fixas ativas vencendo no periodo, excluindo pago/cancelado.
-    @Query("SELECT COALESCE(SUM(cf.valorPlanejado), 0) FROM ContaFixa cf " +
-           "WHERE cf.usuario.id = :usuarioId AND cf.ativo = true " +
-           "AND cf.dataProximoVencimento BETWEEN :inicio AND :fim " +
-           "AND cf.status <> :pago AND cf.status <> :cancelado")
-    BigDecimal somarPlanejadoNoPeriodo(@Param("usuarioId") Long usuarioId,
-                                        @Param("inicio") LocalDate inicio,
-                                        @Param("fim") LocalDate fim,
-                                        @Param("pago") StatusPagamento pago,
-                                        @Param("cancelado") StatusPagamento cancelado);
-
     // Compromissos (PR-F3-01): saidas fixas ativas nao pagas vencendo ate o
     // horizonte; vencida nao paga continua prevista (sem limite inferior).
     @Query("SELECT c FROM ContaFixa c WHERE c.usuario.id = :usuarioId AND c.ativo = true " +

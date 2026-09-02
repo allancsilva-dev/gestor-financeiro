@@ -75,6 +75,10 @@ public class ProjecaoService {
 
     private BigDecimal somarRecorrenciasNoMes(Long usuarioId, YearMonth mes, TipoTransacao tipo) {
         return contaFixaRepository.findByUsuarioIdAndAtivoTrue(usuarioId).stream()
+                // Assinatura de cartao (destino conta_id, V67) nao e saida de caixa: ela vira
+                // FaturaLancamento e so sai do caixa no pagamento da fatura, ja somado por
+                // somarFaturasEmAberto. Contar aqui duplicaria o mesmo dinheiro no mesmo mes.
+                .filter(c -> c.getConta() == null)
                 .filter(c -> (c.getTipo() == null ? TipoTransacao.SAIDA : c.getTipo()) == tipo)
                 .filter(c -> c.getStatus() != StatusPagamento.PAGO && c.getStatus() != StatusPagamento.CANCELADO)
                 .filter(c -> ocorreNoMes(c, mes))
