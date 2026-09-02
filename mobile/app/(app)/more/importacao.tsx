@@ -70,6 +70,8 @@ const MOTIVO: Record<string, string> = {
   EXTERNAL_ID_INVALID: 'identificador inválido',
   COMMIT_FAILED: 'não foi possível lançar',
   MULTIPLE_ISSUES: 'mais de um problema',
+  DUPLICATE_PENDING_BATCH: 'já está em outra importação sua, esperando revisão',
+  DUPLICATE_REVERSED: 'você já desfez este lançamento antes',
 };
 
 const emAndamento = (lote: ImportBatch | null) => lote?.status === 'COMMITTING';
@@ -705,7 +707,15 @@ function LinhaDoExtrato({
             {registro.categoriaNome}
           </Text>
         ) : null}
-        {registro.status === 'DUPLICATE' && <Badge tone="warning">Já importado antes</Badge>}
+        {registro.status === 'DUPLICATE' && (
+          <Badge tone="warning">
+            {registro.reasonCode === 'DUPLICATE_PENDING_BATCH'
+              ? 'Repetido'
+              : registro.reasonCode === 'DUPLICATE_REVERSED'
+                ? 'Você desfez antes'
+                : 'Já importado antes'}
+          </Badge>
+        )}
         {registro.reasonCode && (
           <Text style={{ ...typography.meta, color: colors.warning }}>
             {MOTIVO[registro.reasonCode] ?? registro.reasonCode}
