@@ -5,6 +5,7 @@ import com.gestor.financeiro.model.ImportRecord;
 import com.gestor.financeiro.model.enums.ImportBatchStatus;
 import com.gestor.financeiro.model.enums.ImportFailureCode;
 import com.gestor.financeiro.model.enums.ImportFormat;
+import com.gestor.financeiro.model.enums.ImportOrigin;
 import com.gestor.financeiro.model.enums.ImportRecordStatus;
 import com.gestor.financeiro.model.enums.ImportBalanceReconciliation;
 import com.gestor.financeiro.model.enums.TipoTransacao;
@@ -25,7 +26,6 @@ import java.math.BigDecimal;
 public final class CanonicalImportOrchestrator {
     private final ImportBatchService batches;
     private final ImportConnectorRegistry connectors;
-    private final CsvImportConnector csvConnector;
     private final ImportDeduplicationService deduplicacao;
     private final ImportCategorizacaoService categorizacao;
     private final ImportRecordRepository records;
@@ -35,13 +35,12 @@ public final class CanonicalImportOrchestrator {
     private final TransactionTemplate transactions;
 
     public CanonicalImportOrchestrator(ImportBatchService batches, ImportConnectorRegistry connectors,
-                                       CsvImportConnector csvConnector,
                                        ImportDeduplicationService deduplicacao,
                                        ImportCategorizacaoService categorizacao,
                                        ImportRecordRepository records, ImportBatchRepository batchRepository,
                                        ImportLimits limits, EntityManager entityManager,
                                        PlatformTransactionManager transactionManager) {
-        this.batches = batches; this.connectors = connectors; this.csvConnector = csvConnector; this.deduplicacao = deduplicacao; this.categorizacao = categorizacao; this.records = records;
+        this.batches = batches; this.connectors = connectors; this.deduplicacao = deduplicacao; this.categorizacao = categorizacao; this.records = records;
         this.batchRepository = batchRepository; this.limits = limits; this.entityManager = entityManager;
         this.transactions = new TransactionTemplate(transactionManager);
     }
@@ -53,22 +52,33 @@ public final class CanonicalImportOrchestrator {
     /** Com mapeamento do titular, o cabeçalho do arquivo deixa de precisar ser reconhecível. */
     public ImportBatch stage(Long usuarioId, ImportSource source, String idempotencyKey,
                              ImportMapping mapeamento) throws IOException {
+        return stage(usuarioId, source, idempotencyKey, mapeamento, null, ImportOrigin.UPLOAD);
+    }
+
+    /**
+     * Estágio com formato declarado pela origem.
+     *
+     * <p>{@code formatoDeclarado} nulo mantém o comportamento de sempre: detecção byte a byte, ou
+     * CSV quando o titular trouxe mapeamento de colunas. Preenchido, pula a detecção — é o caminho
+     * de quem já sabe o que está entregando e para quem competir por confiança contra os outros
+     * conectores só produziria recusa por ambiguidade.</p>
+     *
+     * <p>{@code origem} viaja separada do formato de propósito (V68): um conector futuro pode
+     * entregar CSV de verdade, e aí só a origem distingue sincronização de envio manual.</p>
+     */
+    public ImportBatch stage(Long usuarioId, ImportSource source, String idempotencyKey,
+                             ImportMapping mapeamento, ImportFormat formatoDeclarado,
+                             ImportOrigin origem) throws IOException {
         String declaredHash = source.sha256();
         String initialHash = declaredHash == null ? sha256(source) : declaredHash;
-        ImportBatch created = batches.create(usuarioId, ImportFormat.UNKNOWN, null, initialHash, idempotencyKey);
+        ImportBatch created = batches.create(usuarioId, ImportFormat.UNKNOWN, null, initialHash, idempotencyKey, origem);
         if (created.getStatus() != ImportBatchStatus.RECEIVED || created.getFormat() != ImportFormat.UNKNOWN) return created;
         try {
             // Só relê o arquivo quando o hash veio declarado pelo chamador: sem declaração o
             // valor acima já é a leitura íntegra do arquivo e um segundo passe não prova nada.
             if (declaredHash != null && !sha256(source).equals(declaredHash))
                 throw new ImportParsingException(ImportFailureCode.HASH_MISMATCH, "Hash do arquivo não confere");
-            // Com mapeamento em mãos o titular já disse o que o arquivo é. Exigir que a detecção
-            // reconheça o cabeçalho recusaria justamente o arquivo que o mapeamento existe para
-            // resolver — mapeamento de coluna é conceito de CSV.
-            ImportConnectorRegistry.DetectedConnector detected = mapeamento != null && !mapeamento.vazio()
-                    ? new ImportConnectorRegistry.DetectedConnector(csvConnector,
-                            new ConnectorDetection(ImportFormat.CSV, null, 100))
-                    : connectors.detect(source);
+            ImportConnectorRegistry.DetectedConnector detected = resolver(source, mapeamento, formatoDeclarado);
             batches.setDetected(usuarioId, created.getId(), detected.detection().format(), detected.detection().institutionCode());
             transactions.executeWithoutResult(status -> {
                 try { parseTransaction(usuarioId, created.getId(), source, detected.connector(), mapeamento); }
@@ -86,6 +96,38 @@ public final class CanonicalImportOrchestrator {
             if (failure.getCause() instanceof IOException io) throw io;
             throw new ImportParsingException(code, "Falha ao processar importação", failure);
         }
+    }
+
+    private ImportConnectorRegistry.DetectedConnector resolver(ImportSource source, ImportMapping mapeamento,
+                                                               ImportFormat formatoDeclarado) throws IOException {
+        if (formatoDeclarado != null) return comInstituicao(connectors.forFormat(formatoDeclarado), source);
+        // Com mapeamento em mãos o titular já disse o que o arquivo é. Exigir que a detecção
+        // reconheça o cabeçalho recusaria justamente o arquivo que o mapeamento existe para
+        // resolver — mapeamento de coluna é conceito de CSV.
+        if (mapeamento != null && !mapeamento.vazio()) return connectors.forFormat(ImportFormat.CSV);
+        return connectors.detect(source);
+    }
+
+    /**
+     * Formato veio declarado pela origem, mas a instituição só o conteúdo sabe.
+     *
+     * <p>Sem esse enriquecimento o lote fica com instituição nula, e a identidade forte da
+     * deduplicação passa a casar dois bancos diferentes pelo id externo sozinho. Falha de detecção
+     * aqui não é fatal: o formato já está decidido, e seguir sem instituição é pior que seguir com
+     * ela, mas melhor que recusar o lote inteiro.</p>
+     */
+    private ImportConnectorRegistry.DetectedConnector comInstituicao(
+            ImportConnectorRegistry.DetectedConnector escolhido, ImportSource source) {
+        try {
+            ConnectorDetection detalhe = escolhido.connector().detect(source);
+            if (detalhe != null && detalhe.confidence() > 0
+                    && detalhe.format() == escolhido.detection().format()) {
+                return new ImportConnectorRegistry.DetectedConnector(escolhido.connector(), detalhe);
+            }
+        } catch (IOException | RuntimeException semDetalhe) {
+            // Mapeamento do titular existe justamente para arquivos que a detecção não reconhece.
+        }
+        return escolhido;
     }
 
     private void parseTransaction(Long usuarioId, Long batchId, ImportSource source,

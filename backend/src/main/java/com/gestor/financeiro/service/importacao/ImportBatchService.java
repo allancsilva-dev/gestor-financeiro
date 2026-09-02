@@ -7,6 +7,7 @@ import com.gestor.financeiro.model.ImportBatch;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.ImportBatchStatus;
 import com.gestor.financeiro.model.enums.ImportFormat;
+import com.gestor.financeiro.model.enums.ImportOrigin;
 import com.gestor.financeiro.model.enums.ImportFailureCode;
 import com.gestor.financeiro.repository.ImportBatchRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
@@ -35,9 +36,16 @@ public class ImportBatchService {
         this.observability = observability;
     }
 
+    /**
+     * Cria o lote com a proveniência explícita.
+     *
+     * <p>{@code origem} é parâmetro, e não default silencioso, porque o CHECK
+     * {@code ck_import_batches_origin_formato} recusa lote de conector rotulado como envio manual —
+     * e um default que ninguém enxerga é exatamente como esse tipo de rótulo fica errado.</p>
+     */
     @Transactional
     public ImportBatch create(Long usuarioId, ImportFormat format, String institutionCode,
-                              String fileSha256, String idempotencyKey) {
+                              String fileSha256, String idempotencyKey, ImportOrigin origem) {
         validate(format, fileSha256, idempotencyKey);
         // Serializa submissões do mesmo titular; unique parcial continua como backstop.
         Usuario usuario = usuarioRepository.findByIdComLock(usuarioId)
@@ -58,6 +66,7 @@ public class ImportBatchService {
         ImportBatch batch = new ImportBatch();
         batch.setUsuario(usuario);
         batch.setFormat(format);
+        batch.setOrigin(origem == null ? ImportOrigin.UPLOAD : origem);
         batch.setInstitutionCode(normalizeInstitution(institutionCode));
         batch.setFileSha256(fileSha256);
         batch.setIdempotencyKey(idempotencyKey);

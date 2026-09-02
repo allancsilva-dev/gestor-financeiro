@@ -4,6 +4,7 @@ import com.gestor.financeiro.model.ImportBatch;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.ImportBatchStatus;
 import com.gestor.financeiro.model.enums.ImportFormat;
+import com.gestor.financeiro.model.enums.ImportOrigin;
 import com.gestor.financeiro.repository.UsuarioRepository;
 import com.gestor.financeiro.service.importacao.ImportBatchService;
 import jakarta.persistence.EntityManager;
@@ -70,7 +71,7 @@ class CanonicalImportIT {
 
     @Test
     void migrationCreatesConstraintsIndexesAndCascade() {
-        ImportBatch batch = service.create(usuario.getId(), ImportFormat.CSV, null, HASH, "migration:1");
+        ImportBatch batch = service.create(usuario.getId(), ImportFormat.CSV, null, HASH, "migration:1", ImportOrigin.UPLOAD);
         jdbcTemplate.update("""
                 insert into import_records(batch_id, source_line, record_fingerprint, status, version)
                 values (?, 1, ?, 'VALID', 0)
@@ -95,9 +96,9 @@ class CanonicalImportIT {
         var executor = Executors.newFixedThreadPool(2);
         try {
             var first = executor.submit(() -> service.create(
-                    usuario.getId(), ImportFormat.OFX, "001", HASH, "concurrent:1").getId());
+                    usuario.getId(), ImportFormat.OFX, "001", HASH, "concurrent:1", ImportOrigin.UPLOAD).getId());
             var second = executor.submit(() -> service.create(
-                    usuario.getId(), ImportFormat.OFX, "001", HASH, "concurrent:1").getId());
+                    usuario.getId(), ImportFormat.OFX, "001", HASH, "concurrent:1", ImportOrigin.UPLOAD).getId());
             assertEquals(first.get(), second.get());
         } finally {
             executor.shutdownNow();
@@ -109,7 +110,7 @@ class CanonicalImportIT {
 
     @Test
     void optimisticVersionRejectsStaleLifecycleWrite() {
-        ImportBatch batch = service.create(usuario.getId(), ImportFormat.CSV, null, HASH, null);
+        ImportBatch batch = service.create(usuario.getId(), ImportFormat.CSV, null, HASH, null, ImportOrigin.UPLOAD);
         EntityManager first = entityManagerFactory.createEntityManager();
         EntityManager stale = entityManagerFactory.createEntityManager();
         try {

@@ -2,6 +2,7 @@ package com.gestor.financeiro.model;
 
 import com.gestor.financeiro.model.enums.ImportBatchStatus;
 import com.gestor.financeiro.model.enums.ImportFormat;
+import com.gestor.financeiro.model.enums.ImportOrigin;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -36,6 +37,11 @@ public class ImportBatch {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "conta_id")
     private Conta conta;
+
+    /** Proveniência do lote. Nunca inferir a partir de {@link #format} (V68). */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 12)
+    private ImportOrigin origin = ImportOrigin.UPLOAD;
 
     @Column(name = "institution_code", length = 80)
     private String institutionCode;
