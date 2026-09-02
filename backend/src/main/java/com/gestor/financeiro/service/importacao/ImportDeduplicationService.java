@@ -20,8 +20,19 @@ import org.springframework.transaction.annotation.Transactional;
  *       prévia.</li>
  * </ul>
  *
- * <p>A comparação é contra registros já lançados ({@code COMMITTED}) do mesmo titular — o que
- * ainda está em revisão não é fato consumado.</p>
+ * <p>A heurística compara contra registros já lançados ({@code COMMITTED}) do mesmo titular. A
+ * identidade forte olha mais longe desde a Fase 6 (ADR-0021), e por dois motivos concretos:</p>
+ * <ul>
+ *   <li>contra {@code REVERSED}, senão ressincronizar uma janela desfaz uma reversão que o titular
+ *       fez de propósito;</li>
+ *   <li>contra lotes ainda em revisão, senão a sobreposição de janela da sincronização automática
+ *       recria os mesmos dias a cada ciclo — o commit automático nasce desligado, então nada do
+ *       lote anterior chega a {@code COMMITTED} para servir de comparação.</li>
+ * </ul>
+ *
+ * <p>Instituição entra na comparação pelo id canônico do catálogo quando os dois lados o têm, e por
+ * texto quando algum deles não tem. Sem isso o código de um OFX e o de um agregador para o mesmo
+ * banco nunca casariam.</p>
  */
 @Service
 public class ImportDeduplicationService {
@@ -37,9 +48,14 @@ public class ImportDeduplicationService {
     /** Marca duplicados do lote e devolve quantos foram marcados. */
     @Transactional
     public int marcarDuplicados(Long usuarioId, Long batchId) {
+        // Ordem importa: identidade forte antes da heurística, e dentro dela o que já é fato
+        // consumado antes do que ainda espera decisão. O primeiro que marcar define o motivo que o
+        // titular vê na prévia, e "já lançado" explica melhor que "esperando revisão".
         int porIdentidade = records.marcarDuplicadosPorIdentidadeExterna(usuarioId, batchId);
+        int porReversao = records.marcarDuplicadosPorIdentidadeRevertida(usuarioId, batchId);
+        int emRevisaoAnterior = records.marcarDuplicadosEmRevisao(usuarioId, batchId);
         int porImpressao = records.marcarDuplicadosPorImpressao(usuarioId, batchId);
-        int total = porIdentidade + porImpressao;
+        int total = porIdentidade + porReversao + emRevisaoAnterior + porImpressao;
 
         if (total > 0) {
             // Contar ANTES de tocar na entidade. Cada consulta dispara auto-flush do contexto, e

@@ -28,12 +28,14 @@ public class ImportBatchService {
     private final ImportBatchRepository repository;
     private final UsuarioRepository usuarioRepository;
     private final ImportObservability observability;
+    private final InstituicaoResolver instituicoes;
 
     public ImportBatchService(ImportBatchRepository repository, UsuarioRepository usuarioRepository,
-                              ImportObservability observability) {
+                              ImportObservability observability, InstituicaoResolver instituicoes) {
         this.repository = repository;
         this.usuarioRepository = usuarioRepository;
         this.observability = observability;
+        this.instituicoes = instituicoes;
     }
 
     /**
@@ -110,7 +112,11 @@ public class ImportBatchService {
         if (batch.getStatus() != ImportBatchStatus.RECEIVED || batch.getFormat() != ImportFormat.UNKNOWN)
             throw new FinancialConflictException("Detecção só é permitida para importação recebida");
         batch.setFormat(format);
-        batch.setInstitutionCode(normalizeInstitution(institutionCode));
+        String normalizado = normalizeInstitution(institutionCode);
+        batch.setInstitutionCode(normalizado);
+        // Código detectado é texto da fonte; a instituição canônica é o que faz OFX e conector
+        // convergirem na deduplicação. Catálogo sem a instituição deixa nulo e cai no texto.
+        batch.setInstituicao(instituicoes.resolver(normalizado).orElse(null));
         return repository.save(batch);
     }
 

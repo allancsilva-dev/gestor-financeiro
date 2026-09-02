@@ -3,12 +3,14 @@ package com.gestor.financeiro.service.importacao;
 import com.gestor.financeiro.TestDataFactory;
 import com.gestor.financeiro.model.ImportBatch;
 import com.gestor.financeiro.model.ImportRecord;
+import com.gestor.financeiro.model.InstituicaoFinanceira;
 import com.gestor.financeiro.model.Usuario;
 import com.gestor.financeiro.model.enums.ImportBatchStatus;
 import com.gestor.financeiro.model.enums.ImportFormat;
 import com.gestor.financeiro.model.enums.ImportRecordStatus;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.repository.ImportBatchRepository;
+import com.gestor.financeiro.repository.InstituicaoFinanceiraRepository;
 import com.gestor.financeiro.repository.ImportRecordRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
 import org.junit.jupiter.api.AfterEach;
@@ -38,6 +40,7 @@ class ImportDeduplicationServiceTest {
     @Autowired ImportBatchRepository batches;
     @Autowired ImportRecordRepository records;
     @Autowired UsuarioRepository usuarios;
+    @Autowired InstituicaoFinanceiraRepository instituicoes;
 
     private Usuario titular;
     private Usuario outroTitular;
@@ -54,6 +57,7 @@ class ImportDeduplicationServiceTest {
     void limpar() {
         records.deleteAll();
         batches.deleteAll();
+        instituicoes.deleteAll();
         usuarios.deleteById(titular.getId());
         usuarios.deleteById(outroTitular.getId());
     }
@@ -157,15 +161,100 @@ class ImportDeduplicationServiceTest {
         assertEquals(ImportRecordStatus.VALID, statusDe(meuRegistro.getId()));
     }
 
+    /**
+     * Mudança deliberada de contrato na Fase 6 (ADR-0021), que antes era o oposto.
+     *
+     * <p>A dedup só comparava contra {@code COMMITTED}. Com sincronização automática, sobreposição
+     * de janela e commit automático desligado por padrão, nada do lote anterior chega a
+     * {@code COMMITTED} — cada ciclo recriaria os mesmos dias como registros novos até o titular
+     * revisar. O mesmo buraco já existia no envio manual: dois extratos com período sobreposto
+     * passavam batido e duplicavam o ledger no commit.</p>
+     *
+     * <p>Marcar não é bloquear: {@code ImportCommitService.aprovar} recusa apenas
+     * {@code COMMITTED} e {@code REVERSED}, então o titular continua podendo aprovar a linha na
+     * prévia se souber que são dois fatos reais.</p>
+     */
     @Test
-    void registroNaoLancadoAindaNaoBloqueiaNovoEnvio() {
+    void registroEmRevisaoEmOutroLoteMarcaDuplicadoComMotivoProprio() {
         ImportBatch emRevisao = lote(titular, "a".repeat(64), "NUBANK");
         registro(emRevisao, 2, IMPRESSAO_A, "FITID-1", ImportRecordStatus.VALID, "12.34");
 
         ImportBatch novo = lote(titular, "b".repeat(64), "NUBANK");
-        ImportRecord registro = registro(novo, 2, IMPRESSAO_A, "FITID-1", ImportRecordStatus.VALID, "12.34");
+        ImportRecord registro = registro(novo, 2, IMPRESSAO_B, "FITID-1", ImportRecordStatus.VALID, "99.99");
 
-        assertEquals(0, deduplicacao.marcarDuplicados(titular.getId(), novo.getId()));
+        assertEquals(1, deduplicacao.marcarDuplicados(titular.getId(), novo.getId()));
+        assertEquals(ImportRecordStatus.DUPLICATE, statusDe(registro.getId()));
+        assertEquals("DUPLICATE_PENDING_BATCH", motivoDe(registro.getId()));
+    }
+
+    /**
+     * Reverter é decisão explícita do titular; a sincronização seguinte não pode desfazê-la.
+     * Sem esta regra, o overlap de janela ressuscitaria como válido exatamente o que a pessoa
+     * acabou de tirar do ledger.
+     */
+    @Test
+    void reversaoNaoEDesfeitaPeloEnvioSeguinte() {
+        ImportBatch revertido = lote(titular, "a".repeat(64), "NUBANK");
+        registro(revertido, 2, IMPRESSAO_A, "FITID-9", ImportRecordStatus.REVERSED, "12.34");
+
+        ImportBatch novo = lote(titular, "b".repeat(64), "NUBANK");
+        ImportRecord registro = registro(novo, 2, IMPRESSAO_B, "FITID-9", ImportRecordStatus.VALID, "12.34");
+
+        assertEquals(1, deduplicacao.marcarDuplicados(titular.getId(), novo.getId()));
+        assertEquals(ImportRecordStatus.DUPLICATE, statusDe(registro.getId()));
+        assertEquals("DUPLICATE_REVERSED", motivoDe(registro.getId()));
+    }
+
+    /**
+     * O motivo de o catálogo existir.
+     *
+     * <p>O mesmo banco chega com códigos diferentes conforme a rota: {@code <FI><ORG>} num arquivo
+     * OFX, código próprio num agregador. Comparando texto, os dois nunca casam e o mesmo fato entra
+     * duas vezes — a despesa aparece dobrada para o titular. Com instituição canônica dos dois
+     * lados, a identidade forte reconhece.</p>
+     */
+    @Test
+    void mesmoFatoPorRotasDiferentesCasaPelaInstituicaoCanonica() {
+        InstituicaoFinanceira banco = instituicaoCanonica("BANCO-CANONICO");
+
+        ImportBatch porOfx = lote(titular, "a".repeat(64), "0001-OFX");
+        porOfx.setInstituicao(banco);
+        batches.save(porOfx);
+        registro(porOfx, 2, IMPRESSAO_A, "FITID-7", ImportRecordStatus.COMMITTED, "12.34");
+
+        ImportBatch porConector = lote(titular, "b".repeat(64), "AGREGADOR-XYZ");
+        porConector.setInstituicao(banco);
+        batches.save(porConector);
+        ImportRecord registro = registro(porConector, 2, IMPRESSAO_B, "FITID-7", ImportRecordStatus.VALID, "12.34");
+
+        assertEquals(1, deduplicacao.marcarDuplicados(titular.getId(), porConector.getId()));
+        assertEquals(ImportRecordStatus.DUPLICATE, statusDe(registro.getId()));
+    }
+
+    /**
+     * Catálogo vazio é o estado normal de qualquer ambiente onde ninguém populou nada. A dedup
+     * volta a casar por texto e continua funcionando — degrada, não quebra.
+     */
+    @Test
+    void semInstituicaoCanonicaCaiNoCasamentoTextualDeAntes() {
+        ImportBatch primeiro = lote(titular, "a".repeat(64), "BANCO-A");
+        registro(primeiro, 2, IMPRESSAO_A, "FITID-7", ImportRecordStatus.COMMITTED, "12.34");
+
+        ImportBatch outroBanco = lote(titular, "b".repeat(64), "BANCO-B");
+        ImportRecord registro = registro(outroBanco, 2, IMPRESSAO_B, "FITID-7", ImportRecordStatus.VALID, "12.34");
+
+        assertEquals(0, deduplicacao.marcarDuplicados(titular.getId(), outroBanco.getId()));
         assertEquals(ImportRecordStatus.VALID, statusDe(registro.getId()));
+    }
+
+    private InstituicaoFinanceira instituicaoCanonica(String codigo) {
+        InstituicaoFinanceira instituicao = new InstituicaoFinanceira();
+        instituicao.setCodigo(codigo);
+        instituicao.setNome("Banco de teste");
+        return instituicoes.save(instituicao);
+    }
+
+    private String motivoDe(Long registroId) {
+        return records.findById(registroId).orElseThrow().getReasonCode();
     }
 }

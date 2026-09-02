@@ -46,6 +46,14 @@ public class ImportBatch {
     @Column(name = "institution_code", length = 80)
     private String institutionCode;
 
+    /**
+     * Instituição canônica do catálogo (V69). Nulo quando o catálogo não conhece
+     * {@link #institutionCode}; a deduplicação trata os dois casos.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "instituicao_id")
+    private InstituicaoFinanceira instituicao;
+
     @Column(name = "file_sha256", nullable = false, length = 64)
     private String fileSha256;
 
