@@ -19,6 +19,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -44,12 +45,14 @@ public class NotificacaoService {
     public static final String DESTINO_CONTA_FIXA = "CONTA_FIXA";
     public static final String DESTINO_ORCAMENTO = "ORCAMENTO";
     public static final String DESTINO_META = "META";
+    public static final String DESTINO_CARTAO = "CARTAO";
 
     private final NotificacaoRepository notificacaoRepository;
     private final UsuarioRepository usuarioRepository;
     private final CompromissosService compromissosService;
     private final OrcamentoService orcamentoService;
     private final MetaService metaService;
+    private final CartaoService cartaoService;
     private final Clock clock;
 
     // ── leitura ──────────────────────────────────────────────────────────────
@@ -160,6 +163,26 @@ public class NotificacaoService {
                         DESTINO_ORCAMENTO, c.categoriaId(),
                         "ORCAMENTO_ESTOURADO:" + orcamento.ano() + "-" + orcamento.mes()
                                 + ":" + c.categoriaId())));
+
+        // Limite do cartao estourado (BACKLOG-0125): a decisao do dono do produto e
+        // "lancar e avisar, nunca bloquear" — a compra ja entrou na fatura, aqui so
+        // avisamos. Deriva do mesmo calculo da tela Carteira (montarCarteira), entao o
+        // numero do aviso e exatamente o que o usuario ve no app.
+        //
+        // A chave por competencia faz o aviso voltar num novo episodio: quem estourou,
+        // pagou a fatura e estourou de novo no mes seguinte e avisado outra vez.
+        //
+        // Limite zero/nulo e o default de Conta.limiteTotal e significa "nao informado":
+        // avisar ali seria alarme falso para todo mundo que nunca preencheu o limite.
+        YearMonth competencia = YearMonth.from(hoje);
+        cartaoService.usoDoLimite(usuarioId).stream()
+                .filter(CartaoService.UsoLimite::estourado)
+                .forEach(u -> out.add(new Rascunho(TipoNotificacao.LIMITE_ESTOURADO,
+                        "Limite do cartão estourado",
+                        "O cartão " + u.nome() + " passou do limite. As cobranças continuam"
+                                + " entrando na fatura.",
+                        DESTINO_CARTAO, u.cartaoId(),
+                        "LIMITE_ESTOURADO:" + u.cartaoId() + ":" + competencia)));
 
         // Meta concluida: uma vez por meta, para sempre
         metaService.listarPorUsuario(usuarioId, StatusMeta.CONCLUIDA, PageRequest.of(0, 20))

@@ -10,6 +10,7 @@ import com.gestor.financeiro.model.enums.NaturezaContaFinanceira;
 import com.gestor.financeiro.model.enums.EstadoConciliacaoConta;
 import com.gestor.financeiro.model.enums.OrigemDadosConta;
 import com.gestor.financeiro.model.enums.SubtipoContaFinanceira;
+import com.gestor.financeiro.dto.AlertaDto;
 import com.gestor.financeiro.dto.CarteiraCartaoResponse;
 import com.gestor.financeiro.dto.FaturaResumoDto;
 import com.gestor.financeiro.model.FaturaCartao;
@@ -35,6 +36,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Servico canonico de cartao (PR-F2-19): substitui o antigo ContaService
@@ -152,9 +154,64 @@ public class CartaoService {
         return resposta;
     }
 
-    private CarteiraCartaoResponse montarCartao(Conta cartao, List<FaturaCartao> faturas,
-                                                Map<Long, BigDecimal> somaPorFatura,
-                                                LocalDate hoje, int janela) {
+    /**
+     * Uso do limite de um cartao. Fonte unica: a tela Carteira e o aviso de estouro
+     * (BACKLOG-0125) precisam do mesmo numero, ou o usuario recebe um alerta que a tela
+     * nao confirma.
+     */
+    public record UsoLimite(Long cartaoId, String nome, BigDecimal limite,
+                            BigDecimal emAberto, BigDecimal creditoAFavor, int percentualUso) {
+
+        /**
+         * Limite zero ou nulo e o default de Conta.limiteTotal e significa "nao
+         * informado": avisar ali seria alarme falso para todo mundo que nunca preencheu
+         * o limite do cartao.
+         */
+        public boolean estourado() {
+            return limite != null && limite.signum() > 0 && emAberto.compareTo(limite) > 0;
+        }
+    }
+
+    /** Uso do limite de todos os cartoes ativos do titular. Sem efeito colateral. */
+    @Transactional(readOnly = true)
+    public List<UsoLimite> usoDoLimite(Long usuarioId) {
+        return contaRepository.findByUsuarioIdAndAtivoTrue(usuarioId).stream()
+                .map(CartaoService::usoDoLimite)
+                .toList();
+    }
+
+    /** Uso do limite de um cartao do titular; vazio se o cartao nao e dele ou nao existe. */
+    @Transactional(readOnly = true)
+    public Optional<UsoLimite> usoDoLimite(Long usuarioId, Long cartaoId) {
+        if (cartaoId == null) return Optional.empty();
+        return contaRepository.findByIdAndUsuarioId(cartaoId, usuarioId)
+                .map(CartaoService::usoDoLimite);
+    }
+
+    /**
+     * Alerta sincrono de limite estourado para a resposta da operacao que acabou de
+     * acontecer (BACKLOG-0125). Vazio quando nao ha cartao, quando o cartao nao e do
+     * titular ou quando o limite nao foi informado.
+     *
+     * Nunca bloqueia nada: a decisao do dono do produto e "lancar e avisar". A leitura
+     * acontece depois do commit da operacao, entao ja enxerga o passivo atualizado por
+     * FaturaService.espelharPassivo.
+     */
+    @Transactional(readOnly = true)
+    public List<AlertaDto> alertasDeLimite(Long usuarioId, Long cartaoId) {
+        return usoDoLimite(usuarioId, cartaoId)
+                .filter(UsoLimite::estourado)
+                .map(u -> List.of(new AlertaDto(
+                        "LIMITE_ESTOURADO",
+                        "Limite do cartão estourado",
+                        "O cartão " + u.nome() + " passou do limite. A cobrança foi lançada"
+                                + " normalmente e entra na fatura.",
+                        NotificacaoService.DESTINO_CARTAO,
+                        u.cartaoId())))
+                .orElseGet(List::of);
+    }
+
+    private static UsoLimite usoDoLimite(Conta cartao) {
         BigDecimal limite = cartao.getLimiteTotal() == null ? BigDecimal.ZERO : cartao.getLimiteTotal();
         BigDecimal saldo = cartao.getContaFinanceira() == null || cartao.getContaFinanceira().getSaldo() == null
                 ? BigDecimal.ZERO : cartao.getContaFinanceira().getSaldo();
@@ -169,6 +226,23 @@ public class CartaoService {
                         .divide(limite, 0, RoundingMode.HALF_UP)
                         .min(BigDecimal.valueOf(100))
                         .intValue();
+
+        return new UsoLimite(cartao.getId(), cartao.getNome(), limite, emAberto,
+                creditoAFavor, percentualUso);
+    }
+
+    private CarteiraCartaoResponse montarCartao(Conta cartao, List<FaturaCartao> faturas,
+                                                Map<Long, BigDecimal> somaPorFatura,
+                                                LocalDate hoje, int janela) {
+        UsoLimite uso = usoDoLimite(cartao);
+        BigDecimal limite = uso.limite();
+        BigDecimal emAberto = uso.emAberto();
+        BigDecimal creditoAFavor = uso.creditoAFavor();
+        int percentualUso = uso.percentualUso();
+        // Limite disponivel usa o saldo COM sinal, nao o emAberto: credito a favor
+        // aumenta o disponivel acima do limite. Comportamento preservado da versao
+        // anterior a extracao de UsoLimite.
+        BigDecimal saldo = emAberto.subtract(creditoAFavor);
 
         YearMonth competenciaAtual = YearMonth.from(hoje);
         LocalDate vencimentoAtual = FaturaDatas.vencimento(cartao, competenciaAtual);

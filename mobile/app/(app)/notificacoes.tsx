@@ -21,6 +21,8 @@ const ICONE: Record<TipoNotificacao, React.ComponentProps<typeof Ionicons>['name
   FALHA_SALDO: 'alert-circle',
   ORCAMENTO_ESTOURADO: 'trending-up',
   META_ATINGIDA: 'trophy',
+  // 'card' já é o ícone de fatura vencendo; estouro de limite é aviso, não cobrança
+  LIMITE_ESTOURADO: 'warning',
 };
 
 const ROTA_POR_DESTINO: Record<string, string> = {
@@ -29,6 +31,7 @@ const ROTA_POR_DESTINO: Record<string, string> = {
   CONTA_FIXA: '/more/contas-fixas',
   ORCAMENTO: '/more/orcamentos',
   META: '/(app)/metas',
+  CARTAO: '/more/faturas',
 };
 
 export default function Notificacoes() {

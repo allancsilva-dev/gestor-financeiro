@@ -1,6 +1,7 @@
 package com.gestor.financeiro.controller;
 
 import lombok.RequiredArgsConstructor;
+import com.gestor.financeiro.dto.AlertaDto;
 import com.gestor.financeiro.dto.TransacaoRequest;
 import com.gestor.financeiro.dto.TransacaoResponseDto;
 import com.gestor.financeiro.dto.CronogramaItemResponse;
@@ -11,6 +12,7 @@ import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.security.AuthenticatedUserService;
+import com.gestor.financeiro.service.CartaoService;
 import com.gestor.financeiro.service.TransacaoService;
 import com.gestor.financeiro.service.CronogramaService;
 import com.gestor.financeiro.service.SugestaoCategoriaService;
@@ -37,6 +39,7 @@ public class TransacaoController {
     private final CronogramaService cronogramaService;
     private final SugestaoCategoriaService sugestaoCategoriaService;
     private final AuthenticatedUserService authenticatedUserService;
+    private final CartaoService cartaoService;
     
     // GET /api/transacoes/minhas - Lista transações do usuário autenticado
     @GetMapping("/minhas")
@@ -104,7 +107,8 @@ public class TransacaoController {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Transacao transacao = toEntity(request);
         Transacao transacaoCriada = transacaoService.criar(transacao, usuarioId);
-        return ResponseEntity.ok(TransacaoResponseDto.fromEntity(transacaoCriada));
+        return ResponseEntity.ok(TransacaoResponseDto.fromEntity(
+                transacaoCriada, alertasDeLimite(transacaoCriada, usuarioId)));
     }
     
     // PUT /api/transacoes/{id} - Atualiza transação
@@ -117,7 +121,8 @@ public class TransacaoController {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Transacao transacao = toEntity(request);
         Transacao transacaoAtualizada = transacaoService.atualizar(id, transacao, usuarioId);
-        return ResponseEntity.ok(TransacaoResponseDto.fromEntity(transacaoAtualizada));
+        return ResponseEntity.ok(TransacaoResponseDto.fromEntity(
+                transacaoAtualizada, alertasDeLimite(transacaoAtualizada, usuarioId)));
     }
     
     // DELETE /api/transacoes/{id} - Deleta transação
@@ -127,6 +132,16 @@ public class TransacaoController {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         transacaoService.deletar(id, usuarioId);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Aviso de limite estourado (BACKLOG-0125): nunca bloqueia a operacao, so informa.
+     * Lido depois do commit do service, entao ja enxerga o passivo atualizado pela
+     * compra que acabou de entrar na fatura.
+     */
+    private List<AlertaDto> alertasDeLimite(Transacao transacao, Long usuarioId) {
+        if (transacao.getConta() == null) return List.of();
+        return cartaoService.alertasDeLimite(usuarioId, transacao.getConta().getId());
     }
 
     private Transacao toEntity(TransacaoRequest request) {

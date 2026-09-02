@@ -2,6 +2,7 @@ package com.gestor.financeiro.controller;
 
 import lombok.RequiredArgsConstructor;
 import com.gestor.financeiro.dto.ContaFixaResponseDto;
+import com.gestor.financeiro.dto.AlertaDto;
 import com.gestor.financeiro.dto.ContaFixaRequest;
 import com.gestor.financeiro.dto.ValorRequest;
 import com.gestor.financeiro.dto.ExecucaoRecorrenciaDto;
@@ -10,6 +11,7 @@ import com.gestor.financeiro.model.Categoria;
 import com.gestor.financeiro.model.Conta;
 import com.gestor.financeiro.model.ContaFixa;
 import com.gestor.financeiro.security.AuthenticatedUserService;
+import com.gestor.financeiro.service.CartaoService;
 import com.gestor.financeiro.service.ContaFixaService;
 import com.gestor.financeiro.util.PaginationUtils;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,6 +31,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ContaFixaController {
     private final ContaFixaService contaFixaService;
+    private final CartaoService cartaoService;
     private final AuthenticatedUserService authenticatedUserService;
 
     // GET /api/contas-fixas/minhas - Lista contas fixas do usuário autenticado
@@ -56,7 +59,8 @@ public class ContaFixaController {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         ContaFixa contaFixa = toEntity(request);
         ContaFixa novaConta = contaFixaService.criar(contaFixa, usuarioId);
-        return ResponseEntity.ok(ContaFixaResponseDto.fromEntity(novaConta));
+        return ResponseEntity.ok(ContaFixaResponseDto.fromEntity(
+                novaConta, alertasDeLimite(novaConta, usuarioId)));
     }
 
     // PUT /api/contas-fixas/{id} - Atualiza conta fixa
@@ -85,15 +89,18 @@ public class ContaFixaController {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         BigDecimal valorPago = request.getValor();
         ContaFixa contaPaga = contaFixaService.marcarComoPaga(id, valorPago, request.getCarteiraId(), usuarioId);
-        return ResponseEntity.ok(ContaFixaResponseDto.fromEntity(contaPaga));
+        return ResponseEntity.ok(ContaFixaResponseDto.fromEntity(
+                contaPaga, alertasDeLimite(contaPaga, usuarioId)));
     }
 
     @PutMapping("/{id}/realizar")
     public ResponseEntity<ContaFixaResponseDto> realizar(
             @PathVariable Long id, @Valid @RequestBody ValorRequest request) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
+        ContaFixa realizada = contaFixaService.realizar(
+                id, request.getValor(), request.getCarteiraId(), usuarioId, false);
         return ResponseEntity.ok(ContaFixaResponseDto.fromEntity(
-                contaFixaService.realizar(id, request.getValor(), request.getCarteiraId(), usuarioId, false)));
+                realizada, alertasDeLimite(realizada, usuarioId)));
     }
 
     @GetMapping("/falhas-pendentes")
@@ -115,6 +122,18 @@ public class ContaFixaController {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         ContaFixa contaAtualizada = contaFixaService.reativar(id, usuarioId);
         return ResponseEntity.ok(ContaFixaResponseDto.fromEntity(contaAtualizada));
+    }
+
+    /**
+     * Aviso de limite estourado (BACKLOG-0125): nunca bloqueia a cobranca, so informa.
+     *
+     * A cobranca automatica do RecorrenciaScheduler (00:05) nao passa por aqui — nao ha
+     * request. La o aviso chega pelos canais in-app e push, derivados em
+     * NotificacaoService.
+     */
+    private List<AlertaDto> alertasDeLimite(ContaFixa contaFixa, Long usuarioId) {
+        if (contaFixa.getConta() == null) return List.of();
+        return cartaoService.alertasDeLimite(usuarioId, contaFixa.getConta().getId());
     }
 
     private ContaFixa toEntity(ContaFixaRequest request) {

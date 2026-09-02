@@ -27,12 +27,14 @@ public class NotificacaoSyncJobHandler implements JobHandler {
      * Título do push por tipo de evento. Sem valor, sem nome de cartão, sem categoria: o aviso
      * aparece na tela de bloqueio, onde qualquer pessoa vê. O detalhe fica dentro do app.
      */
-    private static final Map<TipoNotificacao, String> TITULO = Map.of(
-            TipoNotificacao.FATURA_VENCENDO, "Fatura vencendo",
-            TipoNotificacao.PARCELA_AGENDADA, "Parcela chegando",
-            TipoNotificacao.FALHA_SALDO, "Conta fixa não foi paga",
-            TipoNotificacao.ORCAMENTO_ESTOURADO, "Orçamento estourado",
-            TipoNotificacao.META_ATINGIDA, "Meta atingida");
+    private static final Map<TipoNotificacao, String> TITULO = Map.ofEntries(
+            Map.entry(TipoNotificacao.FATURA_VENCENDO, "Fatura vencendo"),
+            Map.entry(TipoNotificacao.PARCELA_AGENDADA, "Parcela chegando"),
+            Map.entry(TipoNotificacao.FALHA_SALDO, "Conta fixa não foi paga"),
+            Map.entry(TipoNotificacao.ORCAMENTO_ESTOURADO, "Orçamento estourado"),
+            Map.entry(TipoNotificacao.META_ATINGIDA, "Meta atingida"),
+            // Sem nome de cartao: o titulo aparece na tela de bloqueio.
+            Map.entry(TipoNotificacao.LIMITE_ESTOURADO, "Limite do cartão estourado"));
 
     private static final String CORPO = "Abra o app para ver os detalhes.";
 

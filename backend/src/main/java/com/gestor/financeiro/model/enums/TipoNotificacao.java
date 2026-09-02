@@ -6,7 +6,8 @@ public enum TipoNotificacao {
     PARCELA_AGENDADA("Parcela agendada"),
     FALHA_SALDO("Recorrencia sem saldo"),
     ORCAMENTO_ESTOURADO("Orcamento estourado"),
-    META_ATINGIDA("Meta atingida");
+    META_ATINGIDA("Meta atingida"),
+    LIMITE_ESTOURADO("Limite do cartao estourado");
 
     private final String descricao;
 

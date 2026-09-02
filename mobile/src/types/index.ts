@@ -146,6 +146,8 @@ export interface Transacao {
   recorrente: boolean;
   categoria?: CategoriaResumo;
   cartao?: CartaoResumo;
+  /** Avisos que acompanham a operação sem impedi-la; vazio nas leituras. */
+  alertas?: Alerta[];
 }
 
 export interface TransacaoRequest {
@@ -365,6 +367,8 @@ export interface ContaFixa {
   carteira?: { id: number; nome: string };
   // Destino alternativo à carteira: assinatura cobrada no cartão (V67)
   cartao?: { id: number; nome: string; bandeira?: string; ultimosDigitos?: string };
+  /** Avisos que acompanham a operação sem impedi-la; vazio nas leituras. */
+  alertas?: Alerta[];
 }
 
 export interface ContaFixaRequest {
@@ -789,7 +793,19 @@ export interface HomeResumo {
 
 export type TipoNotificacao =
   | 'FATURA_VENCENDO' | 'PARCELA_AGENDADA' | 'FALHA_SALDO'
-  | 'ORCAMENTO_ESTOURADO' | 'META_ATINGIDA';
+  | 'ORCAMENTO_ESTOURADO' | 'META_ATINGIDA' | 'LIMITE_ESTOURADO';
+
+/**
+ * Aviso que acompanha a resposta de uma operação sem impedi-la (ex.: limite do cartão
+ * estourado). Mesma forma do aviso in-app, de propósito: um componente serve os dois.
+ */
+export interface Alerta {
+  codigo: string;
+  titulo: string;
+  mensagem: string;
+  destino?: string;
+  destinoId?: number;
+}
 
 export interface Notificacao {
   id: number;

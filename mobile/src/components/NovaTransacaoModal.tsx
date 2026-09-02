@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Modal, TouchableOpacity, ActivityIndicator, ScrollView, TextInput, Switch } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, ActivityIndicator, ScrollView, TextInput, Switch, Alert } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { transacaoService } from '../services/transacaoService';
 import { contaFixaService } from '../services/contaFixaService';
@@ -9,7 +9,7 @@ import contaFinanceiraService from '../services/contaFinanceiraService';
 import cartaoService from '../services/cartaoService';
 import { useModalTopInset, useTheme } from '../theme';
 import { parseDateBR, isValidDateBR, parseCurrencyBR, maskCurrencyInput, maskDateInput, todayBR, formatDateOnlyBR } from '../utils/format';
-import { TransacaoRequest, TipoTransacao, SugestaoCategoria } from '../types';
+import { TransacaoRequest, TipoTransacao, SugestaoCategoria, Alerta } from '../types';
 import { rotuloProximaCobranca } from '../domain/recorrencia';
 import { getLancamentoPrefs, setLancamentoPrefs } from '../store/lancamentoPrefs';
 import { CATEGORIAS_INICIAIS } from '../domain/categoriasIniciais';
@@ -318,6 +318,7 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
     if (hasError) return;
 
     setSalvando(true);
+    let alertas: Alerta[] = [];
     try {
       const request: TransacaoRequest = {
         descricao: descricao.trim(),
@@ -367,7 +368,7 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
       } else if (repeteTodoMes) {
         // O que se repete todo mês é compromisso, não lançamento avulso: vira
         // recorrência e o backend passa a lançar sozinho, mês a mês.
-        await contaFixaService.criar({
+        const recorrencia = await contaFixaService.criar({
           descricao: request.descricao,
           valor: request.valor,
           diaVencimento: new Date(request.data + 'T00:00:00').getDate(),
@@ -378,8 +379,10 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
           observacoes: request.observacoes,
           ...(request.cartaoId ? { cartaoId: request.cartaoId } : { carteiraId: request.carteiraId }),
         });
+        alertas = recorrencia.alertas ?? [];
       } else {
-        await transacaoService.criar(request);
+        const criada = await transacaoService.criar(request);
+        alertas = criada.alertas ?? [];
       }
       // Última conta/cartão ficam somente no dispositivo (PR-F3-05)
       setLancamentoPrefs(tipo === 'SAIDA' && formaPagamento === 'CARTAO'
@@ -390,6 +393,11 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
       resetForm();
       onClose();
       onSaved?.();
+      // Aviso do backend que não impede a operação (ex.: limite do cartão estourado).
+      // Vem depois do onClose de propósito: o lançamento deu certo, isto é informação.
+      if (alertas.length > 0) {
+        Alert.alert(alertas[0].titulo, alertas[0].mensagem);
+      }
     } catch (err: any) {
       setErroForm(err?.userMessage ?? 'Erro ao salvar. Tente novamente.');
     } finally {
