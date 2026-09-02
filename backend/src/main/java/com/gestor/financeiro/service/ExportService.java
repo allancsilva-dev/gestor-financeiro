@@ -239,7 +239,7 @@ public class ExportService {
         List<ContaFixa> contasFixas = contaFixaRepository.findByUsuarioId(usuarioId);
 
         StringBuilder csv = new StringBuilder();
-        csv.append("ID,Nome,Categoria,Valor Planejado,Valor Real,Dia Vencimento,Status,Recorrente,Ativo,Observações\n");
+        csv.append("ID,Nome,Categoria,Valor Planejado,Valor Real,Dia Vencimento,Frequência,Status,Recorrente,Ativo,Observações\n");
 
         for (ContaFixa cf : contasFixas) {
             csv.append(cf.getId()).append(",");
@@ -248,6 +248,7 @@ public class ExportService {
             csv.append(cf.getValorPlanejado() != null ? cf.getValorPlanejado() : "0").append(",");
             csv.append(cf.getValorReal() != null ? cf.getValorReal() : "0").append(",");
             csv.append(cf.getDiaVencimento() != null ? cf.getDiaVencimento() : "").append(",");
+            csv.append(cf.getFrequencia() != null ? cf.getFrequencia().getDescricao() : "").append(",");
             csv.append(cf.getStatus() != null ? cf.getStatus() : "").append(",");
             csv.append(Boolean.TRUE.equals(cf.getRecorrente()) ? "Sim" : "Não").append(",");
             csv.append(Boolean.TRUE.equals(cf.getAtivo()) ? "Sim" : "Não").append(",");

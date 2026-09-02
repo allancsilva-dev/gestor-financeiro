@@ -8,6 +8,7 @@ import com.gestor.financeiro.model.enums.StatusPagamento;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.model.ContaFixa;
 import com.gestor.financeiro.repository.*;
+import com.gestor.financeiro.util.CalendarioRecorrencia;
 import com.gestor.financeiro.util.FaturaDatas;
 import org.springframework.stereotype.Service;
 
@@ -86,32 +87,28 @@ public class ProjecaoService {
                 .filter(c -> c.getConta() == null)
                 .filter(c -> (c.getTipo() == null ? TipoTransacao.SAIDA : c.getTipo()) == tipo)
                 .filter(c -> c.getStatus() != StatusPagamento.PAGO && c.getStatus() != StatusPagamento.CANCELADO)
-                .filter(c -> ocorreNoMes(c, mes))
-                .map(ContaFixa::getValorPlanejado)
+                // Semanal cai 4 ou 5 vezes no mes; anual, uma vez por ano. Antes da V72
+                // a projecao assumia "uma vez por mes, sempre".
+                .map(c -> c.getValorPlanejado()
+                        .multiply(BigDecimal.valueOf(ocorrenciasNoMes(c, mes).size())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    private boolean ocorreNoMes(ContaFixa conta, YearMonth mes) {
-        return ocorrenciaNoMes(conta, mes) != null;
-    }
-
     /**
-     * Data da ocorrencia da recorrencia dentro do mes, ou null se nao ocorre. Mesma
-     * regra de sempre — o ramo de caixa so precisa do sim/nao —, mas o ramo de cartao
-     * precisa da data para descobrir em que fatura a cobranca cai.
+     * Ocorrencias da recorrencia dentro do mes. O ramo de caixa so precisa da
+     * quantidade; o de cartao precisa das datas, para descobrir em que fatura cada
+     * cobranca cai.
      */
-    private LocalDate ocorrenciaNoMes(ContaFixa conta, YearMonth mes) {
-        if (conta.getDataProximoVencimento() == null) return null;
-        YearMonth primeiro = YearMonth.from(conta.getDataProximoVencimento());
-        if (Boolean.TRUE.equals(conta.getRecorrente())) {
-            if (mes.isBefore(primeiro)) return null;
-        } else if (!mes.equals(primeiro)) {
-            return null;
-        }
+    private List<LocalDate> ocorrenciasNoMes(ContaFixa conta, YearMonth mes) {
         int dia = conta.getDiaVencimento() != null
                 ? conta.getDiaVencimento()
-                : conta.getDataProximoVencimento().getDayOfMonth();
-        return mes.atDay(Math.min(dia, mes.lengthOfMonth()));
+                : conta.getDataProximoVencimento() == null ? 1 : conta.getDataProximoVencimento().getDayOfMonth();
+        return CalendarioRecorrencia.ocorrenciasNoMes(
+                conta.getDataProximoVencimento(),
+                conta.getFrequencia(),
+                dia,
+                Boolean.TRUE.equals(conta.getRecorrente()),
+                mes);
     }
 
     /**
@@ -134,14 +131,14 @@ public class ProjecaoService {
             if (conta.getStatus() == StatusPagamento.PAGO || conta.getStatus() == StatusPagamento.CANCELADO) continue;
 
             for (int mesesAtras = 2; mesesAtras >= 0; mesesAtras--) {
-                LocalDate ocorrencia = ocorrenciaNoMes(conta, mes.minusMonths(mesesAtras));
-                if (ocorrencia == null) continue;
-                if (ocorrencia.isBefore(conta.getDataProximoVencimento())) continue;
+                for (LocalDate ocorrencia : ocorrenciasNoMes(conta, mes.minusMonths(mesesAtras))) {
+                    if (ocorrencia.isBefore(conta.getDataProximoVencimento())) continue;
 
-                YearMonth competencia = FaturaDatas.competencia(conta.getConta(), ocorrencia);
-                LocalDate vencimentoFatura = FaturaDatas.vencimento(conta.getConta(), competencia);
-                if (YearMonth.from(vencimentoFatura).equals(mes)) {
-                    total = total.add(conta.getValorPlanejado());
+                    YearMonth competencia = FaturaDatas.competencia(conta.getConta(), ocorrencia);
+                    LocalDate vencimentoFatura = FaturaDatas.vencimento(conta.getConta(), competencia);
+                    if (YearMonth.from(vencimentoFatura).equals(mes)) {
+                        total = total.add(conta.getValorPlanejado());
+                    }
                 }
             }
         }

@@ -1,6 +1,7 @@
 package com.gestor.financeiro.model;
 
 import com.gestor.financeiro.model.enums.StatusPagamento;
+import com.gestor.financeiro.model.enums.FrequenciaRecorrencia;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import jakarta.persistence.*;
 import lombok.Data;
@@ -54,8 +55,25 @@ public class ContaFixa {
     @Column(precision = 10, scale = 2)
     private BigDecimal valorReal;
     
+    /**
+     * Dia do mes da cobranca (1..31). Em frequencia sub-mensal a serie nao sai daqui e
+     * sim de dataAncora: o valor e derivado do dia da ancora, so para exibicao e para
+     * satisfazer o NOT NULL herdado da V1.
+     */
     @Column(nullable = false)
     private Integer diaVencimento;
+
+    /** Periodicidade da cobranca (V72). Default MENSAL preserva o comportamento anterior. */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private FrequenciaRecorrencia frequencia = FrequenciaRecorrencia.MENSAL;
+
+    /**
+     * Primeira ocorrencia de recorrencia sub-mensal; fixa o dia da semana e a paridade
+     * da quinzena. NULL em MENSAL+, onde a serie sai de diaVencimento.
+     */
+    @Column(name = "data_ancora")
+    private LocalDate dataAncora;
     
     @Column
     private LocalDate dataProximoVencimento;

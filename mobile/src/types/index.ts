@@ -367,9 +367,15 @@ export interface ContaFixa {
   carteira?: { id: number; nome: string };
   // Destino alternativo à carteira: assinatura cobrada no cartão (V67)
   cartao?: { id: number; nome: string; bandeira?: string; ultimosDigitos?: string };
+  frequencia?: FrequenciaRecorrencia;
+  dataAncora?: string;
   /** Avisos que acompanham a operação sem impedi-la; vazio nas leituras. */
   alertas?: Alerta[];
 }
+
+export type FrequenciaRecorrencia =
+  | 'SEMANAL' | 'QUINZENAL' | 'MENSAL' | 'BIMESTRAL'
+  | 'TRIMESTRAL' | 'SEMESTRAL' | 'ANUAL';
 
 export interface ContaFixaRequest {
   descricao: string; // campo nome do backend aceita "descricao" via @JsonAlias
@@ -382,6 +388,8 @@ export interface ContaFixaRequest {
   execucaoAutomatica?: boolean;
   carteiraId?: number;
   cartaoId?: number; // exclusivo com carteiraId: a cobrança sai do caixa ou do cartão
+  frequencia?: FrequenciaRecorrencia; // ausente vale MENSAL (V72)
+  dataAncora?: string; // obrigatório em SEMANAL/QUINZENAL: fixa dia da semana e paridade
 }
 
 export interface FalhaRecorrencia {

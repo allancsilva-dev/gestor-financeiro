@@ -9,7 +9,9 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
 import java.math.BigDecimal;
+import com.gestor.financeiro.model.enums.FrequenciaRecorrencia;
 import com.gestor.financeiro.model.enums.TipoTransacao;
+import java.time.LocalDate;
 
 public class ContaFixaRequest {
 
@@ -43,6 +45,12 @@ public class ContaFixaRequest {
 
     /** Destino alternativo a carteiraId: assinatura cobrada no cartao (V67). */
     private Long cartaoId;
+
+    /** Periodicidade (V72). Ausente vale MENSAL: cliente antigo continua funcionando. */
+    private FrequenciaRecorrencia frequencia;
+
+    /** Primeira cobranca de recorrencia sub-mensal (SEMANAL/QUINZENAL). */
+    private LocalDate dataAncora;
 
     public String getDescricao() {
         return descricao;
@@ -104,6 +112,10 @@ public class ContaFixaRequest {
     public void setCarteiraId(Long carteiraId) { this.carteiraId = carteiraId; }
     public Long getCartaoId() { return cartaoId; }
     public void setCartaoId(Long cartaoId) { this.cartaoId = cartaoId; }
+    public FrequenciaRecorrencia getFrequencia() { return frequencia; }
+    public void setFrequencia(FrequenciaRecorrencia frequencia) { this.frequencia = frequencia; }
+    public LocalDate getDataAncora() { return dataAncora; }
+    public void setDataAncora(LocalDate dataAncora) { this.dataAncora = dataAncora; }
 
     // Um destino, nunca dois: a cobranca sai do caixa ou do cartao (V67).
     @AssertTrue(message = "Informe apenas um destino: conta ou cartão")
@@ -117,6 +129,11 @@ public class ContaFixaRequest {
     }
 
     // Cartao cobra; nao se recebe salario no cartao.
+    @AssertTrue(message = "Informe a data da primeira cobrança para recorrência semanal ou quinzenal")
+    public boolean isAncoraInformadaQuandoSubMensal() {
+        return frequencia == null || !frequencia.isSubMensal() || dataAncora != null;
+    }
+
     @AssertTrue(message = "Cartão só aceita recorrência de saída")
     public boolean isCartaoSomenteSaida() {
         return cartaoId == null || getTipo() == TipoTransacao.SAIDA;

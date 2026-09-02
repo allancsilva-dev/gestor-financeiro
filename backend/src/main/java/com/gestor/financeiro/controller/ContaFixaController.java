@@ -142,6 +142,8 @@ public class ContaFixaController {
         contaFixa.setValorPlanejado(request.getValor());
         contaFixa.setDiaVencimento(request.getDiaVencimento());
         contaFixa.setRecorrente(request.getRecorrente());
+        contaFixa.setFrequencia(request.getFrequencia());
+        contaFixa.setDataAncora(request.getDataAncora());
         contaFixa.setObservacoes(request.getObservacoes());
         contaFixa.setTipo(request.getTipo());
         contaFixa.setExecucaoAutomatica(request.getExecucaoAutomatica());

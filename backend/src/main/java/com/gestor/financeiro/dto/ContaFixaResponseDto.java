@@ -5,6 +5,7 @@ import com.gestor.financeiro.model.enums.StatusPagamento;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import com.gestor.financeiro.model.enums.FrequenciaRecorrencia;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 
 public record ContaFixaResponseDto(
@@ -23,6 +24,10 @@ public record ContaFixaResponseDto(
     Boolean execucaoAutomatica,
     CarteiraResumo carteira,
     CartaoResumo cartao,
+    /** Periodicidade da cobranca (V72). */
+    FrequenciaRecorrencia frequencia,
+    /** Primeira cobranca de recorrencia sub-mensal; null em MENSAL+. */
+    LocalDate dataAncora,
     /**
      * Avisos que acompanham a operacao sem impedi-la (ex.: limite do cartao estourado).
      * Campo aditivo: nas leituras vem vazio, nunca nulo.
@@ -58,6 +63,8 @@ public record ContaFixaResponseDto(
                 contaFixa.getConta().getNome(),
                 contaFixa.getConta().getBandeira(),
                 contaFixa.getConta().getUltimosDigitos()),
+            contaFixa.getFrequencia(),
+            contaFixa.getDataAncora(),
             alertas == null ? List.of() : alertas
         );
     }

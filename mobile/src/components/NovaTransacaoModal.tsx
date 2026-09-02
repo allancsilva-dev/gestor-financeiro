@@ -9,8 +9,8 @@ import contaFinanceiraService from '../services/contaFinanceiraService';
 import cartaoService from '../services/cartaoService';
 import { useModalTopInset, useTheme } from '../theme';
 import { parseDateBR, isValidDateBR, parseCurrencyBR, maskCurrencyInput, maskDateInput, todayBR, formatDateOnlyBR } from '../utils/format';
-import { TransacaoRequest, TipoTransacao, SugestaoCategoria, Alerta } from '../types';
-import { rotuloProximaCobranca } from '../domain/recorrencia';
+import { TransacaoRequest, TipoTransacao, SugestaoCategoria, Alerta, FrequenciaRecorrencia } from '../types';
+import { FREQUENCIAS, isSubMensal, nomeFrequencia, rotuloProximaCobranca } from '../domain/recorrencia';
 import { getLancamentoPrefs, setLancamentoPrefs } from '../store/lancamentoPrefs';
 import { CATEGORIAS_INICIAIS } from '../domain/categoriasIniciais';
 import { CATEGORY_COLORS } from '../utils/format';
@@ -66,6 +66,7 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
   const refDescricao = useRef<TextInput>(null);
   const refData = useRef<TextInput>(null);
   const [erroForm, setErroForm] = useState<string | null>(null);
+  const [frequencia, setFrequencia] = useState<FrequenciaRecorrencia>('MENSAL');
   const [descricaoError, setDescricaoError] = useState<string | null>(null);
   const [valorError, setValorError] = useState<string | null>(null);
   const [dataError, setDataError] = useState<string | null>(null);
@@ -376,6 +377,8 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
           tipo: request.tipo,
           recorrente: true,
           execucaoAutomatica: true,
+          frequencia,
+          ...(isSubMensal(frequencia) ? { dataAncora: request.data } : {}),
           observacoes: request.observacoes,
           ...(request.cartaoId ? { cartaoId: request.cartaoId } : { carteiraId: request.carteiraId }),
         });
@@ -597,10 +600,31 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
                       onValueChange={(v) => { setRepeteTodoMes(v); if (v) { setParcelado(false); setTotalParcelas(''); } }}
                     />
                   </View>
+                  {repeteTodoMes && (
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{ gap: 8 }}
+                      style={{ marginTop: 8 }}
+                      keyboardShouldPersistTaps="handled"
+                    >
+                      {FREQUENCIAS.map(f => (
+                        <Chip
+                          key={f}
+                          label={nomeFrequencia(f)}
+                          selected={frequencia === f}
+                          onPress={() => setFrequencia(f)}
+                        />
+                      ))}
+                    </ScrollView>
+                  )}
                   {repeteTodoMes && isValidDateBR(data) && (
                     <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 4 }}>
                       Primeira cobrança em {rotuloProximaCobranca(
                         new Date(parseDateBR(data) + 'T00:00:00').getDate(),
+                        new Date(),
+                        frequencia,
+                        isSubMensal(frequencia) ? new Date(parseDateBR(data) + 'T00:00:00') : null,
                       )}
                     </Text>
                   )}

@@ -10,13 +10,14 @@ import Card from '../../../src/components/ui/Card';
 import Chip from '../../../src/components/ui/Chip';
 import IconTile from '../../../src/components/ui/IconTile';
 import Field from '../../../src/components/ui/Field';
-import { ContaFixa, ContaFixaRequest } from '../../../src/types';
+import { ContaFixa, ContaFixaRequest, FrequenciaRecorrencia } from '../../../src/types';
+import { FREQUENCIAS, isSubMensal, nomeFrequencia, rotuloCadencia } from '../../../src/domain/recorrencia';
 import {
   useTheme, useTabBarSpace, numeric, radius, screenPadding, spacing, typography,
 } from '../../../src/theme';
 import { competenciaAtual, competenciaIso } from '../../../src/domain/periodo';
 import { mensagemDeErro } from '../../../src/utils/erros';
-import { parseCurrencyBR, maskCurrencyInput, formatCurrency, formatNumber } from '../../../src/utils/format';
+import { parseCurrencyBR, maskCurrencyInput, maskDateInput, formatCurrency, formatNumber, formatDateOnlyBR, isValidDateBR, parseDateBR } from '../../../src/utils/format';
 import Botao from '../../../src/components/ui/Botao';
 import CabecalhoSubTela from '../../../src/components/ui/CabecalhoSubTela';
 import EstadoVazio from '../../../src/components/ui/EstadoVazio';
@@ -100,6 +101,8 @@ export default function ContasFixasScreen() {
   const [diaCriar, setDiaCriar] = useState('');
   const [categoriaCriarId, setCategoriaCriarId] = useState<number | null>(null);
   const [recorrenteCriar, setRecorrenteCriar] = useState(true);
+  const [frequenciaCriar, setFrequenciaCriar] = useState<FrequenciaRecorrencia>('MENSAL');
+  const [ancoraCriar, setAncoraCriar] = useState('');
   const [tipoCriar, setTipoCriar] = useState<'ENTRADA' | 'SAIDA'>('SAIDA');
   const [automaticaCriar, setAutomaticaCriar] = useState(false);
   const [carteiraCriarId, setCarteiraCriarId] = useState<number | null>(null);
@@ -137,6 +140,7 @@ export default function ContasFixasScreen() {
     setDescricaoCriar(''); setValorCriar(''); setDiaCriar(''); setCategoriaCriarId(null); setRecorrenteCriar(true);
     setTipoCriar('SAIDA'); setAutomaticaCriar(false); setCarteiraCriarId(null); setEditando(null);
     setDestinoCriar('CONTA'); setCartaoCriarId(null);
+    setFrequenciaCriar('MENSAL'); setAncoraCriar('');
     setDescricaoError(null); setValorError(null); setDiaError(null); setCategoriaError(null); setErroCriar(null);
   };
 
@@ -165,6 +169,9 @@ export default function ContasFixasScreen() {
     // Sem restaurar o destino, salvar a edição de uma assinatura apagaria o cartão
     setDestinoCriar(cf.cartao ? 'CARTAO' : 'CONTA');
     setCartaoCriarId(cf.cartao?.id ?? null);
+    // Sem restaurar a frequência, editar uma assinatura anual a devolveria para mensal
+    setFrequenciaCriar(cf.frequencia ?? 'MENSAL');
+    setAncoraCriar(cf.dataAncora ? formatDateOnlyBR(cf.dataAncora) : '');
     setModalCriarVisible(true);
   };
 
@@ -199,7 +206,7 @@ export default function ContasFixasScreen() {
             {/* Duas linhas: com o cartão no meio, uma linha só cortava o dia do
                 vencimento — justamente o dado que diz quando a cobrança cai. */}
             <Text numberOfLines={2} style={{ ...typography.meta, color: colors.textSecondary, marginTop: spacing.xxs }}>
-              {cf.categoria?.nome ? `${cf.categoria.nome} · ` : ''}{cf.cartao ? `${cf.cartao.nome} · ` : ''}{cf.execucaoAutomatica ? 'Automática' : 'Manual'} · dia {cf.diaVencimento}
+              {cf.categoria?.nome ? `${cf.categoria.nome} · ` : ''}{cf.cartao ? `${cf.cartao.nome} · ` : ''}{cf.execucaoAutomatica ? 'Automática' : 'Manual'} · {rotuloCadencia(cf.frequencia ?? 'MENSAL', cf.diaVencimento, cf.dataAncora ? new Date(cf.dataAncora + 'T00:00:00') : null).toLowerCase()}
             </Text>
           </View>
         </View>
@@ -416,8 +423,16 @@ export default function ContasFixasScreen() {
             if (!descricaoCriar.trim()) { setDescricaoError('Descrição obrigatória.'); hasErr = true; }
             const v = parseCurrencyBR(valorCriar);
             if (isNaN(v) || v <= 0) { setValorError('Valor deve ser positivo.'); hasErr = true; }
-            const dia = Number(diaCriar);
-            if (!Number.isInteger(dia) || dia < 1 || dia > 31) { setDiaError('Dia deve ser um número entre 1 e 31.'); hasErr = true; }
+            const subMensal = isSubMensal(frequenciaCriar);
+            // Série semanal/quinzenal sai da âncora; o dia do mês é derivado dela.
+            if (subMensal && !isValidDateBR(ancoraCriar)) {
+              setDiaError('Informe a data da primeira cobrança (DD/MM/AAAA).');
+              hasErr = true;
+            }
+            const dia = subMensal
+              ? (isValidDateBR(ancoraCriar) ? new Date(parseDateBR(ancoraCriar) + 'T00:00:00').getDate() : 0)
+              : Number(diaCriar);
+            if (!subMensal && (!Number.isInteger(dia) || dia < 1 || dia > 31)) { setDiaError('Dia deve ser um número entre 1 e 31.'); hasErr = true; }
             if (!categoriaCriarId) { setCategoriaError('Selecione uma categoria.'); hasErr = true; }
             const usaCartao = tipoCriar === 'SAIDA' && destinoCriar === 'CARTAO';
             if (automaticaCriar && usaCartao && !cartaoCriarId) { setErroCriar('Selecione o cartão da cobrança.'); hasErr = true; }
@@ -431,6 +446,8 @@ export default function ContasFixasScreen() {
               recorrente: recorrenteCriar,
               tipo: tipoCriar,
               execucaoAutomatica: automaticaCriar,
+              frequencia: frequenciaCriar,
+              ...(subMensal ? { dataAncora: parseDateBR(ancoraCriar) } : {}),
               ...(usaCartao
                 ? { cartaoId: automaticaCriar ? cartaoCriarId! : undefined }
                 : { carteiraId: automaticaCriar ? carteiraCriarId! : undefined }),
@@ -446,7 +463,31 @@ export default function ContasFixasScreen() {
           </View>
           <Field label="Descrição" value={descricaoCriar} onChangeText={setDescricaoCriar} placeholder="Ex: Aluguel" error={descricaoError} autoFocus />
           <Field label="Valor" value={valorCriar} onChangeText={(t) => setValorCriar(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" error={valorError} />
-          <Field label="Dia de vencimento" value={diaCriar} onChangeText={setDiaCriar} keyboardType="number-pad" placeholder="Ex: 10" maxLength={2} error={diaError} />
+          <RotuloDeGrupo>Com que frequência</RotuloDeGrupo>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: spacing.sm }}
+            style={{ marginBottom: spacing.md }}
+            keyboardShouldPersistTaps="handled"
+          >
+            {FREQUENCIAS.map(f => (
+              <Chip
+                key={f}
+                label={nomeFrequencia(f)}
+                selected={frequenciaCriar === f}
+                onPress={() => setFrequenciaCriar(f)}
+              />
+            ))}
+          </ScrollView>
+
+          {isSubMensal(frequenciaCriar) ? (
+            // "Dia do mês" não existe em série semanal/quinzenal: o que fixa o dia da
+            // semana e a paridade da quinzena é a data da primeira cobrança.
+            <Field label="Primeira cobrança" value={ancoraCriar} onChangeText={(t) => setAncoraCriar(maskDateInput(t))} keyboardType="number-pad" placeholder="DD/MM/AAAA" maxLength={10} error={diaError} />
+          ) : (
+            <Field label="Dia de vencimento" value={diaCriar} onChangeText={setDiaCriar} keyboardType="number-pad" placeholder="Ex: 10" maxLength={2} error={diaError} />
+          )}
 
           <RotuloDeGrupo>Categoria</RotuloDeGrupo>
           <ScrollView

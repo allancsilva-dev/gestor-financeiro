@@ -12,6 +12,7 @@ import com.gestor.financeiro.model.ContaFixa;
 import com.gestor.financeiro.model.ExecucaoRecorrencia;
 import com.gestor.financeiro.model.Transacao;
 import com.gestor.financeiro.model.Usuario;
+import com.gestor.financeiro.model.enums.FrequenciaRecorrencia;
 import com.gestor.financeiro.model.enums.StatusPagamento;
 import com.gestor.financeiro.model.enums.TipoTransacao;
 import com.gestor.financeiro.model.enums.StatusExecucaoRecorrencia;
@@ -21,6 +22,7 @@ import com.gestor.financeiro.repository.ContaFixaRepository;
 import com.gestor.financeiro.repository.ContaRepository;
 import com.gestor.financeiro.repository.ExecucaoRecorrenciaRepository;
 import com.gestor.financeiro.repository.UsuarioRepository;
+import com.gestor.financeiro.util.CalendarioRecorrencia;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -78,6 +80,7 @@ public class ContaFixaService {
         }
         if (contaFixa.getExecucaoAutomatica() == null) contaFixa.setExecucaoAutomatica(false);
         resolverDestino(contaFixa, usuarioId);
+        resolverFrequencia(contaFixa);
         
         // Calcula próximo vencimento
         calcularProximoVencimento(contaFixa);
@@ -100,25 +103,32 @@ public class ContaFixaService {
     
     // Calcula data do próximo vencimento
     private void calcularProximoVencimento(ContaFixa contaFixa) {
-        LocalDate hoje = LocalDate.now(clock);
-        int diaVencimento = contaFixa.getDiaVencimento();
-        
-        // Próximo vencimento no mês atual
-        LocalDate proximoVencimento = LocalDate.of(
-            hoje.getYear(), 
-            hoje.getMonthValue(), 
-            Math.min(diaVencimento, hoje.lengthOfMonth())
-        );
-        
-        // Se já passou, joga pro próximo mês
-        if (proximoVencimento.isBefore(hoje)) {
-            proximoVencimento = proximoVencimento.plusMonths(1);
-            proximoVencimento = proximoVencimento.withDayOfMonth(
-                Math.min(diaVencimento, proximoVencimento.lengthOfMonth())
-            );
+        contaFixa.setDataProximoVencimento(CalendarioRecorrencia.primeiraAPartirDe(
+                LocalDate.now(clock),
+                contaFixa.getFrequencia(),
+                contaFixa.getDiaVencimento(),
+                contaFixa.getDataAncora()));
+    }
+
+    /**
+     * Normaliza e valida a frequencia (V72). Cada CHECK do banco tem aqui o equivalente
+     * em 4xx: o CHECK e backstop, nunca a mensagem que o usuario ve.
+     */
+    private void resolverFrequencia(ContaFixa conta) {
+        if (conta.getFrequencia() == null) conta.setFrequencia(FrequenciaRecorrencia.MENSAL);
+
+        if (conta.getFrequencia().isSubMensal()) {
+            if (conta.getDataAncora() == null) {
+                throw new BusinessException(
+                        "Informe a data da primeira cobrança para recorrência semanal ou quinzenal");
+            }
+            // "Dia do mes" nao existe em serie sub-mensal; o campo continua NOT NULL
+            // (V1) e vira exibicao, derivado da ancora.
+            conta.setDiaVencimento(conta.getDataAncora().getDayOfMonth());
+        } else {
+            // Sobra de formulario ao trocar a frequencia nao pode virar dado orfao.
+            conta.setDataAncora(null);
         }
-        
-        contaFixa.setDataProximoVencimento(proximoVencimento);
     }
     
     // ✅ CORRIGIDO: Mantém como PAGO e só avança o vencimento
@@ -243,8 +253,10 @@ public class ContaFixaService {
 
     private void avancarOcorrencia(ContaFixa conta) {
         if (Boolean.TRUE.equals(conta.getRecorrente())) {
-            LocalDate proxima = conta.getDataProximoVencimento().plusMonths(1);
-            conta.setDataProximoVencimento(proxima.withDayOfMonth(Math.min(conta.getDiaVencimento(), proxima.lengthOfMonth())));
+            conta.setDataProximoVencimento(CalendarioRecorrencia.proxima(
+                    conta.getDataProximoVencimento(),
+                    conta.getFrequencia(),
+                    conta.getDiaVencimento()));
             conta.setStatus(StatusPagamento.PENDENTE);
         } else {
             conta.setStatus(StatusPagamento.PAGO);
@@ -314,14 +326,41 @@ public class ContaFixaService {
         }
         
         conta.setObservacoes(contaAtualizada.getObservacoes());
+        conta.setFrequencia(contaAtualizada.getFrequencia());
+        conta.setDataAncora(contaAtualizada.getDataAncora());
         resolverDestino(conta, usuarioId);
+        resolverFrequencia(conta);
         
         // Recalcula próximo vencimento
         calcularProximoVencimento(conta);
+        pularOcorrenciasJaExecutadas(conta);
         
         return contaFixaRepository.save(conta);
     }
     
+    /**
+     * Editar recalcula o proximo vencimento do zero, e o recalculo pode cair numa data
+     * que ja tem execucao REALIZADA ou PULADA — trocar a frequencia de uma recorrencia
+     * viva e o caminho mais facil para isso. Sem avancar aqui, o proximo realizar bate
+     * no unique de execucoes_recorrencia e a recorrencia trava em 400 para sempre.
+     */
+    private void pularOcorrenciasJaExecutadas(ContaFixa conta) {
+        if (conta.getId() == null) return;
+        int limite = 400; // teto defensivo: nunca virar laco infinito
+        while (limite-- > 0) {
+            LocalDate vencimento = conta.getDataProximoVencimento();
+            boolean jaExecutada = execucaoRepository
+                    .findByContaFixaIdAndDataVencimento(conta.getId(), vencimento)
+                    .filter(e -> e.getStatus() == StatusExecucaoRecorrencia.REALIZADA
+                            || e.getStatus() == StatusExecucaoRecorrencia.PULADA)
+                    .isPresent();
+            if (!jaExecutada) return;
+            if (!Boolean.TRUE.equals(conta.getRecorrente())) return;
+            conta.setDataProximoVencimento(CalendarioRecorrencia.proxima(
+                    vencimento, conta.getFrequencia(), conta.getDiaVencimento()));
+        }
+    }
+
     // Desativa conta fixa
     @Transactional
     public void deletar(Long id, Long usuarioId) {
