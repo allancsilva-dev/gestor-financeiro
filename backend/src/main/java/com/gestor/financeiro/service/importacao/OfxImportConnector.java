@@ -27,6 +27,8 @@ public final class OfxImportConnector implements FinancialDataConnector {
 
     public OfxImportConnector(ImportLimits limits, CanonicalNormalizer normalizer) { this.limits = limits; this.normalizer = normalizer; }
 
+    @Override public ImportFormat format() { return ImportFormat.OFX; }
+
     @Override public ConnectorDetection detect(ImportSource source) throws IOException {
         byte[] sample;
         try (InputStream input = new BufferedInputStream(source.openStream())) { sample = input.readNBytes(limits.detectionBytes()); }

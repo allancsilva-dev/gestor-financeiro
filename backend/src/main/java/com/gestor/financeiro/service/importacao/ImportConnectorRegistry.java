@@ -32,6 +32,22 @@ public final class ImportConnectorRegistry {
         Candidate winner = candidates.get(0);
         return new DetectedConnector(winner.connector(), winner.detection());
     }
+    /**
+     * Conector escolhido pelo formato, sem detecção heurística.
+     *
+     * <p>Para quando a origem já declara o que entrega: o mapeamento de colunas do titular diz que
+     * o arquivo é CSV, e o conector de rede sabe o que buscou. Submeter esse caso à detecção seria
+     * só uma chance de recusar por ambiguidade um conteúdo sobre o qual não há dúvida.</p>
+     */
+    public DetectedConnector forFormat(ImportFormat formato) throws ImportParsingException {
+        if (formato == null || formato == ImportFormat.UNKNOWN)
+            throw new ImportParsingException(ImportFailureCode.UNSUPPORTED_FORMAT, "Formato não informado");
+        return connectors.stream().filter(connector -> connector.format() == formato).findFirst()
+                .map(connector -> new DetectedConnector(connector, new ConnectorDetection(formato, null, 100)))
+                .orElseThrow(() -> new ImportParsingException(ImportFailureCode.UNSUPPORTED_FORMAT,
+                        "Nenhum conector atende o formato"));
+    }
+
     private Candidate candidate(FinancialDataConnector connector, ImportSource source) {
         try { return new Candidate(connector, connector.detect(source)); }
         catch (IOException | RuntimeException ignored) { return new Candidate(connector, null); }

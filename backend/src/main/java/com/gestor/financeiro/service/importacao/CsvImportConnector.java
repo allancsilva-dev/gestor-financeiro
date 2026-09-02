@@ -31,6 +31,8 @@ public final class CsvImportConnector implements FinancialDataConnector {
         this.limits = limits; this.normalizer = normalizer;
     }
 
+    @Override public ImportFormat format() { return ImportFormat.CSV; }
+
     @Override public ConnectorDetection detect(ImportSource source) throws IOException {
         CsvShape shape = inspect(source);
         return new ConnectorDetection(ImportFormat.CSV, null, shape.score());
