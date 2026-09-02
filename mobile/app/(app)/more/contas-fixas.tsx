@@ -11,7 +11,8 @@ import Chip from '../../../src/components/ui/Chip';
 import IconTile from '../../../src/components/ui/IconTile';
 import Field from '../../../src/components/ui/Field';
 import { ContaFixa, ContaFixaRequest, FrequenciaRecorrencia } from '../../../src/types';
-import { FREQUENCIAS, isSubMensal, nomeFrequencia, rotuloCadencia } from '../../../src/domain/recorrencia';
+import { FREQUENCIAS, isSubMensal, nomeFrequencia, proximaCobranca, rotuloCadencia } from '../../../src/domain/recorrencia';
+import { vencimentoDaCompraNoCartao } from '../../../src/domain/fatura';
 import {
   useTheme, useTabBarSpace, numeric, radius, screenPadding, spacing, typography,
 } from '../../../src/theme';
@@ -174,6 +175,42 @@ export default function ContasFixasScreen() {
     setAncoraCriar(cf.dataAncora ? formatDateOnlyBR(cf.dataAncora) : '');
     setModalCriarVisible(true);
   };
+
+  /**
+   * O que vai acontecer ao salvar. É determinístico (FaturaDatas + o dia escolhido),
+   * e antes disso a tela só dizia "entra na fatura do cartão todo mês" — sem dizer
+   * qual fatura, nem que a primeira cobrança pode sair na hora.
+   */
+  const explicacaoDaCobranca = (() => {
+    const cartao = cartoes.find(c => c.id === cartaoCriarId);
+    if (!cartao) return 'A assinatura entra na fatura do cartão a cada cobrança.';
+
+    const subMensal = isSubMensal(frequenciaCriar);
+    const dia = subMensal
+      ? (isValidDateBR(ancoraCriar) ? new Date(parseDateBR(ancoraCriar) + 'T00:00:00').getDate() : NaN)
+      : Number(diaCriar);
+    if (!Number.isInteger(dia) || dia < 1 || dia > 31) {
+      return `A assinatura entra na fatura do ${cartao.nome} a cada cobrança.`;
+    }
+
+    const primeira = proximaCobranca(
+      dia,
+      new Date(),
+      frequenciaCriar,
+      subMensal && isValidDateBR(ancoraCriar) ? new Date(parseDateBR(ancoraCriar) + 'T00:00:00') : null,
+    );
+    const vencimento = vencimentoDaCompraNoCartao(primeira, cartao.diaFechamento, cartao.diaVencimento);
+    const dois = (n: number) => String(n).padStart(2, '0');
+    const rotulo = `${dois(vencimento.getDate())}/${dois(vencimento.getMonth() + 1)}/${vencimento.getFullYear()}`;
+
+    const hoje = new Date();
+    const saiAgora = automaticaCriar
+      && primeira <= new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+
+    return saiAgora
+      ? `A primeira cobrança sai agora e entra na fatura que vence em ${rotulo}.`
+      : `Entra na fatura do ${cartao.nome} que vence em ${rotulo}.`;
+  })();
 
   const { mes, ano } = competenciaAtual();
   const competenciaDeHoje = competenciaIso(mes, ano);
@@ -448,9 +485,11 @@ export default function ContasFixasScreen() {
               execucaoAutomatica: automaticaCriar,
               frequencia: frequenciaCriar,
               ...(subMensal ? { dataAncora: parseDateBR(ancoraCriar) } : {}),
+              // O destino vale também em execução manual: é onde a cobrança cai
+              // quando o usuário registra. Só é obrigatório na automática.
               ...(usaCartao
-                ? { cartaoId: automaticaCriar ? cartaoCriarId! : undefined }
-                : { carteiraId: automaticaCriar ? carteiraCriarId! : undefined }),
+                ? { cartaoId: cartaoCriarId ?? undefined }
+                : { carteiraId: carteiraCriarId ?? undefined }),
             });
           },
         }}
@@ -510,21 +549,27 @@ export default function ContasFixasScreen() {
             <Chip label="Manual" selected={!automaticaCriar} onPress={() => setAutomaticaCriar(false)} />
             <Chip label="Automática" selected={automaticaCriar} onPress={() => setAutomaticaCriar(true)} />
           </View>
-          {automaticaCriar && (
+          {/*
+            "Cobrar em" fica fora do guard de execução automática de propósito: o
+            backend aceita destino de cartão com execução manual (resolverDestino só
+            exige destino quando automática). Escondendo aqui, quem escolhia "Manual"
+            nunca via que dava para cobrar no cartão.
+          */}
+          {tipoCriar === 'SAIDA' && (
             <>
-              {tipoCriar === 'SAIDA' && (
-                <>
-                  <RotuloDeGrupo>Cobrar em</RotuloDeGrupo>
-                  <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
-                    <Chip label="Conta" selected={destinoCriar === 'CONTA'} onPress={() => { setDestinoCriar('CONTA'); setCartaoCriarId(null); }} />
-                    <Chip label="Cartão" selected={destinoCriar === 'CARTAO'} onPress={() => { setDestinoCriar('CARTAO'); setCarteiraCriarId(null); }} />
-                  </View>
-                </>
-              )}
+              <RotuloDeGrupo>Cobrar em</RotuloDeGrupo>
+              <View style={{ flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md }}>
+                <Chip label="Conta" selected={destinoCriar === 'CONTA'} onPress={() => { setDestinoCriar('CONTA'); setCartaoCriarId(null); }} />
+                <Chip label="Cartão" selected={destinoCriar === 'CARTAO'} onPress={() => { setDestinoCriar('CARTAO'); setCarteiraCriarId(null); }} />
+              </View>
+            </>
+          )}
+          {(
+            <>
               {tipoCriar === 'SAIDA' && destinoCriar === 'CARTAO' ? (
                 <>
                   <Text style={{ ...typography.meta, color: colors.textSecondary, marginBottom: spacing.sm }}>
-                    A assinatura entra na fatura do cartão todo mês.
+                    {explicacaoDaCobranca}
                   </Text>
                   {cartoes.length === 0 ? (
                     <Text style={{ ...typography.meta, color: colors.textSecondary, marginBottom: spacing.sm }}>

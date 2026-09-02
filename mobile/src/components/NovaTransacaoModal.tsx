@@ -10,7 +10,8 @@ import cartaoService from '../services/cartaoService';
 import { useModalTopInset, useTheme } from '../theme';
 import { parseDateBR, isValidDateBR, parseCurrencyBR, maskCurrencyInput, maskDateInput, todayBR, formatDateOnlyBR } from '../utils/format';
 import { TransacaoRequest, TipoTransacao, SugestaoCategoria, Alerta, FrequenciaRecorrencia } from '../types';
-import { FREQUENCIAS, isSubMensal, nomeFrequencia, rotuloProximaCobranca } from '../domain/recorrencia';
+import { FREQUENCIAS, isSubMensal, nomeFrequencia, proximaCobranca, rotuloProximaCobranca } from '../domain/recorrencia';
+import { vencimentoDaCompraNoCartao } from '../domain/fatura';
 import { getLancamentoPrefs, setLancamentoPrefs } from '../store/lancamentoPrefs';
 import { CATEGORIAS_INICIAIS } from '../domain/categoriasIniciais';
 import { CATEGORY_COLORS } from '../utils/format';
@@ -408,6 +409,31 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
     }
   };
 
+  /**
+   * O switch cria uma recorrência automática, não um lançamento — e antes disso nada
+   * na tela dizia isso, nem em qual fatura a cobrança cairia.
+   */
+  const explicacaoDaRecorrencia = (() => {
+    if (tipo === 'SAIDA' && formaPagamento === 'CARTAO') {
+      const cartao = cartoes.find(c => c.id === cartaoId);
+      if (cartao && isValidDateBR(data)) {
+        const primeira = proximaCobranca(
+          new Date(parseDateBR(data) + 'T00:00:00').getDate(),
+          new Date(),
+          frequencia,
+          isSubMensal(frequencia) ? new Date(parseDateBR(data) + 'T00:00:00') : null,
+        );
+        const vencimento = vencimentoDaCompraNoCartao(primeira, cartao.diaFechamento, cartao.diaVencimento);
+        const dois = (n: number) => String(n).padStart(2, '0');
+        return `Entra na fatura do ${cartao.nome} que vence em `
+          + `${dois(vencimento.getDate())}/${dois(vencimento.getMonth() + 1)}/${vencimento.getFullYear()}.`
+          + ' O app cobra sozinho a cada vez.';
+      }
+      return 'Vira uma assinatura: o app lança na fatura do cartão a cada cobrança.';
+    }
+    return 'Vira uma recorrência: o app lança sozinho a cada cobrança.';
+  })();
+
   const tituloModal = initialData?.mode === 'ASSISTANT_DRAFT'
     ? 'Revisar lançamento'
     : initialData ? 'Repetir lançamento' : 'Nova Transação';
@@ -626,6 +652,11 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
                         frequencia,
                         isSubMensal(frequencia) ? new Date(parseDateBR(data) + 'T00:00:00') : null,
                       )}
+                    </Text>
+                  )}
+                  {repeteTodoMes && (
+                    <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 4 }}>
+                      {explicacaoDaRecorrencia}
                     </Text>
                   )}
                 </View>

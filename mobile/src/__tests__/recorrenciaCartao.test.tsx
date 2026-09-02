@@ -91,6 +91,30 @@ async function preencherSaidaNoCartao() {
   fireEvent.press(screen.getByTestId('more-details-toggle'));
 }
 
+/**
+ * O seletor "Cobrar em" ficava dentro do guard de execução automática: quem escolhia
+ * "Manual" nunca via que dava para cobrar no cartão, mesmo o backend aceitando.
+ */
+describe('destino da recorrência na tela Recorrências', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('"Cobrar em" aparece mesmo com execução Manual', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <ContasFixasScreen />
+      </QueryClientProvider>,
+    );
+
+    fireEvent.press(await screen.findByLabelText('Criar recorrência'));
+    await waitFor(() => expect(screen.getByText('Manual')).toBeTruthy());
+    fireEvent.press(screen.getByText('Manual'));
+
+    expect(screen.getByText('Cobrar em')).toBeTruthy();
+    expect(screen.getByText('Cartão')).toBeTruthy();
+  });
+});
+
 describe('assinatura no cartão pelo botão Nova', () => {
   beforeEach(() => jest.clearAllMocks());
 
