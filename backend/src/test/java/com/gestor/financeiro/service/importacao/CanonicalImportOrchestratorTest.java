@@ -78,9 +78,82 @@ class CanonicalImportOrchestratorTest {
         // Registry proprio: os conectores precisam enxergar os mesmos limites do orquestrador.
         CsvImportConnector csv = new CsvImportConnector(limits, normalizer);
         ImportConnectorRegistry registry = new ImportConnectorRegistry(List.of(
-                csv, new OfxImportConnector(limits, normalizer)));
-        return new CanonicalImportOrchestrator(batches, registry, csv, deduplicacao, categorizacao, records, batchRepository, limits,
+                csv, new OfxImportConnector(limits, normalizer),
+                new OpenFinanceNdjsonConnector(limits, normalizer,
+                        new com.fasterxml.jackson.databind.ObjectMapper(),
+                        java.time.Clock.system(java.time.ZoneId.of("America/Sao_Paulo")))));
+        return new CanonicalImportOrchestrator(batches, registry, deduplicacao, categorizacao, records, batchRepository, limits,
                 entityManager, transactionManager);
+    }
+
+
+    private static final String ENVELOPE_OF = "{\"schema\":\"gf-openfinance-v1\",\"institution\":\"BANCO-X\","
+            + "\"account\":\"ext-1\",\"currency\":\"BRL\",\"openingBalance\":\"100.00\","
+            + "\"closingBalance\":\"54.10\"}";
+
+    /**
+     * Prova do ADR-0019: o snapshot do conector entra pelo mesmo caminho de um arquivo enviado, com
+     * detecção pulada porque a origem já declarou o que trouxe. Se isto quebrar, a fase inteira
+     * perdeu o motivo de existir — seria uma segunda verdade financeira.
+     */
+    @Test
+    void snapshotDeConectorAtravessaOPipelineCanonico() throws Exception {
+        String conteudo = ENVELOPE_OF + "\n"
+                + "{\"externalId\":\"tx-1\",\"date\":\"2026-08-02\",\"description\":\"Mercado\",\"amount\":\"-45.90\"}\n";
+
+        ImportBatch lote = orchestrator(5000, 250, 10_000_000L).stage(
+                usuario.getId(), fonte(conteudo), "of:sync:1", ImportMapping.automatico(),
+                ImportFormat.OPEN_FINANCE, com.gestor.financeiro.model.enums.ImportOrigin.CONNECTOR);
+
+        assertEquals(ImportBatchStatus.PARSED, lote.getStatus());
+        assertEquals(ImportFormat.OPEN_FINANCE, lote.getFormat());
+        assertEquals(com.gestor.financeiro.model.enums.ImportOrigin.CONNECTOR, lote.getOrigin());
+        assertEquals("BANCO-X", lote.getInstitutionCode());
+        assertEquals(1, lote.getTotalRecords());
+        assertEquals(1, lote.getValidRecords());
+        // Saldo declarado do envelope fecha com o movimento: 100.00 - 45.90 = 54.10.
+        assertEquals(com.gestor.financeiro.model.enums.ImportBalanceReconciliation.MATCH,
+                lote.getBalanceReconciliation());
+    }
+
+    /**
+     * Determinismo do snapshot: mesma janela buscada duas vezes produz os mesmos bytes, logo o mesmo
+     * {@code file_sha256} e o mesmo lote. É o que transforma replay em detecção barata.
+     */
+    @Test
+    void snapshotIdenticoReaproveitaOLoteEOHash() throws Exception {
+        String conteudo = ENVELOPE_OF + "\n"
+                + "{\"externalId\":\"tx-1\",\"date\":\"2026-08-02\",\"description\":\"Mercado\",\"amount\":\"-45.90\"}\n";
+        var orquestrador = orchestrator(5000, 250, 10_000_000L);
+
+        ImportBatch primeiro = orquestrador.stage(usuario.getId(), fonte(conteudo), "of:sync:2",
+                ImportMapping.automatico(), ImportFormat.OPEN_FINANCE,
+                com.gestor.financeiro.model.enums.ImportOrigin.CONNECTOR);
+        ImportBatch replay = orquestrador.stage(usuario.getId(), fonte(conteudo), "of:sync:2",
+                ImportMapping.automatico(), ImportFormat.OPEN_FINANCE,
+                com.gestor.financeiro.model.enums.ImportOrigin.CONNECTOR);
+
+        assertEquals(primeiro.getId(), replay.getId());
+        assertEquals(primeiro.getFileSha256(), replay.getFileSha256());
+        assertEquals(1, recordsOf(primeiro.getId()).size());
+    }
+
+    /** Snapshot corrompido não vira lote pela metade: o lote termina em FAILED com código. */
+    @Test
+    void snapshotCorrompidoDeixaOLoteEmFalha() {
+        String conteudo = ENVELOPE_OF + "\nisto nao e json\n";
+
+        assertThrows(java.io.IOException.class, () -> orchestrator(5000, 250, 10_000_000L).stage(
+                usuario.getId(), fonte(conteudo), "of:sync:3", ImportMapping.automatico(),
+                ImportFormat.OPEN_FINANCE, com.gestor.financeiro.model.enums.ImportOrigin.CONNECTOR));
+
+        ImportBatch lote = batchDoUsuario();
+        assertEquals(ImportBatchStatus.FAILED, lote.getStatus());
+        assertEquals(ImportFailureCode.PARSE_FAILED.name(), lote.getFailureCode());
+    }
+
+    private ImportSource fonte(String conteudo) {
+        return MemorySource.of(conteudo);
     }
 
     private List<com.gestor.financeiro.model.ImportRecord> recordsOf(Long batchId) {

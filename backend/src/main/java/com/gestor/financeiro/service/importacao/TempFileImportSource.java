@@ -54,6 +54,31 @@ public final class TempFileImportSource implements ImportSource, AutoCloseable {
         }
     }
 
+    /**
+     * Fonte a partir de um stream já produzido pela aplicação — o snapshot do conector (ADR-0019).
+     *
+     * <p>Mesmo tratamento do upload: arquivo restrito ao dono e apagado no {@code close()}. O
+     * conteúdo é dado bancário do titular e não pode ficar legível para outros processos do host
+     * nem sobreviver ao parse.</p>
+     */
+    public static TempFileImportSource of(InputStream conteudo, String nomeExibicao, String contentType,
+                                          Path diretorio) throws IOException {
+        if (conteudo == null) throw new ImportParsingException(ImportFailureCode.EMPTY_FILE, "Conteúdo vazio");
+        Files.createDirectories(diretorio);
+        Path destino = criarArquivoRestrito(diretorio);
+        boolean copiado = false;
+        try {
+            long copiados = Files.copy(conteudo, destino, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            if (copiados == 0) throw new ImportParsingException(ImportFailureCode.EMPTY_FILE, "Conteúdo vazio");
+            copiado = true;
+            return new TempFileImportSource(destino, copiados, nomeSeguro(nomeExibicao), contentType);
+        } finally {
+            if (!copiado) {
+                Files.deleteIfExists(destino);
+            }
+        }
+    }
+
     private static Path criarArquivoRestrito(Path diretorio) throws IOException {
         try {
             return Files.createTempFile(diretorio, "import-", ".bin",
