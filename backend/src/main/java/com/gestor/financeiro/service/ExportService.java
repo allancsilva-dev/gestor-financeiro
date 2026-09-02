@@ -44,6 +44,39 @@ public class ExportService {
         new AssistantExportTable("assistant_usage_daily", "select 'USO_DIARIO' tipo, id, 'EXTERNAL_CALLS' papel, cast(external_calls as varchar) conteudo, cast(usage_date as timestamp) created_at from assistant_usage_daily where usuario_id = ?")
     );
 
+    /**
+     * Open Finance no pacote de dados do titular (ADR-0020).
+     *
+     * <p>O que sai: vínculo, estado, consentimento com escopo e prazo, conta mascarada e log de
+     * sincronização. O que <b>nunca</b> sai: token cifrado, `token_hmac`, cursor do parceiro e
+     * identificador externo de conta. Exportar o segredo transformaria o direito de portabilidade
+     * em canal de vazamento — a pessoa tem direito aos próprios dados, não à credencial que o
+     * sistema guarda em nome dela.</p>
+     */
+    public static final List<AssistantExportTable> OPEN_FINANCE_EXPORT_TABLES = List.of(
+        new AssistantExportTable("conexoes_open_finance", "select 'CONEXAO' tipo, c.id, c.status papel, "
+                + "concat(coalesce(c.apelido, 'sem apelido'), ' | provedor=', p.codigo, "
+                + "case when c.ultima_sync_em is null then '' else ' | ultima_sync' end) conteudo, "
+                + "c.created_at from conexoes_open_finance c join open_finance_provedores p on p.id = c.provedor_id "
+                + "where c.usuario_id = ?"),
+        new AssistantExportTable("consentimentos_open_finance", "select 'CONSENTIMENTO' tipo, id, status papel, "
+                + "concat('escopos=', escopos, ' | expira_em=', expira_em, "
+                + "case when revogado_por is null then '' else concat(' | revogado_por=', revogado_por) end) conteudo, "
+                + "criado_em created_at from consentimentos_open_finance where usuario_id = ?"),
+        new AssistantExportTable("contas_conectadas", "select 'CONTA_CONECTADA' tipo, id, tipo papel, "
+                + "concat('final ', coalesce(mascara, '****'), ' | moeda=', moeda, "
+                + "' | auto_commit=', auto_commit) conteudo, vinculada_em created_at "
+                + "from contas_conectadas where usuario_id = ?"),
+        new AssistantExportTable("saldos_declarados_instituicao", "select 'SALDO_DECLARADO' tipo, id, "
+                + "'INSTITUICAO' papel, concat('contabil=', coalesce(cast(saldo_contabil as varchar), '-'), "
+                + "' | disponivel=', coalesce(cast(saldo_disponivel as varchar), '-')) conteudo, "
+                + "referencia_em created_at from saldos_declarados_instituicao where usuario_id = ?"),
+        new AssistantExportTable("sync_execucoes", "select 'SINCRONIZACAO' tipo, id, status papel, "
+                + "concat('tipo=', tipo, ' | recebidos=', registros_recebidos, ' | novos=', registros_novos, "
+                + "case when erro_codigo is null then '' else concat(' | erro=', erro_codigo) end) conteudo, "
+                + "iniciado_em created_at from sync_execucoes where usuario_id = ?")
+    );
+
     public String exportarTransacoesCsv(Long usuarioId, LocalDate inicio, LocalDate fim) {
         if (inicio == null) inicio = LocalDate.of(2000, 1, 1);
         if (fim == null) fim = LocalDate.now(clock);
@@ -122,13 +155,24 @@ public class ExportService {
         sj.add("=== METAS ===\n" + exportarMetasCsv(usuarioId));
         sj.add("=== CONTAS FIXAS ===\n" + exportarContasFixasCsv(usuarioId));
         sj.add("=== ASSISTENTE — CONVERSAS E MENSAGENS ===\n" + exportarAssistente(usuarioId));
+        sj.add("=== CONEXÕES BANCÁRIAS E CONSENTIMENTOS ===\n" + exportarOpenFinance(usuarioId));
         return sj.toString();
+    }
+
+    /** Conexões, consentimentos e sincronização do titular. Sem token, sem cursor, sem id externo. */
+    private String exportarOpenFinance(Long usuarioId) {
+        return exportarTabelas(usuarioId, OPEN_FINANCE_EXPORT_TABLES,
+                "Tipo,ID,Estado,Detalhe,Data\n");
     }
 
     /** Exporta conteúdo e proveniência; hashes continuam classificados como dado pseudonimizado. */
     private String exportarAssistente(Long usuarioId) {
-        StringBuilder csv = new StringBuilder("Tipo,ID,Canal/Papel,Conteúdo/Hash,Criado em\n");
-        for (AssistantExportTable export : ASSISTANT_EXPORT_TABLES) {
+        return exportarTabelas(usuarioId, ASSISTANT_EXPORT_TABLES, "Tipo,ID,Canal/Papel,Conteúdo/Hash,Criado em\n");
+    }
+
+    private String exportarTabelas(Long usuarioId, List<AssistantExportTable> tabelas, String cabecalho) {
+        StringBuilder csv = new StringBuilder(cabecalho);
+        for (AssistantExportTable export : tabelas) {
             jdbcTemplate.query(export.sql(), (org.springframework.jdbc.core.RowCallbackHandler) rs -> csv.append(rs.getString("tipo")).append(',')
                     .append(rs.getLong("id")).append(',')
                     .append(escapeCsv(rs.getString("papel"))).append(',')

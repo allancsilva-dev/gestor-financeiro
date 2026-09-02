@@ -84,6 +84,208 @@ class PostgresMigrationIT {
         assertTrue(appliedMigrations >= 24);
     }
 
+    /**
+     * V68 — proveniência do lote.
+     *
+     * <p>Prova as duas metades da decisão: o formato do conector passa a ser aceito, e um lote de
+     * conector não consegue se apresentar como envio manual. Sem a segunda metade, a coluna
+     * {@code origin} seria só documentação — qualquer caminho que esquecesse de preenchê-la
+     * gravaria 'UPLOAD' pelo default e ninguém notaria.</p>
+     */
+    @Test
+    void v68AceitaLoteDeConectorERecusaOrigemInconsistente() {
+        Long usuarioId = jdbcTemplate.queryForObject(
+                "insert into usuarios(nome, email, senha, failed_attempts, onboarding_completo)"
+                        + " values ('Conector', 'conector-v68@teste.com', 'x', 0, false) returning id",
+                Long.class);
+        String hash = "b".repeat(64);
+
+        jdbcTemplate.update(
+                "insert into import_batches(usuario_id, format, origin, file_sha256) values (?, ?, ?, ?)",
+                usuarioId, "OPEN_FINANCE", "CONNECTOR", hash);
+
+        assertThrows(DataAccessException.class, () -> jdbcTemplate.update(
+                "insert into import_batches(usuario_id, format, origin, file_sha256) values (?, ?, ?, ?)",
+                usuarioId, "OPEN_FINANCE", "UPLOAD", hash));
+
+        assertThrows(DataAccessException.class, () -> jdbcTemplate.update(
+                "insert into import_batches(usuario_id, format, origin, file_sha256) values (?, ?, ?, ?)",
+                usuarioId, "CSV", "SINCRONIA", hash));
+
+        // Lote antigo continua válido e assume envio manual pelo default da coluna.
+        jdbcTemplate.update(
+                "insert into import_batches(usuario_id, format, file_sha256) values (?, ?, ?)",
+                usuarioId, "CSV", hash);
+        String origemDoLoteCsv = jdbcTemplate.queryForObject(
+                "select origin from import_batches where usuario_id = ? and format = 'CSV'",
+                String.class, usuarioId);
+        assertEquals("UPLOAD", origemDoLoteCsv);
+
+        jdbcTemplate.update("delete from import_batches where usuario_id = ?", usuarioId);
+        jdbcTemplate.update("delete from usuarios where id = ?", usuarioId);
+    }
+
+    /**
+     * V70 — conexão, credencial e consentimento (ADR-0020).
+     *
+     * <p>Prova as invariantes que o banco precisa sustentar sozinho, porque são as que continuam
+     * valendo mesmo se algum caminho de código esquecer delas: um consentimento ativo por conexão,
+     * revogação sempre carimbada, e escopo dentro de uma lista fechada.</p>
+     */
+    @Test
+    void v70SustentaConsentimentoUnicoAtivoERevogacaoCarimbada() {
+        Long usuarioId = jdbcTemplate.queryForObject(
+                "insert into usuarios(nome, email, senha, failed_attempts, onboarding_completo)"
+                        + " values ('Consent', 'consent-v70@teste.com', 'x', 0, false) returning id",
+                Long.class);
+        Long provedorId = jdbcTemplate.queryForObject(
+                "insert into open_finance_provedores(codigo, nome, tipo) values ('FAKE-V70', 'Fake', 'FAKE') returning id",
+                Long.class);
+        Long conexaoId = jdbcTemplate.queryForObject(
+                "insert into conexoes_open_finance(usuario_id, provedor_id, status) values (?, ?, 'ATIVA') returning id",
+                Long.class, usuarioId, provedorId);
+
+        String inserirAtivo = "insert into consentimentos_open_finance(usuario_id, conexao_id, escopos,"
+                + " status, concedido_em, expira_em) values (?, ?, ?, 'ATIVO', current_timestamp,"
+                + " current_timestamp + interval '90 days')";
+        jdbcTemplate.update(inserirAtivo, usuarioId, conexaoId, "ACCOUNTS,TRANSACTIONS");
+
+        // Duas renovações concorrentes não podem deixar dois consentimentos ativos: revogar um
+        // deixaria o outro valendo, e a revogação viraria promessa não cumprida.
+        assertThrows(DataAccessException.class,
+                () -> jdbcTemplate.update(inserirAtivo, usuarioId, conexaoId, "ACCOUNTS"));
+
+        // Escopo fora da lista fechada não entra.
+        String inserirAguardando = "insert into consentimentos_open_finance(usuario_id, conexao_id,"
+                + " escopos, status, expira_em) values (?, ?, ?, 'AGUARDANDO',"
+                + " current_timestamp + interval '90 days')";
+        assertThrows(DataAccessException.class,
+                () -> jdbcTemplate.update(inserirAguardando, usuarioId, conexaoId, "TUDO"));
+
+        // Revogado sem quem e quando seria prova incompleta.
+        String inserirRevogadoSemCarimbo = "insert into consentimentos_open_finance(usuario_id,"
+                + " conexao_id, escopos, status, expira_em) values (?, ?, 'ACCOUNTS', 'REVOGADO',"
+                + " current_timestamp + interval '90 days')";
+        assertThrows(DataAccessException.class,
+                () -> jdbcTemplate.update(inserirRevogadoSemCarimbo, usuarioId, conexaoId));
+
+        // Revogar libera o índice parcial para o consentimento seguinte.
+        jdbcTemplate.update("update consentimentos_open_finance set status = 'REVOGADO',"
+                + " revogado_em = current_timestamp, revogado_por = 'TITULAR'"
+                + " where conexao_id = ? and status = 'ATIVO'", conexaoId);
+        jdbcTemplate.update(inserirAtivo, usuarioId, conexaoId, "ACCOUNTS");
+
+        Integer historico = jdbcTemplate.queryForObject(
+                "select count(*) from consentimentos_open_finance where conexao_id = ?", Integer.class, conexaoId);
+        assertEquals(2, historico, "append-only: revogar nao apaga a linha anterior");
+
+        jdbcTemplate.update("delete from consentimentos_open_finance where usuario_id = ?", usuarioId);
+        jdbcTemplate.update("delete from conexoes_open_finance where usuario_id = ?", usuarioId);
+        jdbcTemplate.update("delete from open_finance_provedores where id = ?", provedorId);
+        jdbcTemplate.update("delete from usuarios where id = ?", usuarioId);
+    }
+
+    /** Apagar a conexão leva a credencial junto: segredo não sobrevive ao vínculo que o justificava. */
+    @Test
+    void v70RemoveCredencialComAConexao() {
+        Long usuarioId = jdbcTemplate.queryForObject(
+                "insert into usuarios(nome, email, senha, failed_attempts, onboarding_completo)"
+                        + " values ('Cred', 'cred-v70@teste.com', 'x', 0, false) returning id",
+                Long.class);
+        Long provedorId = jdbcTemplate.queryForObject(
+                "insert into open_finance_provedores(codigo, nome, tipo) values ('FAKE-CRED', 'Fake', 'FAKE') returning id",
+                Long.class);
+        Long conexaoId = jdbcTemplate.queryForObject(
+                "insert into conexoes_open_finance(usuario_id, provedor_id, status) values (?, ?, 'ATIVA') returning id",
+                Long.class, usuarioId, provedorId);
+        jdbcTemplate.update("insert into conexao_credenciais(conexao_id, usuario_id,"
+                + " access_token_cifrado, key_version, token_hmac) values (?, ?, 'cifrado', 'v1', ?)",
+                conexaoId, usuarioId, "a".repeat(64));
+
+        // HMAC é campo de lookup em hexadecimal; não é lugar para token em claro.
+        assertThrows(DataAccessException.class, () -> jdbcTemplate.update(
+                "insert into conexao_credenciais(conexao_id, usuario_id, token_hmac) values (?, ?, 'token-em-claro')",
+                conexaoId, usuarioId));
+
+        jdbcTemplate.update("delete from conexoes_open_finance where id = ?", conexaoId);
+        Integer credenciais = jdbcTemplate.queryForObject(
+                "select count(*) from conexao_credenciais where usuario_id = ?", Integer.class, usuarioId);
+        assertEquals(0, credenciais);
+
+        jdbcTemplate.update("delete from open_finance_provedores where id = ?", provedorId);
+        jdbcTemplate.update("delete from usuarios where id = ?", usuarioId);
+    }
+
+    /**
+     * V71 — conta conectada e sincronização.
+     *
+     * <p>Duas invariantes que o banco precisa sustentar sozinho: uma carteira nunca recebe duas
+     * conexões ativas (duas fontes escrevendo no mesmo caixa produziriam divergência permanente sem
+     * culpado identificável), e conta ativa tem exatamente um destino no ledger.</p>
+     */
+    @Test
+    void v71ImpedeDuasConexoesNaMesmaCarteiraEExigeDestinoUnico() {
+        Long usuarioId = jdbcTemplate.queryForObject(
+                "insert into usuarios(nome, email, senha, failed_attempts, onboarding_completo)"
+                        + " values ('Sync', 'sync-v71@teste.com', 'x', 0, false) returning id",
+                Long.class);
+        Long carteiraId = jdbcTemplate.queryForObject(
+                "insert into carteiras(nome, subtipo, saldo, usuario_id, version)"
+                        + " values ('Conectada', 'DINHEIRO', 0.00, ?, 0) returning id",
+                Long.class, usuarioId);
+        Long provedorId = jdbcTemplate.queryForObject(
+                "insert into open_finance_provedores(codigo, nome, tipo) values ('FAKE-V71', 'Fake', 'FAKE') returning id",
+                Long.class);
+        Long conexaoId = jdbcTemplate.queryForObject(
+                "insert into conexoes_open_finance(usuario_id, provedor_id, status) values (?, ?, 'ATIVA') returning id",
+                Long.class, usuarioId, provedorId);
+
+        String inserirConta = "insert into contas_conectadas(usuario_id, conexao_id, external_account_id,"
+                + " tipo, carteira_id) values (?, ?, ?, 'CORRENTE', ?)";
+        jdbcTemplate.update(inserirConta, usuarioId, conexaoId, "ext-1", carteiraId);
+
+        // Segunda conexão ativa apontando para a mesma carteira: barrada pelo índice parcial.
+        assertThrows(DataAccessException.class,
+                () -> jdbcTemplate.update(inserirConta, usuarioId, conexaoId, "ext-2", carteiraId));
+
+        // Conta ativa sem destino no ledger: a sincronização não saberia onde lançar.
+        assertThrows(DataAccessException.class, () -> jdbcTemplate.update(
+                "insert into contas_conectadas(usuario_id, conexao_id, external_account_id, tipo)"
+                        + " values (?, ?, 'ext-3', 'CORRENTE')", usuarioId, conexaoId));
+
+        // Mesma conta externa duas vezes na mesma conexão.
+        assertThrows(DataAccessException.class,
+                () -> jdbcTemplate.update(inserirConta, usuarioId, conexaoId, "ext-1", null));
+
+        Long contaConectadaId = jdbcTemplate.queryForObject(
+                "select id from contas_conectadas where usuario_id = ?", Long.class, usuarioId);
+
+        // Log de sincronização: job_key é a terceira camada de reentrância.
+        String inserirExecucao = "insert into sync_execucoes(usuario_id, conta_conectada_id, job_key, tipo, status)"
+                + " values (?, ?, ?, 'INCREMENTAL', 'OK')";
+        jdbcTemplate.update(inserirExecucao, usuarioId, contaConectadaId, "of:sync:1:2026-09-01:2026-09-02");
+        assertThrows(DataAccessException.class, () -> jdbcTemplate.update(
+                inserirExecucao, usuarioId, contaConectadaId, "of:sync:1:2026-09-01:2026-09-02"));
+
+        // Erro sem código seria log inútil no dia do incidente.
+        assertThrows(DataAccessException.class, () -> jdbcTemplate.update(
+                "insert into sync_execucoes(usuario_id, conta_conectada_id, job_key, tipo, status)"
+                        + " values (?, ?, 'of:sync:erro', 'INCREMENTAL', 'ERRO')", usuarioId, contaConectadaId));
+
+        // Mais registros novos do que recebidos seria contagem impossível.
+        assertThrows(DataAccessException.class, () -> jdbcTemplate.update(
+                "insert into sync_execucoes(usuario_id, conta_conectada_id, job_key, tipo, status,"
+                        + " registros_recebidos, registros_novos) values (?, ?, 'of:sync:contagem',"
+                        + " 'INCREMENTAL', 'OK', 2, 5)", usuarioId, contaConectadaId));
+
+        jdbcTemplate.update("delete from sync_execucoes where usuario_id = ?", usuarioId);
+        jdbcTemplate.update("delete from contas_conectadas where usuario_id = ?", usuarioId);
+        jdbcTemplate.update("delete from conexoes_open_finance where usuario_id = ?", usuarioId);
+        jdbcTemplate.update("delete from open_finance_provedores where id = ?", provedorId);
+        jdbcTemplate.update("delete from carteiras where usuario_id = ?", usuarioId);
+        jdbcTemplate.update("delete from usuarios where id = ?", usuarioId);
+    }
+
     @Test
     void migrationCriaMovimentosCarteiraComConstraintsPrincipais() {
         Integer tableCount = jdbcTemplate.queryForObject(

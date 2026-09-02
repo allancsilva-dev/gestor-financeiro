@@ -180,6 +180,59 @@ class UsuarioExclusaoLgpdIT {
                 .containsExactlyInAnyOrderElementsOf(catalogo);
     }
 
+    /**
+     * Guardião do Open Finance: nada entra na exclusão sem uma decisão explícita sobre a exportação.
+     *
+     * <p>O manifesto de exclusão é conferido contra o banco pelo guardião de FK acima, então basta
+     * amarrar exportação a ele. Uma tabela nova só pode ficar de fora do pacote do titular se
+     * estiver na lista de exceções — e a lista é asserida item a item, para que ninguém acrescente
+     * uma exceção sem que este teste mude junto.</p>
+     */
+    @Test
+    void guardiaoOpenFinance_toqueDeTabelaNovaExigeDecisaoSobreExportacao() {
+        Set<String> naExclusao = UsuarioExclusaoService.MANIFESTO_EXCLUSAO.stream()
+                .map(UsuarioExclusaoService.DeleteTitular::tabela)
+                .filter(UsuarioExclusaoLgpdIT::tabelaDeOpenFinance)
+                .collect(java.util.stream.Collectors.toSet());
+        Set<String> naExportacao = ExportService.OPEN_FINANCE_EXPORT_TABLES.stream()
+                .map(ExportService.AssistantExportTable::table)
+                .collect(java.util.stream.Collectors.toSet());
+
+        // Segredo do titular e marcador opaco do parceiro não vão para o pacote de dados.
+        // Exportar a credencial transformaria portabilidade em canal de vazamento: a pessoa tem
+        // direito aos próprios dados, não à credencial que o sistema guarda em nome dela.
+        Set<String> foraDaExportacaoPorDecisao = Set.of("conexao_credenciais", "sync_cursores");
+
+        assertThat(naExclusao).as("toda tabela de Open Finance precisa estar na exclusão")
+                .isNotEmpty();
+        assertThat(foraDaExportacaoPorDecisao)
+                .as("exceções de exportação precisam existir na exclusão")
+                .allMatch(naExclusao::contains);
+        assertThat(naExportacao)
+                .as("exportação do titular = tabelas de Open Finance menos as exceções documentadas")
+                .containsExactlyInAnyOrderElementsOf(naExclusao.stream()
+                        .filter(tabela -> !foraDaExportacaoPorDecisao.contains(tabela))
+                        .collect(java.util.stream.Collectors.toSet()));
+    }
+
+    /** Nenhuma consulta de exportação pode tocar coluna de segredo, por engano ou por join. */
+    @Test
+    void guardiaoOpenFinance_exportacaoNaoMencionaColunaDeSegredo() {
+        for (ExportService.AssistantExportTable tabela : ExportService.OPEN_FINANCE_EXPORT_TABLES) {
+            String sql = tabela.sql().toLowerCase(java.util.Locale.ROOT);
+            assertThat(sql).as("exportação de %s não pode ler token", tabela.table())
+                    .doesNotContain("access_token").doesNotContain("refresh_token")
+                    .doesNotContain("token_hmac").doesNotContain("cursor_opaco")
+                    .doesNotContain("external_account_id").doesNotContain("external_consent_id");
+        }
+    }
+
+    private static boolean tabelaDeOpenFinance(String tabela) {
+        return tabela.startsWith("conexoes_open_finance") || tabela.startsWith("conexao_credenciais")
+                || tabela.startsWith("consentimentos_open_finance") || tabela.startsWith("contas_conectadas")
+                || tabela.startsWith("sync_") || tabela.startsWith("saldos_declarados_");
+    }
+
     @Test
     void excluirTitularComRecorrenciasRemoveTudoEPreservaOutroUsuario() throws IOException {
         Usuario titular = usuarioRepository.save(TestDataFactory.usuario("Titular", "titular-lgpd@teste.com", "hash"));
