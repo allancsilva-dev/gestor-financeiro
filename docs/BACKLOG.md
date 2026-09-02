@@ -1969,6 +1969,11 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Risco se ficar pendente:** baixo enquanto houver uma instância; alto no dia em que houver duas sem
   revisar esta decisão.
 - **Status:** ABERTO — gatilho explícito, não trabalho pendente.
+- **Atualização 2026-09-01 (Fase 6, PR-F6-00):** o caminho de conector regulado nasce assíncrono
+  pela fila durável (ADR-0019), mas **não** fecha este item — o parse do upload HTTP continua
+  síncrono e o gatilho original (segunda instância ou object storage) segue valendo. O que a Fase 6
+  entrega deste critério de aceite é o faxineiro de órfãos, exigido pelo snapshot NDJSON em
+  PR-F6-10. O restante permanece aberto.
 
 ## BACKLOG-0108 — Flow Maestro da importação no mobile
 
@@ -2367,4 +2372,53 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   (`ContaFixa`) no SPA passa a expor o seletor de destino (carteira/cartão), igual ao mobile.
 - **Risco se ficar pendente:** usuários do SPA continuam sem acesso à funcionalidade de assinatura no
   cartão — risco baixo hoje porque o produto é mobile-first por decisão do dono.
+- **Status:** ABERTO
+
+## BACKLOG-0127 — Runbook de rotação da chave de cifra do Open Finance
+
+- **Título:** Documentar e automatizar a re-cifra em lote das credenciais por `key_version`
+- **Prioridade:** P2
+- **Área:** backend, segurança, operação
+- **Motivo:** `OpenFinanceCrypto` já suporta rotação de verdade — cifra na versão corrente e decifra
+  em qualquer versão ainda declarada — mas o procedimento operacional não existe. Sem ele, `rotacionar`
+  continua sendo teoria: ninguém sabe quando parar de declarar a chave antiga, e retirar cedo demais
+  torna as conexões daquele lote inutilizáveis.
+- **Dependências:** PR-F6-05 (entregue); credenciais reais em produção.
+- **Critério de aceite:** runbook em `docs/runbooks/` com os passos (declarar nova como corrente
+  mantendo a antiga em `openfinance.encryption-keys`, rodar a re-cifra, conferir que nenhuma linha
+  aponta para a versão retirada, remover a antiga) e uma rotina de manutenção que faça a re-cifra em
+  lote e reporte a contagem por versão.
+- **Risco se ficar pendente:** a chave nunca é trocada, e `key_version` vira decoração — que é
+  exatamente o que a implementação tentou evitar.
+- **Status:** ABERTO
+
+## BACKLOG-0128 — Stub WireMock para a implementação HTTP do provedor Open Finance
+
+- **Título:** Contrato de parceiro exercitado por stub, quando existir implementação HTTP
+- **Prioridade:** P2
+- **Área:** backend, testes
+- **Motivo:** o plano da Fase 6 previa um stub WireMock no PR-F6-08, mas naquele momento a única
+  implementação da SPI era o fake em processo — um stub HTTP testaria o próprio stub. O contrato só
+  passa a existir quando houver cliente HTTP de parceiro.
+- **Dependências:** PR-F6-01 (escolha do parceiro) e PR-F6-16 (homologação em sandbox).
+- **Critério de aceite:** stub cobrindo paginação, `Retry-After`, 401 de consentimento inválido e
+  resposta malformada, com o mesmo cuidado de `StructuredProviderWireMockTest` quanto a ambiente sem
+  socket.
+- **Risco se ficar pendente:** o primeiro contato com o parceiro real vira o primeiro teste do
+  cliente HTTP.
+- **Status:** ABERTO — aguarda implementação HTTP existir.
+
+## BACKLOG-0129 — Rótulos de motivo de importação fora do mobile
+
+- **Título:** Centralizar o vocabulário de `reasonCode` em vez de duplicar mapa por tela
+- **Prioridade:** P3
+- **Área:** mobile, backend
+- **Motivo:** `mobile/app/(app)/more/importacao.tsx` mantém um mapa `MOTIVO` que precisa ser editado
+  toda vez que o backend acrescenta um código — foi o que aconteceu no PR-F6-04 com
+  `DUPLICATE_PENDING_BATCH` e `DUPLICATE_REVERSED`. O fallback exibe o enum cru para o titular.
+- **Dependências:** nenhuma.
+- **Critério de aceite:** o cliente recebe o texto pronto do backend, ou existe um teste que falha
+  quando um código do enum não tem rótulo no mobile.
+- **Risco se ficar pendente:** cada código novo tem uma janela em que o titular vê `SCREAMING_SNAKE`
+  na tela.
 - **Status:** ABERTO

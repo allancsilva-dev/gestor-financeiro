@@ -108,6 +108,201 @@ integração de produção enquanto `PROB-0081` e os gates de promoção/reconci
 
 ---
 
+### Fase 6 — Conectores regulados e expansão (`EM_ANDAMENTO` desde 2026-09-01)
+
+**Status consolidado:** `EM_ANDAMENTO`. Escopo aprovado pelo dono do produto em 2026-09-01 com os
+três blocos: conector/consentimento/sincronização/reconciliação, planejamento patrimonial e de
+dívidas, e uso familiar com membros e permissões. Parceiro Open Finance **não** contratado: o
+desenvolvimento roda sobre provedor fake determinístico e sandbox, com flags fail-closed. Os gates
+operacionais (`PROB-0081`, PR-F4-18, `BACKLOG-0080`) bloqueiam apenas a ativação em produção
+(PR-F6-16 e PR-F6-17), não o desenvolvimento.
+
+| PR | Escopo | Status | Evidência |
+|---|---|---|---|
+| PR-F6-00 | ADRs da fase: conector de rede, consentimento e ingestão automática | `PASS` | `docs/adr/ADR-0019-conector-de-rede-pelo-pipeline-canonico.md`, `ADR-0020-consentimento-e-credenciais-de-terceiro.md`, `ADR-0021-ingestao-automatica-e-divergencia-banco-ledger.md`; índice em `docs/adr/README.md`; vocabulário em `docs/GLOSSARIO.md`; direção em `docs/SYSTEM_OVERVIEW.md`; `BACKLOG-0107` anotado |
+| PR-F6-01 | Avaliação de parceiro (cobertura, custo, SLA, sandbox, estabilidade do identificador) | `NAO_INICIADO` | — |
+| PR-F6-02 | SPI estabilizada: `format()`, `forFormat(...)`, orquestrador sem dependência concreta de CSV, guarda de arquitetura ampliada | `PASS` | 499 testes unitários e 52 ITs verdes em PostgreSQL real (2026-09-01); `scripts/verify-postgres-migrations.sh` exit 0; as três guardas novas foram confirmadas por injeção de violação antes de serem aceitas |
+| PR-F6-03 | V68: formato `OPEN_FINANCE`, `ck_import_batches_format` recriado, coluna `origin` e trava de coerência | `PASS` | `V68__import_open_finance_origin.sql`; `PostgresMigrationIT.v68AceitaLoteDeConectorERecusaOrigemInconsistente`; 499 unitários e 53 ITs verdes; `verify-postgres-migrations.sh` exit 0, 38 migrations, schema em v68 |
+| PR-F6-04 | V69: catálogo de instituições + três correções de deduplicação | `PASS` | `V69__catalogo_instituicoes.sql`; `InstituicaoResolver`; quatro testes novos em `ImportDeduplicationServiceTest`; 502 unitários, 53 ITs e mobile 533/533 verdes; `verify-postgres-migrations.sh` exit 0, 39 migrations, schema em v69 |
+| PR-F6-05 | V70: conexão, credencial cifrada e consentimento; `OpenFinanceCrypto`; guard de boot; flags fail-closed | `PASS` | `V70__conexao_e_consentimento_open_finance.sql`; 9 testes de cifra e 8 de guard; dois testes de constraint em PostgreSQL real; 55 ITs verdes; `verify-postgres-migrations.sh` exit 0, 40 migrations, schema em v70. **Correção:** os 519 unitários citados na rodada original foram executados antes da edição do manifesto LGPD e não a cobriam; a suíte unitária só voltou a passar com essa mudança no PR-F6-06 |
+| PR-F6-06 | V71: contas conectadas, cursor, log de sync e saldo declarado; manifesto LGPD e exportação do titular | `PASS` | `V71__contas_conectadas_e_sincronizacao.sql`; sete entidades JPA; dois guardiões novos em `UsuarioExclusaoLgpdIT`; 519 unitários e 58 ITs verdes; `verify-postgres-migrations.sh` exit 0, 41 migrations, schema em v71 |
+| PR-F6-07 | Conector NDJSON e fonte a partir de stream | `PASS` | `OpenFinanceNdjsonConnector`; `TempFileImportSource.of(InputStream, ...)`; 14 testes de conector e 3 de pipeline no orquestrador; 536 unitários e 58 ITs verdes; guarda de arquitetura verde sem afrouxar asserção |
+| PR-F6-08 | SPI `OpenFinanceProvider` e provedor fake determinístico no profile `local-e2e` | `PASS` | `OpenFinanceProvider`, `FakeOpenFinanceProvider`, `LocalE2eOpenFinanceConfiguration`; 8 testes de provedor e 1 de sanidade do profile; 545 unitários e 58 ITs verdes. **Stub WireMock adiado** (ver abaixo) |
+| PR-F6-09..11 | Sincronização, backfill e consentimento | `NAO_INICIADO` | — |
+| PR-F6-12..15 | Superfície, reconciliação, mobile e E2E | `NAO_INICIADO` | — |
+| PR-F6-19..22 | Planejamento patrimonial e dívidas | `NAO_INICIADO` | — |
+| PR-F6-23..27 | Uso familiar, membros e permissões | `NAO_INICIADO` | — |
+| PR-F6-16..18 | Homologação em sandbox, ativação em produção e fechamento da fase | `NAO_INICIADO` | Bloqueados por `PROB-0081`, gates do PR-F4-18 e `BACKLOG-0080` |
+
+**Decisões cravadas no PR-F6-00, para não serem redecididas por acidente durante a implementação:**
+fonte remota entra pelo pipeline canônico como `ImportSource`, sem SPI paralela; nenhum
+`*Connector.java` abre conexão de rede, e o teste de arquitetura passa a proibir isso;
+consentimento é append-only e revogar não é excluir; vínculo exige `state` de uso único e PKCE;
+webhook fica fora do escopo da fase; só entra fato efetivado; commit automático é exceção; a
+deduplicação passa a considerar instituição canônica, lotes não finalizados e registros revertidos;
+o saldo de referência é o contábil; divergência nunca se corrige sozinha.
+
+**Rodada de 2026-09-01 (PR-F6-02):** `FinancialDataConnector` ganhou `ImportFormat format()` e
+`ImportConnectorRegistry` ganhou `forFormat(...)`, que resolve o conector sem detecção heurística —
+é o ponto por onde o conector de rede entra depois. `CanonicalImportOrchestrator` parou de injetar
+`CsvImportConnector` concreto (usava a classe só para o desvio de mapeamento) e ganhou o overload
+`stage(..., ImportFormat)`. `detect(...)` ficou inalterado de propósito.
+
+`CanonicalImportArchitectureTest` ganhou três guardas: conector não abre conexão de rede, conector
+não loga `CanonicalImportRecord`, e cada conector declara um formato próprio e distinto. As três
+foram verificadas por injeção deliberada de violação (rede, log do record e formato duplicado) —
+todas falharam como esperado antes de a violação ser revertida.
+
+**Evidência de execução:** backend com 499 testes unitários verdes e 52 testes de integração verdes
+em PostgreSQL 16 real via Testcontainers, incluindo `PostgresMigrationIT`, `ContractV41MigrationIT`,
+`CanonicalImportIT`, `ImportCommitIT`, `ImportReenvioIT` e `UsuarioExclusaoLgpdIT`.
+`scripts/verify-postgres-migrations.sh` terminou com exit 0 (37 migrations aplicadas, schema em
+v67). Isso cobre a parte **PostgreSQL** do gate do PR-F4-18; a reconciliação global em clone
+restaurado e os flows Maestro em iOS/Android continuam `PENDENTE`, e `PROB-0081` segue aberto.
+
+**Rodada de 2026-09-01 (PR-F6-03):** `ImportFormat` ganhou `OPEN_FINANCE` e `import_batches` ganhou
+`origin` (`UPLOAD`/`CONNECTOR`), com `ck_import_batches_origin_formato` impedindo que lote de
+conector se apresente como envio manual. Novo enum `ImportOrigin`. `ImportBatchService.create`
+passou a exigir a origem como **parâmetro**, não default silencioso: um default que ninguém enxerga
+é exatamente como esse rótulo ficaria errado. `ck_import_batches_failure` não foi tocado, conforme
+o escopo — códigos finos do conector irão para `sync_execucoes.erro_codigo`.
+
+**Desvio de escopo registrado:** o plano previa `import_batches.instituicao_id` na V68, mas a chave
+estrangeira aponta para `instituicoes_financeiras`, que só nasce na V69. Coluna e FK foram movidas
+para a V69, juntas, para não existir janela com coluna solta sem integridade referencial.
+
+**Evidência:** 499 testes unitários e 53 ITs verdes em PostgreSQL 16 real;
+`scripts/verify-postgres-migrations.sh` exit 0 com 38 migrations aplicadas e schema em v68. O teste
+novo prova as duas metades da decisão — o par válido (`OPEN_FINANCE`/`CONNECTOR`) é aceito, e tanto
+`OPEN_FINANCE`/`UPLOAD` quanto uma origem fora do vocabulário são recusados pelo banco.
+
+**Rodada de 2026-09-01 (PR-F6-04):** V69 criou `open_finance_provedores`,
+`instituicoes_financeiras`, `instituicao_aliases` e `import_batches.instituicao_id` com a FK.
+`InstituicaoResolver` traduz o código detectado para a instituição canônica, por código ou alias, e
+`ImportBatchService.setDetected` passou a preencher o vínculo. As três correções de deduplicação
+entraram: instituição canônica com fallback textual, identidade forte contra lotes ainda em revisão
+(`DUPLICATE_PENDING_BATCH`) e contra registros revertidos (`DUPLICATE_REVERSED`).
+
+**Mudança de contrato observável, deliberada.** O teste `registroNaoLancadoAindaNaoBloqueiaNovoEnvio`
+afirmava o comportamento oposto e foi reescrito como
+`registroEmRevisaoEmOutroLoteMarcaDuplicadoComMotivoProprio`. A troca não é só pelo conector: o
+mesmo buraco já existia no envio manual — dois extratos com período sobreposto passavam batido e
+duplicavam o ledger no commit. Marcar não é bloquear: `ImportCommitService.aprovar` recusa apenas
+`COMMITTED` e `REVERSED`, então o titular continua podendo aprovar a linha na prévia.
+
+**Desvios de escopo registrados.** (1) Os motivos novos ficaram em inglês
+(`DUPLICATE_PENDING_BATCH`, `DUPLICATE_REVERSED`) e não em português como o plano escrevia, para
+acompanhar o vocabulário de `ImportRecordReasonCode`. (2) O plano previa unicidade da instituição
+por provedor; ficou unicidade global do código canônico, com `provedor_id` opcional — unicidade por
+provedor criaria duas linhas para o mesmo banco vindo por rotas diferentes, que é exatamente o
+problema que o catálogo existe para resolver. (3) O rótulo dos motivos novos no mobile foi ajustado
+aqui, e não no PR-F6-14: sem isso esta rodada exibiria o enum cru na tela do titular, e o selo
+genérico "Já importado antes" mentiria nos dois casos novos.
+
+**Catálogo nasce vazio e sem rota de escrita** (não existe autorização por papel no sistema). Com
+catálogo vazio a deduplicação volta ao casamento textual de antes — degrada, não quebra, e há teste
+para esse caminho.
+
+**Rodada de 2026-09-01 (PR-F6-05):** V70 criou `conexoes_open_finance`, `conexao_credenciais` e
+`consentimentos_open_finance`, em três tabelas separadas porque têm ciclos de vida diferentes — a
+conexão sobrevive à revogação como histórico, a credencial é a primeira coisa apagada, e o
+consentimento é append-only por ser prova de conformidade. As invariantes ficaram no banco:
+`ux_consentimentos_of_ativo_por_conexao` impede duas renovações concorrentes deixarem dois
+consentimentos ativos, `ck_consentimentos_of_revogacao` recusa revogação sem quem e quando, e a
+lista de escopos é fechada por regex.
+
+`OpenFinanceCrypto` usa AES-GCM com IV sorteado por operação e chave só de ambiente. Diferença
+deliberada em relação a `WhatsappCrypto`, que serviu de molde: aqui a **rotação funciona** — a
+classe decifra em qualquer versão ainda declarada e cifra sempre na corrente. Sem isso
+`key_version` seria decoração, trocar a chave exigiria janela de parada e na prática ninguém
+trocaria. `OpenFinanceConfigurationGuard` derruba o boot em `prod`/`vps` sem chave, HMAC, política,
+provedor ou `redirect_uri` HTTPS fixa.
+
+**Escopo ampliado por gate que falhou, corretamente.** `UsuarioExclusaoLgpdIT` reprovou a rodada:
+as três tabelas novas têm `usuario_id` e ficaram fora do manifesto do ADR-0007. O plano previa a
+atualização do manifesto no PR-F6-06, mas deixar a suíte vermelha até lá não é opção — as entradas
+entraram aqui, com as filhas antes da conexão para não bater na FK. O guardião fez exatamente o que
+existe para fazer.
+
+**Sem rede, sem endpoint:** nenhum código desta rodada abre conexão ou expõe rota; a varredura por
+segredo em arquivo versionado voltou limpa. `security-auditor` sobre este PR continua **pendente** —
+o plano o exige e ele não foi executado nesta rodada.
+
+**Rodada de 2026-09-01 (PR-F6-06):** V71 criou `contas_conectadas`, `sync_cursores`,
+`sync_execucoes` e `saldos_declarados_instituicao`. Índices parciais impedem duas conexões ativas
+na mesma carteira ou no mesmo cartão, e um CHECK exige exatamente um destino no ledger enquanto a
+conta estiver ativa. `cursor_opaco` ficou `TEXT`: o formato é do parceiro, e um limite arbitrário
+faria o job falhar com erro de banco no dia em que ele mudasse. `saldos_declarados_instituicao`
+guarda saldo contábil **e** disponível — a conciliação usa o contábil (ADR-0021) e a diferença é o
+diagnóstico de pendente ainda não efetivado.
+
+O manifesto de exclusão recebeu as quatro tabelas, de folha para raiz, e a exportação do titular
+ganhou uma seção de conexões bancárias. Dois guardiões novos amarram isso: um exige decisão
+explícita sobre exportação para toda tabela de Open Finance que entre na exclusão (as únicas
+exceções permitidas são `conexao_credenciais` e `sync_cursores`, asseridas item a item), e outro
+proíbe qualquer consulta de exportação de mencionar coluna de segredo, cursor ou identificador
+externo. Os dois foram verificados por injeção de violação antes de serem aceitos.
+
+**Erro corrigido nesta rodada.** A suíte unitária quebrou ao rodar aqui: os testes usam H2 com
+schema gerado das entidades (`ddl-auto=create-drop`), e as tabelas da V70/V71 não tinham entidade
+JPA, então o manifesto e a exportação falhavam com tabela inexistente. A causa é do PR-F6-05: os
+519 unitários registrados lá foram executados **antes** da edição do manifesto, e a suíte não foi
+reexecutada depois dela. A entrada daquele PR foi corrigida acima. As sete entidades foram criadas
+nesta rodada — o plano as previa para o PR-F6-11, mas manter a suíte vermelha até lá não é opção.
+
+**Rodada de 2026-09-01 (PR-F6-07):** `OpenFinanceNdjsonConnector` lê o snapshot do parceiro pelo
+mesmo contrato de bytes de CSV e OFX, com envelope `gf-openfinance-v1` na primeira linha e um fato
+por linha. Não abre rede — a guarda de arquitetura continua valendo sem ser afrouxada.
+`TempFileImportSource` ganhou fábrica a partir de stream, com o mesmo arquivo restrito ao dono e
+apagado no `close()`.
+
+**A leitura de linha é própria, e não `BufferedReader.readLine()`.** Um snapshot malformado de uma
+única linha faria o `readLine` crescer até acabar a memória e derrubar a instância inteira, em vez
+de falhar a importação. A leitura respeita `record-chars` e o teste cobre esse caminho.
+
+**Instante do parceiro vira data de negócio no conector**, pelo `Clock` do ADR-0003. Deixar a
+conversão para o normalizador usaria o offset que o parceiro mandou: `2026-08-31T23:30-04:00` cairia
+em agosto, quando em São Paulo já é 1º de setembro — movendo a transação de mês e desalinhando
+fatura, orçamento e conciliação de uma vez. Há teste para a virada do dia.
+
+**Dois defeitos encontrados pelos próprios testes, corrigidos aqui.** (1) `detect` estourava em
+arquivo que não fosse JSON; como o registro reexecuta a detecção quando ninguém reivindica o
+arquivo, o titular receberia "não é JSON válido" no lugar de "formato não reconhecido" ao enviar
+outro formato. Passou a devolver confiança zero. (2) O caminho de formato declarado deixava
+`institutionCode` nulo, e a identidade forte da deduplicação passaria a casar bancos diferentes
+pelo id externo sozinho — o titular veria como duplicado o que são dois fatos reais. A instituição
+virou campo obrigatório do envelope e o orquestrador enriquece o lote com ela.
+
+**Rodada de 2026-09-01 (PR-F6-08):** `OpenFinanceProvider` é a SPI onde a rede entra, e só ela.
+Paginação é explícita porque o volume é do parceiro: uma conta com anos de histórico não cabe em
+memória, e o teto de bytes do snapshot precisa poder fechar a janela no meio de uma página. O
+provedor devolve também o fato não efetivado, com marcação — quem descarta é o fetcher, porque a
+regra de só ingerir fato consumado é nossa (ADR-0021) e esconder o pendente aqui impediria
+diagnosticar diferença de saldo.
+
+`FakeOpenFinanceProvider` cobre paginação, determinismo e três modos de falha que a sincronização
+precisa exercitar: identificador instável entre chamadas (o risco número um da fase), pedido de
+espera e consentimento recusado. `LocalE2eOpenFinanceConfiguration` é `@Profile("local-e2e")`, e há
+teste afirmando que o fake não é candidato a bean por component scan — um provedor de mentira em
+ambiente com dado real é o pior desfecho possível desta decisão.
+
+**O guard do ADR-0003 reprovou a primeira versão** do fake, que usava `LocalDate.now()` sem o
+`Clock` de negócio. Num provedor cuja razão de existir é ser reprodutível, isso era defeito de
+verdade, não formalidade: o saldo mudaria conforme o dia da execução. O `Clock` passou a ser
+injetado.
+
+**Desvio de escopo registrado:** o plano previa também um stub WireMock neste PR. Ficou adiado
+para o PR-F6-16 (homologação em sandbox), porque não existe ainda nenhuma implementação HTTP da
+SPI — stub de um contrato que não existe testaria o próprio stub.
+
+**Achados da revisão do plano, incorporados antes de qualquer código:** o reuso direto de
+`ImportAdmissionService.admitir` em job lançaria 429 e consumiria o balde de upload do próprio
+titular; o semáforo de parse é a trava de memória do processo e a lane de conector precisa
+compartilhá-la; a sobreposição de janela sem as travas de deduplicação geraria enxurrada de
+pendentes; o callback sem `state` permitiria vincular conexão alheia a outro perfil.
+
+---
+
 ### Fase 3 de produto — PR-F3-01 a PR-F3-13
 
 **Status consolidado:** `PASS_COM_RESSALVA_OPERACIONAL`

@@ -1,17 +1,30 @@
 # Meta do Nexos Finanças — 15/07/2026
 
-> **Atualização de estado — 25/08/2026 (`main` em `e885ed7`).** Este arquivo nasceu como auditoria
+> **Atualização de estado — 01/09/2026 (`main` em `62f0861`).** Este arquivo nasceu como auditoria
 > em 15/07/2026. O diagnóstico original permanece abaixo como baseline histórica, mas não descreve
 > sozinho o sistema atual. Estados “feito” nesta atualização foram conferidos no código, migrations,
-> testes existentes e histórico Git; nenhuma suíte foi reexecutada nesta revisão documental.
+> testes existentes, histórico Git e nos registros de
+> `CHECKLIST_EXECUCAO_PRS_GESTOR_FINANCEIRO.md`, `CHANGELOG.md` e `SYSTEM_OVERVIEW.md`; nenhuma
+> suíte foi reexecutada nesta revisão documental.
+>
+> A revisão anterior era de 25/08/2026 (`main` em `e885ed7`) e ainda descrevia as Fases 4 e 5 como
+> abertas. As duas foram implementadas desde então e esta revisão corrige a divergência.
 
-## Estado atual em 25/08/2026
+## Estado atual em 01/09/2026
 
 O sistema avançou de “gestor manual com verdades paralelas” para um núcleo financeiro com conta
 financeira canônica, ledger, operações agrupadas, conciliação, métricas oficiais e clientes
-alinhados. As Fases 0–3 do plano de julho foram implementadas. O principal bloqueio restante não é
-uma feature ausente: é a promoção operacional segura do PR-F2-20 em dados restaurados, dependente do
-backup/restore off-host real de `PROB-0081`.
+alinhados. As Fases 0–5 do plano de julho foram implementadas no recorte mobile-first: além do
+núcleo financeiro, existem hoje o pipeline canônico de importação (Fase 4) e o assistente
+financeiro por texto, áudio e WhatsApp (Fase 5).
+
+Os bloqueios restantes são operacionais, não escopo funcional ausente:
+
+- promoção segura do PR-F2-20 em dados restaurados, dependente do backup/restore off-host real de
+  `PROB-0081` (`BACKLOG-0088`);
+- gates de execução do PR-F4-18 — PostgreSQL, reconciliação global e Maestro em iOS e Android;
+- ressalvas do assistente — homologação Meta do WhatsApp e ativação em produção (`PROB-0092`), com
+  a integração desligada por padrão.
 
 **Veredito atual:** `APTO_PARA_DESENVOLVIMENTO` e `NAO_APTO_PARA_DEPLOY_PUBLICO` enquanto os gates
 operacionais permanecerem abertos.
@@ -49,8 +62,20 @@ operacionais permanecerem abertos.
 - Padrão visual mobile foi unificado e protegido por teste de arquitetura visual; quatro flows
   Maestro foram registrados verdes em 22/08/2026. Validação assistiva em hardware físico continua
   pendente.
-- Importação CSV, anexos, investimentos e insights determinísticos existem. OFX completo, pipeline
-  avançado de revisão, WhatsApp, áudio, IA e Open Finance continuam futuros.
+- Anexos, investimentos e insights determinísticos existem. O pipeline canônico de importação
+  existe com CSV e OFX, mapeamento configurável de colunas, prévia paginada, deduplicação, commit
+  no ledger pela fila, reversão auditável, revisão de fatura, saldo declarado, alertas e
+  automações (Fase 4).
+- O assistente financeiro existe por texto, áudio e WhatsApp, com parser determinístico, rascunho e
+  confirmação exatamente uma vez, perguntas de intenção fechada, recomendações explicáveis e
+  parcelamento no cartão (Fase 5). A integração WhatsApp fica desligada por padrão até a
+  homologação Meta.
+- Open Finance e conectores regulados (Fase 6) saíram do papel em 01/09/2026: existem os três ADRs
+  da fase, o schema completo (V68–V71), o conector NDJSON dentro do pipeline canônico, a cifra das
+  credenciais e o provedor fake determinístico. Continuam **inexistentes** sincronização, endpoint,
+  superfície mobile e qualquer implementação HTTP de parceiro; nenhuma linha da fase abre conexão de
+  rede e a feature nasce desligada. Rollover de orçamento configurável, previsto na Fase 4, segue sem
+  implementação.
 
 ### Evidência de qualidade disponível
 
@@ -878,17 +903,17 @@ Antes de migration ou código:
 
 ## Roadmap recomendado
 
-### Progresso consolidado em 25/08/2026
+### Progresso consolidado em 01/09/2026
 
 | Fase | Estado | Resultado |
 |---|---|---|
 | 0 — decisões e congelamento | **CONCLUÍDA** | glossário, ADR-0008..0015, invariantes e plano de migration aprovados |
 | 1 — integridade imediata | **CONCLUÍDA** | P0-1..P0-4 corrigidos, regressões e migrations adicionadas |
-| 2 — verdade financeira | **IMPLEMENTADA COM GATE OPERACIONAL** | conta financeira, operações, ledger, cartão, metas, investimentos, métricas e reconciliação; promoção do PR-F2-20 depende de `PROB-0081` |
+| 2 — verdade financeira | **IMPLEMENTADA COM GATE OPERACIONAL** | conta financeira, operações, ledger, cartão, metas, investimentos, métricas e reconciliação; promoção do PR-F2-20 depende de `PROB-0081` (`BACKLOG-0088`) |
 | 3 — experiência simples | **CONCLUÍDA** | compromissos, sugestão de categoria, lançamento rápido, home reduzida, drill-down, onboarding mínimo e clientes alinhados |
-| 4 — importação e automação | **PARCIAL** | CSV, recorrências e insights determinísticos existem; OFX/pipeline avançado/rollover de orçamento seguem futuros |
-| 5 — assistente conversacional | **NÃO INICIADA** | texto, áudio, WhatsApp e IA continuam fora do núcleo atual |
-| 6 — conectores regulados | **NÃO INICIADA** | Open Finance e expansão familiar permanecem futuras |
+| 4 — importação e automação | **CONCLUÍDA_MOBILE** | PR-F4-01..17 `PASS` e PR-F4-18 `EM_VALIDACAO`: pipeline canônico, CSV/OFX, mapeamento configurável, dedup, commit pela fila, reversão auditável, fatura, saldo declarado, alertas e automações. Web fora de escopo por decisão mobile-first; rollover de orçamento não entregue |
+| 5 — assistente conversacional | **CONCLUÍDA_COM_RESSALVAS_OPERACIONAIS** | PR-F5-00..10: texto, áudio, WhatsApp, perguntas, recomendações e parcelamento no cartão; E2E iOS verde em 29/08/2026 (`artifacts/fase5/run-20/`). Homologação Meta aberta e produção desligada (`PROB-0092`) |
+| 6 — conectores regulados | **NÃO INICIADA** | Open Finance e expansão familiar permanecem futuras; existe apenas a interface `FinancialDataConnector`, nascida no PR-F4-01 |
 
 ### Fase 0 — Congelamento e decisões
 
@@ -933,17 +958,23 @@ Antes de migration ou código:
 - visão separada de dinheiro disponível, reservado, investido e dívidas;
 - drill-down de cada número até sua origem.
 
-### Fase 4 — Importação e automação determinística
+### Fase 4 — Importação e automação determinística (`CONCLUÍDA_MOBILE` em 2026-08-28)
 
 - regras de categorização;
 - detecção de recorrências e assinaturas;
 - pipeline canônico de importação;
 - CSV e OFX com mapeamento, prévia, deduplicação e conciliação;
 - importação e revisão de fatura;
-- rollover de orçamento configurável e auditável;
+- rollover de orçamento configurável e auditável — **não entregue**, segue aberto; não confundir
+  com rollover de fatura, que já existe (ver seções acima);
 - notificações;
 - alertas úteis;
 - automações de metas.
+
+Escopo retirado deliberadamente: a paridade web desta fase foi cortada por decisão de produto
+mobile-first (`BACKLOG-0109`, `BACKLOG-0115`) — é desvio registrado, não implementação pendente.
+O fechamento técnico do PR-F4-18 ainda depende dos gates de execução em PostgreSQL, reconciliação
+global e Maestro em iOS e Android.
 
 ### Fase 5 — Assistente conversacional (`CONCLUÍDA_COM_RESSALVAS_OPERACIONAIS` em 2026-08-28)
 
@@ -955,7 +986,7 @@ Antes de migration ou código:
 - recomendações explicáveis ligadas a ações;
 - observabilidade, privacidade, limites de custo e fallback de fornecedor.
 
-### Fase 6 — Conectores regulados e expansão (`PRÓXIMA`)
+### Fase 6 — Conectores regulados e expansão (`EM_ANDAMENTO` desde 2026-09-01)
 
 - interface `FinancialDataConnector` estabilizada;
 - avaliar parceiro Open Finance autorizado, cobertura, custo e SLA;
@@ -1008,15 +1039,26 @@ Produto estará alinhado à meta quando usuário conseguir:
 ## Estado desta decisão
 
 Em 15/07/2026 este documento consolidava diagnóstico e decisões candidatas. Desde então, decisões de
-domínio foram formalizadas nas ADRs, Fases 1–3 foram implementadas e o modelo financeiro alvo passou
-a existir no núcleo do sistema.
+domínio foram formalizadas nas ADRs, as Fases 1–5 foram implementadas e o modelo financeiro alvo,
+o pipeline canônico de importação e o assistente financeiro passaram a existir no sistema.
 
 Prioridade atual:
 
-1. fechar `PROB-0081` com remote off-host e restore drill real;
-2. promover e comprovar PR-F2-20 em clone restaurado, com zero divergências;
-3. fechar gates de deploy, acessibilidade física e pendências P1 atuais do backlog;
-4. somente depois ampliar automação, captura conversacional ou conectores regulados.
+1. fechar `PROB-0081` com remote off-host e restore drill real, e então promover e comprovar
+   PR-F2-20 em clone restaurado com zero divergências (`BACKLOG-0088`);
+2. fechar os gates de execução do PR-F4-18 — PostgreSQL, reconciliação global e Maestro em iOS e
+   Android;
+3. fechar as ressalvas do assistente: homologação Meta do WhatsApp, ativação em produção
+   (`PROB-0092`), teto de custo com default silencioso (`BACKLOG-0117`), `BACKLOG-0111` e
+   `BACKLOG-0112`;
+4. fechar gates de deploy e acessibilidade física (`BACKLOG-0078`, `BACKLOG-0080`) e as pendências
+   P1 atuais do backlog;
+5. a Fase 6 — conectores regulados — foi iniciada em 01/09/2026 com decisão do dono do produto de
+   desenvolver em paralelo, com flags fail-closed. Os gates acima continuam bloqueando a **ativação
+   em produção** (PR-F6-16 e PR-F6-17), não o desenvolvimento. O escopo aprovado inclui os três
+   blocos: conector/consentimento/sincronização/reconciliação, planejamento patrimonial e de dívidas,
+   e uso familiar com membros e permissões — este último por último, por exigir modelo de
+   titularidade que o sistema não tem.
 
 Este documento continua sendo direção de produto. Mudanças de código, banco, infraestrutura ou
 produto exigem escopo próprio e validação proporcional ao risco.
