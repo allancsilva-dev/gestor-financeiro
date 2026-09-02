@@ -317,6 +317,62 @@ O sistema e **single-tenant** — nao ha multi-tenancy corporativa. Cada usuario
 | Actuator | Implementado | `/actuator/health`, `/actuator/info` e `ReconciliacaoHealthIndicator` (`UNKNOWN`/`UP`/`DEGRADED`; `DEGRADED` responde 200, `DOWN`/`OUT_OF_SERVICE` respondem 503). |
 | Swagger | Implementado | SpringDoc OpenAPI em `/swagger-ui.html`. Publico em dev, autenticado em prod. |
 | CI | Implementado | GitHub Actions: `ci.yml`, `mobile-maestro.yml`, `mobile-release.yml`. |
+| Open Finance / conector regulado | **Parcial, desligado por padrao** | Fase 6 em andamento (PR-F6-00 a 08 concluidos em 2026-09-01). Ja existem: schema completo (V68-V71), SPI `OpenFinanceProvider`, conector NDJSON no pipeline canonico, cifra com rotacao, guard de boot fail-closed e provedor fake em `local-e2e`. Ainda **nao** existem sincronizacao, endpoint, superficie mobile nem implementacao HTTP de parceiro. `openfinance.enabled=false` por padrao; ativacao em producao depende de `PROB-0081`, dos gates do PR-F4-18 e de `BACKLOG-0080`. |
+
+## Fase 6 — conectores regulados (em andamento desde 2026-09-01)
+
+Tres ADRs foram aceitos antes de qualquer implementacao, seguindo a regra do projeto de decidir por
+ADR e nao por acidente:
+
+- **ADR-0019** — a fonte remota e adaptada para `ImportSource`. O job de sincronizacao busca as
+  paginas do parceiro, escreve um snapshot NDJSON deterministico em arquivo temporario e entrega ao
+  pipeline canonico existente. HTTP, OAuth, paginacao e cursor ficam em `service/openfinance/`, fora
+  do pacote `importacao`; nenhum `*Connector.java` abre conexao de rede, e o teste de arquitetura
+  passa a proibir rede explicitamente. Assim `file_sha256`, `declaredBalances`, deduplicacao, previa,
+  commit idempotente e reversao continuam valendo sem codigo novo.
+- **ADR-0020** — consentimento por instituicao e append-only (revogar muda status, nunca apaga
+  linha); credencial fica em tabela separada, cifrada em AES-GCM com `key_version`; o vinculo exige
+  `state` de uso unico e PKCE, porque callback sem `state` permitiria vincular conexao alheia ao
+  perfil de outra pessoa; revogar **nao** e excluir — as transacoes ja lancadas permanecem no ledger;
+  webhook do parceiro fica **fora do escopo** da fase, so polling.
+- **ADR-0021** — so entra fato efetivado (pendente e autorizacao nao); commit automatico e excecao e
+  exige lote limpo com saldo conciliado; a deduplicacao passa a olhar instituicao canonica, lotes nao
+  finalizados e registros revertidos, senao a sobreposicao de janela geraria duplicados pendentes sem
+  fim e a ressincronizacao desfaria reversoes do titular; o saldo de referencia e o contabil;
+  divergencia nunca se corrige sozinha.
+
+### O que ja esta implementado (PR-F6-02 a PR-F6-08)
+
+- **SPI de importacao estabilizada.** `FinancialDataConnector` ganhou `format()` e
+  `ImportConnectorRegistry` ganhou `forFormat(...)`, que resolve o conector sem detecao heuristica.
+  A guarda `CanonicalImportArchitectureTest` passou a proibir rede em `*Connector.java`, log do
+  `CanonicalImportRecord` e formato duplicado entre conectores.
+- **Schema (V68-V71).** `import_batches` ganhou `origin` (`UPLOAD`/`CONNECTOR`) e `instituicao_id`;
+  catalogo de provedores, instituicoes e aliases; conexao, credencial cifrada e consentimento
+  append-only; contas conectadas, cursor, log de sincronizacao e saldo declarado.
+- **Deduplicacao corrigida em tres frentes**, valendo tambem para CSV e OFX: instituicao canonica com
+  fallback textual, identidade forte contra lotes ainda em revisao (`DUPLICATE_PENDING_BATCH`) e
+  contra registros revertidos (`DUPLICATE_REVERSED`).
+- **Cifra e guard.** `OpenFinanceCrypto` (AES-GCM, IV por operacao, rotacao real por `key_version`) e
+  `OpenFinanceConfigurationGuard`, que derruba o boot em `prod`/`vps` sem chave, HMAC, politica,
+  provedor ou `redirect_uri` HTTPS fixa.
+- **Conector NDJSON.** `OpenFinanceNdjsonConnector` le o snapshot pelo mesmo contrato de bytes de CSV
+  e OFX, com leitura de linha limitada (nao `readLine()`, que cresceria ate derrubar a instancia) e
+  conversao do instante do parceiro para data de negocio pelo `Clock` do ADR-0003.
+- **Provedor fake.** `FakeOpenFinanceProvider` em `@Profile("local-e2e")` cobre paginacao,
+  determinismo, identificador instavel, pedido de espera e consentimento recusado. E o que sustenta
+  a decisao de nao contratar agregador nesta fase.
+- **LGPD.** As sete tabelas novas entraram no manifesto de exclusao do ADR-0007, e a exportacao do
+  titular ganhou conexoes, consentimentos, contas mascaradas, saldo declarado e log de sincronizacao.
+  Dois guardioes amarram isso: um exige decisao explicita sobre exportacao para cada tabela nova, e
+  outro proibe qualquer consulta de exportacao de mencionar token, HMAC, cursor ou id externo.
+
+### O que ainda nao existe
+
+Sincronizacao incremental e backfill, ciclo de vida do consentimento (incluindo o `state` de uso
+unico do callback), endpoint `/api/v1/conexoes`, superficie mobile, invariante `SALDO_INSTITUICAO` na
+reconciliacao global e qualquer implementacao HTTP de parceiro. Nenhuma linha desta fase abre conexao
+de rede ate agora.
 
 ## Principais decisoes tecnicas
 

@@ -32,3 +32,6 @@ Regras:
 | [ADR-0016](ADR-0016-fila-duravel-e-limites-do-worker.md) | Fila duravel, worker e o que fica sincrono | Accepted |
 | [ADR-0017](ADR-0017-assistente-financeiro-mobile-first.md) | Assistente financeiro mobile-first | Accepted |
 | [ADR-0018](ADR-0018-gate-de-feature-em-runtime-via-capacidades.md) | Gate de feature do app sai do build e vira runtime via `/api/v1/capacidades` | Accepted |
+| [ADR-0019](ADR-0019-conector-de-rede-pelo-pipeline-canonico.md) | Conector de rede entra pelo pipeline canonico como `ImportSource` | Accepted |
+| [ADR-0020](ADR-0020-consentimento-e-credenciais-de-terceiro.md) | Consentimento, credenciais de terceiro e revogacao | Accepted |
+| [ADR-0021](ADR-0021-ingestao-automatica-e-divergencia-banco-ledger.md) | Ingestao automatica: o que entra, o que duplica e divergencia banco/ledger | Accepted |

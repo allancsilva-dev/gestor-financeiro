@@ -94,6 +94,45 @@ seguem ADR-0008..0015. Mantido junto com os ADRs em `docs/adr/`.
 - **Modalidade da meta** — escolha obrigatoria COFRE_REAL/RESERVA_VIRTUAL na criacao e imutavel
   depois, inclusive com reserva zerada (endurecimento da ADR-0012 no PR-F3-11).
 
+## Conectores regulados (Fase 6 — ADR-0019..0021)
+
+- **Conector de dados financeiros** — implementacao de `FinancialDataConnector`. Le bytes de um
+  `ImportSource` e emite `CanonicalImportRecord`. Nunca abre conexao de rede (ADR-0019).
+- **Snapshot NDJSON** — materializacao deterministica da resposta paginada do parceiro em arquivo
+  temporario, com envelope na primeira linha (instituicao, conta, janela, saldos). Mesma janela
+  buscada duas vezes produz os mesmos bytes e o mesmo `file_sha256`.
+- **Conexao** — vinculo do titular com uma instituicao atraves de um provedor. Tem status proprio
+  (`PENDENTE`, `ATIVA`, `EXPIRADA`, `REVOGADA`, `ERRO`, `DESVINCULADA`).
+- **Consentimento** — autorizacao com escopo e prazo dada pelo titular a instituicao. E append-only:
+  revogar muda status, nunca apaga linha (ADR-0020).
+- **Revogacao** — encerra consentimento e apaga credencial, no sistema e no parceiro. **Nao** e
+  exclusao: as transacoes ja lancadas continuam no ledger.
+- **Conta conectada** — conta ou cartao do parceiro vinculado a uma Carteira (ou Conta de cartao).
+  Uma Carteira nunca recebe duas conexoes ativas.
+- **Sincronizacao incremental** — busca periodica de uma janela de transacoes, com sobreposicao
+  deliberada de alguns dias porque banco publica com atraso.
+- **Cursor de sincronizacao** — marcador opaco do parceiro que define onde a proxima janela comeca.
+  So avanca depois que o lote correspondente e criado com sucesso.
+- **Backfill** — carga inicial do historico, fatiada em janelas mensais para tras.
+- **Fato efetivado** — lancamento ja liquidado. So ele e ingerido; pendente e autorizacao nao entram
+  (ADR-0021, coerente com a caixa canonica do ADR-0010).
+- **Saldo contabil / saldo disponivel** — o parceiro publica os dois. A conciliacao usa o
+  **contabil**; a diferenca entre eles e o diagnostico de pendentes ainda nao efetivados.
+- **Origem do lote** — `UPLOAD` (titular enviou arquivo) ou `CONNECTOR` (sincronizacao
+  automatica). Separada do formato de proposito: um conector futuro pode entregar CSV de verdade, e
+  ai so a origem distingue.
+- **Instituicao canonica** — linha unica do catalogo para a qual todos os nomes do mesmo banco
+  convergem (codigo de OFX, codigo de agregador, alias). Sem ela a deduplicacao compara texto livre
+  e o mesmo fato entra duas vezes por rotas diferentes.
+- **Duplicado em revisao** (`DUPLICATE_PENDING_BATCH`) — ja existe em outro lote seu que ainda
+  espera revisao. Marcar nao e bloquear: o titular pode aprovar na previa se forem dois fatos reais.
+- **Duplicado revertido** (`DUPLICATE_REVERSED`) — voce ja desfez este lancamento antes; a
+  ressincronizacao nao o traz de volta sozinha.
+- **Provedor** — parceiro de dados financeiros (agregador, acesso direto ou o fake deterministico
+  de teste). Endpoint e segredo vivem em property; o banco guarda so o `config_ref`.
+- **Ajuste de conciliacao** — lancamento explicito do titular, com descricao obrigatoria, para
+  fechar divergencia que a ressincronizacao nao resolveu. Nunca e feito pelo sistema.
+
 ## Regras de ouro (resumo executivo)
 
 1. Backend e a unica fonte de regra financeira; clientes apresentam (ADR-0001).
@@ -101,3 +140,7 @@ seguem ADR-0008..0015. Mantido junto com os ADRs em `docs/adr/`.
 3. Datas de negocio usam o timezone de negocio via `Clock` injetado (ADR-0003).
 4. Exclusao LGPD remove todos os dados do titular, e somente do titular (ADR-0007).
 5. Backup e criptografado, off-host e com restore comprovado (ADR-0006).
+6. Fonte externa entra sempre pelo pipeline canonico de importacao; nunca ha um segundo caminho ate
+   o ledger (ADR-0019).
+7. Automacao nunca grava operacao definitiva sobre duvida: lote com invalido, pendente de revisao,
+   duplicado heuristico ou saldo divergente fica retido para revisao humana (ADR-0021).
