@@ -173,11 +173,16 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
   });
   const carteiras = carteirasPage ?? [];
 
-  const { data: contasPage } = useQuery({
+  // A chave ['cartoes'] é compartilhada com a tela de Recorrências e invalidada por
+  // Carteira e Fatura. Quem escrever no cache primeiro define o formato para todo
+  // mundo, então as duas pontas precisam usar o MESMO queryFn: com listar() aqui e
+  // listarTodos() lá, esta tela gravava uma Page e a outra lia esperando um array
+  // (crash "undefined is not a function" em cartoes.find).
+  const { data: cartoesData } = useQuery({
     queryKey: ['cartoes'],
-    queryFn: () => cartaoService.listar(),
+    queryFn: () => cartaoService.listarTodos(),
   });
-  const cartoes = contasPage?.content ?? [];
+  const cartoes = cartoesData ?? [];
 
   // Sem carteira a transação não movimenta saldo — pré-seleciona a conta principal do titular.
   // Antes caía em `carteiras[0]`, que é ordem de listagem, não escolha de ninguém: quem tinha
