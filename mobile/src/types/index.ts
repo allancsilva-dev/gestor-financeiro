@@ -389,7 +389,9 @@ export interface ContaFixaRequest {
   carteiraId?: number;
   cartaoId?: number; // exclusivo com carteiraId: a cobrança sai do caixa ou do cartão
   frequencia?: FrequenciaRecorrencia; // ausente vale MENSAL (V72)
-  dataAncora?: string; // obrigatório em SEMANAL/QUINZENAL: fixa dia da semana e paridade
+  // Primeira cobrança da série (V73). Obrigatória em toda frequência exceto MENSAL: fixa
+  // o dia da semana em SEMANAL/QUINZENAL e o mês do aniversário de BIMESTRAL a ANUAL.
+  dataAncora?: string;
 }
 
 export interface FalhaRecorrencia {

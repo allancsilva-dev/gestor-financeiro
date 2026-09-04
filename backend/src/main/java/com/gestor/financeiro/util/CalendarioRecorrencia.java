@@ -48,6 +48,10 @@ public final class CalendarioRecorrencia {
      * <p>Sub-mensal: caminha em passos inteiros a partir da ancora. Ancora no futuro e
      * a propria primeira ocorrencia — quem agenda para semana que vem nao e cobrado
      * hoje.</p>
+     *
+     * <p>Multiplo de mes COM ancora (V73): mesma regra — a serie sai da ancora, entao o
+     * mes do aniversario e escolhido pelo usuario e sobrevive a qualquer edicao. Sem
+     * ancora, o comportamento anterior a V73 e preservado.</p>
      */
     public static LocalDate primeiraAPartirDe(LocalDate hoje, FrequenciaRecorrencia frequencia,
                                               int diaVencimento, LocalDate ancora) {
@@ -58,6 +62,20 @@ public final class CalendarioRecorrencia {
             LocalDate ocorrencia = base;
             while (ocorrencia.isBefore(hoje)) {
                 ocorrencia = ocorrencia.plusDays(f.getPasso());
+            }
+            return ocorrencia;
+        }
+
+        // Com ancora (V73), a serie sai dela e nao de "hoje": e o que permite escolher o
+        // mes de uma anual ("todo 15 de marco") e o que impede uma edicao em setembro de
+        // antecipar o aniversario.
+        if (ancora != null) {
+            LocalDate ocorrencia = ancora;
+            // Teto defensivo: passo minimo aqui e 2 meses, entao 600 saltos cobrem um
+            // seculo. Sem ele, um passo mal formado viraria laco infinito.
+            int limite = 600;
+            while (ocorrencia.isBefore(hoje) && limite-- > 0) {
+                ocorrencia = proxima(ocorrencia, f, diaVencimento);
             }
             return ocorrencia;
         }

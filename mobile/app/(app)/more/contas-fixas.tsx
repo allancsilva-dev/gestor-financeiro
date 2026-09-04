@@ -11,7 +11,7 @@ import Chip from '../../../src/components/ui/Chip';
 import IconTile from '../../../src/components/ui/IconTile';
 import Field from '../../../src/components/ui/Field';
 import { ContaFixa, ContaFixaRequest, FrequenciaRecorrencia } from '../../../src/types';
-import { FREQUENCIAS, isSubMensal, nomeFrequencia, proximaCobranca, rotuloCadencia } from '../../../src/domain/recorrencia';
+import { proximaCobranca, rotuloCadencia, usaAncora } from '../../../src/domain/recorrencia';
 import { vencimentoDaCompraNoCartao } from '../../../src/domain/fatura';
 import {
   useTheme, useTabBarSpace, numeric, radius, screenPadding, spacing, typography,
@@ -24,10 +24,21 @@ import CabecalhoSubTela from '../../../src/components/ui/CabecalhoSubTela';
 import EstadoVazio from '../../../src/components/ui/EstadoVazio';
 import FolhaModal from '../../../src/components/ui/FolhaModal';
 import RotuloDeGrupo from '../../../src/components/ui/RotuloDeGrupo';
+import SeletorDeFrequencia from '../../../src/components/ui/SeletorDeFrequencia';
 import SkeletonBox from '../../../src/components/ui/SkeletonBox';
 import Fab from '../../../src/components/ui/Fab';
 import type { ContaFinanceira } from '../../../src/types';
 import { emojiDaCategoria } from '../../../src/domain/iconeCategoria';
+
+type Aba = 'TODAS' | 'ASSINATURAS' | 'CANCELADAS';
+
+const ABAS: { chave: Aba; rotulo: string }[] = [
+  { chave: 'TODAS', rotulo: 'Todas' },
+  // Assinatura é a cobrança que cai na fatura de um cartão. Filtro client-side: a
+  // listagem de ativas já veio inteira, e uma query só para isso seria round-trip à toa.
+  { chave: 'ASSINATURAS', rotulo: 'Assinaturas' },
+  { chave: 'CANCELADAS', rotulo: 'Canceladas' },
+];
 
 export default function ContasFixasScreen() {
   const colors = useTheme();
@@ -42,16 +53,40 @@ export default function ContasFixasScreen() {
   const [erroCarteira, setErroCarteira] = useState<string | null>(null);
   const [pulandoId, setPulandoId] = useState<number | null>(null);
   const [editando, setEditando] = useState<ContaFixa | null>(null);
+  const [aba, setAba] = useState<Aba>('TODAS');
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['contas-fixas'],
     queryFn: () => contaFixaService.listar(),
   });
 
+  // Segunda query, só quando a aba é aberta: cancelada nunca entra na listagem padrão.
+  // A chave é prefixada por ['contas-fixas'] de propósito — invalidateQueries casa por
+  // prefixo, então cancelar/reativar e as invalidações globais já a alcançam.
+  const {
+    data: canceladasData,
+    isLoading: carregandoCanceladas,
+    isError: erroCanceladas,
+    refetch: recarregarCanceladas,
+  } = useQuery({
+    queryKey: ['contas-fixas', 'canceladas'],
+    queryFn: () => contaFixaService.listar({ ativo: false }),
+    enabled: aba === 'CANCELADAS',
+  });
+
   const contas = data?.content ?? [];
   const emAberto = contas.filter(cf => cf.status === 'PENDENTE' || cf.status === 'ATRASADO');
   const totalAReceber = emAberto.filter(cf => cf.tipo === 'ENTRADA').reduce((acc, cf) => acc + Number(cf.valorPlanejado ?? 0), 0);
   const totalAPagar = emAberto.filter(cf => cf.tipo !== 'ENTRADA').reduce((acc, cf) => acc + Number(cf.valorPlanejado ?? 0), 0);
+
+  // O resumo do cabeçalho sai sempre das ativas, nunca da lista exibida: na aba
+  // Canceladas ele mostraria um total fantasma de cobranças que não vão acontecer.
+  const canceladas = canceladasData?.content ?? [];
+  const listaExibida = aba === 'CANCELADAS'
+    ? canceladas
+    : aba === 'ASSINATURAS'
+      ? contas.filter(cf => cf.cartao != null)
+      : contas;
 
   const { data: carteirasData } = useQuery({
     queryKey: ['contas-financeiras-caixa'],
@@ -94,6 +129,38 @@ export default function ContasFixasScreen() {
         },
       },
     ]);
+  };
+
+  const cancelarMutation = useMutation({
+    mutationFn: (id: number) => contaFixaService.deletar(id),
+    // Prefixo: alcança também ['contas-fixas','canceladas'], onde a conta reaparece.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['contas-fixas'] }),
+    onError: (err: unknown) =>
+      Alert.alert('Não foi possível cancelar', mensagemDeErro(err, 'Tente novamente.')),
+  });
+
+  const reativarMutation = useMutation({
+    mutationFn: (id: number) => contaFixaService.reativar(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['contas-fixas'] }),
+    // Reativar com o cartão excluído volta 422 com a mensagem de negócio pronta
+    // (o interceptor já normaliza o envelope); repassá-la diz o que fazer.
+    onError: (err: unknown) =>
+      Alert.alert('Não foi possível reativar', mensagemDeErro(err, 'Tente novamente.')),
+  });
+
+  const confirmarCancelamento = (cf: ContaFixa) => {
+    Alert.alert(
+      'Cancelar assinatura?',
+      `${cf.nome} deixa de ser cobrada. As cobranças que já entraram na fatura continuam lá.`,
+      [
+        { text: 'Voltar', style: 'cancel' },
+        {
+          text: 'Cancelar assinatura',
+          style: 'destructive',
+          onPress: () => cancelarMutation.mutate(cf.id),
+        },
+      ],
+    );
   };
 
   // criar conta fixa
@@ -171,8 +238,13 @@ export default function ContasFixasScreen() {
     setDestinoCriar(cf.cartao ? 'CARTAO' : 'CONTA');
     setCartaoCriarId(cf.cartao?.id ?? null);
     // Sem restaurar a frequência, editar uma assinatura anual a devolveria para mensal
-    setFrequenciaCriar(cf.frequencia ?? 'MENSAL');
-    setAncoraCriar(cf.dataAncora ? formatDateOnlyBR(cf.dataAncora) : '');
+    const frequencia = cf.frequencia ?? 'MENSAL';
+    setFrequenciaCriar(frequencia);
+    // Auto-cura: linha criada entre V72 e V73 tem frequência não-mensal sem âncora, e o
+    // campo agora é obrigatório. Sem isto, abrir para trocar o nome pediria uma data que
+    // o usuário nunca informou — o próximo vencimento é a melhor aproximação que existe.
+    const ancora = cf.dataAncora ?? (usaAncora(frequencia) ? cf.dataProximoVencimento : null);
+    setAncoraCriar(ancora ? formatDateOnlyBR(ancora) : '');
     setModalCriarVisible(true);
   };
 
@@ -185,8 +257,8 @@ export default function ContasFixasScreen() {
     const cartao = cartoes.find(c => c.id === cartaoCriarId);
     if (!cartao) return 'A assinatura entra na fatura do cartão a cada cobrança.';
 
-    const subMensal = isSubMensal(frequenciaCriar);
-    const dia = subMensal
+    const comAncora = usaAncora(frequenciaCriar);
+    const dia = comAncora
       ? (isValidDateBR(ancoraCriar) ? new Date(parseDateBR(ancoraCriar) + 'T00:00:00').getDate() : NaN)
       : Number(diaCriar);
     if (!Number.isInteger(dia) || dia < 1 || dia > 31) {
@@ -197,7 +269,7 @@ export default function ContasFixasScreen() {
       dia,
       new Date(),
       frequenciaCriar,
-      subMensal && isValidDateBR(ancoraCriar) ? new Date(parseDateBR(ancoraCriar) + 'T00:00:00') : null,
+      comAncora && isValidDateBR(ancoraCriar) ? new Date(parseDateBR(ancoraCriar) + 'T00:00:00') : null,
     );
     const vencimento = vencimentoDaCompraNoCartao(primeira, cartao.diaFechamento, cartao.diaVencimento);
     const dois = (n: number) => String(n).padStart(2, '0');
@@ -221,6 +293,12 @@ export default function ContasFixasScreen() {
     const realizavel = !cf.dataProximoVencimento || cf.dataProximoVencimento.slice(0, 7) <= competenciaDeHoje;
     const ocupado = pulandoId != null || pagarMutation.status === 'pending';
     const acaoDeQuitar = cf.tipo === 'ENTRADA' ? 'Receber' : 'Pagar';
+    const cancelada = cf.ativo === false;
+    // `ativo=false` mistura duas coisas: cancelamento e fim de ciclo. avancarOcorrencia
+    // marca ativo=false + PAGO ao encerrar uma conta de um mês só (ContaFixaService),
+    // e essa cumpriu o que prometeu — oferecer "Reativar" ali não faria sentido.
+    // Separar de verdade exigiria uma coluna de motivo no backend.
+    const concluida = cancelada && cf.recorrente === false && cf.status === 'PAGO';
     return (
       <Card radius={radius.xl} style={{ marginBottom: spacing.md }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
@@ -238,7 +316,9 @@ export default function ContasFixasScreen() {
           <View style={{ flex: 1, minWidth: 0 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.sm }}>
               <Text numberOfLines={1} style={{ ...typography.cardTitle, color: colors.textPrimary, flex: 1 }}>{cf.nome}</Text>
-              <Badge status={cf.status} />
+              {cancelada
+                ? <Badge tone={concluida ? 'success' : 'danger'}>{concluida ? 'Concluída' : 'Cancelada'}</Badge>
+                : <Badge status={cf.status} />}
             </View>
             {/* Duas linhas: com o cartão no meio, uma linha só cortava o dia do
                 vencimento — justamente o dado que diz quando a cobrança cai. */}
@@ -269,7 +349,17 @@ export default function ContasFixasScreen() {
             onPress={() => abrirEdicao(cf)}
             dica={`Edita ${cf.nome}`}
           />
-          {pendente && cf.recorrente !== false && (
+          {cancelada && !concluida && (
+            <Botao
+              titulo="Reativar"
+              tamanho="pill"
+              onPress={() => reativarMutation.mutate(cf.id)}
+              desabilitado={reativarMutation.isPending}
+              carregando={reativarMutation.isPending && reativarMutation.variables === cf.id}
+              accessibilityLabel={`Reativar ${cf.nome}`}
+            />
+          )}
+          {!cancelada && pendente && cf.recorrente !== false && (
             <Botao
               titulo="Pular"
               variante="secundario"
@@ -280,7 +370,7 @@ export default function ContasFixasScreen() {
               dica={`Pula ${cf.nome} neste mês`}
             />
           )}
-          {pendente && realizavel && (
+          {!cancelada && pendente && realizavel && (
             <Botao
               titulo={acaoDeQuitar}
               tamanho="pill"
@@ -294,6 +384,22 @@ export default function ContasFixasScreen() {
                 setCarteiraPagamentoId(cf.carteira?.id ?? (carteiras.length === 1 ? carteiras[0].id : null));
                 setModalPagarVisible(true);
               }}
+            />
+          )}
+          {/* Quarto botão da linha; ela já tem flexWrap, então em caixa estreita quebra
+              em vez de estourar. `texto` e não `perigo` de propósito: um botão vermelho
+              cheio brigaria com o "Pagar" primário ao lado, e quem carrega o peso
+              destrutivo é a confirmação. */}
+          {!cancelada && (
+            <Botao
+              titulo="Cancelar"
+              variante="texto"
+              tamanho="pill"
+              onPress={() => confirmarCancelamento(cf)}
+              desabilitado={cancelarMutation.isPending}
+              carregando={cancelarMutation.isPending && cancelarMutation.variables === cf.id}
+              accessibilityLabel={`Cancelar ${cf.nome}`}
+              dica="Para de cobrar. As cobranças já lançadas permanecem."
             />
           )}
         </View>
@@ -314,24 +420,38 @@ export default function ContasFixasScreen() {
         }
       />
 
-      {isLoading ? (
+      <View style={{
+        flexDirection: 'row', gap: spacing.sm,
+        paddingHorizontal: screenPadding, paddingBottom: spacing.md,
+      }}>
+        {ABAS.map(({ chave, rotulo }) => (
+          <Chip key={chave} label={rotulo} selected={aba === chave} onPress={() => setAba(chave)} />
+        ))}
+      </View>
+
+      {isLoading || (aba === 'CANCELADAS' && carregandoCanceladas) ? (
         <View style={{ paddingHorizontal: screenPadding, gap: spacing.md }}>
           {[1, 2, 3].map(i => <SkeletonBox key={i} width="100%" height={110} borderRadius={radius.xl} />)}
         </View>
-      ) : isError ? (
+      ) : isError || (aba === 'CANCELADAS' && erroCanceladas) ? (
+        // Sem este guard a aba Canceladas anunciaria "Nada cancelado" quando a busca
+        // falhou — dizer que não há nada é diferente de não ter conseguido perguntar.
         <EstadoVazio
           emoji="📶"
           titulo="Não deu para carregar suas recorrências"
           texto="Verifique sua conexão e tente de novo."
-          acao={{ rotulo: 'Tentar de novo', onPress: () => refetch() }}
+          acao={{
+            rotulo: 'Tentar de novo',
+            onPress: () => { if (isError) refetch(); if (erroCanceladas) recarregarCanceladas(); },
+          }}
         />
       ) : (
         <FlatList
-          data={contas}
+          data={listaExibida}
           keyExtractor={item => item.id.toString()}
           contentContainerStyle={{ paddingHorizontal: screenPadding, paddingBottom: tabBarSpace }}
           renderItem={renderItem}
-          ListHeaderComponent={sugestoes.length === 0 ? null : (
+          ListHeaderComponent={aba !== 'TODAS' || sugestoes.length === 0 ? null : (
             <Card radius={radius.xl} style={{ marginBottom: spacing.md }}>
               <Text style={{ ...typography.cardTitle, color: colors.textPrimary }}>
                 Isto se repete todo mês
@@ -381,12 +501,27 @@ export default function ContasFixasScreen() {
             </Card>
           )}
           ListEmptyComponent={() => (
-            <EstadoVazio
-              emoji="🧾"
-              titulo="Nenhuma recorrência ainda"
-              texto="Cadastre salário, aluguel ou outros valores recorrentes."
-              acao={{ rotulo: 'Cadastrar recorrência', onPress: () => { limparCriar(); setModalCriarVisible(true); } }}
-            />
+            aba === 'CANCELADAS' ? (
+              <EstadoVazio
+                emoji="🗂️"
+                titulo="Nada cancelado"
+                texto="O que você cancelar aparece aqui, e pode voltar a ser cobrado."
+              />
+            ) : aba === 'ASSINATURAS' ? (
+              <EstadoVazio
+                emoji="💳"
+                titulo="Nenhuma assinatura no cartão"
+                texto="Assinaturas são as recorrências que entram na fatura de um cartão."
+                acao={{ rotulo: 'Cadastrar assinatura', onPress: () => { limparCriar(); setModalCriarVisible(true); } }}
+              />
+            ) : (
+              <EstadoVazio
+                emoji="🧾"
+                titulo="Nenhuma recorrência ainda"
+                texto="Cadastre salário, aluguel ou outros valores recorrentes."
+                acao={{ rotulo: 'Cadastrar recorrência', onPress: () => { limparCriar(); setModalCriarVisible(true); } }}
+              />
+            )
           )}
         />
       )}
@@ -460,16 +595,16 @@ export default function ContasFixasScreen() {
             if (!descricaoCriar.trim()) { setDescricaoError('Descrição obrigatória.'); hasErr = true; }
             const v = parseCurrencyBR(valorCriar);
             if (isNaN(v) || v <= 0) { setValorError('Valor deve ser positivo.'); hasErr = true; }
-            const subMensal = isSubMensal(frequenciaCriar);
-            // Série semanal/quinzenal sai da âncora; o dia do mês é derivado dela.
-            if (subMensal && !isValidDateBR(ancoraCriar)) {
+            const comAncora = usaAncora(frequenciaCriar);
+            // Fora de MENSAL, a série sai da âncora; o dia do mês é derivado dela.
+            if (comAncora && !isValidDateBR(ancoraCriar)) {
               setDiaError('Informe a data da primeira cobrança (DD/MM/AAAA).');
               hasErr = true;
             }
-            const dia = subMensal
+            const dia = comAncora
               ? (isValidDateBR(ancoraCriar) ? new Date(parseDateBR(ancoraCriar) + 'T00:00:00').getDate() : 0)
               : Number(diaCriar);
-            if (!subMensal && (!Number.isInteger(dia) || dia < 1 || dia > 31)) { setDiaError('Dia deve ser um número entre 1 e 31.'); hasErr = true; }
+            if (!comAncora && (!Number.isInteger(dia) || dia < 1 || dia > 31)) { setDiaError('Dia deve ser um número entre 1 e 31.'); hasErr = true; }
             if (!categoriaCriarId) { setCategoriaError('Selecione uma categoria.'); hasErr = true; }
             const usaCartao = tipoCriar === 'SAIDA' && destinoCriar === 'CARTAO';
             if (automaticaCriar && usaCartao && !cartaoCriarId) { setErroCriar('Selecione o cartão da cobrança.'); hasErr = true; }
@@ -484,7 +619,7 @@ export default function ContasFixasScreen() {
               tipo: tipoCriar,
               execucaoAutomatica: automaticaCriar,
               frequencia: frequenciaCriar,
-              ...(subMensal ? { dataAncora: parseDateBR(ancoraCriar) } : {}),
+              ...(comAncora ? { dataAncora: parseDateBR(ancoraCriar) } : {}),
               // O destino vale também em execução manual: é onde a cobrança cai
               // quando o usuário registra. Só é obrigatório na automática.
               ...(usaCartao
@@ -503,26 +638,12 @@ export default function ContasFixasScreen() {
           <Field label="Descrição" value={descricaoCriar} onChangeText={setDescricaoCriar} placeholder="Ex: Aluguel" error={descricaoError} autoFocus />
           <Field label="Valor" value={valorCriar} onChangeText={(t) => setValorCriar(maskCurrencyInput(t))} keyboardType="number-pad" placeholder="0,00" error={valorError} />
           <RotuloDeGrupo>Com que frequência</RotuloDeGrupo>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: spacing.sm }}
-            style={{ marginBottom: spacing.md }}
-            keyboardShouldPersistTaps="handled"
-          >
-            {FREQUENCIAS.map(f => (
-              <Chip
-                key={f}
-                label={nomeFrequencia(f)}
-                selected={frequenciaCriar === f}
-                onPress={() => setFrequenciaCriar(f)}
-              />
-            ))}
-          </ScrollView>
+          <SeletorDeFrequencia valor={frequenciaCriar} onSelecionar={setFrequenciaCriar} />
 
-          {isSubMensal(frequenciaCriar) ? (
-            // "Dia do mês" não existe em série semanal/quinzenal: o que fixa o dia da
-            // semana e a paridade da quinzena é a data da primeira cobrança.
+          {usaAncora(frequenciaCriar) ? (
+            // "Dia do mês" não descreve estas séries: em semanal/quinzenal o que fixa o
+            // dia da semana e a paridade é a data da primeira cobrança, e de bimestral a
+            // anual é ela que fixa o mês do aniversário ("todo 15 de março").
             <Field label="Primeira cobrança" value={ancoraCriar} onChangeText={(t) => setAncoraCriar(maskDateInput(t))} keyboardType="number-pad" placeholder="DD/MM/AAAA" maxLength={10} error={diaError} />
           ) : (
             <Field label="Dia de vencimento" value={diaCriar} onChangeText={setDiaCriar} keyboardType="number-pad" placeholder="Ex: 10" maxLength={2} error={diaError} />
@@ -605,18 +726,23 @@ export default function ContasFixasScreen() {
             </>
           )}
 
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md, marginTop: spacing.md }}>
-            <View style={{ flex: 1 }}>
-              <Text style={{ ...typography.cardTitle, fontWeight: '600', color: colors.textPrimary }}>Repete todo mês</Text>
-              <Text style={{ ...typography.meta, color: colors.textSecondary, marginTop: spacing.xxs }}>Desative para contas de um mês só.</Text>
+          {/* Só na criação: ContaFixaService.atualizar nunca chama setRecorrente, então na
+              edição o switch era um no-op que prometia o que não entregava. Quem quer
+              parar de cobrar usa "Cancelar" no card. */}
+          {!editando && (
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md, marginTop: spacing.md }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ ...typography.cardTitle, fontWeight: '600', color: colors.textPrimary }}>Repete sempre</Text>
+                <Text style={{ ...typography.meta, color: colors.textSecondary, marginTop: spacing.xxs }}>Desative para uma cobrança única.</Text>
+              </View>
+              <Switch
+                value={recorrenteCriar}
+                onValueChange={setRecorrenteCriar}
+                trackColor={{ true: colors.brand }}
+                accessibilityLabel="Repete sempre"
+              />
             </View>
-            <Switch
-              value={recorrenteCriar}
-              onValueChange={setRecorrenteCriar}
-              trackColor={{ true: colors.brand }}
-              accessibilityLabel="Repete todo mês"
-            />
-          </View>
+          )}
 
           {erroCriar && (
             <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={{ ...typography.meta, color: colors.danger, marginTop: spacing.lg }}>

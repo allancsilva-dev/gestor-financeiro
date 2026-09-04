@@ -50,7 +50,18 @@ public class ContaFixaService {
     
     // Lista contas fixas ativas do usuário
     public Page<ContaFixa> listarPorUsuario(Long usuarioId, Pageable pageable) {
-        return contaFixaRepository.findByUsuarioIdAndAtivoTrue(usuarioId, pageable);
+        return listarPorUsuario(usuarioId, pageable, true);
+    }
+
+    /**
+     * Lista as recorrencias do titular. {@code ativo=false} traz as canceladas, que a UI
+     * precisa para oferecer "Reativar" — sem isso o endpoint de reativar e inalcancavel,
+     * porque a cancelada some da unica listagem que existe.
+     */
+    public Page<ContaFixa> listarPorUsuario(Long usuarioId, Pageable pageable, boolean ativo) {
+        return ativo
+                ? contaFixaRepository.findByUsuarioIdAndAtivoTrue(usuarioId, pageable)
+                : contaFixaRepository.findByUsuarioIdAndAtivoFalse(usuarioId, pageable);
     }
     
     // Cria nova conta fixa
@@ -79,7 +90,7 @@ public class ContaFixaService {
             contaFixa.setTipo(TipoTransacao.SAIDA);
         }
         if (contaFixa.getExecucaoAutomatica() == null) contaFixa.setExecucaoAutomatica(false);
-        resolverDestino(contaFixa, usuarioId);
+        resolverDestino(contaFixa, idDe(contaFixa.getCarteira()), idDe(contaFixa.getConta()), usuarioId);
         resolverFrequencia(contaFixa);
         
         // Calcula próximo vencimento
@@ -125,9 +136,15 @@ public class ContaFixaService {
             // "Dia do mes" nao existe em serie sub-mensal; o campo continua NOT NULL
             // (V1) e vira exibicao, derivado da ancora.
             conta.setDiaVencimento(conta.getDataAncora().getDayOfMonth());
-        } else {
-            // Sobra de formulario ao trocar a frequencia nao pode virar dado orfao.
+        } else if (conta.getFrequencia() == FrequenciaRecorrencia.MENSAL) {
+            // Todo mes tem ocorrencia, entao o mes de partida e irrelevante: guardar
+            // ancora aqui so criaria dado redundante (e violaria o CHECK da V73).
             conta.setDataAncora(null);
+        } else if (conta.getDataAncora() != null) {
+            // De BIMESTRAL a ANUAL a ancora e opcional e define o mes do aniversario.
+            // O dia exibido acompanha a ancora, senao "todo dia 10" contradiz uma ancora
+            // que cai no dia 15.
+            conta.setDiaVencimento(conta.getDataAncora().getDayOfMonth());
         }
     }
     
@@ -290,17 +307,51 @@ public class ContaFixaService {
         return contaFixaRepository.save(conta);
     }
 
+    /**
+     * Volta a cobrar uma recorrencia cancelada.
+     *
+     * <p>Nao cobra retroativo: o proximo vencimento e recalculado a partir de hoje, entao
+     * o scheduler nao tem meses parados para recuperar. Quem cancelou em janeiro e
+     * reativou em junho nao leva cinco cobrancas de uma vez.</p>
+     */
     @Transactional
     public ContaFixa reativar(Long id, Long usuarioId) {
-        ContaFixa conta = buscarPorIdDoUsuario(id, usuarioId);
+        // Lock pessimista como em realizar/pularMes: reativar mexe na serie, e duas
+        // chamadas simultaneas deixariam dataProximoVencimento inconsistente.
+        ContaFixa conta = contaFixaRepository.findByIdAndUsuarioIdForUpdate(id, usuarioId)
+                .orElseThrow(() -> new ResourceNotFoundException("Recorrência não encontrada"));
 
         if (conta.getAtivo() != null && conta.getAtivo()) {
             throw new BusinessException("Conta fixa já está ativa");
         }
 
+        // "Concluida" nao e "cancelada". avancarOcorrencia encerra uma conta de um mes so
+        // com ativo=false + PAGO quando ela cumpre o ciclo, e as duas caem no mesmo
+        // ativo=false. A UI ja esconde o botao Reativar nesse caso, mas quem decide o que
+        // e uma cobranca valida e o servidor: sem este guard, um PUT direto ressuscitaria
+        // uma serie que ja terminou.
+        if (Boolean.FALSE.equals(conta.getRecorrente()) && conta.getStatus() == StatusPagamento.PAGO) {
+            throw new BusinessException(
+                    "Esta conta já foi concluída. Crie uma nova recorrência para cobrar de novo");
+        }
+
+        // Sem revalidar o destino, reativar uma assinatura cujo cartao foi excluido cria
+        // uma recorrencia zumbi: toda execucao automatica estoura "Cartão da recorrência
+        // está inativo", o scheduler engole a excecao, o vencimento nunca avanca e nada
+        // aparece em /falhas-pendentes (que so cobre FALHA_SALDO). Melhor recusar aqui,
+        // com mensagem que diz o que fazer.
+        if (conta.getConta() != null && !Boolean.TRUE.equals(conta.getConta().getAtivo())) {
+            throw new BusinessException(
+                    "O cartão desta assinatura foi removido. Edite a recorrência e escolha outro destino antes de reativar");
+        }
+
         conta.setAtivo(true);
         conta.setStatus(StatusPagamento.PENDENTE);
         calcularProximoVencimento(conta);
+        // A data recalculada pode cair numa ocorrencia ja REALIZADA/PULADA (cobrou hoje,
+        // cancelou, reativou no mesmo dia). Sem avancar, todo realizar/pular seguinte bate
+        // no unique de execucoes_recorrencia e a recorrencia trava em 400 para sempre.
+        pularOcorrenciasJaExecutadas(conta);
 
         return contaFixaRepository.save(conta);
     }
@@ -309,15 +360,23 @@ public class ContaFixaService {
     @Transactional
     public ContaFixa atualizar(Long id, ContaFixa contaAtualizada, Long usuarioId) {
         ContaFixa conta = buscarPorIdDoUsuario(id, usuarioId);
-        
+
+        // Estado da serie ANTES de qualquer setter. E o que decide, la embaixo, se o
+        // aniversario se move: ler diaVencimento depois do setter compararia o valor novo
+        // com ele mesmo, e mudar so o dia de uma mensal nunca recalcularia a serie.
+        FrequenciaRecorrencia frequenciaAnterior = conta.getFrequencia();
+        LocalDate ancoraAnterior = conta.getDataAncora();
+        Integer diaAnterior = conta.getDiaVencimento();
+
         conta.setNome(contaAtualizada.getNome());
         conta.setValorPlanejado(contaAtualizada.getValorPlanejado());
         conta.setDiaVencimento(contaAtualizada.getDiaVencimento());
         conta.setTipo(contaAtualizada.getTipo() == null ? TipoTransacao.SAIDA : contaAtualizada.getTipo());
         conta.setExecucaoAutomatica(Boolean.TRUE.equals(contaAtualizada.getExecucaoAutomatica()));
-        conta.setCarteira(contaAtualizada.getCarteira());
-        conta.setConta(contaAtualizada.getConta());
-        
+        // O destino sai dos ids do payload, nunca dos stubs: ver resolverDestino.
+        resolverDestino(conta, idDe(contaAtualizada.getCarteira()),
+                idDe(contaAtualizada.getConta()), usuarioId);
+
         if (contaAtualizada.getCategoria() != null && contaAtualizada.getCategoria().getId() != null) {
             Categoria categoria = categoriaRepository.findByIdAndUsuarioId(
                     contaAtualizada.getCategoria().getId(), usuarioId)
@@ -326,14 +385,23 @@ public class ContaFixaService {
         }
         
         conta.setObservacoes(contaAtualizada.getObservacoes());
+
+        // A serie so e recalculada quando algo que a define muda. Recalcular sempre
+        // antecipava o aniversario: numa anual de marco, editar o valor em setembro movia
+        // a cobranca para setembro, porque calcularProximoVencimento parte de hoje.
         conta.setFrequencia(contaAtualizada.getFrequencia());
         conta.setDataAncora(contaAtualizada.getDataAncora());
-        resolverDestino(conta, usuarioId);
         resolverFrequencia(conta);
-        
-        // Recalcula próximo vencimento
-        calcularProximoVencimento(conta);
-        pularOcorrenciasJaExecutadas(conta);
+
+        boolean serieMudou = !java.util.Objects.equals(frequenciaAnterior, conta.getFrequencia())
+                || !java.util.Objects.equals(ancoraAnterior, conta.getDataAncora())
+                || !java.util.Objects.equals(diaAnterior, conta.getDiaVencimento())
+                || conta.getDataProximoVencimento() == null;
+
+        if (serieMudou) {
+            calcularProximoVencimento(conta);
+            pularOcorrenciasJaExecutadas(conta);
+        }
         
         return contaFixaRepository.save(conta);
     }
@@ -346,18 +414,23 @@ public class ContaFixaService {
      */
     private void pularOcorrenciasJaExecutadas(ContaFixa conta) {
         if (conta.getId() == null) return;
+        if (!Boolean.TRUE.equals(conta.getRecorrente())) return;
+
+        // Piso da serie: a ultima ocorrencia ja REALIZADA ou PULADA. Comparar so a data
+        // exata (como antes) deixava passar o caso perigoso — mudar a ancora move a serie
+        // para tras dentro de um mes ja cobrado, com dia diferente, e o unique
+        // (conta_fixa_id, data_vencimento) nao pega isso: viraria cobranca dupla.
+        LocalDate piso = execucaoRepository
+                .findTopByContaFixaIdAndStatusInOrderByDataVencimentoDesc(conta.getId(),
+                        List.of(StatusExecucaoRecorrencia.REALIZADA, StatusExecucaoRecorrencia.PULADA))
+                .map(ExecucaoRecorrencia::getDataVencimento)
+                .orElse(null);
+        if (piso == null) return;
+
         int limite = 400; // teto defensivo: nunca virar laco infinito
-        while (limite-- > 0) {
-            LocalDate vencimento = conta.getDataProximoVencimento();
-            boolean jaExecutada = execucaoRepository
-                    .findByContaFixaIdAndDataVencimento(conta.getId(), vencimento)
-                    .filter(e -> e.getStatus() == StatusExecucaoRecorrencia.REALIZADA
-                            || e.getStatus() == StatusExecucaoRecorrencia.PULADA)
-                    .isPresent();
-            if (!jaExecutada) return;
-            if (!Boolean.TRUE.equals(conta.getRecorrente())) return;
+        while (!conta.getDataProximoVencimento().isAfter(piso) && limite-- > 0) {
             conta.setDataProximoVencimento(CalendarioRecorrencia.proxima(
-                    vencimento, conta.getFrequencia(), conta.getDiaVencimento()));
+                    conta.getDataProximoVencimento(), conta.getFrequencia(), conta.getDiaVencimento()));
         }
     }
 
@@ -404,9 +477,25 @@ public class ContaFixaService {
      * Um destino, nunca dois: a cobranca sai do caixa (carteira) ou do cartao (V67).
      * Valida em 400 o que os CHECKs da V67 so pegariam como 500.
      */
-    private void resolverDestino(ContaFixa conta, Long usuarioId) {
-        Long carteiraId = conta.getCarteira() == null ? null : conta.getCarteira().getId();
-        Long cartaoId = conta.getConta() == null ? null : conta.getConta().getId();
+    /**
+     * Aponta a recorrencia para o destino pedido, resolvendo os ids em entidades
+     * gerenciadas.
+     *
+     * <p>Os ids chegam por parametro de proposito. Pendurar o stub do JSON (um
+     * {@code Conta} so com id, versao nula) na entidade gerenciada e depois consultar
+     * fazia o auto-flush do Hibernate tentar cascatear um objeto destacado — 500 em
+     * "Detached entity ... has an uninitialized version value" ao editar assinatura de
+     * cartao. Aqui a entidade so recebe o que ja veio do banco.</p>
+     */
+    private static Long idDe(Carteira carteira) {
+        return carteira == null ? null : carteira.getId();
+    }
+
+    private static Long idDe(Conta conta) {
+        return conta == null ? null : conta.getId();
+    }
+
+    private void resolverDestino(ContaFixa conta, Long carteiraId, Long cartaoId, Long usuarioId) {
 
         if (carteiraId != null && cartaoId != null)
             throw new BusinessException("Informe apenas um destino: conta ou cartão");

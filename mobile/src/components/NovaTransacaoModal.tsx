@@ -10,7 +10,8 @@ import cartaoService from '../services/cartaoService';
 import { useModalTopInset, useTheme } from '../theme';
 import { parseDateBR, isValidDateBR, parseCurrencyBR, maskCurrencyInput, maskDateInput, todayBR, formatDateOnlyBR } from '../utils/format';
 import { TransacaoRequest, TipoTransacao, SugestaoCategoria, Alerta, FrequenciaRecorrencia } from '../types';
-import { FREQUENCIAS, isSubMensal, nomeFrequencia, proximaCobranca, rotuloProximaCobranca } from '../domain/recorrencia';
+import { proximaCobranca, rotuloProximaCobranca, usaAncora } from '../domain/recorrencia';
+import SeletorDeFrequencia from './ui/SeletorDeFrequencia';
 import { vencimentoDaCompraNoCartao } from '../domain/fatura';
 import { getLancamentoPrefs, setLancamentoPrefs } from '../store/lancamentoPrefs';
 import { CATEGORIAS_INICIAIS } from '../domain/categoriasIniciais';
@@ -384,7 +385,9 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
           recorrente: true,
           execucaoAutomatica: true,
           frequencia,
-          ...(isSubMensal(frequencia) ? { dataAncora: request.data } : {}),
+          // Âncora em toda frequência não-mensal (V73): sem ela, escolher "Anual" aqui
+          // criaria uma assinatura começando no mês corrente, contradizendo Recorrências.
+          ...(usaAncora(frequencia) ? { dataAncora: request.data } : {}),
           observacoes: request.observacoes,
           ...(request.cartaoId ? { cartaoId: request.cartaoId } : { carteiraId: request.carteiraId }),
         });
@@ -426,7 +429,7 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
           new Date(parseDateBR(data) + 'T00:00:00').getDate(),
           new Date(),
           frequencia,
-          isSubMensal(frequencia) ? new Date(parseDateBR(data) + 'T00:00:00') : null,
+          usaAncora(frequencia) ? new Date(parseDateBR(data) + 'T00:00:00') : null,
         );
         const vencimento = vencimentoDaCompraNoCartao(primeira, cartao.diaFechamento, cartao.diaVencimento);
         const dois = (n: number) => String(n).padStart(2, '0');
@@ -632,22 +635,9 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
                     />
                   </View>
                   {repeteTodoMes && (
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={{ gap: 8 }}
-                      style={{ marginTop: 8 }}
-                      keyboardShouldPersistTaps="handled"
-                    >
-                      {FREQUENCIAS.map(f => (
-                        <Chip
-                          key={f}
-                          label={nomeFrequencia(f)}
-                          selected={frequencia === f}
-                          onPress={() => setFrequencia(f)}
-                        />
-                      ))}
-                    </ScrollView>
+                    <View style={{ marginTop: 8 }}>
+                      <SeletorDeFrequencia valor={frequencia} onSelecionar={setFrequencia} />
+                    </View>
                   )}
                   {repeteTodoMes && isValidDateBR(data) && (
                     <Text style={{ color: colors.textSecondary, fontSize: 12, marginTop: 4 }}>
@@ -655,7 +645,7 @@ export default function NovaTransacaoModal({ visible, onClose, onSaved, initialT
                         new Date(parseDateBR(data) + 'T00:00:00').getDate(),
                         new Date(),
                         frequencia,
-                        isSubMensal(frequencia) ? new Date(parseDateBR(data) + 'T00:00:00') : null,
+                        usaAncora(frequencia) ? new Date(parseDateBR(data) + 'T00:00:00') : null,
                       )}
                     </Text>
                   )}

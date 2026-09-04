@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -140,6 +141,111 @@ class ContaFixaFrequenciaTest {
         assertTrue(atualizada.getDataProximoVencimento().isAfter(jaRealizada),
                 "ocorrencia ja realizada precisa ser pulada, senao o proximo realizar trava no unique");
         assertEquals(jaRealizada.getDayOfMonth(), atualizada.getDataProximoVencimento().getDayOfMonth());
+    }
+
+    /**
+     * O caso que o dono do produto tentou e nao conseguiu: "Amazon Prime, todo 15 de
+     * marco", cadastrado em outro mes. Antes da V73 a ancora era proibida em ANUAL e a
+     * serie saia sempre do mes corrente.
+     */
+    @Test
+    void anualPodeEscolherOMesDoAniversario() {
+        LocalDate marco = LocalDate.now().withMonth(3).withDayOfMonth(15);
+
+        ContaFixa prime = service.criar(nova("Amazon Prime", FrequenciaRecorrencia.ANUAL, marco), usuario.getId());
+
+        assertEquals(3, prime.getDataProximoVencimento().getMonthValue(),
+                "a cobranca precisa cair em marco, nao no mes do cadastro");
+        assertEquals(15, prime.getDataProximoVencimento().getDayOfMonth());
+        assertEquals(marco, prime.getDataAncora());
+    }
+
+    /**
+     * Editar o valor nao pode mover o aniversario. Antes, atualizar recalculava a serie a
+     * partir de hoje e uma anual de marco virava uma anual do mes da edicao.
+     */
+    @Test
+    void editarValorNaoMoveOAniversarioDaAnual() {
+        LocalDate marco = LocalDate.now().withMonth(3).withDayOfMonth(15);
+        ContaFixa prime = service.criar(nova("Amazon Prime", FrequenciaRecorrencia.ANUAL, marco), usuario.getId());
+        LocalDate vencimentoOriginal = prime.getDataProximoVencimento();
+
+        ContaFixa edicao = nova("Amazon Prime", FrequenciaRecorrencia.ANUAL, marco);
+        edicao.setValorPlanejado(new BigDecimal("99.00"));
+        ContaFixa atualizada = service.atualizar(prime.getId(), edicao, usuario.getId());
+
+        assertEquals(vencimentoOriginal, atualizada.getDataProximoVencimento(),
+                "mudar so o valor nao pode mexer na data da cobranca");
+        assertEquals(0, new BigDecimal("99.00").compareTo(atualizada.getValorPlanejado()));
+    }
+
+    /** Trocar a frequencia continua recalculando: aí a serie mudou de verdade. */
+    @Test
+    void trocarAFrequenciaRecalculaASerie() {
+        LocalDate marco = LocalDate.now().withMonth(3).withDayOfMonth(15);
+        ContaFixa prime = service.criar(nova("Prime", FrequenciaRecorrencia.ANUAL, marco), usuario.getId());
+
+        ContaFixa edicao = nova("Prime", FrequenciaRecorrencia.MENSAL, null);
+        ContaFixa atualizada = service.atualizar(prime.getId(), edicao, usuario.getId());
+
+        assertEquals(FrequenciaRecorrencia.MENSAL, atualizada.getFrequencia());
+        assertNull(atualizada.getDataAncora(), "mensal nao guarda ancora");
+        assertFalse(atualizada.getDataProximoVencimento().isBefore(LocalDate.now()));
+    }
+
+    /** Sem ancora, BIMESTRAL..ANUAL continuam com o comportamento anterior a V73. */
+    @Test
+    void anualSemAncoraMantemComportamentoAnterior() {
+        ContaFixa prime = service.criar(nova("Prime", FrequenciaRecorrencia.ANUAL, null), usuario.getId());
+
+        assertNull(prime.getDataAncora());
+        assertFalse(prime.getDataProximoVencimento().isBefore(LocalDate.now()));
+        assertEquals(LocalDate.now().getDayOfMonth(), prime.getDataProximoVencimento().getDayOfMonth());
+    }
+
+    /**
+     * O caso que o unique (conta_fixa_id, data_vencimento) nao pega: mudar a ancora move a
+     * serie para tras, para um mes JA COBRADO mas com dia diferente. Sem o piso da ultima
+     * execucao, isso vira cobranca dupla sem o banco reclamar.
+     */
+    @Test
+    void mudarAncoraNaoVoltaParaMesJaCobrado() {
+        ContaFixa mensal = service.criar(nova("Streaming", FrequenciaRecorrencia.MENSAL, null), usuario.getId());
+        LocalDate cobrada = mensal.getDataProximoVencimento();
+        service.realizar(mensal.getId(), null, carteira.getId(), usuario.getId(), false);
+
+        // edicao que puxaria a serie para um dia anterior do mesmo mes ja cobrado
+        ContaFixa edicao = nova("Streaming", FrequenciaRecorrencia.MENSAL, null);
+        edicao.setDiaVencimento(Math.max(1, cobrada.getDayOfMonth() - 1));
+        ContaFixa atualizada = service.atualizar(mensal.getId(), edicao, usuario.getId());
+
+        assertTrue(atualizada.getDataProximoVencimento().isAfter(cobrada),
+                "a serie nao pode voltar para um mes ja cobrado; ficou em "
+                        + atualizada.getDataProximoVencimento() + " e ja cobrou " + cobrada);
+    }
+
+    /**
+     * O mesmo perigo, agora no caminho que a V73 abriu: a ancora de uma BIMESTRAL sendo
+     * puxada para um dia anterior do mes que ja foi cobrado. Aqui a serie sai da ancora,
+     * entao sem o piso ela realmente pousaria no mes cobrado — com dia diferente, que e
+     * exatamente o que o unique (conta_fixa_id, data_vencimento) nao pega.
+     */
+    @Test
+    void mudarAncoraDeBimestralNaoVoltaParaMesJaCobrado() {
+        LocalDate hoje = LocalDate.now();
+        ContaFixa bimestral = service.criar(
+                nova("Academia", FrequenciaRecorrencia.BIMESTRAL, hoje), usuario.getId());
+        LocalDate cobrada = bimestral.getDataProximoVencimento();
+        service.realizar(bimestral.getId(), null, carteira.getId(), usuario.getId(), false);
+
+        LocalDate ancoraPuxada = hoje.withDayOfMonth(Math.max(1, hoje.getDayOfMonth() - 1));
+        ContaFixa edicao = nova("Academia", FrequenciaRecorrencia.BIMESTRAL, ancoraPuxada);
+        ContaFixa atualizada = service.atualizar(bimestral.getId(), edicao, usuario.getId());
+
+        assertEquals(ancoraPuxada, atualizada.getDataAncora(), "a ancora escolhida e respeitada");
+        assertTrue(atualizada.getDataProximoVencimento().isAfter(cobrada),
+                "a serie nao pode voltar para um mes ja cobrado; ficou em "
+                        + atualizada.getDataProximoVencimento() + " e ja cobrou " + cobrada);
     }
 
     private ContaFixa nova(String nome, FrequenciaRecorrencia frequencia, LocalDate ancora) {

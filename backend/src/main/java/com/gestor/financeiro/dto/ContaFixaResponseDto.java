@@ -26,7 +26,8 @@ public record ContaFixaResponseDto(
     CartaoResumo cartao,
     /** Periodicidade da cobranca (V72). */
     FrequenciaRecorrencia frequencia,
-    /** Primeira cobranca de recorrencia sub-mensal; null em MENSAL+. */
+    /** Primeira cobranca da serie: fixa o dia da semana em SEMANAL/QUINZENAL e o mes do
+     *  aniversario de BIMESTRAL a ANUAL (V73). Sempre null em MENSAL. */
     LocalDate dataAncora,
     /**
      * Avisos que acompanham a operacao sem impedi-la (ex.: limite do cartao estourado).

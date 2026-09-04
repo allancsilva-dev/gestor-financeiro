@@ -12,6 +12,7 @@ import com.gestor.financeiro.service.ContaFixaService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
@@ -82,6 +83,45 @@ class ContaFixaRecorrenciaTest {
         assertEquals(StatusExecucaoRecorrencia.PULADA, execucao.getStatus());
         assertTrue(contaFixaRepository.findById(conta.getId()).orElseThrow().getDataProximoVencimento().isAfter(vencimento));
         assertTrue(transacaoRepository.findByUsuarioId(usuario.getId()).isEmpty());
+    }
+
+    /**
+     * A aba "Canceladas" depende disto. Sem uma listagem de inativas, a recorrencia
+     * cancelada some da unica listagem que existe e o endpoint /reativar fica
+     * inalcancavel: nao ha como o app descobrir o id dela.
+     */
+    @Test
+    void listagemSeparaAtivasDeCanceladas() {
+        ContaFixa viva = salvar("Aluguel", "900.00", TipoTransacao.SAIDA, false, LocalDate.now().plusDays(3));
+        ContaFixa cancelada = salvar("Netflix", "60.00", TipoTransacao.SAIDA, false, LocalDate.now().plusDays(5));
+        service.deletar(cancelada.getId(), usuario.getId());
+
+        var ativas = service.listarPorUsuario(usuario.getId(), PageRequest.of(0, 20), true);
+        var canceladas = service.listarPorUsuario(usuario.getId(), PageRequest.of(0, 20), false);
+
+        assertEquals(1, ativas.getTotalElements());
+        assertEquals(viva.getId(), ativas.getContent().get(0).getId());
+        assertEquals(1, canceladas.getTotalElements());
+        assertEquals(cancelada.getId(), canceladas.getContent().get(0).getId());
+    }
+
+    /** O default preserva o contrato: cliente antigo continua vendo so as ativas. */
+    @Test
+    void listagemPadraoContinuaSoComAtivas() {
+        ContaFixa cancelada = salvar("Netflix", "60.00", TipoTransacao.SAIDA, false, LocalDate.now().plusDays(5));
+        service.deletar(cancelada.getId(), usuario.getId());
+
+        assertEquals(0, service.listarPorUsuario(usuario.getId(), PageRequest.of(0, 20)).getTotalElements());
+    }
+
+    @Test
+    void canceladasNaoVazamEntreTitulares() {
+        ContaFixa cancelada = salvar("Netflix", "60.00", TipoTransacao.SAIDA, false, LocalDate.now().plusDays(5));
+        service.deletar(cancelada.getId(), usuario.getId());
+        Usuario outro = usuarioRepository.save(TestDataFactory.usuario(
+                "Outro", "canceladas-outro@teste.com", passwordEncoder.encode("123456")));
+
+        assertEquals(0, service.listarPorUsuario(outro.getId(), PageRequest.of(0, 20), false).getTotalElements());
     }
 
     private ContaFixa salvar(String nome, String valor, TipoTransacao tipo, boolean automatica, LocalDate vencimento) {

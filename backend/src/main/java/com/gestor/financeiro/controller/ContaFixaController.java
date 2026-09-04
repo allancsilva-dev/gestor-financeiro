@@ -37,11 +37,13 @@ public class ContaFixaController {
     // GET /api/contas-fixas/minhas - Lista contas fixas do usuário autenticado
     @GetMapping("/minhas")
     public ResponseEntity<Page<ContaFixaResponseDto>> listarPorUsuario(
-        @PageableDefault(size = 20, sort = "diaVencimento", direction = Sort.Direction.ASC) Pageable pageable
+        @PageableDefault(size = 20, sort = "diaVencimento", direction = Sort.Direction.ASC) Pageable pageable,
+        // Default true preserva o contrato: cliente antigo continua vendo so as ativas.
+        @RequestParam(defaultValue = "true") boolean ativo
     ) {
         Long usuarioId = authenticatedUserService.getAuthenticatedUserId();
         Pageable cappedPageable = PaginationUtils.enforceMaxSize(pageable, 100);
-        Page<ContaFixa> contas = contaFixaService.listarPorUsuario(usuarioId, cappedPageable);
+        Page<ContaFixa> contas = contaFixaService.listarPorUsuario(usuarioId, cappedPageable, ativo);
         return ResponseEntity.ok(contas.map(ContaFixaResponseDto::fromEntity));
     }
 

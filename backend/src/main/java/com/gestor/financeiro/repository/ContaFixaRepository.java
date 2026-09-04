@@ -31,6 +31,11 @@ public interface ContaFixaRepository extends JpaRepository<ContaFixa, Long> {
     @EntityGraph(attributePaths = {"categoria", "carteira", "conta"})
     Page<ContaFixa> findByUsuarioIdAndAtivoTrue(Long usuarioId, Pageable pageable);
 
+    // Aba "Canceladas": sem isto, uma recorrencia desativada some da UI para sempre e o
+    // endpoint /reativar fica inalcancavel, porque nao ha como descobrir o id dela.
+    @EntityGraph(attributePaths = {"categoria", "carteira", "conta"})
+    Page<ContaFixa> findByUsuarioIdAndAtivoFalse(Long usuarioId, Pageable pageable);
+
     @EntityGraph(attributePaths = {"categoria", "carteira", "conta"})
     Optional<ContaFixa> findByIdAndUsuarioId(Long id, Long usuarioId);
 

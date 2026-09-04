@@ -12,6 +12,15 @@ import java.util.Optional;
 public interface ExecucaoRecorrenciaRepository extends JpaRepository<ExecucaoRecorrencia, Long> {
     Optional<ExecucaoRecorrencia> findByContaFixaIdAndDataVencimento(Long contaFixaId, LocalDate dataVencimento);
 
+    /**
+     * Ultima ocorrencia ja processada da recorrencia. Serve de piso para a serie: mudar a
+     * ancora pode recalcular o proximo vencimento para uma data anterior a uma cobranca
+     * ja feita, e o unique (conta_fixa_id, data_vencimento) so pega colisao no MESMO dia
+     * — mes ja cobrado com dia diferente passaria e viraria cobranca dupla.
+     */
+    Optional<ExecucaoRecorrencia> findTopByContaFixaIdAndStatusInOrderByDataVencimentoDesc(
+            Long contaFixaId, List<StatusExecucaoRecorrencia> statuses);
+
     boolean existsByContaFixaIdAndDataVencimentoAndStatusIn(
             Long contaFixaId, LocalDate dataVencimento, List<StatusExecucaoRecorrencia> statuses);
 

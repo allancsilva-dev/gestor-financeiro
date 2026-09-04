@@ -208,6 +208,102 @@ class ContaFixaCartaoTest {
                 () -> criar("Netflix", "60.00", true, LocalDate.now().plusDays(5), alheio, null));
     }
 
+    /**
+     * Reativar sem revalidar o destino criava recorrencia zumbi: o cartao removido faz
+     * toda execucao automatica estourar, o scheduler engole a excecao, o vencimento nunca
+     * avanca e nada aparece em /falhas-pendentes, que so cobre FALHA_SALDO.
+     */
+    @Test
+    void reativarAssinaturaDeCartaoRemovidoRecusaEmVezDeVirarZumbi() {
+        ContaFixa netflix = criar("Netflix", "60.00", true, LocalDate.now().plusDays(5), cartao, null);
+        cartaoService.deletarCartao(cartao.getId(), usuario.getId());
+        assertFalse(contaFixaRepository.findById(netflix.getId()).orElseThrow().getAtivo());
+
+        BusinessException erro = assertThrows(BusinessException.class,
+                () -> service.reativar(netflix.getId(), usuario.getId()));
+
+        assertTrue(erro.getMessage().contains("cartão desta assinatura foi removido"),
+                "a mensagem precisa dizer o que fazer; veio: " + erro.getMessage());
+        assertFalse(contaFixaRepository.findById(netflix.getId()).orElseThrow().getAtivo(),
+                "recusar nao pode deixar a recorrencia meio reativada");
+    }
+
+    /**
+     * Cobrar hoje, cancelar e reativar no mesmo dia fazia o recalculo pousar na ocorrencia
+     * ja REALIZADA. Sem avancar, todo realizar/pular seguinte batia no unique de
+     * execucoes_recorrencia e a recorrencia travava em 400 para sempre.
+     */
+    @Test
+    void reativarNoMesmoDiaDeUmaOcorrenciaJaRealizadaNaoTrava() {
+        ContaFixa netflix = criar("Netflix", "60.00", false, LocalDate.now(), cartao, null);
+        service.realizar(netflix.getId(), null, null, usuario.getId(), false);
+        service.deletar(netflix.getId(), usuario.getId());
+
+        ContaFixa reativada = service.reativar(netflix.getId(), usuario.getId());
+
+        assertTrue(reativada.getAtivo());
+        assertTrue(reativada.getDataProximoVencimento().isAfter(LocalDate.now()),
+                "a ocorrencia ja realizada precisa ter sido pulada");
+        // e o proximo realizar precisa funcionar, nao estourar no unique
+        service.realizar(reativada.getId(), null, null, usuario.getId(), true);
+    }
+
+    /** Cancelar em janeiro e reativar em junho nao pode cobrar os meses parados de uma vez. */
+    @Test
+    void reativarNaoCobraRetroativo() {
+        ContaFixa netflix = criar("Netflix", "60.00", true, LocalDate.now().plusDays(5), cartao, null);
+        service.deletar(netflix.getId(), usuario.getId());
+        int lancamentosAntes = faturaLancamentoRepository.findAll().size();
+
+        ContaFixa reativada = service.reativar(netflix.getId(), usuario.getId());
+
+        assertFalse(reativada.getDataProximoVencimento().isBefore(LocalDate.now()),
+                "vencimento reativado nunca pode ficar no passado");
+        assertEquals(lancamentosAntes, faturaLancamentoRepository.findAll().size(),
+                "reativar nao lanca cobranca por conta propria");
+    }
+
+    /**
+     * Conta de um mes so que cumpriu o ciclo nao volta a cobrar.
+     *
+     * avancarOcorrencia encerra a nao-recorrente com ativo=false + PAGO, o mesmo
+     * ativo=false de um cancelamento. A tela distingue os dois e nao oferece "Reativar"
+     * na concluida, mas quem decide o que e cobranca valida e o servidor: sem este guard,
+     * um PUT direto em /reativar ressuscitaria uma serie que ja terminou.
+     */
+    @Test
+    void reativarRecusaContaQueJaCumpriuOCiclo() {
+        ContaFixa avulsa = base("IPTU 2026", "300.00", false, LocalDate.now());
+        avulsa.setRecorrente(false);
+        avulsa.setConta(cartao);
+        ContaFixa criada = service.criar(avulsa, usuario.getId());
+        service.realizar(criada.getId(), null, null, usuario.getId(), false);
+
+        ContaFixa encerrada = contaFixaRepository.findById(criada.getId()).orElseThrow();
+        assertFalse(encerrada.getAtivo(), "fim de ciclo desativa a conta");
+        assertEquals(StatusPagamento.PAGO, encerrada.getStatus());
+
+        BusinessException erro = assertThrows(BusinessException.class,
+                () -> service.reativar(criada.getId(), usuario.getId()));
+        assertTrue(erro.getMessage().contains("concluída"), erro.getMessage());
+    }
+
+    /** Cancelar nao apaga o que ja foi cobrado: a fatura e historico. */
+    @Test
+    void cancelarMantemAsCobrancasJaLancadasNaFatura() {
+        ContaFixa netflix = criar("Netflix", "60.00", false, LocalDate.now(), cartao, null);
+        service.realizar(netflix.getId(), null, null, usuario.getId(), false);
+        int lancamentos = faturaLancamentoRepository.findAll().size();
+        assertEquals(1, lancamentos);
+
+        service.deletar(netflix.getId(), usuario.getId());
+
+        assertFalse(contaFixaRepository.findById(netflix.getId()).orElseThrow().getAtivo());
+        assertEquals(lancamentos, faturaLancamentoRepository.findAll().size(),
+                "cancelar assinatura nao pode estornar o que ja entrou na fatura");
+        assertEquals(1, transacaoRepository.findByUsuarioId(usuario.getId()).size());
+    }
+
     private ContaFixa base(String nome, String valor, boolean automatica, LocalDate vencimento) {
         ContaFixa conta = new ContaFixa();
         conta.setUsuario(usuario);
@@ -220,6 +316,58 @@ class ContaFixaCartaoTest {
         conta.setTipo(TipoTransacao.SAIDA);
         conta.setExecucaoAutomatica(automatica);
         return conta;
+    }
+
+    /**
+     * Editar uma assinatura de cartao devolvia 500.
+     *
+     * O controller monta o destino como um stub — um {@link Conta} so com o id — e
+     * {@code atualizar} o pendurava direto na entidade ja gerenciada. A primeira consulta
+     * do metodo (a da categoria) dispara auto-flush, o Hibernate tenta cascatear o stub
+     * destacado e estoura "Detached entity with generated id ... has an uninitialized
+     * version value". Os testes antigos nao pegavam porque passavam a entidade gerenciada
+     * do proprio contexto de persistencia, e nao o stub que chega do JSON.
+     */
+    @Test
+    void editarAssinaturaDeCartaoNaoEstouraComDestinoVindoDoJson() {
+        ContaFixa netflix = criar("Netflix", "60.00", false, LocalDate.now(), cartao, null);
+
+        ContaFixa edicao = base("Netflix BR", "60.00", false, LocalDate.now());
+        edicao.setConta(stubDoCartao());
+
+        ContaFixa depois = service.atualizar(netflix.getId(), edicao, usuario.getId());
+        contaFixaRepository.flush();
+
+        assertEquals("Netflix BR", depois.getNome());
+        assertEquals(cartao.getId(), depois.getConta().getId());
+        assertNull(depois.getCarteira());
+    }
+
+    /**
+     * Mudar so o dia de vencimento tem de mover a serie. O piso de comparacao era lido
+     * depois do setter, entao "dia anterior" era o dia novo e a condicao nunca era
+     * verdadeira: a cobranca continuava marcada para o dia velho.
+     */
+    @Test
+    void mudarODiaDeVencimentoMoveAProximaCobranca() {
+        ContaFixa netflix = criar("Netflix", "60.00", false, LocalDate.now(), cartao, null);
+        int diaNovo = netflix.getDiaVencimento() == 28 ? 27 : 28;
+
+        ContaFixa edicao = base("Netflix", "60.00", false, LocalDate.now());
+        edicao.setDiaVencimento(diaNovo);
+        edicao.setConta(stubDoCartao());
+
+        ContaFixa depois = service.atualizar(netflix.getId(), edicao, usuario.getId());
+
+        assertEquals(diaNovo, depois.getDiaVencimento());
+        assertEquals(diaNovo, depois.getDataProximoVencimento().getDayOfMonth());
+    }
+
+    /** O destino como o JSON entrega: id e mais nada. */
+    private Conta stubDoCartao() {
+        Conta stub = new Conta();
+        stub.setId(cartao.getId());
+        return stub;
     }
 
     private ContaFixa criar(String nome, String valor, boolean automatica, LocalDate vencimento,

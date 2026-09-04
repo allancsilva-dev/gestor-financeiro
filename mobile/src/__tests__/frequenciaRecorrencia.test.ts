@@ -4,6 +4,7 @@ import {
   nomeFrequencia,
   proximaCobranca,
   rotuloCadencia,
+  usaAncora,
 } from '../domain/recorrencia';
 
 /**
@@ -76,6 +77,36 @@ describe('frequência de recorrência — paridade com o backend', () => {
       .toEqual(new Date(2026, 9, 5));
   });
 
+  it('só MENSAL dispensa âncora', () => {
+    expect(usaAncora('MENSAL')).toBe(false);
+    expect(usaAncora('ANUAL')).toBe(true);
+    expect(usaAncora('BIMESTRAL')).toBe(true);
+    expect(usaAncora('SEMANAL')).toBe(true);
+  });
+
+  // V73: a série sai da âncora e não de "hoje". É o que deixa o dono escolher o mês da
+  // anual — e o que impede que editar o valor em setembro mova o aniversário de março.
+  it('anual com âncora fica no mês do aniversário', () => {
+    expect(proximaCobranca(15, new Date(2026, 8, 1), 'ANUAL', new Date(2026, 2, 15)))
+      .toEqual(new Date(2027, 2, 15));
+  });
+
+  it('bimestral com âncora preserva a fase, não recomeça em hoje', () => {
+    // Âncora em janeiro: a série é jan, mar, mai, jul, set — nunca outubro.
+    expect(proximaCobranca(10, new Date(2026, 8, 20), 'BIMESTRAL', new Date(2026, 0, 10)))
+      .toEqual(new Date(2026, 10, 10));
+  });
+
+  it('âncora mensal-múltipla no futuro é a própria primeira cobrança', () => {
+    expect(proximaCobranca(15, new Date(2026, 8, 1), 'ANUAL', new Date(2027, 2, 15)))
+      .toEqual(new Date(2027, 2, 15));
+  });
+
+  it('âncora em dia 31 encurta em mês curto', () => {
+    expect(proximaCobranca(31, new Date(2026, 1, 1), 'BIMESTRAL', new Date(2025, 11, 31)))
+      .toEqual(new Date(2026, 1, 28));
+  });
+
   it('sem frequência informada, comporta-se como mensal', () => {
     expect(proximaCobranca(10, new Date(2026, 8, 20)))
       .toEqual(proximaCobranca(10, new Date(2026, 8, 20), 'MENSAL'));
@@ -99,6 +130,16 @@ describe('rótulo de cadência', () => {
   it('anual diz o mês quando tem âncora', () => {
     expect(rotuloCadencia('ANUAL', 10, new Date(2026, 8, 10)))
       .toBe('Todo dia 10 de setembro');
+  });
+
+  it('trimestral com âncora diz o mês de partida', () => {
+    // "A cada 3 meses, dia 15" não diz se cai em março ou em abril.
+    expect(rotuloCadencia('TRIMESTRAL', 15, new Date(2026, 2, 15)))
+      .toBe('A cada 3 meses, dia 15, a partir de março');
+  });
+
+  it('sem âncora, o rótulo não inventa mês', () => {
+    expect(rotuloCadencia('TRIMESTRAL', 15)).toBe('A cada 3 meses, dia 15');
   });
 
   it('todas as frequências têm nome e rótulo', () => {
