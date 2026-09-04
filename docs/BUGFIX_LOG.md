@@ -4,6 +4,224 @@ Registro de bugs corrigidos. Mantido pelo `docs-reporter`.
 
 ---
 
+## BUG-0111 — Reativar ressuscitava recorrência que já tinha cumprido o ciclo ("Concluída" tratada como "Cancelada")
+
+- **Problema relacionado:** PROB-0098
+- **Data:** 2026-09-04
+- **Area:** backend
+- **Sintoma:** achado pelo `quality-reviewer` nesta sessão (não commitado). `avancarOcorrencia`
+  encerra uma `ContaFixa` de ocorrência única (`recorrente=false`) com `ativo=false` + status
+  `PAGO` quando ela cumpre o ciclo — o mesmo `ativo=false` usado num cancelamento manual. A tela
+  mobile já distinguia (rótulo "Concluída", sem botão Reativar), mas nada no servidor impedia um
+  `PUT /v1/contas-fixas/{id}/reativar` direto, que ressuscitava uma série já terminada.
+- **Causa raiz:** confirmada — `ContaFixaService.reativar` só checava `conta.getAtivo()`, sem
+  diferenciar cancelamento de conclusão natural de ciclo.
+- **Correcao aplicada:** `reativar` recusa com 422 BUSINESS_ERROR quando
+  `recorrente == false && status == PAGO` ("Esta conta já foi concluída. Crie uma nova recorrência
+  para cobrar de novo").
+- **Arquivos alterados:** `backend/src/main/java/com/gestor/financeiro/service/ContaFixaService.java`.
+- **Testes/validacoes executadas:** `ContaFixaCartaoTest.reativarRecusaContaQueJaCumpriuOCiclo`;
+  suíte backend completa relatada pela sessão (595 testes, 0 falhas).
+- **Resultado:** PASS
+- **Ressalvas:** a distinção "cancelada" vs. "concluída" continua inferida a partir de
+  `ativo=false` + `recorrente`/`status` sobrecarregados, não de um campo dedicado — ver
+  BACKLOG-0133.
+- **Commit:** pendente
+
+---
+
+## BUG-0110 — Editar só o dia de vencimento não movia a próxima cobrança
+
+- **Problema relacionado:** PROB-0098
+- **Data:** 2026-09-04
+- **Area:** backend
+- **Sintoma:** achado em runtime nesta sessão (não commitado), depois de recompilar o backend (ver
+  PROB-0100). Em `ContaFixaService.atualizar`, mudar somente `diaVencimento` (sem tocar
+  frequência/âncora) não recalculava `dataProximoVencimento`.
+- **Causa raiz:** confirmada — `diaAnterior` era lido **depois** de `conta.setDiaVencimento(...)`
+  já ter rodado, então a comparação usada para decidir `serieMudou` comparava o valor novo contra
+  ele mesmo, nunca disparando por esse caminho.
+- **Correcao aplicada:** os três valores "anteriores" (frequência, âncora, dia de vencimento)
+  passaram a ser lidos antes de qualquer setter em `atualizar`.
+- **Arquivos alterados:** `backend/src/main/java/com/gestor/financeiro/service/ContaFixaService.java`.
+- **Testes/validacoes executadas:** `ContaFixaCartaoTest.mudarODiaDeVencimentoMoveAProximaCobranca`;
+  suíte backend completa (595 testes, 0 falhas).
+- **Resultado:** PASS
+- **Ressalvas:** nenhuma.
+- **Commit:** pendente
+
+---
+
+## BUG-0109 — HTTP 500 ao editar qualquer assinatura de cartão (detached entity com `version` nula)
+
+- **Problema relacionado:** PROB-0098
+- **Data:** 2026-09-04
+- **Area:** backend
+- **Sintoma:** achado em runtime nesta sessão (não commitado), depois de recompilar/reiniciar o
+  backend que estava rodando build V72 antiga (ver PROB-0100). `PUT` em qualquer assinatura de
+  cartão devolvia 500.
+- **Causa raiz:** confirmada — `ContaFixaService.atualizar` pendurava o stub do JSON (um `Conta`
+  só com id, `version` nula, montado por `ContaFixaController.toEntity`) direto na entidade
+  `ContaFixa` já gerenciada pelo Hibernate; a consulta seguinte (busca de categoria) disparava
+  auto-flush, que tentava cascatear o objeto destacado: "Detached entity with generated id 'N' has
+  an uninitialized version value: com.gestor.financeiro.model.Conta.version" →
+  `DataIntegrityViolationException` → 500. Os testes existentes não pegavam porque passavam a
+  entidade gerenciada do próprio contexto de persistência, não o stub que chega de um JSON real.
+- **Correcao aplicada:** `resolverDestino` passou a receber `carteiraId`/`cartaoId` por parâmetro
+  (ids já resolvidos), nunca o stub do payload; a entidade gerenciada só recebe objetos que já
+  vieram do banco.
+- **Arquivos alterados:** `backend/src/main/java/com/gestor/financeiro/service/ContaFixaService.java`.
+- **Testes/validacoes executadas:**
+  `ContaFixaCartaoTest.editarAssinaturaDeCartaoNaoEstouraComDestinoVindoDoJson`; suíte backend
+  completa (595 testes, 0 falhas).
+- **Resultado:** PASS
+- **Ressalvas:** o padrão "pendurar stub de JSON numa entidade gerenciada" pode existir em outros
+  `services`/`controllers` que seguem o mesmo estilo de `toEntity`; não foi auditado fora de
+  `ContaFixaService` nesta sessão.
+- **Commit:** pendente
+
+---
+
+## BUG-0108 — `pularOcorrenciasJaExecutadas` comparava só a data exata; mudar a âncora podia voltar a série para um mês já cobrado
+
+- **Problema relacionado:** PROB-0098
+- **Data:** 2026-09-04
+- **Area:** backend
+- **Sintoma:** mudar a âncora (`data_ancora`) de uma recorrência podia mover
+  `dataProximoVencimento` para um mês já cobrado, só que com dia diferente do original — o unique
+  `(conta_fixa_id, data_vencimento)` não pega essa colisão porque a data exata muda, então viraria
+  cobrança duplicada dentro do mesmo mês.
+- **Causa raiz:** confirmada — a função só verificava se a data exata do próximo vencimento já
+  tinha uma execução `REALIZADA`/`PULADA`; não usava um piso baseado no calendário efetivamente já
+  cobrado, só na data pontual.
+- **Correcao aplicada:** passou a usar como piso a última execução `REALIZADA`/`PULADA` (novo
+  `ExecucaoRecorrenciaRepository.findTopByContaFixaIdAndStatusInOrderByDataVencimentoDesc`),
+  avançando a série em passos de `CalendarioRecorrencia.proxima` até ultrapassar esse piso.
+- **Arquivos alterados:**
+  `backend/src/main/java/com/gestor/financeiro/service/ContaFixaService.java`,
+  `backend/src/main/java/com/gestor/financeiro/repository/ExecucaoRecorrenciaRepository.java`.
+- **Testes/validacoes executadas:** `ContaFixaFrequenciaTest.mudarAncoraNaoVoltaParaMesJaCobrado`,
+  `mudarAncoraDeBimestralNaoVoltaParaMesJaCobrado`; suíte backend completa (595 testes, 0 falhas).
+- **Resultado:** PASS
+- **Ressalvas:** nenhuma.
+- **Commit:** pendente
+
+---
+
+## BUG-0107 — `reativar` tinha dois buracos: recorrência zumbi (cartão excluído) e trava em 400 permanente
+
+- **Problema relacionado:** PROB-0098
+- **Data:** 2026-09-04
+- **Area:** backend
+- **Sintoma:** (i) reativar uma assinatura cujo cartão de destino tinha sido excluído (soft
+  delete) criava uma "recorrência zumbi": a execução automática estourava toda noite ("Cartão da
+  recorrência está inativo"), o scheduler engolia a exceção, o vencimento nunca avançava e nada
+  aparecia em `/falhas-pendentes` (endpoint que só cobre `FALHA_SALDO`). (ii) `reativar` não
+  chamava `pularOcorrenciasJaExecutadas`; cobrar/cancelar/reativar no mesmo dia calendário travava
+  a recorrência em 400 permanente, porque a data recalculada caía numa ocorrência já
+  `REALIZADA`/`PULADA`.
+- **Causa raiz:** confirmada — ausência de revalidação do destino em `reativar` (i); ausência da
+  chamada a `pularOcorrenciasJaExecutadas` depois de recalcular o próximo vencimento (ii).
+- **Correcao aplicada:** `reativar` agora recusa com 422 BUSINESS_ERROR quando
+  `conta.getConta() != null && !conta.getConta().getAtivo()` ("O cartão desta assinatura foi
+  removido. Edite a recorrência e escolha outro destino antes de reativar"); passou a chamar
+  `pularOcorrenciasJaExecutadas` logo depois de `calcularProximoVencimento`; ganhou lock
+  pessimista (`findByIdAndUsuarioIdForUpdate`), coerente com `realizar`/`pularMes`.
+- **Arquivos alterados:** `backend/src/main/java/com/gestor/financeiro/service/ContaFixaService.java`.
+- **Testes/validacoes executadas:**
+  `ContaFixaCartaoTest.reativarAssinaturaDeCartaoRemovidoRecusaEmVezDeVirarZumbi`,
+  `reativarNoMesmoDiaDeUmaOcorrenciaJaRealizadaNaoTrava`, `reativarNaoCobraRetroativo`; suíte
+  backend completa (595 testes, 0 falhas).
+- **Resultado:** PASS
+- **Ressalvas:** nenhuma.
+- **Commit:** pendente
+
+---
+
+## BUG-0106 — `atualizar` antecipava o aniversário de uma recorrência não-mensal
+
+- **Problema relacionado:** PROB-0098
+- **Data:** 2026-09-04
+- **Area:** backend
+- **Sintoma:** editar qualquer campo de uma `ContaFixa` (mesmo só o nome ou o valor, sem mexer em
+  frequência/âncora/dia) recalculava `dataProximoVencimento` a partir de hoje. Numa recorrência
+  anual cadastrada com aniversário em março, editar o valor em setembro movia a cobrança de março
+  para setembro.
+- **Causa raiz:** confirmada — `atualizar` sempre chamava `calcularProximoVencimento(conta)`
+  incondicionalmente, e esse cálculo parte de "hoje" quando não há indício de que a série deveria
+  ser preservada.
+- **Correcao aplicada:** a série só é recalculada quando frequência, âncora ou dia de vencimento
+  realmente mudam (`serieMudou`), comparando contra os valores capturados antes de qualquer
+  setter.
+- **Arquivos alterados:** `backend/src/main/java/com/gestor/financeiro/service/ContaFixaService.java`.
+- **Testes/validacoes executadas:**
+  `ContaFixaFrequenciaTest.editarValorNaoMoveOAniversarioDaAnual`, `trocarAFrequenciaRecalculaASerie`,
+  `trocarFrequenciaNaoTravaEmOcorrenciaJaRealizada`; suíte backend completa (595 testes, 0 falhas).
+- **Resultado:** PASS
+- **Ressalvas:** nenhuma.
+- **Commit:** pendente
+
+---
+
+## BUG-0105 — Cold start quebrava quando duas telas liam cartões pela mesma chave de cache com formatos diferentes
+
+- **Problema relacionado:** PROB-0099
+- **Data:** 2026-09-03
+- **Area:** mobile
+- **Sintoma:** a tela de Recorrências e o `NovaTransacaoModal` usavam a mesma chave React Query
+  `['cartoes']`, mas com `queryFn` diferentes — uma devolvia `PagedResponse<Cartao>`, a outra um
+  array puro. Quem abrisse uma tela depois da outra recebia do cache um objeto com forma
+  inesperada e o app quebrava (crash em runtime, sem perda de dados).
+- **Causa raiz:** confirmada — duas `queryFn` divergentes compartilhando a mesma `queryKey`; React
+  Query não valida a forma do dado entre diferentes consumidores da mesma chave.
+- **Correcao aplicada:** unificado um único formato de retorno para a chave `['cartoes']`,
+  consumido pelas duas telas.
+- **Arquivos alterados:** `mobile/app/(app)/more/contas-fixas.tsx`,
+  `mobile/src/components/NovaTransacaoModal.tsx`.
+- **Testes/validacoes executadas:** `mobile/src/__tests__/cacheCartoesCompartilhado.test.tsx`
+  (novo, regressão: garante mesma `queryFn` para a mesma chave nas duas telas); suíte mobile
+  completa relatada pela sessão (50 suítes / 584 testes, 0 falhas).
+- **Resultado:** PASS
+- **Ressalvas:** cobre só as duas telas conhecidas hoje; uma terceira tela que reuse `['cartoes']`
+  com `queryFn` divergente não é pega automaticamente.
+- **Commit:** `cec09af`
+
+---
+
+## BUG-0104 — Assinatura de cartão era projetada em dobro no saldo futuro
+
+- **Problema relacionado:** PROB-0098
+- **Data:** 2026-09-02
+- **Area:** backend
+- **Sintoma:** `GET /api/v1/dashboard/projecao` (consumido pela Visão financeira do mobile e pelo
+  Dashboard web) somava a mesma assinatura de cartão duas vezes: uma em `totalContasFixas` (via
+  `somarRecorrenciasNoMes`, que somava toda `ContaFixa` ativa sem olhar o destino) e outra em
+  `totalFaturas` (a cobrança já materializada como `FaturaLancamento`), deixando o `saldoFinal`
+  projetado pessimista em 1x o valor de cada assinatura de cartão.
+- **Causa raiz:** confirmada — `somarRecorrenciasNoMes` não distinguia destino caixa de destino
+  cartão. Uma correção intermediária no mesmo dia (`ea78e9e`) removeu a assinatura de cartão de
+  `totalContasFixas`, mas como a fatura só é materializada quando a cobrança de fato acontece,
+  meses futuros ficaram sem nenhuma fatura para somar e a assinatura sumiu inteira da projeção — o
+  saldo passou de pessimista a cego.
+- **Correcao aplicada:** reclassificação em vez de filtro (`e514257`) — a cobrança futura de
+  cartão entra em `totalFaturas` no mês em que vence a fatura que a contém
+  (`FaturaDatas.competencia` + vencimento, ADR-0010); ocorrência anterior a
+  `dataProximoVencimento` já foi cobrada e já está numa fatura materializada, então é pulada — é o
+  que impede a dobra de voltar.
+- **Arquivos alterados:**
+  `backend/src/main/java/com/gestor/financeiro/service/ProjecaoService.java`,
+  `backend/src/main/java/com/gestor/financeiro/repository/ContaFixaRepository.java` (removida a
+  query órfã `somarPlanejadoNoPeriodo`, que reintroduziria a mesma dobra se algum dia fosse
+  ligada).
+- **Testes/validacoes executadas:** `ProjecaoServiceTest` (ampliado), `CompromissosServiceTest`
+  (novo teste de regressão confirmando que Compromissos não tem a mesma dobra — soma só
+  FATURA/PARCELA e a ocorrência já cobrada sai de PREVISTO).
+- **Resultado:** PASS
+- **Ressalvas:** nenhuma.
+- **Commit:** `ea78e9e` (correção parcial), `e514257` (correção completa)
+
+---
+
 ## BUG-0103 — Migration V41 abortava com cartão legado sem dia de fechamento/vencimento
 
 - **Data:** 2026-08-29

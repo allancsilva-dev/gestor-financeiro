@@ -2245,7 +2245,16 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   cobrindo o cálculo de próximo vencimento e paridade mobile.
 - **Risco se ficar pendente:** qualquer assinatura com cobrança não-mensal continua sem caminho de
   cadastro (mesmo sintoma de origem do PROB-0098, só que para outra periodicidade).
-- **Status:** ABERTO
+- **Status:** FECHADO (2026-09-02/04) — migration `V72` (commit `3ee1601`) introduziu
+  `FrequenciaRecorrencia` SEMANAL..ANUAL; migration `V73__ancora_para_toda_frequencia.sql`
+  (working tree, não commitada) soltou `data_ancora` para toda frequência exceto MENSAL, deixando
+  a série sair da âncora e o usuário escolher o mês do aniversário (ex.: "todo 15 de março"). No
+  mobile, `SeletorDeFrequencia` (grade `flexWrap`, novo componente
+  `mobile/src/components/ui/SeletorDeFrequencia.tsx`) mostra as 7 opções sem rolar nas duas telas
+  (criação e edição), e o campo "Primeira cobrança" vale para toda frequência não-mensal.
+  Verificado em runtime no simulador iPhone 17 Pro contra backend real (Postgres): anual com
+  âncora 15/03/2026 mostrou "Entra na fatura do Itaú que vence em 28/03/2027" e card "todo dia 15
+  de março"; editar só o nome preservou âncora e vencimento (ver BUG-0106).
 
 ---
 
@@ -2354,7 +2363,8 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
 - **Risco se ficar pendente:** usuário só descobre o estouro de limite quando o cartão físico é
   recusado ou ao abrir a fatura — a decisão de produto de "avisar" fica só metade implementada
   (lançar sim, avisar não).
-- **Status:** ABERTO
+- **Status:** FECHADO (2026-09-02, commit `6fa53c0` — "avise quando a cobrança estoura o limite do
+  cartão"). Aviso entregue em 3 canais (in-app, conforme `NotificacaoService`, e reforço na tela).
 
 ---
 
@@ -2372,7 +2382,10 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   (`ContaFixa`) no SPA passa a expor o seletor de destino (carteira/cartão), igual ao mobile.
 - **Risco se ficar pendente:** usuários do SPA continuam sem acesso à funcionalidade de assinatura no
   cartão — risco baixo hoje porque o produto é mobile-first por decisão do dono.
-- **Status:** ABERTO
+- **Status:** ABERTO — **atualização 2026-09-04:** a entrega de frequências V72/V73 (ver
+  BACKLOG-0120, fechado) e o ciclo de vida completo da assinatura no mobile (abas Todas/
+  Assinaturas/Canceladas, Cancelar, Reativar, rótulo "Concluída" — ver BUG-0104 a BUG-0111) também
+  foram mobile+backend apenas, ampliando a defasagem do web nesta área.
 
 ## BACKLOG-0127 — Runbook de rotação da chave de cifra do Open Finance
 
@@ -2421,4 +2434,129 @@ Todo item deve ser resolvido pela causa raiz, com desenho coerente com a arquite
   quando um código do enum não tem rótulo no mobile.
 - **Risco se ficar pendente:** cada código novo tem uma janela em que o titular vê `SCREAMING_SNAKE`
   na tela.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0130 — Precedência de mensagem quando categoria E destino são inválidos no mesmo PUT de `atualizar`
+
+- **Titulo:** `ContaFixaService.atualizar` não tem teste que fixe qual validação vence quando dois
+  campos são inválidos ao mesmo tempo
+- **Prioridade:** P3
+- **Área:** backend
+- **Motivo:** correção de BUG-0109 (PROB-0098, 2026-09-04) moveu `resolverDestino` para rodar antes
+  da resolução de categoria em `atualizar`. Se o cliente mandar categoria E destino inválidos na
+  mesma requisição, isso muda **qual mensagem** de erro vence — o `code`/status HTTP do envelope
+  não muda (continua 4xx apropriado a cada validação), só o texto. Não há teste fixando essa
+  precedência.
+- **Dependências:** nenhuma.
+- **Critério de aceite:** teste que fixa qual validação vence quando categoria e destino são
+  inválidos ao mesmo tempo em `atualizar`, documentando o comportamento esperado.
+- **Risco se ficar pendente:** comportamento não documentado pode mudar sem ninguém perceber numa
+  refatoração futura de `ContaFixaService.atualizar`.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0131 — Abas de `contas-fixas.tsx` sem `accessibilityRole="tab"`
+
+- **Titulo:** Abas Todas/Assinaturas/Canceladas usam `Chip` genérico, sem semântica de aba para
+  leitor de tela
+- **Prioridade:** P3
+- **Área:** mobile
+- **Motivo:** o ciclo de vida da assinatura entregue em 2026-09-04 (BUG-0104 a BUG-0111,
+  BACKLOG-0120 fechado) adicionou três abas em `mobile/app/(app)/more/contas-fixas.tsx`
+  implementadas com o componente `Chip` já existente, sem `accessibilityRole="tab"` — leitor de
+  tela anuncia só o rótulo do chip, não o papel de aba nem o estado selecionado.
+- **Dependências:** nenhuma.
+- **Critério de aceite:** `Chip` usado como aba expõe `accessibilityRole="tab"` e
+  `accessibilityState.selected`, verificado por teste ou por VoiceOver/TalkBack real.
+- **Risco se ficar pendente:** usuário de leitor de tela não percebe que está navegando entre abas
+  na tela de Recorrências.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0132 — `contaFixaService.listar` continua com `size=20` fixo (aba Canceladas sem paginação real)
+
+- **Titulo:** Listagem de recorrências (ativas e canceladas) não pagina de fato no mobile
+- **Prioridade:** P3
+- **Área:** mobile
+- **Motivo:** a nova aba Canceladas (2026-09-04, BUG-0104 a BUG-0111) reusa
+  `contaFixaService.listar({ ativo: false })`, que mantém `size=20` fixo (pré-existente); quem
+  tiver mais de 20 recorrências canceladas não vê o restante — não há paginação nem "carregar
+  mais" em nenhuma das duas listagens (Todas/Assinaturas ou Canceladas).
+- **Dependências:** nenhuma.
+- **Critério de aceite:** a listagem de recorrências (e a aba Canceladas em particular) pagina de
+  fato, ou expõe algum mecanismo de "carregar mais" além dos 20 primeiros registros.
+- **Risco se ficar pendente:** usuário com histórico extenso de cancelamentos não encontra uma
+  recorrência antiga para reativar.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0133 — Distinguir "cancelada" de "concluída" de verdade precisa de coluna de motivo em `contas_fixas`
+
+- **Titulo:** `ativo=false` é sobrecarregado entre cancelamento manual e fim natural de ciclo
+- **Prioridade:** P2
+- **Área:** backend, banco
+- **Motivo:** hoje `ativo=false` cobre tanto cancelamento manual (`ContaFixaService`, endpoint
+  `DELETE`) quanto o fim natural do ciclo de uma recorrência de ocorrência única
+  (`avancarOcorrencia` marca `ativo=false` + `PAGO`). A correção de BUG-0111 (2026-09-04) e a UI
+  mobile inferem "Concluída" pela combinação `recorrente=false && status=PAGO`, o que funciona
+  hoje mas não é uma distinção de primeira classe — é decisão do dono do produto travada nesta
+  sessão: "separar de verdade exigiria uma coluna de motivo no backend, deixado para depois".
+- **Dependências:** decisão de produto sobre o vocabulário (ex.: coluna `motivo_encerramento` enum
+  CANCELADA/CONCLUIDA); migration nova.
+- **Critério de aceite:** `contas_fixas` ganha uma coluna que registra explicitamente o motivo de
+  `ativo=false`, e a inferência atual (`recorrente=false && status=PAGO`) é substituída pela
+  leitura direta dessa coluna, tanto no backend (`reativar`) quanto na UI mobile.
+- **Risco se ficar pendente:** qualquer novo caminho que desative uma `ContaFixa` sem passar pelos
+  dois fluxos conhecidos hoje (cancelar, avançar ocorrência única) pode ser mal classificado pela
+  UI como "Cancelada" ou "Concluída".
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0134 — Sem checagem de que o backend em execução corresponde ao código atual antes de verificação em runtime
+
+- **Titulo:** Nenhum passo/script confirma a versão do artefato em execução antes de uma rodada de
+  verificação em runtime
+- **Prioridade:** P3
+- **Área:** infra, documentacao
+- **Motivo:** PROB-0100 (2026-09-04) — a primeira rodada de verificação em runtime desta sessão
+  correu contra uma build V72 antiga do backend, mascarando os bugs 4a/4b/4c (BUG-0109, BUG-0110,
+  BUG-0111) que só existiam no código novo (V73). Só depois de recompilar/reiniciar o backend os
+  bugs apareceram.
+- **Dependências:** nenhuma técnica; decisão de processo/tooling.
+- **Critério de aceite:** existe um passo documentado (ou script) que, antes de qualquer
+  verificação de runtime, confirma que o backend em execução corresponde ao commit/working tree
+  atual (ex.: checar versão Flyway ativa vs. migrations presentes no working tree, ou hash de
+  build exposto num endpoint de health/info).
+- **Risco se ficar pendente:** repetição do mesmo falso-negativo em sessões futuras — bugs reais
+  não aparecem porque o binário testado não é o binário atual.
+- **Status:** ABERTO
+
+---
+
+## BACKLOG-0135 — IDs duplicados em `docs/BUGFIX_LOG.md` (BUG-0100, BUG-0101, BUG-0102 aparecem duas vezes com conteúdos diferentes)
+
+- **Titulo:** Limpeza de documentação — renumerar entradas duplicadas do bugfix log
+- **Prioridade:** P3
+- **Área:** documentacao
+- **Motivo:** achado ao buscar o próximo ID livre nesta sessão de `docs-reporter` (2026-09-04). O
+  arquivo tem um bloco perto do topo (entradas "Migration V41 abortava...", "App pedia permissão de
+  notificação...", "Assistente respondia fatura...", "Reenviar o mesmo arquivo...") usando os IDs
+  BUG-0103/0102/0101/0100, que cobrem assuntos completamente diferentes dos BUG-0100/0101/0102 já
+  existentes mais abaixo no mesmo arquivo (ligados a PROB-0098: `carteiraId` desviando cobrança,
+  corrida no unique de `execucoes_recorrencia`, exclusão de cartão não desativando assinaturas).
+  Aparentemente uma sessão anterior de `docs-reporter` escolheu os próximos IDs olhando só o topo
+  do arquivo, sem ver que o restante do arquivo já tinha entradas mais recentes cronologicamente
+  mas com números menores.
+- **Dependências:** nenhuma técnica; é limpeza de documentação, exige cuidado para não perder
+  histórico (renumerar preservando o conteúdo original de cada entrada).
+- **Critério de aceite:** cada ID `BUG-XXXX` aparece exatamente uma vez em `docs/BUGFIX_LOG.md`;
+  entradas duplicadas são renumeradas com um ID livre, preservando todo o conteúdo original.
+- **Risco se ficar pendente:** referência cruzada a um ID como "BUG-0101" é ambígua sem contexto
+  adicional (linha/assunto), porque existem duas entradas diferentes com esse mesmo ID.
 - **Status:** ABERTO

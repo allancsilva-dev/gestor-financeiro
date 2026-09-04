@@ -2523,3 +2523,76 @@ esta evidência histórica não fecha o problema;
   mobile-first já registrada). Ver BACKLOG-0120 a BACKLOG-0126.
 - **Proximo passo:** priorizar os itens de BACKLOG-0120 a BACKLOG-0126 conforme demanda de produto;
   nenhuma ação bloqueante pendente para esta entrega em si.
+
+---
+
+## PROB-0099 — Crash no cold start: `['cartoes']` compartilhada entre telas com `queryFn` de formatos diferentes
+
+- **ID:** PROB-0099
+- **Titulo:** Tela de Recorrências e `NovaTransacaoModal` liam cartões pela mesma chave React Query
+  `['cartoes']`, mas com `queryFn` divergentes (um formato `PagedResponse`, outro array puro)
+- **Data:** 2026-09-03
+- **Origem:** revisão/uso do app durante a sessão de recorrência de cartão (continuação de PROB-0098)
+- **Severidade:** HIGH
+- **Status:** FECHADO (2026-09-03, commit `cec09af`)
+- **Area:** mobile
+- **Sintoma:** quem abrisse a tela de Recorrências e depois o `NovaTransacaoModal` (ou na ordem
+  inversa) recebia do cache React Query um objeto com forma inesperada e o app quebrava — crash em
+  runtime, sem perda de dados.
+- **Causa raiz:** confirmada — as duas telas usavam a chave `['cartoes']`, cada uma com sua própria
+  `queryFn`: uma resolvia `PagedResponse<Cartao>`, a outra um array puro de `Cartao`. React Query
+  cacheia por chave e não valida a forma do dado entre diferentes consumidores da mesma chave —
+  quem lia por último "vencia" o formato para os dois.
+- **Impacto tecnico:** qualquer sequência de navegação que tocasse as duas telas quebrava o app
+  para o usuário final; sintoma reproduzível de forma determinística pela ordem de navegação.
+- **Arquivos ou modulos relacionados:** `mobile/app/(app)/more/contas-fixas.tsx`,
+  `mobile/src/components/NovaTransacaoModal.tsx`, `mobile/src/__tests__/cacheCartoesCompartilhado.test.tsx`.
+- **Solucao proposta:** um único formato de retorno para a chave `['cartoes']`, compartilhado pelas
+  duas telas que a consultam.
+- **Solucao aplicada:** unificado o formato de retorno das duas `queryFn`; novo teste de regressão
+  `cacheCartoesCompartilhado.test.tsx` garante que ambas as telas usam a mesma `queryFn` para a
+  mesma `queryKey`.
+- **Evidencias ou comandos usados:** commit `cec09af`; suíte mobile completa relatada pela sessão
+  (ver evidência consolidada em PROB-0098/BUG-0104 a BUG-0111).
+- **Riscos residuais:** o teste de regressão cobre as duas telas conhecidas hoje; uma terceira tela
+  futura que reutilize `['cartoes']` com `queryFn` divergente não é pega automaticamente, a menos
+  que também seja incluída nesse mesmo teste.
+- **Proximo passo:** nenhuma ação bloqueante pendente. Considerar extrair um hook único (ex.:
+  `useCartoes`) que centralize a `queryFn` para eliminar esta classe de erro por completo — não
+  implementado nesta sessão (ver BACKLOG, se priorizado).
+
+---
+
+## PROB-0100 — Verificação em runtime rodou contra build antiga do backend (V72), mascarando as regressões da própria sessão
+
+- **ID:** PROB-0100
+- **Titulo:** Backend que estava no ar na porta 8081 para a verificação em runtime era uma build
+  V72 antiga, sem as correções de `ContaFixaService`/migration V73 feitas nesta sessão
+- **Data:** 2026-09-04
+- **Origem:** implementação/verificação (achado ao investigar por que a primeira rodada de
+  verificação não reproduzia os sintomas esperados na edição de assinatura de cartão)
+- **Severidade:** MEDIUM
+- **Status:** FECHADO (recompilado e reiniciado o backend nesta sessão)
+- **Area:** infra, documentacao
+- **Sintoma:** o backend local (porta 8081, conforme convenção registrada em memória do usuário —
+  8080 é ocupada pelo BlueStacks) continuava servindo uma build anterior (schema em Flyway V72),
+  sem as alterações de código desta sessão (V73 + correções em `ContaFixaService`); qualquer
+  verificação de runtime contra ele não refletia o estado atual do working tree.
+- **Causa raiz:** confirmada — o processo do backend não tinha sido recompilado/reiniciado depois
+  das alterações de código feitas nesta sessão; não existe hoje nenhum mecanismo automático que
+  detecte ou avise que o binário em execução está desatualizado em relação ao working tree.
+- **Impacto tecnico:** a primeira rodada de verificação em runtime deu falso-negativo — não
+  encontrou os bugs 4a/4b/4c (ver BUG-0109, BUG-0110, BUG-0111), que só existiam no código novo.
+  Os bugs só foram descobertos depois de recompilar e reiniciar o backend.
+- **Arquivos ou modulos relacionados:** nenhum arquivo de aplicação — achado operacional/processo.
+- **Solucao proposta:** antes de qualquer verificação de runtime, confirmar que o binário em
+  execução corresponde ao commit/working tree atual (ex.: checar a versão Flyway ativa contra as
+  migrations presentes no working tree).
+- **Solucao aplicada:** recompilação e reinício manual do backend nesta sessão; nenhuma automação
+  adicional foi criada.
+- **Evidencias ou comandos usados:** discrepância observada entre a versão Flyway ativa (v72) e o
+  head do working tree (migration V73 pendente de aplicar); reinício do backend expôs BUG-0109,
+  BUG-0110 e BUG-0111 em runtime.
+- **Riscos residuais:** nada impede a mesma situação de se repetir em sessões futuras — não há
+  checagem automática de "build em execução == código atual" no fluxo de verificação local.
+- **Proximo passo:** ver BACKLOG-0134 (checagem de build antes de verificação em runtime).
